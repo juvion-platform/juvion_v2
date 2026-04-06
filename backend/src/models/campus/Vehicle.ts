@@ -1,0 +1,5 @@
+import { Schema, model, Document } from 'mongoose';
+export interface IVehicle extends Document { collegeId: Schema.Types.ObjectId; vehicleNumber: string; type: string; make: string; vehicleModel: string; capacity: number; fuelType: string; driverId?: Schema.Types.ObjectId; insuranceExpiry?: Date; fitnessExpiry?: Date; status: string; }
+const schema = new Schema<IVehicle>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, vehicleNumber: { type: String, required: true }, type: { type: String, enum: ['bus', 'van', 'car', 'ambulance', 'utility'], required: true }, make: String, vehicleModel: String, capacity: { type: Number, required: true }, fuelType: { type: String, enum: ['diesel', 'petrol', 'electric', 'cng'], required: true }, driverId: { type: Schema.Types.ObjectId, ref: 'Staff' }, insuranceExpiry: Date, fitnessExpiry: Date, status: { type: String, enum: ['active', 'maintenance', 'retired'], default: 'active' } }, { timestamps: true });
+schema.index({ collegeId: 1, vehicleNumber: 1 }, { unique: true });
+export const Vehicle = model<IVehicle>('Vehicle', schema);

@@ -1,0 +1,5 @@
+import { Schema, model, Document } from 'mongoose';
+export interface ICommittee extends Document { collegeId: Schema.Types.ObjectId; name: string; type: string; purpose: string; chairpersonId?: Schema.Types.ObjectId; members: { personId: Schema.Types.ObjectId; role: string }[]; formedDate: Date; isActive: boolean; }
+const schema = new Schema<ICommittee>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, name: { type: String, required: true }, type: { type: String, enum: ['statutory', 'academic', 'administrative', 'disciplinary', 'grievance', 'anti_ragging', 'icc', 'iqac', 'other'], required: true }, purpose: String, chairpersonId: { type: Schema.Types.ObjectId, ref: 'Person' }, members: [{ personId: { type: Schema.Types.ObjectId, ref: 'Person' }, role: String }], formedDate: { type: Date, required: true }, isActive: { type: Boolean, default: true } }, { timestamps: true });
+schema.index({ collegeId: 1, type: 1 });
+export const Committee = model<ICommittee>('Committee', schema);

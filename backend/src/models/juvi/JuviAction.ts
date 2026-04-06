@@ -1,0 +1,5 @@
+import { Schema, model, Document } from 'mongoose';
+export interface IJuviAction extends Document { collegeId: Schema.Types.ObjectId; conversationId: Schema.Types.ObjectId; actionType: string; module: string; entity: string; operation: string; payload: Record<string, any>; result?: Record<string, any>; status: string; executedAt: Date; }
+const schema = new Schema<IJuviAction>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, conversationId: { type: Schema.Types.ObjectId, ref: 'JuviConversation', required: true }, actionType: { type: String, enum: ['query', 'create', 'update', 'delete', 'navigate', 'report'], required: true }, module: { type: String, required: true }, entity: { type: String, required: true }, operation: { type: String, required: true }, payload: Schema.Types.Mixed, result: Schema.Types.Mixed, status: { type: String, enum: ['pending', 'executed', 'failed', 'rolled_back'], default: 'pending' }, executedAt: { type: Date, default: Date.now } }, { timestamps: true });
+schema.index({ collegeId: 1, conversationId: 1 });
+export const JuviAction = model<IJuviAction>('JuviAction', schema);

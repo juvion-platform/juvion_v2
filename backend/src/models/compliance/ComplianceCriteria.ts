@@ -1,0 +1,5 @@
+import { Schema, model, Document } from 'mongoose';
+export interface IComplianceCriteria extends Document { collegeId: Schema.Types.ObjectId; accreditationCycleId: Schema.Types.ObjectId; criterionNumber: string; title: string; maxScore: number; selfScore?: number; peerScore?: number; evidence: { description: string; fileUrl?: string }[]; status: string; }
+const schema = new Schema<IComplianceCriteria>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, accreditationCycleId: { type: Schema.Types.ObjectId, ref: 'AccreditationCycle', required: true }, criterionNumber: { type: String, required: true }, title: { type: String, required: true }, maxScore: { type: Number, required: true }, selfScore: Number, peerScore: Number, evidence: [{ description: String, fileUrl: String }], status: { type: String, enum: ['not_started', 'in_progress', 'submitted', 'reviewed'], default: 'not_started' } }, { timestamps: true });
+schema.index({ collegeId: 1, accreditationCycleId: 1, criterionNumber: 1 });
+export const ComplianceCriteria = model<IComplianceCriteria>('ComplianceCriteria', schema);

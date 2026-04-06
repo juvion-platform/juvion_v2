@@ -1,0 +1,5 @@
+import { Schema, model, Document } from 'mongoose';
+export interface IAnnouncement extends Document { collegeId: Schema.Types.ObjectId; title: string; content: string; category: string; priority: string; postedBy: Schema.Types.ObjectId; targetAudience: string; attachmentUrl?: string; isPinned: boolean; expiryDate?: Date; }
+const schema = new Schema<IAnnouncement>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, title: { type: String, required: true }, content: { type: String, required: true }, category: { type: String, enum: ['general', 'academic', 'exam', 'placement', 'event', 'hostel', 'sports', 'other'], required: true }, priority: { type: String, enum: ['low', 'normal', 'high', 'urgent'], default: 'normal' }, postedBy: { type: Schema.Types.ObjectId, ref: 'Person', required: true }, targetAudience: { type: String, enum: ['all', 'students', 'faculty', 'staff', 'parents'], required: true }, attachmentUrl: String, isPinned: { type: Boolean, default: false }, expiryDate: Date }, { timestamps: true });
+schema.index({ collegeId: 1, createdAt: -1 });
+export const Announcement = model<IAnnouncement>('Announcement', schema);

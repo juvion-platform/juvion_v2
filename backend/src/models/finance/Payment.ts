@@ -1,0 +1,25 @@
+import { Schema, model, Document } from 'mongoose';
+
+export interface IPayment extends Document {
+  collegeId: Schema.Types.ObjectId;
+  studentId: Schema.Types.ObjectId; receiptNumber: string; amount: number; paymentMode: string; transactionRef?: string; paymentDate: Date; allocations: { lineItemId: Schema.Types.ObjectId; amount: number }[]; status: string; collectedBy?: Schema.Types.ObjectId; remarks?: string;
+}
+
+const schema = new Schema<IPayment>({
+  collegeId: { type: Schema.Types.ObjectId, required: true, index: true },
+  studentId: { type: Schema.Types.ObjectId, ref: 'Student', required: true },
+  receiptNumber: { type: String, required: true },
+  amount: { type: Number, required: true },
+  paymentMode: { type: String, enum: ['cash', 'cheque', 'dd', 'online', 'upi', 'neft', 'rtgs', 'card'], required: true },
+  transactionRef: String,
+  paymentDate: { type: Date, default: Date.now },
+  allocations: [{ lineItemId: { type: Schema.Types.ObjectId, ref: 'FeeLineItem' }, amount: Number }],
+  status: { type: String, enum: ['success', 'pending', 'failed', 'reversed'], default: 'success' },
+  collectedBy: { type: Schema.Types.ObjectId, ref: 'Person' },
+  remarks: String,
+}, { timestamps: true });
+
+schema.index({ collegeId: 1, receiptNumber: 1 }, { unique: true });
+schema.index({ collegeId: 1, studentId: 1 });
+
+export const Payment = model<IPayment>('Payment', schema);

@@ -1,0 +1,5 @@
+import { Schema, model, Document } from 'mongoose';
+export interface IRTIRequest extends Document { collegeId: Schema.Types.ObjectId; applicantName: string; applicationDate: Date; subject: string; description: string; feeReceived: number; assignedTo?: Schema.Types.ObjectId; responseDate?: Date; response?: string; appealFiled: boolean; status: string; }
+const schema = new Schema<IRTIRequest>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, applicantName: { type: String, required: true }, applicationDate: { type: Date, required: true }, subject: { type: String, required: true }, description: String, feeReceived: { type: Number, default: 0 }, assignedTo: { type: Schema.Types.ObjectId, ref: 'Person' }, responseDate: Date, response: String, appealFiled: { type: Boolean, default: false }, status: { type: String, enum: ['received', 'processing', 'responded', 'appeal', 'closed'], default: 'received' } }, { timestamps: true });
+schema.index({ collegeId: 1, status: 1 });
+export const RTIRequest = model<IRTIRequest>('RTIRequest', schema);

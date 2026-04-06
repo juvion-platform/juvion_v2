@@ -1,0 +1,5 @@
+import { Schema, model, Document } from 'mongoose';
+export interface ISecurityIncident extends Document { collegeId: Schema.Types.ObjectId; reportedBy: Schema.Types.ObjectId; incidentDate: Date; location: string; type: string; description: string; severity: string; actionTaken?: string; status: string; }
+const schema = new Schema<ISecurityIncident>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, reportedBy: { type: Schema.Types.ObjectId, ref: 'Person', required: true }, incidentDate: { type: Date, required: true }, location: { type: String, required: true }, type: { type: String, enum: ['theft', 'vandalism', 'trespassing', 'fire', 'accident', 'other'], required: true }, description: { type: String, required: true }, severity: { type: String, enum: ['low', 'medium', 'high', 'critical'], required: true }, actionTaken: String, status: { type: String, enum: ['reported', 'investigating', 'resolved', 'closed'], default: 'reported' } }, { timestamps: true });
+schema.index({ collegeId: 1, status: 1 });
+export const SecurityIncident = model<ISecurityIncident>('SecurityIncident', schema);

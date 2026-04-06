@@ -1,0 +1,5 @@
+import { Schema, model, Document } from 'mongoose';
+export interface IAuditFinding extends Document { collegeId: Schema.Types.ObjectId; auditType: string; auditorName: string; auditDate: Date; finding: string; severity: string; department?: string; correctionAction?: string; correctionDeadline?: Date; status: string; }
+const schema = new Schema<IAuditFinding>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, auditType: { type: String, enum: ['internal', 'external', 'naac', 'nba', 'iso', 'financial'], required: true }, auditorName: { type: String, required: true }, auditDate: { type: Date, required: true }, finding: { type: String, required: true }, severity: { type: String, enum: ['observation', 'minor_nc', 'major_nc', 'critical'], required: true }, department: String, correctionAction: String, correctionDeadline: Date, status: { type: String, enum: ['open', 'action_taken', 'verified', 'closed'], default: 'open' } }, { timestamps: true });
+schema.index({ collegeId: 1, status: 1 });
+export const AuditFinding = model<IAuditFinding>('AuditFinding', schema);

@@ -1,0 +1,5 @@
+import { Schema, model, Document } from 'mongoose';
+export interface ILegalCase extends Document { collegeId: Schema.Types.ObjectId; caseNumber: string; courtName: string; caseType: string; filedDate: Date; opposingParty: string; description: string; lawyerName?: string; nextHearingDate?: Date; status: string; outcome?: string; }
+const schema = new Schema<ILegalCase>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, caseNumber: { type: String, required: true }, courtName: { type: String, required: true }, caseType: { type: String, enum: ['civil', 'criminal', 'consumer', 'labour', 'writ', 'other'], required: true }, filedDate: { type: Date, required: true }, opposingParty: { type: String, required: true }, description: String, lawyerName: String, nextHearingDate: Date, status: { type: String, enum: ['active', 'hearing', 'stayed', 'disposed', 'closed'], default: 'active' }, outcome: String }, { timestamps: true });
+schema.index({ collegeId: 1, status: 1 });
+export const LegalCase = model<ILegalCase>('LegalCase', schema);

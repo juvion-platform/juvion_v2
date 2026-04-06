@@ -1,0 +1,5 @@
+import { Schema, model, Document } from 'mongoose';
+export interface IGreenInitiative extends Document { collegeId: Schema.Types.ObjectId; name: string; type: string; description: string; startDate: Date; coordinatorId?: Schema.Types.ObjectId; metrics?: Record<string, any>; status: string; }
+const schema = new Schema<IGreenInitiative>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, name: { type: String, required: true }, type: { type: String, enum: ['solar', 'rainwater_harvesting', 'waste_management', 'tree_plantation', 'energy_saving', 'other'], required: true }, description: String, startDate: { type: Date, required: true }, coordinatorId: { type: Schema.Types.ObjectId, ref: 'Person' }, metrics: Schema.Types.Mixed, status: { type: String, enum: ['planned', 'active', 'completed'], default: 'planned' } }, { timestamps: true });
+schema.index({ collegeId: 1 });
+export const GreenInitiative = model<IGreenInitiative>('GreenInitiative', schema);

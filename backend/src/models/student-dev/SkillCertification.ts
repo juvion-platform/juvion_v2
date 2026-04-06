@@ -1,0 +1,5 @@
+import { Schema, model, Document } from 'mongoose';
+export interface ISkillCertification extends Document { collegeId: Schema.Types.ObjectId; studentId: Schema.Types.ObjectId; certificationName: string; provider: string; completedDate: Date; certificateUrl?: string; credentialId?: string; validUntil?: Date; }
+const schema = new Schema<ISkillCertification>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, studentId: { type: Schema.Types.ObjectId, ref: 'Student', required: true }, certificationName: { type: String, required: true }, provider: { type: String, required: true }, completedDate: { type: Date, required: true }, certificateUrl: String, credentialId: String, validUntil: Date }, { timestamps: true });
+schema.index({ collegeId: 1, studentId: 1 });
+export const SkillCertification = model<ISkillCertification>('SkillCertification', schema);

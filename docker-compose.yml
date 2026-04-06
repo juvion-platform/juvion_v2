@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7
+    ports: ['27017:27017']
+    volumes: [juvion_mongo_data:/data/db]
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports: ['6379:6379']
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    ports: ['3001:3001']
+    env_file: .env
+    depends_on: [mongodb, redis]
+    volumes: ['./backend/src:/app/src']
+    restart: unless-stopped
+
+  admin-portal:
+    build: ./admin-portal
+    ports: ['5173:5173']
+    depends_on: [backend]
+    volumes: ['./admin-portal/src:/app/src']
+    restart: unless-stopped
+
+volumes:
+  juvion_mongo_data:

@@ -1,0 +1,5 @@
+import { Schema, model, Document } from 'mongoose';
+export interface IAchievement extends Document { collegeId: Schema.Types.ObjectId; studentId: Schema.Types.ObjectId; title: string; category: string; level: string; date: Date; description?: string; certificateUrl?: string; verifiedBy?: Schema.Types.ObjectId; }
+const schema = new Schema<IAchievement>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, studentId: { type: Schema.Types.ObjectId, ref: 'Student', required: true }, title: { type: String, required: true }, category: { type: String, enum: ['academic', 'technical', 'cultural', 'sports', 'social', 'entrepreneurship', 'other'], required: true }, level: { type: String, enum: ['college', 'university', 'state', 'national', 'international'], required: true }, date: { type: Date, required: true }, description: String, certificateUrl: String, verifiedBy: { type: Schema.Types.ObjectId, ref: 'Person' } }, { timestamps: true });
+schema.index({ collegeId: 1, studentId: 1 });
+export const Achievement = model<IAchievement>('Achievement', schema);

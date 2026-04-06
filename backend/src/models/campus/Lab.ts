@@ -1,0 +1,5 @@
+import { Schema, model, Document } from 'mongoose';
+export interface ILab extends Document { collegeId: Schema.Types.ObjectId; roomId: Schema.Types.ObjectId; name: string; departmentId: Schema.Types.ObjectId; labInChargeId?: Schema.Types.ObjectId; equipment: { name: string; quantity: number; workingCount: number }[]; capacity: number; isActive: boolean; }
+const schema = new Schema<ILab>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, roomId: { type: Schema.Types.ObjectId, ref: 'Room', required: true }, name: { type: String, required: true }, departmentId: { type: Schema.Types.ObjectId, ref: 'Department', required: true }, labInChargeId: { type: Schema.Types.ObjectId, ref: 'Faculty' }, equipment: [{ name: String, quantity: Number, workingCount: Number }], capacity: { type: Number, required: true }, isActive: { type: Boolean, default: true } }, { timestamps: true });
+schema.index({ collegeId: 1, departmentId: 1 });
+export const Lab = model<ILab>('Lab', schema);

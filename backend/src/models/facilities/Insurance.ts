@@ -1,0 +1,5 @@
+import { Schema, model, Document } from 'mongoose';
+export interface IInsurance extends Document { collegeId: Schema.Types.ObjectId; policyNumber: string; provider: string; type: string; coverageAmount: number; premium: number; startDate: Date; endDate: Date; coveredAssets?: string; status: string; }
+const schema = new Schema<IInsurance>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, policyNumber: { type: String, required: true }, provider: { type: String, required: true }, type: { type: String, enum: ['property', 'vehicle', 'equipment', 'liability', 'fire', 'student_group'], required: true }, coverageAmount: { type: Number, required: true }, premium: { type: Number, required: true }, startDate: { type: Date, required: true }, endDate: { type: Date, required: true }, coveredAssets: String, status: { type: String, enum: ['active', 'expired', 'claimed', 'cancelled'], default: 'active' } }, { timestamps: true });
+schema.index({ collegeId: 1, policyNumber: 1 }, { unique: true });
+export const Insurance = model<IInsurance>('Insurance', schema);

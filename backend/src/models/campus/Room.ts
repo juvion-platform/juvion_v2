@@ -1,0 +1,5 @@
+import { Schema, model, Document } from 'mongoose';
+export interface IRoom extends Document { collegeId: Schema.Types.ObjectId; buildingId: Schema.Types.ObjectId; roomNumber: string; floor: number; type: string; capacity: number; hasProjector: boolean; hasAC: boolean; status: string; }
+const schema = new Schema<IRoom>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, buildingId: { type: Schema.Types.ObjectId, ref: 'Building', required: true }, roomNumber: { type: String, required: true }, floor: { type: Number, required: true }, type: { type: String, enum: ['classroom', 'lab', 'seminar_hall', 'conference', 'office', 'workshop', 'auditorium'], required: true }, capacity: { type: Number, required: true }, hasProjector: { type: Boolean, default: false }, hasAC: { type: Boolean, default: false }, status: { type: String, enum: ['available', 'occupied', 'maintenance', 'reserved'], default: 'available' } }, { timestamps: true });
+schema.index({ collegeId: 1, buildingId: 1, roomNumber: 1 }, { unique: true });
+export const Room = model<IRoom>('Room', schema);

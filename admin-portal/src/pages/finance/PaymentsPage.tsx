@@ -1,0 +1,136 @@
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { listPayments, createPayment, updatePayment, deletePayment } from '../../services/finance';
+import { listStudents } from '../../services/people';
+import DataTable from '../../components/ui/DataTable';
+import Badge from '../../components/ui/Badge';
+import Modal from '../../components/ui/Modal';
+import { Plus, Pencil, Trash2, ExternalLink } from 'lucide-react';
+import { Link } from 'react-router-dom';
+
+const PAYMENT_MODES = ['cash', 'cheque', 'dd', 'online', 'upi', 'neft', 'rtgs', 'card'] as const;
+const STATUSES = ['success', 'pending', 'failed', 'reversed'] as const;
+const STATUS_COLOR: Record<string, string> = { success: 'success', pending: 'warning', failed: 'danger', reversed: 'info' };
+const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none";
+const lbl = "block text-sm font-medium text-gray-700 mb-1";
+const manageLink = "inline-flex items-center gap-0.5 text-xs text-primary-500 hover:text-primary-700 font-medium ml-1";
+
+export default function PaymentsPage() {
+  const qc = useQueryClient();
+  const [page, setPage] = useState(1);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<any>(null);
+  const [form, setForm] = useState({ studentId: '', receiptNumber: '', amount: '', paymentMode: 'cash', transactionRef: '', paymentDate: '', status: 'pending', remarks: '' });
+
+  const { data, isLoading } = useQuery({ queryKey: ['payments', page], queryFn: () => listPayments(page, 20) });
+  const { data: students } = useQuery({ queryKey: ['students-all'], queryFn: () => listStudents(1, 100) });
+
+  const createMut = useMutation({ mutationFn: createPayment, onSuccess: () => { qc.invalidateQueries({ queryKey: ['payments'] }); closeModal(); } });
+  const updateMut = useMutation({ mutationFn: ({ id, data }: any) => updatePayment(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['payments'] }); closeModal(); } });
+  const deleteMut = useMutation({ mutationFn: deletePayment, onSuccess: () => { qc.invalidateQueries({ queryKey: ['payments'] }); } });
+
+  function openCreate() {
+    setEditing(null);
+    setForm({ studentId: '', receiptNumber: '', amount: '', paymentMode: 'cash', transactionRef: '', paymentDate: '', status: 'pending', remarks: '' });
+    setModalOpen(true);
+  }
+  function openEdit(row: any) {
+    setEditing(row);
+    setForm({
+      studentId: row.studentId?._id || row.studentId || '',
+      receiptNumber: row.receiptNumber || '',
+      amount: String(row.amount || ''),
+      paymentMode: row.paymentMode || 'cash',
+      transactionRef: row.transactionRef || '',
+      paymentDate: row.paymentDate ? row.paymentDate.slice(0, 10) : '',
+      status: row.status || 'pending',
+      remarks: row.remarks || '',
+    });
+    setModalOpen(true);
+  }
+  function closeModal() { setModalOpen(false); setEditing(null); }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const payload: any = { ...form, amount: Number(form.amount) };
+    if (!payload.transactionRef) delete payload.transactionRef;
+    if (!payload.remarks) delete payload.remarks;
+    if (editing) updateMut.mutate({ id: editing._id, data: payload });
+    else createMut.mutate(payload);
+  }
+
+  const columns = [
+    { key: 'studentId', label: 'Student', render: (r: any) => <span className="font-medium text-navy">{r.studentId?.name || r.studentId?.firstName || '—'}</span> },
+    { key: 'receiptNumber', label: 'Receipt #' },
+    { key: 'amount', label: 'Amount', render: (r: any) => `₹${Number(r.amount).toLocaleString()}` },
+    { key: 'paymentMode', label: 'Mode', render: (r: any) => <Badge variant="info">{r.paymentMode}</Badge> },
+    { key: 'paymentDate', label: 'Date', render: (r: any) => r.paymentDate ? new Date(r.paymentDate).toLocaleDateString() : '-' },
+    { key: 'status', label: 'Status', render: (r: any) => <Badge variant={STATUS_COLOR[r.status] || 'default'}>{r.status}</Badge> },
+    { key: 'actions', label: '', render: (r: any) => (
+      <div className="flex gap-1">
+        <button onClick={(e) => { e.stopPropagation(); openEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
+        <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this payment?')) deleteMut.mutate(r._id); }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
+      </div>
+    )},
+  ];
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-5">
+        <h2 className="text-xl font-bold text-navy">Payments</h2>
+        <button onClick={openCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700">
+          <Plus size={16} className="text-white" /> New Payment
+        </button>
+      </div>
+
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} />
+
+      {data && data.pages > 1 && (
+        <div className="flex items-center justify-center gap-2 mt-4">
+          <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Prev</button>
+          <span className="text-sm text-gray-500">Page {page} of {data.pages}</span>
+          <button disabled={page >= data.pages} onClick={() => setPage(p => p + 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Next</button>
+        </div>
+      )}
+
+      <Modal open={modalOpen} onClose={closeModal} title={editing ? 'Edit Payment' : 'New Payment'}>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={lbl}>Student * <Link to="/people" target="_blank" className={manageLink}>+ Manage <ExternalLink size={10} /></Link></label>
+              <select required value={form.studentId} onChange={e => setForm(f => ({ ...f, studentId: e.target.value }))} className={inp}>
+                <option value="">Select student</option>
+                {(students?.items || []).map((s: any) => (
+                  <option key={s._id} value={s._id}>
+                    {s.name || (s.firstName + ' ' + s.lastName) || s.rollNumber || s._id}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div><label className={lbl}>Receipt Number *</label><input required value={form.receiptNumber} onChange={e => setForm(f => ({ ...f, receiptNumber: e.target.value }))} className={inp} /></div>
+            <div><label className={lbl}>Amount *</label><input required type="number" min={0} value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} className={inp} /></div>
+            <div><label className={lbl}>Payment Mode *</label>
+              <select required value={form.paymentMode} onChange={e => setForm(f => ({ ...f, paymentMode: e.target.value }))} className={inp}>
+                {PAYMENT_MODES.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+            <div><label className={lbl}>Transaction Ref</label><input value={form.transactionRef} onChange={e => setForm(f => ({ ...f, transactionRef: e.target.value }))} className={inp} /></div>
+            <div><label className={lbl}>Payment Date *</label><input required type="date" value={form.paymentDate} onChange={e => setForm(f => ({ ...f, paymentDate: e.target.value }))} className={inp} /></div>
+            <div><label className={lbl}>Status *</label>
+              <select required value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className={inp}>
+                {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div><label className={lbl}>Remarks</label><input value={form.remarks} onChange={e => setForm(f => ({ ...f, remarks: e.target.value }))} className={inp} /></div>
+          </div>
+          <div className="flex justify-end gap-3 pt-2 border-t">
+            <button type="button" onClick={closeModal} className="px-4 py-2 border rounded-lg text-sm">Cancel</button>
+            <button type="submit" disabled={createMut.isPending || updateMut.isPending} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
+              {createMut.isPending || updateMut.isPending ? 'Saving...' : editing ? 'Update' : 'Create'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+    </div>
+  );
+}

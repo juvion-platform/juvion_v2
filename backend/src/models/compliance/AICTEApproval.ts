@@ -1,0 +1,5 @@
+import { Schema, model, Document } from 'mongoose';
+export interface IAICTEApproval extends Document { collegeId: Schema.Types.ObjectId; academicYearId: Schema.Types.ObjectId; applicationId?: string; approvalDate?: Date; approvedIntake: { programmeId: Schema.Types.ObjectId; branchId: Schema.Types.ObjectId; intake: number }[]; eoa?: string; status: string; }
+const schema = new Schema<IAICTEApproval>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, academicYearId: { type: Schema.Types.ObjectId, ref: 'AcademicYear', required: true }, applicationId: String, approvalDate: Date, approvedIntake: [{ programmeId: { type: Schema.Types.ObjectId, ref: 'Programme' }, branchId: { type: Schema.Types.ObjectId, ref: 'Branch' }, intake: Number }], eoa: String, status: { type: String, enum: ['applied', 'inspection', 'approved', 'conditional', 'rejected'], default: 'applied' } }, { timestamps: true });
+schema.index({ collegeId: 1, academicYearId: 1 });
+export const AICTEApproval = model<IAICTEApproval>('AICTEApproval', schema);

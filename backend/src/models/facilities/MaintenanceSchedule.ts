@@ -1,0 +1,5 @@
+import { Schema, model, Document } from 'mongoose';
+export interface IMaintenanceSchedule extends Document { collegeId: Schema.Types.ObjectId; assetId?: Schema.Types.ObjectId; facilityName: string; type: string; frequency: string; lastDoneDate?: Date; nextDueDate: Date; assignedTeam?: string; status: string; }
+const schema = new Schema<IMaintenanceSchedule>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, assetId: { type: Schema.Types.ObjectId, ref: 'Asset' }, facilityName: { type: String, required: true }, type: { type: String, enum: ['preventive', 'corrective', 'predictive'], required: true }, frequency: { type: String, enum: ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'], required: true }, lastDoneDate: Date, nextDueDate: { type: Date, required: true }, assignedTeam: String, status: { type: String, enum: ['scheduled', 'overdue', 'completed'], default: 'scheduled' } }, { timestamps: true });
+schema.index({ collegeId: 1, nextDueDate: 1 });
+export const MaintenanceSchedule = model<IMaintenanceSchedule>('MaintenanceSchedule', schema);

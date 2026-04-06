@@ -1,0 +1,5 @@
+import { Schema, model, Document } from 'mongoose';
+export interface IVisitorEntry extends Document { collegeId: Schema.Types.ObjectId; visitorName: string; phone: string; idType: string; idNumber: string; purpose: string; whomToMeet: string; department?: string; inTime: Date; outTime?: Date; vehicleNumber?: string; }
+const schema = new Schema<IVisitorEntry>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, visitorName: { type: String, required: true }, phone: { type: String, required: true }, idType: { type: String, enum: ['aadhaar', 'driving_license', 'voter_id', 'pan', 'other'], required: true }, idNumber: { type: String, required: true }, purpose: { type: String, required: true }, whomToMeet: { type: String, required: true }, department: String, inTime: { type: Date, default: Date.now }, outTime: Date, vehicleNumber: String }, { timestamps: true });
+schema.index({ collegeId: 1, inTime: -1 });
+export const VisitorEntry = model<IVisitorEntry>('VisitorEntry', schema);

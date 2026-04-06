@@ -1,0 +1,5 @@
+import { Schema, model, Document } from 'mongoose';
+export interface IAsset extends Document { collegeId: Schema.Types.ObjectId; assetId: string; name: string; category: string; departmentId?: Schema.Types.ObjectId; location: string; purchaseDate?: Date; purchaseCost?: number; currentValue?: number; vendor?: string; warrantyExpiry?: Date; status: string; }
+const schema = new Schema<IAsset>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, assetId: { type: String, required: true }, name: { type: String, required: true }, category: { type: String, enum: ['furniture', 'electronics', 'it_equipment', 'lab_equipment', 'vehicle', 'sports', 'other'], required: true }, departmentId: { type: Schema.Types.ObjectId, ref: 'Department' }, location: { type: String, required: true }, purchaseDate: Date, purchaseCost: Number, currentValue: Number, vendor: String, warrantyExpiry: Date, status: { type: String, enum: ['in_use', 'in_stock', 'maintenance', 'disposed', 'lost'], default: 'in_use' } }, { timestamps: true });
+schema.index({ collegeId: 1, assetId: 1 }, { unique: true });
+export const Asset = model<IAsset>('Asset', schema);

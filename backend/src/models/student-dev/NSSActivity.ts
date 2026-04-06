@@ -1,0 +1,5 @@
+import { Schema, model, Document } from 'mongoose';
+export interface INSSActivity extends Document { collegeId: Schema.Types.ObjectId; title: string; type: string; date: Date; venue: string; description?: string; coordinatorId?: Schema.Types.ObjectId; participantCount?: number; hours: number; status: string; }
+const schema = new Schema<INSSActivity>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, title: { type: String, required: true }, type: { type: String, enum: ['camp', 'blood_donation', 'awareness', 'tree_plantation', 'cleanliness', 'community_service', 'other'], required: true }, date: { type: Date, required: true }, venue: String, description: String, coordinatorId: { type: Schema.Types.ObjectId, ref: 'Person' }, participantCount: Number, hours: { type: Number, required: true }, status: { type: String, enum: ['planned', 'completed', 'cancelled'], default: 'planned' } }, { timestamps: true });
+schema.index({ collegeId: 1, date: -1 });
+export const NSSActivity = model<INSSActivity>('NSSActivity', schema);

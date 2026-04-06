@@ -1,0 +1,122 @@
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { listCurriculumMaps, createCurriculumMap, deleteCurriculumMap, listRegulations, listProgrammes, listBranches, listCourses } from '../../services/academics';
+import DataTable from '../../components/ui/DataTable';
+import Badge from '../../components/ui/Badge';
+import Modal from '../../components/ui/Modal';
+import { Plus, Trash2 } from 'lucide-react';
+
+const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none";
+const lbl = "block text-sm font-medium text-gray-700 mb-1";
+
+export default function CurriculumPage() {
+  const qc = useQueryClient();
+  const [page, setPage] = useState(1);
+  const [filterBranch, setFilterBranch] = useState('');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [form, setForm] = useState({ regulationId: '', programmeId: '', branchId: '', semester: '', courseId: '', isElective: false, electiveGroup: '' });
+
+  const { data, isLoading } = useQuery({ queryKey: ['curriculum', page, filterBranch], queryFn: () => listCurriculumMaps(page, 20, filterBranch || undefined) });
+  const { data: regsData } = useQuery({ queryKey: ['regulations', 1, 100], queryFn: () => listRegulations(1, 100) });
+  const { data: progsData } = useQuery({ queryKey: ['programmes', 1, 100], queryFn: () => listProgrammes(1, 100) });
+  const { data: branchData } = useQuery({ queryKey: ['branches', 1, 100], queryFn: () => listBranches(1, 100) });
+  const { data: coursesData } = useQuery({ queryKey: ['courses', 1, 200], queryFn: () => listCourses(1, 200) });
+
+  const createMut = useMutation({ mutationFn: createCurriculumMap, onSuccess: () => { qc.invalidateQueries({ queryKey: ['curriculum'] }); closeModal(); } });
+  const deleteMut = useMutation({ mutationFn: deleteCurriculumMap, onSuccess: () => { qc.invalidateQueries({ queryKey: ['curriculum'] }); } });
+
+  function closeModal() { setModalOpen(false); }
+  function openCreate() {
+    setForm({ regulationId: '', programmeId: '', branchId: '', semester: '', courseId: '', isElective: false, electiveGroup: '' });
+    setModalOpen(true);
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const payload: any = { ...form, semester: Number(form.semester) };
+    if (!payload.electiveGroup) delete payload.electiveGroup;
+    createMut.mutate(payload);
+  }
+
+  const columns = [
+    { key: 'semester', label: 'Semester', render: (r: any) => <span className="font-medium text-navy">Sem {r.semester}</span> },
+    { key: 'courseId', label: 'Course', render: (r: any) => typeof r.courseId === 'object' ? `${r.courseId.code} — ${r.courseId.name}` : r.courseId },
+    { key: 'isElective', label: 'Type', render: (r: any) => r.isElective ? <Badge variant="warning">Elective</Badge> : <Badge variant="info">Core</Badge> },
+    { key: 'electiveGroup', label: 'Elective Group', render: (r: any) => r.electiveGroup || '—' },
+    { key: 'actions', label: '', render: (r: any) => (
+      <button onClick={(e) => { e.stopPropagation(); if (confirm('Remove this mapping?')) deleteMut.mutate(r._id); }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
+    )},
+  ];
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-5">
+        <h2 className="text-xl font-bold text-navy">Curriculum Map</h2>
+        <div className="flex gap-3">
+          <select value={filterBranch} onChange={e => { setFilterBranch(e.target.value); setPage(1); }} className="border rounded-lg px-3 py-2 text-sm">
+            <option value="">All Branches</option>
+            {branchData?.items?.map((b: any) => <option key={b._id} value={b._id}>{b.code}</option>)}
+          </select>
+          <button onClick={openCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700">
+            <Plus size={16} className="text-white" /> Map Course
+          </button>
+        </div>
+      </div>
+
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} />
+
+      {data && data.pages > 1 && (
+        <div className="flex items-center justify-center gap-2 mt-4">
+          <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Prev</button>
+          <span className="text-sm text-gray-500">Page {page} of {data.pages}</span>
+          <button disabled={page >= data.pages} onClick={() => setPage(p => p + 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Next</button>
+        </div>
+      )}
+
+      <Modal open={modalOpen} onClose={closeModal} title="Map Course to Curriculum">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div><label className={lbl}>Regulation *</label>
+              <select required value={form.regulationId} onChange={e => setForm(f => ({ ...f, regulationId: e.target.value }))} className={inp}>
+                <option value="">Select...</option>
+                {regsData?.items?.map((r: any) => <option key={r._id} value={r._id}>{r.code}</option>)}
+              </select>
+            </div>
+            <div><label className={lbl}>Programme *</label>
+              <select required value={form.programmeId} onChange={e => setForm(f => ({ ...f, programmeId: e.target.value }))} className={inp}>
+                <option value="">Select...</option>
+                {progsData?.items?.map((p: any) => <option key={p._id} value={p._id}>{p.code}</option>)}
+              </select>
+            </div>
+            <div><label className={lbl}>Branch *</label>
+              <select required value={form.branchId} onChange={e => setForm(f => ({ ...f, branchId: e.target.value }))} className={inp}>
+                <option value="">Select...</option>
+                {branchData?.items?.map((b: any) => <option key={b._id} value={b._id}>{b.code} — {b.name}</option>)}
+              </select>
+            </div>
+            <div><label className={lbl}>Semester # *</label><input required type="number" min={1} max={12} value={form.semester} onChange={e => setForm(f => ({ ...f, semester: e.target.value }))} className={inp} /></div>
+            <div className="col-span-2"><label className={lbl}>Course *</label>
+              <select required value={form.courseId} onChange={e => setForm(f => ({ ...f, courseId: e.target.value }))} className={inp}>
+                <option value="">Select course...</option>
+                {coursesData?.items?.map((c: any) => <option key={c._id} value={c._id}>{c.code} — {c.name} ({c.credits} cr)</option>)}
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="cmIsElective" checked={form.isElective} onChange={e => setForm(f => ({ ...f, isElective: e.target.checked }))} className="rounded" />
+              <label htmlFor="cmIsElective" className="text-sm text-gray-700">Elective</label>
+            </div>
+            {form.isElective && (
+              <div><label className={lbl}>Elective Group</label><input value={form.electiveGroup} onChange={e => setForm(f => ({ ...f, electiveGroup: e.target.value }))} className={inp} placeholder="e.g. PE-I, OE-II" /></div>
+            )}
+          </div>
+          <div className="flex justify-end gap-3 pt-2 border-t">
+            <button type="button" onClick={closeModal} className="px-4 py-2 border rounded-lg text-sm">Cancel</button>
+            <button type="submit" disabled={createMut.isPending} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
+              {createMut.isPending ? 'Saving...' : 'Add Mapping'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+    </div>
+  );
+}

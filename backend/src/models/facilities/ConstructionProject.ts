@@ -1,0 +1,5 @@
+import { Schema, model, Document } from 'mongoose';
+export interface IConstructionProject extends Document { collegeId: Schema.Types.ObjectId; name: string; description: string; contractorName?: string; estimatedCost: number; actualCost?: number; startDate: Date; expectedCompletion: Date; actualCompletion?: Date; status: string; }
+const schema = new Schema<IConstructionProject>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, name: { type: String, required: true }, description: String, contractorName: String, estimatedCost: { type: Number, required: true }, actualCost: Number, startDate: { type: Date, required: true }, expectedCompletion: { type: Date, required: true }, actualCompletion: Date, status: { type: String, enum: ['planned', 'in_progress', 'completed', 'on_hold', 'cancelled'], default: 'planned' } }, { timestamps: true });
+schema.index({ collegeId: 1, status: 1 });
+export const ConstructionProject = model<IConstructionProject>('ConstructionProject', schema);

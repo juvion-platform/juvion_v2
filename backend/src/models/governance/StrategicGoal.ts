@@ -1,0 +1,5 @@
+import { Schema, model, Document } from 'mongoose';
+export interface IStrategicGoal extends Document { collegeId: Schema.Types.ObjectId; title: string; description: string; category: string; targetDate: Date; kpis: { metric: string; target: number; current: number }[]; ownerId?: Schema.Types.ObjectId; status: string; }
+const schema = new Schema<IStrategicGoal>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, title: { type: String, required: true }, description: String, category: { type: String, enum: ['academic_excellence', 'research', 'infrastructure', 'placement', 'accreditation', 'outreach', 'revenue'], required: true }, targetDate: { type: Date, required: true }, kpis: [{ metric: String, target: Number, current: Number }], ownerId: { type: Schema.Types.ObjectId, ref: 'Person' }, status: { type: String, enum: ['active', 'achieved', 'on_track', 'at_risk', 'missed'], default: 'active' } }, { timestamps: true });
+schema.index({ collegeId: 1, status: 1 });
+export const StrategicGoal = model<IStrategicGoal>('StrategicGoal', schema);

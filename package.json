@@ -1,0 +1,17 @@
+{
+  "name": "juvion-v2",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Juvion v2 — Indian College ERP Platform",
+  "workspaces": ["backend", "admin-portal"],
+  "scripts": {
+    "dev": "npm run dev --workspaces --if-present",
+    "dev:backend": "npm run dev -w backend",
+    "dev:portal": "npm run dev -w admin-portal",
+    "build": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "clean": "rm -rf node_modules backend/node_modules admin-portal/node_modules backend/dist admin-portal/dist"
+  },
+  "engines": { "node": ">=20.0.0" }
+}

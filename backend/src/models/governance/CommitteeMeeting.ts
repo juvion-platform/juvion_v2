@@ -1,0 +1,5 @@
+import { Schema, model, Document } from 'mongoose';
+export interface ICommitteeMeeting extends Document { collegeId: Schema.Types.ObjectId; committeeId: Schema.Types.ObjectId; meetingDate: Date; agenda: string; minutes?: string; attendees: Schema.Types.ObjectId[]; decisions: string[]; nextMeetingDate?: Date; status: string; }
+const schema = new Schema<ICommitteeMeeting>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, committeeId: { type: Schema.Types.ObjectId, ref: 'Committee', required: true }, meetingDate: { type: Date, required: true }, agenda: { type: String, required: true }, minutes: String, attendees: [{ type: Schema.Types.ObjectId, ref: 'Person' }], decisions: [String], nextMeetingDate: Date, status: { type: String, enum: ['scheduled', 'completed', 'cancelled'], default: 'scheduled' } }, { timestamps: true });
+schema.index({ collegeId: 1, committeeId: 1, meetingDate: -1 });
+export const CommitteeMeeting = model<ICommitteeMeeting>('CommitteeMeeting', schema);

@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1a3a5c"/>
+      <stop offset="100%" stop-color="#2a7fa0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded square background -->
+  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
+
+  <!-- Graduation cap — flat diamond (mortarboard top) -->
+  <polygon points="32,14 50,22 32,30 14,22" fill="white"/>
+  <!-- Cap board highlight -->
+  <polygon points="32,14 50,22 32,30 14,22" fill="white" opacity="0.15"/>
+
+  <!-- Right side of cap (3-D feel) -->
+  <polygon points="50,22 50,30 44,33 44,25" fill="white" opacity="0.5"/>
+
+  <!-- Tassel rope -->
+  <line x1="50" y1="22" x2="50" y2="34" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.85"/>
+  <circle cx="50" cy="36" r="2.5" fill="white" opacity="0.85"/>
+
+  <!-- Letter J -->
+  <text
+    x="32" y="56"
+    font-family="'Georgia', 'Times New Roman', serif"
+    font-size="22"
+    font-weight="700"
+    fill="white"
+    text-anchor="middle"
+    dominant-baseline="auto"
+    letter-spacing="-0.5"
+  >J</text>
+</svg>

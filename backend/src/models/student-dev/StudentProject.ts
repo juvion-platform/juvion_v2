@@ -1,0 +1,5 @@
+import { Schema, model, Document } from 'mongoose';
+export interface IStudentProject extends Document { collegeId: Schema.Types.ObjectId; title: string; type: string; teamMembers: Schema.Types.ObjectId[]; guideId?: Schema.Types.ObjectId; semester: number; description?: string; technologies: string[]; repoUrl?: string; status: string; grade?: string; }
+const schema = new Schema<IStudentProject>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, title: { type: String, required: true }, type: { type: String, enum: ['mini_project', 'major_project', 'industry_project', 'research_project'], required: true }, teamMembers: [{ type: Schema.Types.ObjectId, ref: 'Student' }], guideId: { type: Schema.Types.ObjectId, ref: 'Faculty' }, semester: { type: Number, required: true }, description: String, technologies: [String], repoUrl: String, status: { type: String, enum: ['proposed', 'in_progress', 'completed', 'presented'], default: 'proposed' }, grade: String }, { timestamps: true });
+schema.index({ collegeId: 1, guideId: 1 });
+export const StudentProject = model<IStudentProject>('StudentProject', schema);

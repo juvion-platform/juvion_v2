@@ -1,0 +1,5 @@
+import { Schema, model, Document } from 'mongoose';
+export interface IPeriodicalSubscription extends Document { collegeId: Schema.Types.ObjectId; title: string; type: string; publisher: string; frequency: string; issn?: string; startDate: Date; endDate: Date; cost: number; isActive: boolean; }
+const schema = new Schema<IPeriodicalSubscription>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, title: { type: String, required: true }, type: { type: String, enum: ['journal', 'magazine', 'newspaper'], required: true }, publisher: { type: String, required: true }, frequency: { type: String, enum: ['daily', 'weekly', 'fortnightly', 'monthly', 'quarterly', 'annually'], required: true }, issn: String, startDate: { type: Date, required: true }, endDate: { type: Date, required: true }, cost: { type: Number, required: true }, isActive: { type: Boolean, default: true } }, { timestamps: true });
+schema.index({ collegeId: 1, type: 1 });
+export const PeriodicalSubscription = model<IPeriodicalSubscription>('PeriodicalSubscription', schema);

@@ -1,0 +1,5 @@
+import { Schema, model, Document } from 'mongoose';
+export interface IGatePass extends Document { collegeId: Schema.Types.ObjectId; personId: Schema.Types.ObjectId; personType: string; type: string; reason: string; outTime: Date; expectedInTime: Date; actualInTime?: Date; approvedBy?: Schema.Types.ObjectId; status: string; }
+const schema = new Schema<IGatePass>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, personId: { type: Schema.Types.ObjectId, ref: 'Person', required: true }, personType: { type: String, enum: ['student', 'faculty', 'staff'], required: true }, type: { type: String, enum: ['half_day', 'full_day', 'emergency', 'night_out'], required: true }, reason: { type: String, required: true }, outTime: { type: Date, required: true }, expectedInTime: { type: Date, required: true }, actualInTime: Date, approvedBy: { type: Schema.Types.ObjectId, ref: 'Person' }, status: { type: String, enum: ['requested', 'approved', 'rejected', 'active', 'returned'], default: 'requested' } }, { timestamps: true });
+schema.index({ collegeId: 1, personId: 1, outTime: -1 });
+export const GatePass = model<IGatePass>('GatePass', schema);
