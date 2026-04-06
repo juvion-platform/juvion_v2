@@ -64,7 +64,7 @@ export async function getStats(collegeId: string) {
 export async function listFeeStructures(collegeId: string, page = 1, limit = 20, academicYearId?: string) {
   const filter: any = { collegeId };
   if (academicYearId) filter.academicYearId = academicYearId;
-  return paginate(FeeStructure, filter, page, limit);
+  return paginate(FeeStructure, filter, page, limit, { createdAt: -1 }, ['academicYearId', 'programmeId', 'branchId']);
 }
 
 export async function getFeeStructure(collegeId: string, id: string) {
@@ -96,7 +96,7 @@ export async function deleteFeeStructure(collegeId: string, id: string, who: str
 // ═══ Student Fee Account ══════════════════════════════════
 
 export async function listStudentFeeAccounts(collegeId: string, page = 1, limit = 20) {
-  return paginate(StudentFeeAccount, { collegeId }, page, limit);
+  return paginate(StudentFeeAccount, { collegeId }, page, limit, { createdAt: -1 }, ['studentId']);
 }
 
 export async function getStudentFeeAccount(collegeId: string, id: string) {
@@ -131,7 +131,7 @@ export async function listFeeLineItems(collegeId: string, page = 1, limit = 20, 
   const filter: any = { collegeId };
   if (studentId) filter.studentId = studentId;
   if (status) filter.status = status;
-  return paginate(FeeLineItem, filter, page, limit);
+  return paginate(FeeLineItem, filter, page, limit, { createdAt: -1 }, ['studentId', 'feeStructureId', 'academicYearId']);
 }
 
 export async function getFeeLineItem(collegeId: string, id: string) {
@@ -165,7 +165,7 @@ export async function deleteFeeLineItem(collegeId: string, id: string, who: stri
 export async function listPayments(collegeId: string, page = 1, limit = 20, studentId?: string) {
   const filter: any = { collegeId };
   if (studentId) filter.studentId = studentId;
-  return paginate(Payment, filter, page, limit);
+  return paginate(Payment, filter, page, limit, { createdAt: -1 }, ['studentId']);
 }
 
 export async function getPayment(collegeId: string, id: string) {
@@ -214,7 +214,7 @@ export async function deletePayment(collegeId: string, id: string, who: string) 
 export async function listScholarships(collegeId: string, page = 1, limit = 20, academicYearId?: string) {
   const filter: any = { collegeId };
   if (academicYearId) filter.academicYearId = academicYearId;
-  return paginate(Scholarship, filter, page, limit);
+  return paginate(Scholarship, filter, page, limit, { createdAt: -1 }, ['academicYearId']);
 }
 
 export async function getScholarship(collegeId: string, id: string) {
@@ -248,7 +248,7 @@ export async function deleteScholarship(collegeId: string, id: string, who: stri
 export async function listScholarshipAllocations(collegeId: string, page = 1, limit = 20, scholarshipId?: string) {
   const filter: any = { collegeId };
   if (scholarshipId) filter.scholarshipId = scholarshipId;
-  return paginate(ScholarshipAllocation, filter, page, limit);
+  return paginate(ScholarshipAllocation, filter, page, limit, { createdAt: -1 }, ['scholarshipId', 'studentId']);
 }
 
 export async function createScholarshipAllocation(collegeId: string, data: any, who: string) {
@@ -276,7 +276,7 @@ export async function deleteScholarshipAllocation(collegeId: string, id: string,
 export async function listConcessions(collegeId: string, page = 1, limit = 20, studentId?: string) {
   const filter: any = { collegeId };
   if (studentId) filter.studentId = studentId;
-  return paginate(Concession, filter, page, limit);
+  return paginate(Concession, filter, page, limit, { createdAt: -1 }, ['studentId', 'academicYearId']);
 }
 
 export async function createConcession(collegeId: string, data: any, who: string) {
@@ -304,7 +304,7 @@ export async function deleteConcession(collegeId: string, id: string, who: strin
 export async function listRefunds(collegeId: string, page = 1, limit = 20, studentId?: string) {
   const filter: any = { collegeId };
   if (studentId) filter.studentId = studentId;
-  return paginate(Refund, filter, page, limit);
+  return paginate(Refund, filter, page, limit, { createdAt: -1 }, ['studentId', 'paymentId']);
 }
 
 export async function createRefund(collegeId: string, data: any, who: string) {
@@ -332,7 +332,7 @@ export async function deleteRefund(collegeId: string, id: string, who: string) {
 export async function listFinePenalties(collegeId: string, page = 1, limit = 20, studentId?: string) {
   const filter: any = { collegeId };
   if (studentId) filter.studentId = studentId;
-  return paginate(FinePenalty, filter, page, limit);
+  return paginate(FinePenalty, filter, page, limit, { createdAt: -1 }, ['studentId']);
 }
 
 export async function createFinePenalty(collegeId: string, data: any, who: string) {
@@ -360,7 +360,7 @@ export async function deleteFinePenalty(collegeId: string, id: string, who: stri
 export async function listInvoices(collegeId: string, page = 1, limit = 20, status?: string) {
   const filter: any = { collegeId };
   if (status) filter.status = status;
-  return paginate(Invoice, filter, page, limit);
+  return paginate(Invoice, filter, page, limit, { createdAt: -1 }, ['studentId']);
 }
 
 export async function getInvoice(collegeId: string, id: string) {
@@ -394,7 +394,7 @@ export async function deleteInvoice(collegeId: string, id: string, who: string) 
 export async function listBudgets(collegeId: string, page = 1, limit = 20, academicYearId?: string) {
   const filter: any = { collegeId };
   if (academicYearId) filter.academicYearId = academicYearId;
-  return paginate(Budget, filter, page, limit);
+  return paginate(Budget, filter, page, limit, { createdAt: -1 }, ['academicYearId', 'departmentId']);
 }
 
 export async function getBudget(collegeId: string, id: string) {
@@ -428,7 +428,7 @@ export async function deleteBudget(collegeId: string, id: string, who: string) {
 export async function listExpenses(collegeId: string, page = 1, limit = 20, status?: string) {
   const filter: any = { collegeId };
   if (status) filter.status = status;
-  return paginate(Expense, filter, page, limit);
+  return paginate(Expense, filter, page, limit, { createdAt: -1 }, ['budgetId']);
 }
 
 export async function getExpense(collegeId: string, id: string) {
@@ -518,7 +518,7 @@ export async function deletePaymentGatewayLog(collegeId: string, id: string, who
 export async function listFeeReminders(collegeId: string, page = 1, limit = 20, studentId?: string) {
   const filter: any = { collegeId };
   if (studentId) filter.studentId = studentId;
-  return paginate(FeeReminder, filter, page, limit);
+  return paginate(FeeReminder, filter, page, limit, { createdAt: -1 }, ['studentId']);
 }
 
 export async function createFeeReminder(collegeId: string, data: any, who: string) {

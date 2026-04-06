@@ -105,7 +105,7 @@ export async function convertInquiryToApplicant(collegeId: string, inquiryId: st
 export async function listApplicants(collegeId: string, page: number, limit: number, status?: string) {
   const filter: any = { collegeId };
   if (status) filter.status = status;
-  return paginate(Applicant, filter, page, limit, { createdAt: -1 });
+  return paginate(Applicant, filter, page, limit, { createdAt: -1 }, ['inquiryId']);
 }
 
 export async function getApplicant(collegeId: string, id: string) {
@@ -138,7 +138,7 @@ export async function updateApplicant(collegeId: string, id: string, data: any, 
 export async function listExamScores(collegeId: string, page: number, limit: number, applicantId?: string) {
   const filter: any = { collegeId };
   if (applicantId) filter.applicantId = applicantId;
-  return paginate(EntranceExamScore, filter, page, limit, { createdAt: -1 });
+  return paginate(EntranceExamScore, filter, page, limit, { createdAt: -1 }, ['applicantId']);
 }
 
 export async function createExamScore(collegeId: string, data: any, performedBy: string) {
@@ -159,7 +159,7 @@ export async function updateExamScore(collegeId: string, id: string, data: any, 
 export async function listCounselingAllotments(collegeId: string, page: number, limit: number, applicantId?: string) {
   const filter: any = { collegeId };
   if (applicantId) filter.applicantId = applicantId;
-  return paginate(CounselingAllotment, filter, page, limit, { createdAt: -1 });
+  return paginate(CounselingAllotment, filter, page, limit, { createdAt: -1 }, ['applicantId']);
 }
 
 export async function createCounselingAllotment(collegeId: string, data: any, performedBy: string) {
@@ -180,7 +180,7 @@ export async function updateCounselingAllotment(collegeId: string, id: string, d
 export async function listOffers(collegeId: string, page: number, limit: number, status?: string) {
   const filter: any = { collegeId };
   if (status) filter.status = status;
-  return paginate(AdmissionOffer, filter, page, limit, { createdAt: -1 });
+  return paginate(AdmissionOffer, filter, page, limit, { createdAt: -1 }, ['applicantId']);
 }
 
 export async function createOffer(collegeId: string, data: any, performedBy: string) {
@@ -201,7 +201,7 @@ export async function updateOffer(collegeId: string, id: string, data: any, perf
 export async function listDocumentChecklists(collegeId: string, page: number, limit: number, status?: string) {
   const filter: any = { collegeId };
   if (status) filter.status = status;
-  return paginate(DocumentChecklist, filter, page, limit, { createdAt: -1 });
+  return paginate(DocumentChecklist, filter, page, limit, { createdAt: -1 }, ['applicantId']);
 }
 
 export async function getDocumentChecklist(collegeId: string, applicantId: string) {
@@ -223,7 +223,7 @@ export async function upsertDocumentChecklist(collegeId: string, applicantId: st
 // ─── Admissions (Final Enrollment) ───────────────────────────
 
 export async function listAdmissions(collegeId: string, page: number, limit: number) {
-  return paginate(Admission, { collegeId }, page, limit, { admissionDate: -1 });
+  return paginate(Admission, { collegeId }, page, limit, { admissionDate: -1 }, ['applicantId', 'studentId']);
 }
 
 export async function getAdmission(collegeId: string, id: string) {

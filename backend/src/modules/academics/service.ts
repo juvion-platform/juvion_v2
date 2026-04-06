@@ -87,7 +87,7 @@ export async function deleteRegulation(collegeId: string, id: string, performedB
 // ─── Programmes ─────────────────────────────────────────────
 
 export async function listProgrammes(collegeId: string, page: number, limit: number) {
-  return paginate(Programme, { collegeId }, page, limit, { code: 1 });
+  return paginate(Programme, { collegeId }, page, limit, { code: 1 }, ['regulationId']);
 }
 
 export async function getProgramme(collegeId: string, id: string) {
@@ -119,7 +119,7 @@ export async function deleteProgramme(collegeId: string, id: string, performedBy
 // ─── Departments ────────────────────────────────────────────
 
 export async function listDepartments(collegeId: string, page: number, limit: number) {
-  return paginate(Department, { collegeId }, page, limit, { code: 1 });
+  return paginate(Department, { collegeId }, page, limit, { code: 1 }, ['hodId']);
 }
 
 export async function getDepartment(collegeId: string, id: string) {
@@ -151,7 +151,7 @@ export async function deleteDepartment(collegeId: string, id: string, performedB
 // ─── Branches ───────────────────────────────────────────────
 
 export async function listBranches(collegeId: string, page: number, limit: number) {
-  return paginate(Branch, { collegeId }, page, limit, { code: 1 });
+  return paginate(Branch, { collegeId }, page, limit, { code: 1 }, ['programmeId', 'departmentId']);
 }
 
 export async function getBranch(collegeId: string, id: string) {
@@ -183,7 +183,7 @@ export async function deleteBranch(collegeId: string, id: string, performedBy: s
 // ─── Batches ────────────────────────────────────────────────
 
 export async function listBatches(collegeId: string, page: number, limit: number) {
-  return paginate(Batch, { collegeId }, page, limit, { admissionYear: -1 });
+  return paginate(Batch, { collegeId }, page, limit, { admissionYear: -1 }, ['programmeId', 'regulationId']);
 }
 
 export async function getBatch(collegeId: string, id: string) {
@@ -215,7 +215,7 @@ export async function deleteBatch(collegeId: string, id: string, performedBy: st
 // ─── Sections ───────────────────────────────────────────────
 
 export async function listSections(collegeId: string, page: number, limit: number) {
-  return paginate(Section, { collegeId }, page, limit, { year: 1, semester: 1, name: 1 });
+  return paginate(Section, { collegeId }, page, limit, { year: 1, semester: 1, name: 1 }, ['branchId', 'batchId', 'classAdvisorId']);
 }
 
 export async function getSection(collegeId: string, id: string) {
@@ -288,7 +288,7 @@ export async function deleteAcademicYear(collegeId: string, id: string, performe
 export async function listSemesters(collegeId: string, page: number, limit: number, academicYearId?: string) {
   const filter: any = { collegeId };
   if (academicYearId) filter.academicYearId = academicYearId;
-  return paginate(Semester, filter, page, limit, { year: 1, number: 1 });
+  return paginate(Semester, filter, page, limit, { year: 1, number: 1 }, ['academicYearId']);
 }
 
 export async function getSemester(collegeId: string, id: string) {
@@ -322,7 +322,7 @@ export async function deleteSemester(collegeId: string, id: string, performedBy:
 export async function listCourses(collegeId: string, page: number, limit: number, regulationId?: string) {
   const filter: any = { collegeId };
   if (regulationId) filter.regulationId = regulationId;
-  return paginate(Course, filter, page, limit, { code: 1 });
+  return paginate(Course, filter, page, limit, { code: 1 }, ['regulationId', 'departmentId']);
 }
 
 export async function getCourse(collegeId: string, id: string) {
@@ -357,7 +357,7 @@ export async function listCurriculumMaps(collegeId: string, page: number, limit:
   const filter: any = { collegeId };
   if (branchId) filter.branchId = branchId;
   if (semester) filter.semester = semester;
-  return paginate(CurriculumMap, filter, page, limit, { semester: 1 });
+  return paginate(CurriculumMap, filter, page, limit, { semester: 1 }, ['branchId']);
 }
 
 export async function createCurriculumMap(collegeId: string, data: any, performedBy: string) {
@@ -385,7 +385,7 @@ export async function deleteCurriculumMap(collegeId: string, id: string, perform
 export async function listCourseOfferings(collegeId: string, page: number, limit: number, semesterId?: string) {
   const filter: any = { collegeId };
   if (semesterId) filter.semesterId = semesterId;
-  return paginate(CourseOffering, filter, page, limit, { createdAt: -1 });
+  return paginate(CourseOffering, filter, page, limit, { createdAt: -1 }, ['courseId', 'semesterId', 'sectionId', 'facultyId']);
 }
 
 export async function getCourseOffering(collegeId: string, id: string) {
@@ -419,7 +419,7 @@ export async function deleteCourseOffering(collegeId: string, id: string, perfor
 export async function listEnrollments(collegeId: string, page: number, limit: number, semesterId?: string) {
   const filter: any = { collegeId };
   if (semesterId) filter.semesterId = semesterId;
-  return paginate(Enrollment, filter, page, limit, { enrolledAt: -1 });
+  return paginate(Enrollment, filter, page, limit, { enrolledAt: -1 }, ['studentId', 'courseOfferingId', 'semesterId']);
 }
 
 export async function createEnrollment(collegeId: string, data: any, performedBy: string) {
@@ -450,7 +450,7 @@ export async function deleteEnrollment(collegeId: string, id: string, performedB
 export async function listCalendarEvents(collegeId: string, page: number, limit: number, academicYearId?: string) {
   const filter: any = { collegeId };
   if (academicYearId) filter.academicYearId = academicYearId;
-  return paginate(AcademicCalendar, filter, page, limit, { startDate: 1 });
+  return paginate(AcademicCalendar, filter, page, limit, { startDate: 1 }, ['academicYearId']);
 }
 export async function createCalendarEvent(collegeId: string, data: any, performedBy: string) {
   const doc = await AcademicCalendar.create({ ...data, collegeId });
@@ -475,7 +475,7 @@ export async function deleteCalendarEvent(collegeId: string, id: string, perform
 export async function listTimetables(collegeId: string, page: number, limit: number, semesterId?: string) {
   const filter: any = { collegeId };
   if (semesterId) filter.semesterId = semesterId;
-  return paginate(Timetable, filter, page, limit, { createdAt: -1 });
+  return paginate(Timetable, filter, page, limit, { createdAt: -1 }, ['semesterId', 'sectionId']);
 }
 export async function getTimetable(collegeId: string, id: string) {
   const doc = await Timetable.findOne({ _id: id, collegeId }).populate('semesterId sectionId').lean();
@@ -527,7 +527,7 @@ export async function deleteTimetableSlot(collegeId: string, id: string, _perfor
 export async function listAttendanceSessions(collegeId: string, page: number, limit: number, courseOfferingId?: string) {
   const filter: any = { collegeId };
   if (courseOfferingId) filter.courseOfferingId = courseOfferingId;
-  return paginate(AttendanceSession, filter, page, limit, { date: -1 });
+  return paginate(AttendanceSession, filter, page, limit, { date: -1 }, ['courseOfferingId', 'facultyId']);
 }
 export async function getAttendanceSession(collegeId: string, id: string) {
   const doc = await AttendanceSession.findOne({ _id: id, collegeId }).populate('courseOfferingId facultyId').lean();
@@ -580,7 +580,7 @@ export async function deleteAttendanceRecord(collegeId: string, id: string, _per
 export async function listInternalAssessments(collegeId: string, page: number, limit: number, courseOfferingId?: string) {
   const filter: any = { collegeId };
   if (courseOfferingId) filter.courseOfferingId = courseOfferingId;
-  return paginate(InternalAssessment, filter, page, limit, { date: -1 });
+  return paginate(InternalAssessment, filter, page, limit, { date: -1 }, ['courseOfferingId']);
 }
 export async function createInternalAssessment(collegeId: string, data: any, performedBy: string) {
   const doc = await InternalAssessment.create({ ...data, collegeId });
@@ -633,7 +633,7 @@ export async function deleteInternalMark(collegeId: string, id: string, _perform
 export async function listExamRegistrations(collegeId: string, page: number, limit: number, semesterId?: string) {
   const filter: any = { collegeId };
   if (semesterId) filter.semesterId = semesterId;
-  return paginate(ExamRegistration, filter, page, limit, { registeredAt: -1 });
+  return paginate(ExamRegistration, filter, page, limit, { registeredAt: -1 }, ['studentId', 'semesterId']);
 }
 export async function createExamRegistration(collegeId: string, data: any, performedBy: string) {
   const doc = await ExamRegistration.create({ ...data, collegeId });
@@ -656,7 +656,7 @@ export async function deleteExamRegistration(collegeId: string, id: string, _per
 export async function listExamSchedules(collegeId: string, page: number, limit: number, semesterId?: string) {
   const filter: any = { collegeId };
   if (semesterId) filter.semesterId = semesterId;
-  return paginate(ExamSchedule, filter, page, limit, { date: 1, startTime: 1 });
+  return paginate(ExamSchedule, filter, page, limit, { date: 1, startTime: 1 }, ['courseId', 'semesterId']);
 }
 export async function createExamSchedule(collegeId: string, data: any, performedBy: string) {
   const doc = await ExamSchedule.create({ ...data, collegeId });
@@ -679,7 +679,7 @@ export async function deleteExamSchedule(collegeId: string, id: string, _perform
 export async function listExternalMarks(collegeId: string, page: number, limit: number, semesterId?: string) {
   const filter: any = { collegeId };
   if (semesterId) filter.semesterId = semesterId;
-  return paginate(ExternalMark, filter, page, limit, { createdAt: -1 });
+  return paginate(ExternalMark, filter, page, limit, { createdAt: -1 }, ['studentId', 'courseId', 'semesterId']);
 }
 export async function createExternalMark(collegeId: string, data: any, _performedBy: string) {
   const doc = await ExternalMark.create({ ...data, collegeId });
@@ -702,7 +702,7 @@ export async function listGradeCards(collegeId: string, page: number, limit: num
   const filter: any = { collegeId };
   if (semesterId) filter.semesterId = semesterId;
   if (studentId) filter.studentId = studentId;
-  return paginate(GradeCard, filter, page, limit, { createdAt: -1 });
+  return paginate(GradeCard, filter, page, limit, { createdAt: -1 }, ['studentId', 'courseId', 'semesterId']);
 }
 export async function createGradeCard(collegeId: string, data: any, _performedBy: string) {
   const doc = await GradeCard.create({ ...data, collegeId });
@@ -724,7 +724,7 @@ export async function deleteGradeCard(collegeId: string, id: string, _performedB
 export async function listSemesterResults(collegeId: string, page: number, limit: number, semesterId?: string) {
   const filter: any = { collegeId };
   if (semesterId) filter.semesterId = semesterId;
-  return paginate(SemesterResult, filter, page, limit, { cgpa: -1 });
+  return paginate(SemesterResult, filter, page, limit, { cgpa: -1 }, ['studentId', 'semesterId']);
 }
 export async function createSemesterResult(collegeId: string, data: any, _performedBy: string) {
   const doc = await SemesterResult.create({ ...data, collegeId });
@@ -786,7 +786,7 @@ export async function deleteProgramOutcome(collegeId: string, id: string, _perfo
 export async function listElectiveAllocations(collegeId: string, page: number, limit: number, semesterId?: string) {
   const filter: any = { collegeId };
   if (semesterId) filter.semesterId = semesterId;
-  return paginate(ElectiveAllocation, filter, page, limit, { preference: 1 });
+  return paginate(ElectiveAllocation, filter, page, limit, { preference: 1 }, ['studentId', 'courseOfferingId', 'semesterId']);
 }
 export async function createElectiveAllocation(collegeId: string, data: any, _performedBy: string) {
   const doc = await ElectiveAllocation.create({ ...data, collegeId });
@@ -808,7 +808,7 @@ export async function deleteElectiveAllocation(collegeId: string, id: string, _p
 export async function listLessonPlans(collegeId: string, page: number, limit: number, courseOfferingId?: string) {
   const filter: any = { collegeId };
   if (courseOfferingId) filter.courseOfferingId = courseOfferingId;
-  return paginate(LessonPlan, filter, page, limit, { weekNumber: 1 });
+  return paginate(LessonPlan, filter, page, limit, { weekNumber: 1 }, ['courseOfferingId']);
 }
 export async function createLessonPlan(collegeId: string, data: any, _performedBy: string) {
   const doc = await LessonPlan.create({ ...data, collegeId });
@@ -830,7 +830,7 @@ export async function deleteLessonPlan(collegeId: string, id: string, _performed
 export async function listCourseFeedback(collegeId: string, page: number, limit: number, courseOfferingId?: string) {
   const filter: any = { collegeId };
   if (courseOfferingId) filter.courseOfferingId = courseOfferingId;
-  return paginate(CourseFeedback, filter, page, limit, { submittedAt: -1 });
+  return paginate(CourseFeedback, filter, page, limit, { submittedAt: -1 }, ['courseOfferingId', 'studentId']);
 }
 export async function createCourseFeedback(collegeId: string, data: any, _performedBy: string) {
   const doc = await CourseFeedback.create({ ...data, collegeId, submittedAt: new Date() });
