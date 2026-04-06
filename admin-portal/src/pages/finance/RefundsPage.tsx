@@ -63,11 +63,11 @@ export default function RefundsPage() {
   }
 
   function studentLabel(s: any) {
-    return s.name || [s.firstName, s.lastName].filter(Boolean).join(' ') || s.rollNumber || s._id;
+    return s.person?.name || s.rollNumber || s._id;
   }
 
   const columns = [
-    { key: 'studentId', label: 'Student', render: (r: any) => <span className="font-medium text-navy">{r.studentId?.name || r.studentId?.firstName || '—'}</span> },
+    { key: 'studentId', label: 'Student', render: (r: any) => <span className="font-medium text-navy">{r.studentId?.personId?.name || r.studentId?.rollNumber || '—'}</span> },
     { key: 'amount', label: 'Amount', render: (r: any) => `₹${Number(r.amount).toLocaleString()}` },
     { key: 'reason', label: 'Reason' },
     { key: 'refundMode', label: 'Mode', render: (r: any) => <Badge variant="info">{r.refundMode}</Badge> },

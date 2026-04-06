@@ -31,6 +31,8 @@ import { paginate } from '../../shared/pagination';
 import { createAuditLog } from '../../shared/audit';
 import { AppError } from '../../middleware/errorHandler';
 
+const STUDENT_POPULATE = { path: 'studentId', populate: { path: 'personId' } };
+
 // ─── Dashboard Stats ────────────────────────────────────────
 
 export async function getStats(collegeId: string) {
@@ -419,7 +421,7 @@ export async function deleteCourseOffering(collegeId: string, id: string, perfor
 export async function listEnrollments(collegeId: string, page: number, limit: number, semesterId?: string) {
   const filter: any = { collegeId };
   if (semesterId) filter.semesterId = semesterId;
-  return paginate(Enrollment, filter, page, limit, { enrolledAt: -1 }, ['studentId', 'courseOfferingId', 'semesterId']);
+  return paginate(Enrollment, filter, page, limit, { enrolledAt: -1 }, [STUDENT_POPULATE, 'courseOfferingId', 'semesterId'] as any);
 }
 
 export async function createEnrollment(collegeId: string, data: any, performedBy: string) {
@@ -554,7 +556,7 @@ export async function deleteAttendanceSession(collegeId: string, id: string, _pe
 // ═══ Phase 4: Attendance Records ═══════════════════════════
 
 export async function listAttendanceRecords(collegeId: string, sessionId: string) {
-  return AttendanceRecord.find({ collegeId, sessionId }).populate('studentId').sort({ studentId: 1 }).lean();
+  return AttendanceRecord.find({ collegeId, sessionId }).populate(STUDENT_POPULATE as any).sort({ studentId: 1 }).lean();
 }
 export async function createAttendanceRecord(collegeId: string, data: any, _performedBy: string) {
   const doc = await AttendanceRecord.create({ ...data, collegeId });
@@ -607,7 +609,7 @@ export async function getInternalAssessment(collegeId: string, id: string) {
 // ═══ Phase 5: Internal Marks ═══════════════════════════════
 
 export async function listInternalMarks(collegeId: string, assessmentId: string) {
-  return InternalMark.find({ collegeId, assessmentId }).populate('studentId').sort({ studentId: 1 }).lean();
+  return InternalMark.find({ collegeId, assessmentId }).populate(STUDENT_POPULATE as any).sort({ studentId: 1 }).lean();
 }
 export async function createInternalMark(collegeId: string, data: any, _performedBy: string) {
   const doc = await InternalMark.create({ ...data, collegeId });
@@ -633,7 +635,7 @@ export async function deleteInternalMark(collegeId: string, id: string, _perform
 export async function listExamRegistrations(collegeId: string, page: number, limit: number, semesterId?: string) {
   const filter: any = { collegeId };
   if (semesterId) filter.semesterId = semesterId;
-  return paginate(ExamRegistration, filter, page, limit, { registeredAt: -1 }, ['studentId', 'semesterId']);
+  return paginate(ExamRegistration, filter, page, limit, { registeredAt: -1 }, [STUDENT_POPULATE, 'semesterId'] as any);
 }
 export async function createExamRegistration(collegeId: string, data: any, performedBy: string) {
   const doc = await ExamRegistration.create({ ...data, collegeId });
@@ -679,7 +681,7 @@ export async function deleteExamSchedule(collegeId: string, id: string, _perform
 export async function listExternalMarks(collegeId: string, page: number, limit: number, semesterId?: string) {
   const filter: any = { collegeId };
   if (semesterId) filter.semesterId = semesterId;
-  return paginate(ExternalMark, filter, page, limit, { createdAt: -1 }, ['studentId', 'courseId', 'semesterId']);
+  return paginate(ExternalMark, filter, page, limit, { createdAt: -1 }, [STUDENT_POPULATE, 'courseId', 'semesterId'] as any);
 }
 export async function createExternalMark(collegeId: string, data: any, _performedBy: string) {
   const doc = await ExternalMark.create({ ...data, collegeId });
@@ -702,7 +704,7 @@ export async function listGradeCards(collegeId: string, page: number, limit: num
   const filter: any = { collegeId };
   if (semesterId) filter.semesterId = semesterId;
   if (studentId) filter.studentId = studentId;
-  return paginate(GradeCard, filter, page, limit, { createdAt: -1 }, ['studentId', 'courseId', 'semesterId']);
+  return paginate(GradeCard, filter, page, limit, { createdAt: -1 }, [STUDENT_POPULATE, 'courseId', 'semesterId'] as any);
 }
 export async function createGradeCard(collegeId: string, data: any, _performedBy: string) {
   const doc = await GradeCard.create({ ...data, collegeId });
@@ -724,7 +726,7 @@ export async function deleteGradeCard(collegeId: string, id: string, _performedB
 export async function listSemesterResults(collegeId: string, page: number, limit: number, semesterId?: string) {
   const filter: any = { collegeId };
   if (semesterId) filter.semesterId = semesterId;
-  return paginate(SemesterResult, filter, page, limit, { cgpa: -1 }, ['studentId', 'semesterId']);
+  return paginate(SemesterResult, filter, page, limit, { cgpa: -1 }, [STUDENT_POPULATE, 'semesterId'] as any);
 }
 export async function createSemesterResult(collegeId: string, data: any, _performedBy: string) {
   const doc = await SemesterResult.create({ ...data, collegeId });
@@ -786,7 +788,7 @@ export async function deleteProgramOutcome(collegeId: string, id: string, _perfo
 export async function listElectiveAllocations(collegeId: string, page: number, limit: number, semesterId?: string) {
   const filter: any = { collegeId };
   if (semesterId) filter.semesterId = semesterId;
-  return paginate(ElectiveAllocation, filter, page, limit, { preference: 1 }, ['studentId', 'courseOfferingId', 'semesterId']);
+  return paginate(ElectiveAllocation, filter, page, limit, { preference: 1 }, [STUDENT_POPULATE, 'courseOfferingId', 'semesterId'] as any);
 }
 export async function createElectiveAllocation(collegeId: string, data: any, _performedBy: string) {
   const doc = await ElectiveAllocation.create({ ...data, collegeId });
@@ -830,7 +832,7 @@ export async function deleteLessonPlan(collegeId: string, id: string, _performed
 export async function listCourseFeedback(collegeId: string, page: number, limit: number, courseOfferingId?: string) {
   const filter: any = { collegeId };
   if (courseOfferingId) filter.courseOfferingId = courseOfferingId;
-  return paginate(CourseFeedback, filter, page, limit, { submittedAt: -1 }, ['courseOfferingId', 'studentId']);
+  return paginate(CourseFeedback, filter, page, limit, { submittedAt: -1 }, ['courseOfferingId', STUDENT_POPULATE] as any);
 }
 export async function createCourseFeedback(collegeId: string, data: any, _performedBy: string) {
   const doc = await CourseFeedback.create({ ...data, collegeId, submittedAt: new Date() });

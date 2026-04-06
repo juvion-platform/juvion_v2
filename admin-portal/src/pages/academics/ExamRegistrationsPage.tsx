@@ -42,7 +42,7 @@ export default function ExamRegistrationsPage() {
   }
 
   const columns = [
-    { key: 'studentId', label: 'Student', render: (r: any) => <span className="font-medium text-navy">{typeof r.studentId === 'object' ? r.studentId.name || r.studentId._id : r.studentId}</span> },
+    { key: 'studentId', label: 'Student', render: (r: any) => <span className="font-medium text-navy">{typeof r.studentId === 'object' ? r.studentId.personId?.name || r.studentId.rollNumber || r.studentId._id : r.studentId}</span> },
     { key: 'courseOfferingId', label: 'Course', render: (r: any) => {
       if (typeof r.courseOfferingId === 'object' && r.courseOfferingId?.courseId) {
         const c = r.courseOfferingId.courseId;

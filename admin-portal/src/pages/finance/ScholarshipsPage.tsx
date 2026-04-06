@@ -63,7 +63,7 @@ export default function ScholarshipsPage() {
     { key: 'name', label: 'Name', render: (r: any) => <span className="font-medium text-navy">{r.name}</span> },
     { key: 'provider', label: 'Provider', render: (r: any) => <Badge variant="info">{r.provider}</Badge> },
     { key: 'type', label: 'Type', render: (r: any) => <Badge variant="default">{r.type}</Badge> },
-    { key: 'academicYearId', label: 'Academic Year', render: (r: any) => r.academicYearId?.name || '—' },
+    { key: 'academicYearId', label: 'Academic Year', render: (r: any) => r.academicYearId?.label || r.academicYearId?.code || '—' },
     { key: 'amount', label: 'Amount', render: (r: any) => `₹${Number(r.amount).toLocaleString()}` },
     { key: 'isActive', label: 'Status', render: (r: any) => <Badge variant={r.isActive ? 'success' : 'default'}>{r.isActive ? 'Active' : 'Inactive'}</Badge> },
     { key: 'actions', label: '', render: (r: any) => (
@@ -112,7 +112,7 @@ export default function ScholarshipsPage() {
             <div><label className={lbl}>Academic Year * <Link to="/academics/academic-years" target="_blank" className={manageLink}>+ Manage <ExternalLink size={10} /></Link></label>
               <select required value={form.academicYearId} onChange={e => setForm(f => ({ ...f, academicYearId: e.target.value }))} className={inp}>
                 <option value="">Select academic year</option>
-                {(academicYears?.items || []).map((ay: any) => <option key={ay._id} value={ay._id}>{ay.name}</option>)}
+                {(academicYears?.items || []).map((ay: any) => <option key={ay._id} value={ay._id}>{ay.label || ay.code}</option>)}
               </select>
             </div>
             <div><label className={lbl}>Max Recipients</label><input type="number" min={0} value={form.maxRecipients} onChange={e => setForm(f => ({ ...f, maxRecipients: e.target.value }))} className={inp} /></div>

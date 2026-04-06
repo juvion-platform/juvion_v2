@@ -60,7 +60,7 @@ export default function FinePenaltiesPage() {
   }
 
   const columns = [
-    { key: 'studentId', label: 'Student', render: (r: any) => <span className="font-medium text-navy">{r.studentId?.name || r.studentId?.firstName || '\u2014'}</span> },
+    { key: 'studentId', label: 'Student', render: (r: any) => <span className="font-medium text-navy">{r.studentId?.personId?.name || r.studentId?.rollNumber || '\u2014'}</span> },
     { key: 'type', label: 'Type', render: (r: any) => <Badge variant="info">{r.type}</Badge> },
     { key: 'reason', label: 'Reason' },
     { key: 'amount', label: 'Amount', render: (r: any) => `₹${Number(r.amount).toLocaleString()}` },
@@ -102,7 +102,7 @@ export default function FinePenaltiesPage() {
                 <option value="">Select student...</option>
                 {students.map((s: any) => (
                   <option key={s._id} value={s._id}>
-                    {s.name || [s.firstName, s.lastName].filter(Boolean).join(' ') || s.rollNumber || s._id}
+                    {s.person?.name || s.rollNumber || s._id}
                   </option>
                 ))}
               </select>

@@ -62,7 +62,7 @@ export default function BudgetsPage() {
   }
 
   const columns = [
-    { key: 'academicYear', label: 'Academic Year', render: (r: any) => r.academicYearId?.name || '\u2014' },
+    { key: 'academicYear', label: 'Academic Year', render: (r: any) => r.academicYearId?.label || r.academicYearId?.code || '\u2014' },
     { key: 'department', label: 'Department', render: (r: any) => r.departmentId?.name || '\u2014' },
     { key: 'category', label: 'Category', render: (r: any) => <span className="font-medium text-navy">{r.category}</span> },
     { key: 'allocatedAmount', label: 'Allocated', render: (r: any) => `₹${Number(r.allocatedAmount).toLocaleString()}` },
@@ -107,7 +107,7 @@ export default function BudgetsPage() {
               <label className={lbl}>Academic Year * <Link to="/academics/academic-years" target="_blank" className={manageLink}>+ Manage <ExternalLink size={10} /></Link></label>
               <select required value={form.academicYearId} onChange={e => setForm(f => ({ ...f, academicYearId: e.target.value }))} className={inp}>
                 <option value="">Select academic year</option>
-                {academicYears.map((ay: any) => <option key={ay._id} value={ay._id}>{ay.name}</option>)}
+                {academicYears.map((ay: any) => <option key={ay._id} value={ay._id}>{ay.label || ay.code}</option>)}
               </select>
             </div>
             <div>

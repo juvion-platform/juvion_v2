@@ -60,7 +60,7 @@ export default function PaymentsPage() {
   }
 
   const columns = [
-    { key: 'studentId', label: 'Student', render: (r: any) => <span className="font-medium text-navy">{r.studentId?.name || r.studentId?.firstName || '—'}</span> },
+    { key: 'studentId', label: 'Student', render: (r: any) => <span className="font-medium text-navy">{r.studentId?.personId?.name || r.studentId?.rollNumber || '—'}</span> },
     { key: 'receiptNumber', label: 'Receipt #' },
     { key: 'amount', label: 'Amount', render: (r: any) => `₹${Number(r.amount).toLocaleString()}` },
     { key: 'paymentMode', label: 'Mode', render: (r: any) => <Badge variant="info">{r.paymentMode}</Badge> },
@@ -102,7 +102,7 @@ export default function PaymentsPage() {
                 <option value="">Select student</option>
                 {(students?.items || []).map((s: any) => (
                   <option key={s._id} value={s._id}>
-                    {s.name || (s.firstName + ' ' + s.lastName) || s.rollNumber || s._id}
+                    {s.person?.name || s.rollNumber || s._id}
                   </option>
                 ))}
               </select>

@@ -59,12 +59,12 @@ export default function InvoicesPage() {
   }
 
   function studentLabel(s: any) {
-    return s.name || [s.firstName, s.lastName].filter(Boolean).join(' ') || s.rollNumber || s._id;
+    return s.person?.name || s.rollNumber || s._id;
   }
 
   const columns = [
     { key: 'invoiceNumber', label: 'Invoice #', render: (r: any) => <span className="font-medium text-navy">{r.invoiceNumber}</span> },
-    { key: 'studentId', label: 'Student', render: (r: any) => r.studentId?.name || r.studentId?.firstName || '—' },
+    { key: 'studentId', label: 'Student', render: (r: any) => r.studentId?.personId?.name || r.studentId?.rollNumber || '—' },
     { key: 'type', label: 'Type', render: (r: any) => <Badge variant="info">{r.type}</Badge> },
     { key: 'totalAmount', label: 'Total', render: (r: any) => `₹${Number(r.totalAmount).toLocaleString()}` },
     { key: 'dueDate', label: 'Due Date', render: (r: any) => r.dueDate ? new Date(r.dueDate).toLocaleDateString() : '-' },

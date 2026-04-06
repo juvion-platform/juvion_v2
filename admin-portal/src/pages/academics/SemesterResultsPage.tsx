@@ -41,7 +41,7 @@ export default function SemesterResultsPage() {
   }
 
   const columns = [
-    { key: 'studentId', label: 'Student', render: (r: any) => <span className="font-medium text-navy">{typeof r.studentId === 'object' ? r.studentId.name || r.studentId._id : r.studentId}</span> },
+    { key: 'studentId', label: 'Student', render: (r: any) => <span className="font-medium text-navy">{typeof r.studentId === 'object' ? r.studentId.personId?.name || r.studentId.rollNumber || r.studentId._id : r.studentId}</span> },
     { key: 'semesterId', label: 'Semester', render: (r: any) => typeof r.semesterId === 'object' ? `Sem ${r.semesterId.number}` : r.semesterId },
     { key: 'sgpa', label: 'SGPA', render: (r: any) => <span className="font-bold">{r.sgpa?.toFixed(2)}</span> },
     { key: 'cgpa', label: 'CGPA', render: (r: any) => <span className="font-bold">{r.cgpa?.toFixed(2)}</span> },

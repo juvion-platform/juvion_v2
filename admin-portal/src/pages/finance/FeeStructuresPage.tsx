@@ -86,7 +86,7 @@ export default function FeeStructuresPage() {
 
   const columns = [
     { key: 'programmeId', label: 'Programme', render: (r: any) => <span className="font-medium text-navy">{r.programmeId?.name || '—'}</span> },
-    { key: 'academicYearId', label: 'Academic Year', render: (r: any) => <span>{r.academicYearId?.name || '—'}</span> },
+    { key: 'academicYearId', label: 'Academic Year', render: (r: any) => <span>{r.academicYearId?.label || r.academicYearId?.code || '—'}</span> },
     { key: 'year', label: 'Year' },
     { key: 'quota', label: 'Quota', render: (r: any) => <Badge variant="info">{r.quota}</Badge> },
     { key: 'totalAmount', label: 'Total Amount', render: (r: any) => `₹${Number(r.totalAmount).toLocaleString()}` },

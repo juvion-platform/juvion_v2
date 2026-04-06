@@ -66,11 +66,11 @@ export default function ConcessionsPage() {
   }
 
   function studentDisplayName(s: any): string {
-    return s.name || [s.firstName, s.lastName].filter(Boolean).join(' ') || s.rollNumber || s._id;
+    return s.person?.name || s.rollNumber || s._id;
   }
 
   const columns = [
-    { key: 'studentId', label: 'Student', render: (r: any) => <span className="font-medium text-navy">{r.studentId?.name || r.studentId?.firstName || '\u2014'}</span> },
+    { key: 'studentId', label: 'Student', render: (r: any) => <span className="font-medium text-navy">{r.studentId?.personId?.name || r.studentId?.rollNumber || '\u2014'}</span> },
     { key: 'type', label: 'Type', render: (r: any) => <Badge variant="info">{r.type}</Badge> },
     { key: 'percentage', label: '% / Flat', render: (r: any) => r.percentage ? `${r.percentage}%` : r.flatAmount ? `\u20B9${Number(r.flatAmount).toLocaleString()}` : '-' },
     { key: 'reason', label: 'Reason' },
@@ -122,7 +122,7 @@ export default function ConcessionsPage() {
             <div><label className={lbl}>Academic Year * <Link to="/academics/academic-years" target="_blank" className={manageLink}>+ Manage <ExternalLink size={10} /></Link></label>
               <select required value={form.academicYearId} onChange={e => setForm(f => ({ ...f, academicYearId: e.target.value }))} className={inp}>
                 <option value="">Select academic year...</option>
-                {academicYears.map((ay: any) => <option key={ay._id} value={ay._id}>{ay.name}</option>)}
+                {academicYears.map((ay: any) => <option key={ay._id} value={ay._id}>{ay.label || ay.code}</option>)}
               </select>
             </div>
             <div><label className={lbl}>Status *</label>

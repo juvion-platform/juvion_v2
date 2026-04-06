@@ -42,7 +42,7 @@ export default function GradeCardsPage() {
   }
 
   const columns = [
-    { key: 'studentId', label: 'Student', render: (r: any) => <span className="font-medium text-navy">{typeof r.studentId === 'object' ? r.studentId.name || r.studentId._id : r.studentId}</span> },
+    { key: 'studentId', label: 'Student', render: (r: any) => <span className="font-medium text-navy">{typeof r.studentId === 'object' ? r.studentId.personId?.name || r.studentId.rollNumber || r.studentId._id : r.studentId}</span> },
     { key: 'courseId', label: 'Course', render: (r: any) => typeof r.courseId === 'object' ? `${r.courseId.code}` : r.courseId },
     { key: 'internalMarks', label: 'Internal' },
     { key: 'externalMarks', label: 'External' },
