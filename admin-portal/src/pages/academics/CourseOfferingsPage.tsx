@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listCourseOfferings, createCourseOffering, updateCourseOffering, deleteCourseOffering, listCourses, listSemesters, listSections } from '../../services/academics';
+import { listFaculty } from '../../services/people';
 import DataTable from '../../components/ui/DataTable';
 import Modal from '../../components/ui/Modal';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, ExternalLink } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none";
 const lbl = "block text-sm font-medium text-gray-700 mb-1";
+const manageLink = "inline-flex items-center gap-0.5 text-xs text-primary-500 hover:text-primary-700 font-medium ml-1";
 
 export default function CourseOfferingsPage() {
   const qc = useQueryClient();
@@ -19,6 +22,8 @@ export default function CourseOfferingsPage() {
   const { data: coursesData } = useQuery({ queryKey: ['courses', 1, 200], queryFn: () => listCourses(1, 200) });
   const { data: semData } = useQuery({ queryKey: ['semesters', 1, 100], queryFn: () => listSemesters(1, 100) });
   const { data: secData } = useQuery({ queryKey: ['sections', 1, 100], queryFn: () => listSections(1, 100) });
+  const { data: facultyData } = useQuery({ queryKey: ['faculty-all'], queryFn: () => listFaculty(1, 200) });
+  const faculty = facultyData?.items || [];
 
   const createMut = useMutation({ mutationFn: createCourseOffering, onSuccess: () => { qc.invalidateQueries({ queryKey: ['offerings'] }); qc.invalidateQueries({ queryKey: ['academics-stats'] }); closeModal(); } });
   const updateMut = useMutation({ mutationFn: ({ id, data }: any) => updateCourseOffering(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['offerings'] }); closeModal(); } });
@@ -92,7 +97,12 @@ export default function CourseOfferingsPage() {
                 {secData?.items?.map((s: any) => <option key={s._id} value={s._id}>{s.name}</option>)}
               </select>
             </div>
-            <div><label className={lbl}>Faculty ID *</label><input required value={form.facultyId} onChange={e => setForm(f => ({ ...f, facultyId: e.target.value }))} className={inp} placeholder="Faculty ObjectId" /></div>
+            <div><label className={lbl}>Faculty <Link to="/people/faculty" target="_blank" className={manageLink}>+ Manage <ExternalLink size={10} /></Link></label>
+              <select value={form.facultyId} onChange={e => setForm(f => ({ ...f, facultyId: e.target.value }))} className={inp}>
+                <option value="">None</option>
+                {faculty.map((f: any) => <option key={f._id} value={f._id}>{f.person?.name || f.employeeCode || f._id}</option>)}
+              </select>
+            </div>
             <div><label className={lbl}>Max Enrollment</label><input type="number" min={1} value={form.maxEnrollment} onChange={e => setForm(f => ({ ...f, maxEnrollment: e.target.value }))} className={inp} /></div>
           </div>
           <div className="flex justify-end gap-3 pt-2 border-t">

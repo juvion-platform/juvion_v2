@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listSections, createSection, updateSection, deleteSection, listBranches, listBatches } from '../../services/academics';
+import { listFaculty } from '../../services/people';
 import DataTable from '../../components/ui/DataTable';
 import Modal from '../../components/ui/Modal';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, ExternalLink } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none";
 const lbl = "block text-sm font-medium text-gray-700 mb-1";
+const manageLink = "inline-flex items-center gap-0.5 text-xs text-primary-500 hover:text-primary-700 font-medium ml-1";
 
 export default function SectionsPage() {
   const qc = useQueryClient();
@@ -18,6 +21,8 @@ export default function SectionsPage() {
   const { data, isLoading } = useQuery({ queryKey: ['sections', page], queryFn: () => listSections(page, 20) });
   const { data: branchData } = useQuery({ queryKey: ['branches', 1, 100], queryFn: () => listBranches(1, 100) });
   const { data: batchData } = useQuery({ queryKey: ['batches', 1, 100], queryFn: () => listBatches(1, 100) });
+  const { data: facultyData } = useQuery({ queryKey: ['faculty-all'], queryFn: () => listFaculty(1, 200) });
+  const faculty = facultyData?.items || [];
 
   const createMut = useMutation({ mutationFn: createSection, onSuccess: () => { qc.invalidateQueries({ queryKey: ['sections'] }); qc.invalidateQueries({ queryKey: ['academics-stats'] }); closeModal(); } });
   const updateMut = useMutation({ mutationFn: ({ id, data }: any) => updateSection(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['sections'] }); closeModal(); } });
@@ -91,7 +96,12 @@ export default function SectionsPage() {
             </div>
             <div><label className={lbl}>Year *</label><input required type="number" min={1} max={6} value={form.year} onChange={e => setForm(f => ({ ...f, year: e.target.value }))} className={inp} placeholder="e.g. 1, 2, 3, 4" /></div>
             <div><label className={lbl}>Semester *</label><input required type="number" min={1} max={12} value={form.semester} onChange={e => setForm(f => ({ ...f, semester: e.target.value }))} className={inp} placeholder="e.g. 1, 2" /></div>
-            <div className="col-span-2"><label className={lbl}>Class Advisor (Faculty ID)</label><input value={form.classAdvisorId} onChange={e => setForm(f => ({ ...f, classAdvisorId: e.target.value }))} className={inp} placeholder="Optional — Faculty ObjectId" /></div>
+            <div className="col-span-2"><label className={lbl}>Class Advisor (Faculty) <Link to="/people/faculty" target="_blank" className={manageLink}>+ Manage <ExternalLink size={10} /></Link></label>
+              <select value={form.classAdvisorId} onChange={e => setForm(f => ({ ...f, classAdvisorId: e.target.value }))} className={inp}>
+                <option value="">None</option>
+                {faculty.map((f: any) => <option key={f._id} value={f._id}>{f.person?.name || f.employeeCode || f._id}</option>)}
+              </select>
+            </div>
           </div>
           <div className="flex justify-end gap-3 pt-2 border-t">
             <button type="button" onClick={closeModal} className="px-4 py-2 border rounded-lg text-sm">Cancel</button>

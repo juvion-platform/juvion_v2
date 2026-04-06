@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { listExamScores, createExamScore } from '../../services/admissions';
+import { Link } from 'react-router-dom';
+import { listExamScores, createExamScore, listApplicants } from '../../services/admissions';
 import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
-import { Plus } from 'lucide-react';
+import { Plus, ExternalLink } from 'lucide-react';
+
+const manageLink = "inline-flex items-center gap-0.5 text-xs text-primary-500 hover:text-primary-700 font-medium ml-1";
 
 const EXAMS = ['EAMCET', 'JEE', 'ECET'] as const;
 
@@ -18,6 +21,8 @@ export default function ExamScoresPage() {
     queryKey: ['exam-scores', page],
     queryFn: () => listExamScores(page, 20),
   });
+
+  const { data: applicantsData } = useQuery({ queryKey: ['applicants-all'], queryFn: () => listApplicants(1, 200) });
 
   const createMut = useMutation({
     mutationFn: createExamScore,
@@ -66,8 +71,16 @@ export default function ExamScoresPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
-              <label className="block text-sm font-medium mb-1">Applicant ID *</label>
-              <input required value={form.applicantId} onChange={e => setForm(f => ({ ...f, applicantId: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" />
+              <label className="block text-sm font-medium mb-1">
+                Applicant *
+                <Link to="/admissions/applicants" className={manageLink}>+ Manage <ExternalLink size={11} /></Link>
+              </label>
+              <select required value={form.applicantId} onChange={e => setForm(f => ({ ...f, applicantId: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm">
+                <option value="">Select applicant...</option>
+                {(applicantsData?.items || []).map((a: any) => (
+                  <option key={a._id} value={a._id}>{a.name || a.email || a._id}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Exam Type *</label>

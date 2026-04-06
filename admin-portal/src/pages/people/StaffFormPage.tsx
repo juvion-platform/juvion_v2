@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getStaff, createStaff, updateStaff } from '../../services/people';
+import { listDepartments } from '../../services/academics';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 
 const STATUSES = ['active', 'on_leave', 'separated'] as const;
@@ -10,7 +11,7 @@ const GENDERS = ['male', 'female', 'other'] as const;
 
 const emptyForm = {
   name: '', phone: '', email: '', gender: '', dob: '', aadhaar: '',
-  employeeCode: '', designation: '', staffType: 'Administrative', status: 'active',
+  employeeCode: '', designation: '', departmentId: '', staffType: 'Administrative', status: 'active',
   // Address
   line1: '', line2: '', city: '', state: '', pincode: '',
 };
@@ -31,6 +32,8 @@ export default function StaffFormPage() {
     enabled: isEdit,
   });
 
+  const { data: departmentsData } = useQuery({ queryKey: ['departments'], queryFn: () => listDepartments(1, 200) });
+
   useEffect(() => {
     if (existing) {
       const p = existing.person || existing.personId || {};
@@ -39,6 +42,7 @@ export default function StaffFormPage() {
         name: p.name || '', phone: p.phone || '', email: p.email || '', gender: p.gender || '',
         dob: p.dob ? p.dob.substring(0, 10) : '', aadhaar: p.aadhaar || '',
         employeeCode: existing.employeeCode || '', designation: existing.designation || '',
+        departmentId: existing.departmentId?._id || existing.departmentId || '',
         staffType: existing.staffType || 'Administrative', status: existing.status || 'active',
         line1: addr.line1 || '', line2: addr.line2 || '', city: addr.city || '',
         state: addr.state || '', pincode: addr.pincode || '',
@@ -140,6 +144,13 @@ export default function StaffFormPage() {
           <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-4">
             <div><label className={lbl}>Employee Code <span className="text-red-500">*</span></label><input required value={form.employeeCode} onChange={e => setForm(f => ({ ...f, employeeCode: e.target.value }))} className={inp} placeholder="e.g. STF-001" /></div>
             <div><label className={lbl}>Designation <span className="text-red-500">*</span></label><input required value={form.designation} onChange={e => setForm(f => ({ ...f, designation: e.target.value }))} className={inp} placeholder="e.g. Office Superintendent" /></div>
+            <div>
+              <div className="flex items-center justify-between mb-1"><label className="text-sm font-medium text-gray-700">Department</label><Link to="/academics/departments" className="text-xs text-primary-600 hover:underline">+ Manage</Link></div>
+              <select value={form.departmentId} onChange={e => setForm(f => ({ ...f, departmentId: e.target.value }))} className={inp}>
+                <option value="">Select...</option>
+                {(departmentsData?.items || []).map((d: any) => <option key={d._id} value={d._id}>{d.name}</option>)}
+              </select>
+            </div>
             <div><label className={lbl}>Staff Type <span className="text-red-500">*</span></label><select required value={form.staffType} onChange={e => setForm(f => ({ ...f, staffType: e.target.value }))} className={inp}>{STAFF_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
             <div><label className={lbl}>Status</label><select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className={inp}>{STATUSES.map(s => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}</select></div>
           </div>

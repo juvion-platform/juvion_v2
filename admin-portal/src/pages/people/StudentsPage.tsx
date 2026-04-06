@@ -34,8 +34,8 @@ export default function StudentsPage() {
     { key: 'phone', label: 'Phone', render: (r: any) => (r.person?.phone || r.personId?.phone || '—') },
     { key: 'rollNumber', label: 'Roll No', render: (r: any) => r.rollNumber || '—' },
     { key: 'admissionYear', label: 'Year' },
-    { key: 'quota', label: 'Quota', render: (r: any) => r.quota ? <span className="capitalize">{r.quota}</span> : '—' },
-    { key: 'category', label: 'Category', render: (r: any) => r.category || '—' },
+    { key: 'programme', label: 'Programme', render: (r: any) => r.programme?.name || '—' },
+    { key: 'branch', label: 'Branch', render: (r: any) => r.branch?.name || '—' },
     { key: 'status', label: 'Status', render: (r: any) => <Badge variant={STATUS_COLOR[r.status]}>{r.status?.replace(/_/g, ' ')}</Badge> },
     { key: 'actions', label: '', render: (r: any) => (
       <div className="flex gap-1">

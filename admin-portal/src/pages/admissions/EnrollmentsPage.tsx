@@ -1,10 +1,14 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { listEnrollments, createEnrollment } from '../../services/admissions';
+import { Link } from 'react-router-dom';
+import { listEnrollments, createEnrollment, listApplicants } from '../../services/admissions';
+import { listStudents } from '../../services/people';
 import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
-import { Plus } from 'lucide-react';
+import { Plus, ExternalLink } from 'lucide-react';
+
+const manageLink = "inline-flex items-center gap-0.5 text-xs text-primary-500 hover:text-primary-700 font-medium ml-1";
 
 export default function EnrollmentsPage() {
   const qc = useQueryClient();
@@ -16,6 +20,9 @@ export default function EnrollmentsPage() {
     queryKey: ['enrollments', page],
     queryFn: () => listEnrollments(page, 20),
   });
+
+  const { data: applicantsData } = useQuery({ queryKey: ['applicants-all'], queryFn: () => listApplicants(1, 200) });
+  const { data: studentsData } = useQuery({ queryKey: ['students-all'], queryFn: () => listStudents(1, 200) });
 
   const createMut = useMutation({
     mutationFn: createEnrollment,
@@ -57,12 +64,28 @@ export default function EnrollmentsPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Applicant ID *</label>
-              <input required value={form.applicantId} onChange={e => setForm(f => ({ ...f, applicantId: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" />
+              <label className="block text-sm font-medium mb-1">
+                Applicant *
+                <Link to="/admissions/applicants" className={manageLink}>+ Manage <ExternalLink size={11} /></Link>
+              </label>
+              <select required value={form.applicantId} onChange={e => setForm(f => ({ ...f, applicantId: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm">
+                <option value="">Select applicant...</option>
+                {(applicantsData?.items || []).map((a: any) => (
+                  <option key={a._id} value={a._id}>{a.name || a.email || a._id}</option>
+                ))}
+              </select>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Student ID</label>
-              <input value={form.studentId} onChange={e => setForm(f => ({ ...f, studentId: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Optional — auto-generated" />
+              <label className="block text-sm font-medium mb-1">
+                Student
+                <Link to="/people" className={manageLink}>+ Manage <ExternalLink size={11} /></Link>
+              </label>
+              <select value={form.studentId} onChange={e => setForm(f => ({ ...f, studentId: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm">
+                <option value="">None</option>
+                {(studentsData?.items || []).map((s: any) => (
+                  <option key={s._id} value={s._id}>{s.person?.name || s.rollNumber || s._id}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Admission Date *</label>

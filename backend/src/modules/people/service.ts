@@ -11,6 +11,21 @@ import { AppError } from '../../middleware/errorHandler';
 
 const toOid = (id: string) => new mongoose.Types.ObjectId(id);
 
+// ─── Dashboard Stats ─────────────────────────────────
+export async function getDashboardStats(collegeId: string) {
+  const [persons, students, activeStudents, faculty, activeFaculty, staff, activeStaff, parents] = await Promise.all([
+    Person.countDocuments({ collegeId }),
+    Student.countDocuments({ collegeId }),
+    Student.countDocuments({ collegeId, status: 'active' }),
+    Faculty.countDocuments({ collegeId }),
+    Faculty.countDocuments({ collegeId, status: 'active' }),
+    Staff.countDocuments({ collegeId }),
+    Staff.countDocuments({ collegeId, status: 'active' }),
+    Parent.countDocuments({ collegeId }),
+  ]);
+  return { persons, students, activeStudents, faculty, activeFaculty, staff, activeStaff, parents };
+}
+
 // ─── Helpers ─────────────────────────────────────────
 
 /** Create a Person record, return the document */
@@ -100,6 +115,14 @@ export async function listStudents(collegeId: string, page: number, limit: numbe
     { $match: filter },
     { $lookup: { from: 'people', localField: 'personId', foreignField: '_id', as: 'person' } },
     { $unwind: '$person' },
+    { $lookup: { from: 'regulations', localField: 'regulationId', foreignField: '_id', as: 'regulation' } },
+    { $unwind: { path: '$regulation', preserveNullAndEmptyArrays: true } },
+    { $lookup: { from: 'programmes', localField: 'programmeId', foreignField: '_id', as: 'programme' } },
+    { $unwind: { path: '$programme', preserveNullAndEmptyArrays: true } },
+    { $lookup: { from: 'branches', localField: 'branchId', foreignField: '_id', as: 'branch' } },
+    { $unwind: { path: '$branch', preserveNullAndEmptyArrays: true } },
+    { $lookup: { from: 'batches', localField: 'batchId', foreignField: '_id', as: 'batch' } },
+    { $unwind: { path: '$batch', preserveNullAndEmptyArrays: true } },
   ];
   if (search) pipeline.push({ $match: { 'person.name': { $regex: search, $options: 'i' } } });
 
@@ -112,7 +135,7 @@ export async function listStudents(collegeId: string, page: number, limit: numbe
 }
 
 export async function getStudent(collegeId: string, id: string) {
-  const doc = await Student.findOne({ _id: id, collegeId }).populate('personId').lean();
+  const doc = await Student.findOne({ _id: id, collegeId }).populate('personId').populate('regulationId').populate('programmeId').populate('branchId').populate('batchId').lean();
   if (!doc) throw new AppError(404, 'Student not found');
   return doc;
 }
@@ -125,7 +148,7 @@ export async function createStudent(collegeId: string, data: any, performedBy: s
     admissionYear: data.admissionYear,
     status: data.status || 'active',
   };
-  ['category', 'quota', 'rollNumber'].forEach(k => { if (data[k]) studentFields[k] = data[k]; });
+  ['category', 'quota', 'rollNumber', 'regulationId', 'programmeId', 'branchId', 'batchId'].forEach(k => { if (data[k]) studentFields[k] = data[k]; });
   const doc = await Student.create(studentFields);
   await createAuditLog({ collegeId, entityType: 'Student', entityId: String(doc._id), entityName: data.name, action: 'create', changes: [], performedBy });
   return { ...doc.toObject(), person: person.toObject() };
@@ -140,7 +163,7 @@ export async function updateStudent(collegeId: string, id: string, data: any, pe
   if (Object.keys(personFields).length > 0) await Person.findByIdAndUpdate(student.personId, { $set: personFields });
 
   const studentFields: any = {};
-  ['admissionYear', 'category', 'quota', 'rollNumber', 'status'].forEach(k => { if (data[k] !== undefined) studentFields[k] = data[k]; });
+  ['admissionYear', 'category', 'quota', 'rollNumber', 'status', 'regulationId', 'programmeId', 'branchId', 'batchId'].forEach(k => { if (data[k] !== undefined) studentFields[k] = data[k]; });
   if (Object.keys(studentFields).length > 0) await Student.findByIdAndUpdate(id, { $set: studentFields });
 
   await createAuditLog({ collegeId, entityType: 'Student', entityId: id, entityName: data.name || 'Student', action: 'update', changes: [], performedBy });
@@ -165,6 +188,8 @@ export async function listFaculty(collegeId: string, page: number, limit: number
     { $match: filter },
     { $lookup: { from: 'people', localField: 'personId', foreignField: '_id', as: 'person' } },
     { $unwind: '$person' },
+    { $lookup: { from: 'departments', localField: 'departmentId', foreignField: '_id', as: 'department' } },
+    { $unwind: { path: '$department', preserveNullAndEmptyArrays: true } },
   ];
   if (search) pipeline.push({ $match: { 'person.name': { $regex: search, $options: 'i' } } });
 
@@ -177,7 +202,7 @@ export async function listFaculty(collegeId: string, page: number, limit: number
 }
 
 export async function getFaculty(collegeId: string, id: string) {
-  const doc = await Faculty.findOne({ _id: id, collegeId }).populate('personId').lean();
+  const doc = await Faculty.findOne({ _id: id, collegeId }).populate('personId').populate('departmentId').lean();
   if (!doc) throw new AppError(404, 'Faculty not found');
   return doc;
 }
@@ -189,7 +214,7 @@ export async function createFaculty(collegeId: string, data: any, performedBy: s
     employeeCode: data.employeeCode, designation: data.designation,
     contractType: data.contractType || 'regular', status: data.status || 'active',
   };
-  ['specialization', 'qualification'].forEach(k => { if (data[k]) fields[k] = data[k]; });
+  ['specialization', 'qualification', 'departmentId'].forEach(k => { if (data[k]) fields[k] = data[k]; });
   const doc = await Faculty.create(fields);
   await createAuditLog({ collegeId, entityType: 'Faculty', entityId: String(doc._id), entityName: data.name, action: 'create', changes: [], performedBy });
   return { ...doc.toObject(), person: person.toObject() };
@@ -204,11 +229,11 @@ export async function updateFaculty(collegeId: string, id: string, data: any, pe
   if (Object.keys(personFields).length > 0) await Person.findByIdAndUpdate(fac.personId, { $set: personFields });
 
   const facFields: any = {};
-  ['employeeCode', 'designation', 'specialization', 'qualification', 'contractType', 'status'].forEach(k => { if (data[k] !== undefined) facFields[k] = data[k]; });
+  ['employeeCode', 'designation', 'specialization', 'qualification', 'contractType', 'status', 'departmentId'].forEach(k => { if (data[k] !== undefined) facFields[k] = data[k]; });
   if (Object.keys(facFields).length > 0) await Faculty.findByIdAndUpdate(id, { $set: facFields });
 
   await createAuditLog({ collegeId, entityType: 'Faculty', entityId: id, entityName: data.name || 'Faculty', action: 'update', changes: [], performedBy });
-  const doc = await Faculty.findById(id).populate('personId').lean();
+  const doc = await Faculty.findById(id).populate('personId').populate('departmentId').lean();
   return doc;
 }
 
@@ -230,6 +255,8 @@ export async function listStaff(collegeId: string, page: number, limit: number, 
     { $match: filter },
     { $lookup: { from: 'people', localField: 'personId', foreignField: '_id', as: 'person' } },
     { $unwind: '$person' },
+    { $lookup: { from: 'departments', localField: 'departmentId', foreignField: '_id', as: 'department' } },
+    { $unwind: { path: '$department', preserveNullAndEmptyArrays: true } },
   ];
   if (search) pipeline.push({ $match: { 'person.name': { $regex: search, $options: 'i' } } });
 
@@ -242,7 +269,7 @@ export async function listStaff(collegeId: string, page: number, limit: number, 
 }
 
 export async function getStaff(collegeId: string, id: string) {
-  const doc = await Staff.findOne({ _id: id, collegeId }).populate('personId').lean();
+  const doc = await Staff.findOne({ _id: id, collegeId }).populate('personId').populate('departmentId').lean();
   if (!doc) throw new AppError(404, 'Staff not found');
   return doc;
 }
@@ -254,6 +281,7 @@ export async function createStaff(collegeId: string, data: any, performedBy: str
     employeeCode: data.employeeCode, designation: data.designation,
     staffType: data.staffType, status: data.status || 'active',
   };
+  if (data.departmentId) fields.departmentId = data.departmentId;
   const doc = await Staff.create(fields);
   await createAuditLog({ collegeId, entityType: 'Staff', entityId: String(doc._id), entityName: data.name, action: 'create', changes: [], performedBy });
   return { ...doc.toObject(), person: person.toObject() };
@@ -268,11 +296,11 @@ export async function updateStaff(collegeId: string, id: string, data: any, perf
   if (Object.keys(personFields).length > 0) await Person.findByIdAndUpdate(s.personId, { $set: personFields });
 
   const staffFields: any = {};
-  ['employeeCode', 'designation', 'staffType', 'status'].forEach(k => { if (data[k] !== undefined) staffFields[k] = data[k]; });
+  ['employeeCode', 'designation', 'staffType', 'status', 'departmentId'].forEach(k => { if (data[k] !== undefined) staffFields[k] = data[k]; });
   if (Object.keys(staffFields).length > 0) await Staff.findByIdAndUpdate(id, { $set: staffFields });
 
   await createAuditLog({ collegeId, entityType: 'Staff', entityId: id, entityName: data.name || 'Staff', action: 'update', changes: [], performedBy });
-  const doc = await Staff.findById(id).populate('personId').lean();
+  const doc = await Staff.findById(id).populate('personId').populate('departmentId').lean();
   return doc;
 }
 
@@ -360,16 +388,3 @@ export async function deleteOrganization(collegeId: string, id: string, performe
   return { deleted: true };
 }
 
-// ─── Dashboard Stats ─────────────────────────────────
-
-export async function getDashboardStats(collegeId: string) {
-  const [persons, students, faculty, staff, parents, organizations] = await Promise.all([
-    Person.countDocuments({ collegeId }),
-    Student.countDocuments({ collegeId }),
-    Faculty.countDocuments({ collegeId }),
-    Staff.countDocuments({ collegeId }),
-    Parent.countDocuments({ collegeId }),
-    Organization.countDocuments({ collegeId }),
-  ]);
-  return { persons, students, faculty, staff, parents, organizations };
-}

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getFaculty, createFaculty, updateFaculty } from '../../services/people';
+import { listDepartments } from '../../services/academics';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 
 const STATUSES = ['active', 'on_leave', 'separated'] as const;
@@ -11,7 +12,7 @@ const GENDERS = ['male', 'female', 'other'] as const;
 const emptyForm = {
   name: '', phone: '', email: '', gender: '', dob: '', aadhaar: '',
   employeeCode: '', designation: '', specialization: '', qualification: '',
-  contractType: 'regular', status: 'active',
+  departmentId: '', contractType: 'regular', status: 'active',
   // Address
   line1: '', line2: '', city: '', state: '', pincode: '',
 };
@@ -32,6 +33,8 @@ export default function FacultyFormPage() {
     enabled: isEdit,
   });
 
+  const { data: departmentsData } = useQuery({ queryKey: ['departments'], queryFn: () => listDepartments(1, 200) });
+
   useEffect(() => {
     if (existing) {
       const p = existing.person || existing.personId || {};
@@ -41,6 +44,7 @@ export default function FacultyFormPage() {
         dob: p.dob ? p.dob.substring(0, 10) : '', aadhaar: p.aadhaar || '',
         employeeCode: existing.employeeCode || '', designation: existing.designation || '',
         specialization: existing.specialization || '', qualification: existing.qualification || '',
+        departmentId: existing.departmentId?._id || existing.departmentId || '',
         contractType: existing.contractType || 'regular', status: existing.status || 'active',
         line1: addr.line1 || '', line2: addr.line2 || '', city: addr.city || '',
         state: addr.state || '', pincode: addr.pincode || '',
@@ -142,6 +146,13 @@ export default function FacultyFormPage() {
           <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-4">
             <div><label className={lbl}>Employee Code <span className="text-red-500">*</span></label><input required value={form.employeeCode} onChange={e => setForm(f => ({ ...f, employeeCode: e.target.value }))} className={inp} placeholder="e.g. FAC-001" /></div>
             <div><label className={lbl}>Designation <span className="text-red-500">*</span></label><input required value={form.designation} onChange={e => setForm(f => ({ ...f, designation: e.target.value }))} className={inp} placeholder="e.g. Associate Professor" /></div>
+            <div>
+              <div className="flex items-center justify-between mb-1"><label className="text-sm font-medium text-gray-700">Department</label><Link to="/academics/departments" className="text-xs text-primary-600 hover:underline">+ Manage</Link></div>
+              <select value={form.departmentId} onChange={e => setForm(f => ({ ...f, departmentId: e.target.value }))} className={inp}>
+                <option value="">Select...</option>
+                {(departmentsData?.items || []).map((d: any) => <option key={d._id} value={d._id}>{d.name}</option>)}
+              </select>
+            </div>
             <div><label className={lbl}>Qualification</label><input value={form.qualification} onChange={e => setForm(f => ({ ...f, qualification: e.target.value }))} className={inp} placeholder="e.g. Ph.D, M.Tech" /></div>
             <div><label className={lbl}>Specialization</label><input value={form.specialization} onChange={e => setForm(f => ({ ...f, specialization: e.target.value }))} className={inp} placeholder="e.g. Data Science, AI/ML" /></div>
             <div><label className={lbl}>Contract Type</label><select value={form.contractType} onChange={e => setForm(f => ({ ...f, contractType: e.target.value }))} className={inp}>{CONTRACT_TYPES.map(c => <option key={c} value={c} className="capitalize">{c}</option>)}</select></div>

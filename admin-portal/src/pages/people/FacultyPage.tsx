@@ -31,6 +31,7 @@ export default function FacultyPage() {
     { key: 'name', label: 'Name', render: (r: any) => (r.person?.name || r.personId?.name || '—') },
     { key: 'phone', label: 'Phone', render: (r: any) => (r.person?.phone || r.personId?.phone || '—') },
     { key: 'designation', label: 'Designation' },
+    { key: 'department', label: 'Department', render: (r: any) => r.department?.name || '—' },
     { key: 'qualification', label: 'Qualification', render: (r: any) => r.qualification || '—' },
     { key: 'contractType', label: 'Contract', render: (r: any) => <span className="capitalize">{r.contractType}</span> },
     { key: 'status', label: 'Status', render: (r: any) => <Badge variant={STATUS_COLOR[r.status]}>{r.status?.replace(/_/g, ' ')}</Badge> },

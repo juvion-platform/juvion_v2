@@ -13,6 +13,7 @@ import complianceRouter from '../modules/compliance/routes';
 import governanceRouter from '../modules/governance/routes';
 import platformRouter from '../modules/platform/routes';
 import juviRouter from '../modules/juvi/routes';
+import collegesRouter from '../modules/colleges/routes';
 
 const router = Router();
 
@@ -30,5 +31,6 @@ router.use('/compliance', complianceRouter);    // M10
 router.use('/governance', governanceRouter);    // M11
 router.use('/platform', platformRouter);        // M12
 router.use('/juvi', juviRouter);                // Juvi
+router.use('/colleges', collegesRouter);        // College Management (superadmin)
 
 export default router;

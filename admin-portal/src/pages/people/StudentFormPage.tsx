@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getStudent, createStudent, updateStudent } from '../../services/people';
+import { listRegulations, listProgrammes, listBranches, listBatches } from '../../services/academics';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 
 const STATUSES = ['prospective', 'active', 'year_back', 'detained', 'graduated', 'exited', 'alumni'] as const;
@@ -11,6 +12,7 @@ const GENDERS = ['male', 'female', 'other'] as const;
 const emptyForm = {
   name: '', phone: '', email: '', gender: '', dob: '', aadhaar: '',
   admissionYear: new Date().getFullYear().toString(), category: '', quota: '', rollNumber: '',
+  regulationId: '', programmeId: '', branchId: '', batchId: '',
   status: 'active',
   // Address
   line1: '', line2: '', city: '', state: '', pincode: '',
@@ -32,6 +34,11 @@ export default function StudentFormPage() {
     enabled: isEdit,
   });
 
+  const { data: regulationsData } = useQuery({ queryKey: ['regulations'], queryFn: () => listRegulations(1, 200) });
+  const { data: programmesData } = useQuery({ queryKey: ['programmes'], queryFn: () => listProgrammes(1, 200) });
+  const { data: branchesData } = useQuery({ queryKey: ['branches'], queryFn: () => listBranches(1, 200) });
+  const { data: batchesData } = useQuery({ queryKey: ['batches'], queryFn: () => listBatches(1, 200) });
+
   useEffect(() => {
     if (existing) {
       const p = existing.person || existing.personId || {};
@@ -41,6 +48,10 @@ export default function StudentFormPage() {
         dob: p.dob ? p.dob.substring(0, 10) : '', aadhaar: p.aadhaar || '',
         admissionYear: String(existing.admissionYear || ''), category: existing.category || '',
         quota: existing.quota || '', rollNumber: existing.rollNumber || '',
+        regulationId: existing.regulationId?._id || existing.regulationId || '',
+        programmeId: existing.programmeId?._id || existing.programmeId || '',
+        branchId: existing.branchId?._id || existing.branchId || '',
+        batchId: existing.batchId?._id || existing.batchId || '',
         status: existing.status || 'active',
         line1: addr.line1 || '', line2: addr.line2 || '', city: addr.city || '',
         state: addr.state || '', pincode: addr.pincode || '',
@@ -143,6 +154,34 @@ export default function StudentFormPage() {
           <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-4">
             <div><label className={lbl}>Admission Year <span className="text-red-500">*</span></label><input required type="number" value={form.admissionYear} onChange={e => setForm(f => ({ ...f, admissionYear: e.target.value }))} className={inp} /></div>
             <div><label className={lbl}>Roll Number</label><input value={form.rollNumber} onChange={e => setForm(f => ({ ...f, rollNumber: e.target.value }))} className={inp} /></div>
+            <div>
+              <div className="flex items-center justify-between mb-1"><label className="text-sm font-medium text-gray-700">Regulation</label><Link to="/academics/regulations" className="text-xs text-primary-600 hover:underline">+ Manage</Link></div>
+              <select value={form.regulationId} onChange={e => setForm(f => ({ ...f, regulationId: e.target.value }))} className={inp}>
+                <option value="">Select...</option>
+                {(regulationsData?.items || []).map((r: any) => <option key={r._id} value={r._id}>{r.code + ' - ' + r.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-1"><label className="text-sm font-medium text-gray-700">Programme</label><Link to="/academics/programmes" className="text-xs text-primary-600 hover:underline">+ Manage</Link></div>
+              <select value={form.programmeId} onChange={e => setForm(f => ({ ...f, programmeId: e.target.value }))} className={inp}>
+                <option value="">Select...</option>
+                {(programmesData?.items || []).map((p: any) => <option key={p._id} value={p._id}>{p.name || p.code}</option>)}
+              </select>
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-1"><label className="text-sm font-medium text-gray-700">Branch</label><Link to="/academics/branches" className="text-xs text-primary-600 hover:underline">+ Manage</Link></div>
+              <select value={form.branchId} onChange={e => setForm(f => ({ ...f, branchId: e.target.value }))} className={inp}>
+                <option value="">Select...</option>
+                {(branchesData?.items || []).map((b: any) => <option key={b._id} value={b._id}>{b.name || b.code}</option>)}
+              </select>
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-1"><label className="text-sm font-medium text-gray-700">Batch</label><Link to="/academics/batches" className="text-xs text-primary-600 hover:underline">+ Manage</Link></div>
+              <select value={form.batchId} onChange={e => setForm(f => ({ ...f, batchId: e.target.value }))} className={inp}>
+                <option value="">Select...</option>
+                {(batchesData?.items || []).map((bt: any) => <option key={bt._id} value={bt._id}>{bt.code || bt._id}</option>)}
+              </select>
+            </div>
             <div><label className={lbl}>Quota</label><select value={form.quota} onChange={e => setForm(f => ({ ...f, quota: e.target.value }))} className={inp}><option value="">Select...</option>{QUOTAS.map(q => <option key={q} value={q} className="capitalize">{q}</option>)}</select></div>
             <div><label className={lbl}>Category</label><input value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className={inp} placeholder="e.g. OC, BC-A, SC, ST" /></div>
             <div><label className={lbl}>Status</label><select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className={inp}>{STATUSES.map(s => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}</select></div>

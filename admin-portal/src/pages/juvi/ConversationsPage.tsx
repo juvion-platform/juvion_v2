@@ -1,0 +1,109 @@
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { listConversations, createConversation, updateConversation, deleteConversation } from '../../services/juvi';
+import DataTable from '../../components/ui/DataTable';
+import Badge from '../../components/ui/Badge';
+import Modal from '../../components/ui/Modal';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
+
+const STATUSES = ['active', 'closed', 'archived'] as const;
+const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none";
+const lbl = "block text-sm font-medium text-gray-700 mb-1";
+
+export default function ConversationsPage() {
+  const qc = useQueryClient();
+  const [page, setPage] = useState(1);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<any>(null);
+  const [form, setForm] = useState({ userId: '', personaType: '', status: 'active' as string, messageCount: '' });
+
+  const { data, isLoading } = useQuery({ queryKey: ['juvi-conversations', page], queryFn: () => listConversations(page, 20) });
+
+  const createMut = useMutation({ mutationFn: createConversation, onSuccess: () => { qc.invalidateQueries({ queryKey: ['juvi-conversations'] }); closeModal(); } });
+  const updateMut = useMutation({ mutationFn: ({ id, data }: any) => updateConversation(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['juvi-conversations'] }); closeModal(); } });
+  const deleteMut = useMutation({ mutationFn: deleteConversation, onSuccess: () => { qc.invalidateQueries({ queryKey: ['juvi-conversations'] }); } });
+
+  function openCreate() {
+    setEditing(null);
+    setForm({ userId: '', personaType: '', status: 'active', messageCount: '' });
+    setModalOpen(true);
+  }
+  function openEdit(row: any) {
+    setEditing(row);
+    setForm({
+      userId: row.userId?._id || row.userId || '',
+      personaType: row.personaType || '',
+      status: row.status || 'active',
+      messageCount: row.messageCount != null ? String(row.messageCount) : '',
+    });
+    setModalOpen(true);
+  }
+  function closeModal() { setModalOpen(false); setEditing(null); }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const payload: any = { ...form };
+    if (form.messageCount) payload.messageCount = Number(form.messageCount);
+    else delete payload.messageCount;
+    if (editing) updateMut.mutate({ id: editing._id, data: payload });
+    else createMut.mutate(payload);
+  }
+
+  const statusVariant: Record<string, string> = { active: 'success', closed: 'default', archived: 'warning' };
+
+  const columns = [
+    { key: 'personaType', label: 'Persona', render: (r: any) => <span className="font-medium text-navy">{r.personaType}</span> },
+    { key: 'userId', label: 'User ID', render: (r: any) => <span className="text-xs text-gray-500 font-mono">{r.userId?._id || r.userId || '—'}</span> },
+    { key: 'messageCount', label: 'Messages', render: (r: any) => r.messageCount ?? 0 },
+    { key: 'status', label: 'Status', render: (r: any) => <Badge variant={statusVariant[r.status] || 'default'}>{r.status}</Badge> },
+    { key: 'lastMessageAt', label: 'Last Message', render: (r: any) => r.lastMessageAt ? new Date(r.lastMessageAt).toLocaleString() : '—' },
+    { key: 'actions', label: '', render: (r: any) => (
+      <div className="flex gap-1">
+        <button onClick={(e) => { e.stopPropagation(); openEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
+        <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this conversation?')) deleteMut.mutate(r._id); }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
+      </div>
+    )},
+  ];
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-5">
+        <h2 className="text-xl font-bold text-navy">Conversations</h2>
+        <button onClick={openCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700">
+          <Plus size={16} className="text-white" /> New Conversation
+        </button>
+      </div>
+
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} />
+
+      {data && data.pages > 1 && (
+        <div className="flex items-center justify-center gap-2 mt-4">
+          <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Prev</button>
+          <span className="text-sm text-gray-500">Page {page} of {data.pages}</span>
+          <button disabled={page >= data.pages} onClick={() => setPage(p => p + 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Next</button>
+        </div>
+      )}
+
+      <Modal open={modalOpen} onClose={closeModal} title={editing ? 'Edit Conversation' : 'New Conversation'}>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div><label className={lbl}>User ID *</label><input required value={form.userId} onChange={e => setForm(f => ({ ...f, userId: e.target.value }))} className={inp} /></div>
+            <div><label className={lbl}>Persona Type *</label><input required value={form.personaType} onChange={e => setForm(f => ({ ...f, personaType: e.target.value }))} className={inp} /></div>
+            <div><label className={lbl}>Status</label>
+              <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className={inp}>
+                {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div><label className={lbl}>Message Count</label><input type="number" min={0} value={form.messageCount} onChange={e => setForm(f => ({ ...f, messageCount: e.target.value }))} className={inp} /></div>
+          </div>
+          <div className="flex justify-end gap-3 pt-2 border-t">
+            <button type="button" onClick={closeModal} className="px-4 py-2 border rounded-lg text-sm">Cancel</button>
+            <button type="submit" disabled={createMut.isPending || updateMut.isPending} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
+              {createMut.isPending || updateMut.isPending ? 'Saving...' : editing ? 'Update' : 'Create'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+    </div>
+  );
+}

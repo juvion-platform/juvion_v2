@@ -1,15 +1,18 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listSemesterResults, createSemesterResult, updateSemesterResult, deleteSemesterResult, listSemesters } from '../../services/academics';
+import { listStudents } from '../../services/people';
 import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, ExternalLink } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const RESULTS = ['pass', 'fail', 'detained'] as const;
 const RESULT_COLOR: Record<string, string> = { pass: 'success', fail: 'danger', detained: 'warning' };
 const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none";
 const lbl = "block text-sm font-medium text-gray-700 mb-1";
+const manageLink = "inline-flex items-center gap-0.5 text-xs text-primary-500 hover:text-primary-700 font-medium ml-1";
 
 export default function SemesterResultsPage() {
   const qc = useQueryClient();
@@ -20,6 +23,8 @@ export default function SemesterResultsPage() {
 
   const { data, isLoading } = useQuery({ queryKey: ['semester-results', page], queryFn: () => listSemesterResults(page, 20) });
   const { data: semData } = useQuery({ queryKey: ['semesters', 1, 100], queryFn: () => listSemesters(1, 100) });
+  const { data: studentsData } = useQuery({ queryKey: ['students-all'], queryFn: () => listStudents(1, 200) });
+  const students = studentsData?.items || [];
 
   const createMut = useMutation({ mutationFn: createSemesterResult, onSuccess: () => { qc.invalidateQueries({ queryKey: ['semester-results'] }); closeModal(); } });
   const updateMut = useMutation({ mutationFn: ({ id, data }: any) => updateSemesterResult(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['semester-results'] }); closeModal(); } });
@@ -73,7 +78,12 @@ export default function SemesterResultsPage() {
       <Modal open={modalOpen} onClose={closeModal} title={editing ? 'Edit Result' : 'New Semester Result'}>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div><label className={lbl}>Student ID *</label><input required value={form.studentId} onChange={e => setForm(f => ({ ...f, studentId: e.target.value }))} className={inp} placeholder="Student ObjectId" /></div>
+            <div><label className={lbl}>Student * <Link to="/people" target="_blank" className={manageLink}>+ Manage <ExternalLink size={10} /></Link></label>
+              <select required value={form.studentId} onChange={e => setForm(f => ({ ...f, studentId: e.target.value }))} className={inp}>
+                <option value="">Select student...</option>
+                {students.map((s: any) => <option key={s._id} value={s._id}>{s.person?.name || s.rollNumber || s._id}</option>)}
+              </select>
+            </div>
             <div><label className={lbl}>Semester *</label>
               <select required value={form.semesterId} onChange={e => setForm(f => ({ ...f, semesterId: e.target.value }))} className={inp}>
                 <option value="">Select...</option>

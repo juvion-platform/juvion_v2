@@ -1,10 +1,14 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { listOffers, createOffer, updateOffer } from '../../services/admissions';
+import { Link } from 'react-router-dom';
+import { listOffers, createOffer, updateOffer, listApplicants } from '../../services/admissions';
+import { listProgrammes, listBranches } from '../../services/academics';
 import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
-import { Plus, Pencil } from 'lucide-react';
+import { Plus, Pencil, ExternalLink } from 'lucide-react';
+
+const manageLink = "inline-flex items-center gap-0.5 text-xs text-primary-500 hover:text-primary-700 font-medium ml-1";
 
 const STATUS_COLOR: Record<string, string> = { offered: 'info', accepted: 'success', declined: 'danger', lapsed: 'default' };
 const STATUSES = ['offered', 'accepted', 'declined', 'lapsed'] as const;
@@ -21,6 +25,10 @@ export default function OffersPage() {
     queryKey: ['offers', page, filterStatus],
     queryFn: () => listOffers(page, 20, filterStatus || undefined),
   });
+
+  const { data: applicantsData } = useQuery({ queryKey: ['applicants-all'], queryFn: () => listApplicants(1, 200) });
+  const { data: programmesData } = useQuery({ queryKey: ['programmes-all'], queryFn: () => listProgrammes(1, 100) });
+  const { data: branchesData } = useQuery({ queryKey: ['branches-all'], queryFn: () => listBranches(1, 100) });
 
   const createMut = useMutation({ mutationFn: createOffer, onSuccess: () => { qc.invalidateQueries({ queryKey: ['offers'] }); close(); } });
   const updateMut = useMutation({ mutationFn: ({ id, data }: any) => updateOffer(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['offers'] }); close(); } });
@@ -83,16 +91,40 @@ export default function OffersPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Applicant ID *</label>
-              <input required value={form.applicantId} onChange={e => setForm(f => ({ ...f, applicantId: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" />
+              <label className="block text-sm font-medium mb-1">
+                Applicant *
+                <Link to="/admissions/applicants" className={manageLink}>+ Manage <ExternalLink size={11} /></Link>
+              </label>
+              <select required value={form.applicantId} onChange={e => setForm(f => ({ ...f, applicantId: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm">
+                <option value="">Select applicant...</option>
+                {(applicantsData?.items || []).map((a: any) => (
+                  <option key={a._id} value={a._id}>{a.name || a.email || a._id}</option>
+                ))}
+              </select>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Programme ID *</label>
-              <input required value={form.programmeId} onChange={e => setForm(f => ({ ...f, programmeId: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" />
+              <label className="block text-sm font-medium mb-1">
+                Programme *
+                <Link to="/academics/programmes" className={manageLink}>+ Manage <ExternalLink size={11} /></Link>
+              </label>
+              <select required value={form.programmeId} onChange={e => setForm(f => ({ ...f, programmeId: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm">
+                <option value="">Select programme...</option>
+                {(programmesData?.items || []).map((p: any) => (
+                  <option key={p._id} value={p._id}>{p.name || p.code}</option>
+                ))}
+              </select>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Branch ID</label>
-              <input value={form.branchId} onChange={e => setForm(f => ({ ...f, branchId: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" />
+              <label className="block text-sm font-medium mb-1">
+                Branch
+                <Link to="/academics/branches" className={manageLink}>+ Manage <ExternalLink size={11} /></Link>
+              </label>
+              <select value={form.branchId} onChange={e => setForm(f => ({ ...f, branchId: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm">
+                <option value="">None</option>
+                {(branchesData?.items || []).map((b: any) => (
+                  <option key={b._id} value={b._id}>{b.name || b.code}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Fee Quoted (₹) *</label>

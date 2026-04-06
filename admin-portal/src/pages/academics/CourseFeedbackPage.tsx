@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listCourseFeedbacks, createCourseFeedback, updateCourseFeedback, deleteCourseFeedback, listCourseOfferings } from '../../services/academics';
+import { listStudents } from '../../services/people';
 import DataTable from '../../components/ui/DataTable';
 import Modal from '../../components/ui/Modal';
-import { Plus, Pencil, Trash2, Star } from 'lucide-react';
+import { Plus, Pencil, Trash2, Star, ExternalLink } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none";
 const lbl = "block text-sm font-medium text-gray-700 mb-1";
+const manageLink = "inline-flex items-center gap-0.5 text-xs text-primary-500 hover:text-primary-700 font-medium ml-1";
 
 export default function CourseFeedbackPage() {
   const qc = useQueryClient();
@@ -17,6 +20,8 @@ export default function CourseFeedbackPage() {
 
   const { data, isLoading } = useQuery({ queryKey: ['course-feedback', page], queryFn: () => listCourseFeedbacks(page, 20) });
   const { data: offeringsData } = useQuery({ queryKey: ['offerings', 1, 200], queryFn: () => listCourseOfferings(1, 200) });
+  const { data: studentsData } = useQuery({ queryKey: ['students-all'], queryFn: () => listStudents(1, 200) });
+  const students = studentsData?.items || [];
 
   const createMut = useMutation({ mutationFn: createCourseFeedback, onSuccess: () => { qc.invalidateQueries({ queryKey: ['course-feedback'] }); closeModal(); } });
   const updateMut = useMutation({ mutationFn: ({ id, data }: any) => updateCourseFeedback(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['course-feedback'] }); closeModal(); } });
@@ -89,7 +94,12 @@ export default function CourseFeedbackPage() {
                 {offeringsData?.items?.map((o: any) => <option key={o._id} value={o._id}>{typeof o.courseId === 'object' ? `${o.courseId.code} — ${o.courseId.name}` : o._id}</option>)}
               </select>
             </div>
-            <div><label className={lbl}>Student ID *</label><input required value={form.studentId} onChange={e => setForm(f => ({ ...f, studentId: e.target.value }))} className={inp} placeholder="Student ObjectId" /></div>
+            <div><label className={lbl}>Student * <Link to="/people" target="_blank" className={manageLink}>+ Manage <ExternalLink size={10} /></Link></label>
+              <select required value={form.studentId} onChange={e => setForm(f => ({ ...f, studentId: e.target.value }))} className={inp}>
+                <option value="">Select student...</option>
+                {students.map((s: any) => <option key={s._id} value={s._id}>{s.person?.name || s.rollNumber || s._id}</option>)}
+              </select>
+            </div>
             <div><label className={lbl}>Overall Rating (1-5) *</label><input required type="number" min={1} max={5} value={form.overallRating} onChange={e => setForm(f => ({ ...f, overallRating: e.target.value }))} className={inp} /></div>
             <div className="col-span-2"><label className={lbl}>Comments</label><textarea value={form.comments} onChange={e => setForm(f => ({ ...f, comments: e.target.value }))} className={inp} rows={3} /></div>
           </div>

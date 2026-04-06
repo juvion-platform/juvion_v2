@@ -1,0 +1,110 @@
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { listKnowledgeBase, createKnowledgeBase, updateKnowledgeBase, deleteKnowledgeBase } from '../../services/juvi';
+import DataTable from '../../components/ui/DataTable';
+import Badge from '../../components/ui/Badge';
+import Modal from '../../components/ui/Modal';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
+
+const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none";
+const lbl = "block text-sm font-medium text-gray-700 mb-1";
+
+export default function KnowledgeBasePage() {
+  const qc = useQueryClient();
+  const [page, setPage] = useState(1);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<any>(null);
+  const [form, setForm] = useState({ category: '', question: '', answer: '', tags: '', source: '', isActive: true });
+
+  const { data, isLoading } = useQuery({ queryKey: ['juvi-knowledge-base', page], queryFn: () => listKnowledgeBase(page, 20) });
+
+  const createMut = useMutation({ mutationFn: createKnowledgeBase, onSuccess: () => { qc.invalidateQueries({ queryKey: ['juvi-knowledge-base'] }); closeModal(); } });
+  const updateMut = useMutation({ mutationFn: ({ id, data }: any) => updateKnowledgeBase(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['juvi-knowledge-base'] }); closeModal(); } });
+  const deleteMut = useMutation({ mutationFn: deleteKnowledgeBase, onSuccess: () => { qc.invalidateQueries({ queryKey: ['juvi-knowledge-base'] }); } });
+
+  function openCreate() {
+    setEditing(null);
+    setForm({ category: '', question: '', answer: '', tags: '', source: '', isActive: true });
+    setModalOpen(true);
+  }
+  function openEdit(row: any) {
+    setEditing(row);
+    setForm({
+      category: row.category || '',
+      question: row.question || '',
+      answer: row.answer || '',
+      tags: (row.tags || []).join(', '),
+      source: row.source || '',
+      isActive: row.isActive ?? true,
+    });
+    setModalOpen(true);
+  }
+  function closeModal() { setModalOpen(false); setEditing(null); }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const payload: any = { ...form };
+    payload.tags = form.tags ? form.tags.split(',').map(s => s.trim()).filter(Boolean) : [];
+    if (!payload.source) delete payload.source;
+    if (editing) updateMut.mutate({ id: editing._id, data: payload });
+    else createMut.mutate(payload);
+  }
+
+  const columns = [
+    { key: 'question', label: 'Question', render: (r: any) => <span className="font-medium text-navy">{(r.question || '').substring(0, 60)}{(r.question || '').length > 60 ? '...' : ''}</span> },
+    { key: 'category', label: 'Category', render: (r: any) => <Badge variant="info">{r.category}</Badge> },
+    { key: 'tags', label: 'Tags', render: (r: any) => (r.tags || []).length > 0 ? (r.tags || []).slice(0, 3).map((t: string) => <Badge key={t} variant="default">{t}</Badge>) : '—' },
+    { key: 'source', label: 'Source', render: (r: any) => r.source || '—' },
+    { key: 'usageCount', label: 'Usage', render: (r: any) => r.usageCount ?? 0 },
+    { key: 'isActive', label: 'Status', render: (r: any) => <Badge variant={r.isActive ? 'success' : 'default'}>{r.isActive ? 'Active' : 'Inactive'}</Badge> },
+    { key: 'actions', label: '', render: (r: any) => (
+      <div className="flex gap-1">
+        <button onClick={(e) => { e.stopPropagation(); openEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
+        <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this entry?')) deleteMut.mutate(r._id); }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
+      </div>
+    )},
+  ];
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-5">
+        <h2 className="text-xl font-bold text-navy">Knowledge Base</h2>
+        <button onClick={openCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700">
+          <Plus size={16} className="text-white" /> New Entry
+        </button>
+      </div>
+
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} />
+
+      {data && data.pages > 1 && (
+        <div className="flex items-center justify-center gap-2 mt-4">
+          <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Prev</button>
+          <span className="text-sm text-gray-500">Page {page} of {data.pages}</span>
+          <button disabled={page >= data.pages} onClick={() => setPage(p => p + 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Next</button>
+        </div>
+      )}
+
+      <Modal open={modalOpen} onClose={closeModal} title={editing ? 'Edit Knowledge Base Entry' : 'New Knowledge Base Entry'}>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div><label className={lbl}>Category *</label><input required value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className={inp} /></div>
+            <div><label className={lbl}>Source</label><input value={form.source} onChange={e => setForm(f => ({ ...f, source: e.target.value }))} className={inp} /></div>
+            <div className="col-span-2"><label className={lbl}>Question *</label><textarea required rows={2} value={form.question} onChange={e => setForm(f => ({ ...f, question: e.target.value }))} className={inp} /></div>
+            <div className="col-span-2"><label className={lbl}>Answer *</label><textarea required rows={4} value={form.answer} onChange={e => setForm(f => ({ ...f, answer: e.target.value }))} className={inp} /></div>
+            <div><label className={lbl}>Tags (comma-separated)</label><input value={form.tags} onChange={e => setForm(f => ({ ...f, tags: e.target.value }))} className={inp} placeholder="fees, admission, hostel" /></div>
+            <div className="flex items-center gap-2 pt-6">
+              <input type="checkbox" id="kbIsActive" checked={form.isActive} onChange={e => setForm(f => ({ ...f, isActive: e.target.checked }))} className="rounded" />
+              <label htmlFor="kbIsActive" className="text-sm text-gray-700">Active</label>
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 pt-2 border-t">
+            <button type="button" onClick={closeModal} className="px-4 py-2 border rounded-lg text-sm">Cancel</button>
+            <button type="submit" disabled={createMut.isPending || updateMut.isPending} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
+              {createMut.isPending || updateMut.isPending ? 'Saving...' : editing ? 'Update' : 'Create'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+    </div>
+  );
+}

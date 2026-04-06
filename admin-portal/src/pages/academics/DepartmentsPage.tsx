@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listDepartments, createDepartment, updateDepartment, deleteDepartment } from '../../services/academics';
+import { listFaculty } from '../../services/people';
 import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, ExternalLink } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none";
 const lbl = "block text-sm font-medium text-gray-700 mb-1";
+const manageLink = "inline-flex items-center gap-0.5 text-xs text-primary-500 hover:text-primary-700 font-medium ml-1";
 
 export default function DepartmentsPage() {
   const qc = useQueryClient();
@@ -17,6 +20,8 @@ export default function DepartmentsPage() {
   const [form, setForm] = useState({ code: '', name: '', hodId: '', isActive: true });
 
   const { data, isLoading } = useQuery({ queryKey: ['departments', page], queryFn: () => listDepartments(page, 20) });
+  const { data: facultyData } = useQuery({ queryKey: ['faculty-all'], queryFn: () => listFaculty(1, 200) });
+  const faculty = facultyData?.items || [];
 
   const createMut = useMutation({ mutationFn: createDepartment, onSuccess: () => { qc.invalidateQueries({ queryKey: ['departments'] }); qc.invalidateQueries({ queryKey: ['academics-stats'] }); closeModal(); } });
   const updateMut = useMutation({ mutationFn: ({ id, data }: any) => updateDepartment(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['departments'] }); closeModal(); } });
@@ -75,7 +80,12 @@ export default function DepartmentsPage() {
           <div className="grid grid-cols-2 gap-4">
             <div><label className={lbl}>Code *</label><input required value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))} className={inp} placeholder="e.g. CSE" /></div>
             <div><label className={lbl}>Name *</label><input required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className={inp} placeholder="e.g. Computer Science & Engineering" /></div>
-            <div className="col-span-2"><label className={lbl}>HOD (Faculty ID)</label><input value={form.hodId} onChange={e => setForm(f => ({ ...f, hodId: e.target.value }))} className={inp} placeholder="Optional — Faculty ObjectId" /></div>
+            <div className="col-span-2"><label className={lbl}>HOD (Faculty) <Link to="/people/faculty" target="_blank" className={manageLink}>+ Manage <ExternalLink size={10} /></Link></label>
+              <select value={form.hodId} onChange={e => setForm(f => ({ ...f, hodId: e.target.value }))} className={inp}>
+                <option value="">None</option>
+                {faculty.map((f: any) => <option key={f._id} value={f._id}>{f.person?.name || f.employeeCode || f._id}</option>)}
+              </select>
+            </div>
             <div className="col-span-2 flex items-center gap-2">
               <input type="checkbox" id="deptIsActive" checked={form.isActive} onChange={e => setForm(f => ({ ...f, isActive: e.target.checked }))} className="rounded" />
               <label htmlFor="deptIsActive" className="text-sm text-gray-700">Active</label>

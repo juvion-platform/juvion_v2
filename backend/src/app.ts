@@ -6,6 +6,7 @@ import morgan from 'morgan';
 import { connectDB } from './config/db';
 import { errorHandler } from './middleware/errorHandler';
 import apiRouter from './routes';
+import authRouter from './modules/auth/routes';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -19,6 +20,7 @@ app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 app.use(express.json({ limit: '10mb' }));
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', version: '2.0.0' }));
+app.use('/api/auth', authRouter);
 app.use('/api', apiRouter);
 app.use(errorHandler);
 

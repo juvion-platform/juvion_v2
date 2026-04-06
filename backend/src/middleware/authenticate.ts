@@ -23,8 +23,16 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev-secret') as any;
     req.user = decoded;
-    req.collegeId = (req.headers['x-college-id'] as string) || decoded.collegeId;
-    if (!req.collegeId) return res.status(400).json({ error: 'College ID required' });
+
+    // Superadmin scopes into a college via x-college-id header; they don't have collegeId in JWT
+    const headerCollegeId = req.headers['x-college-id'] as string;
+    req.collegeId = headerCollegeId || decoded.collegeId;
+
+    // Superadmins may access college-agnostic routes (like /colleges) without a collegeId
+    if (!req.collegeId && decoded.role !== 'super_admin') {
+      return res.status(400).json({ error: 'College ID required' });
+    }
+
     next();
   } catch {
     res.status(401).json({ error: 'Invalid token' });

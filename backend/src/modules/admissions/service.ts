@@ -10,7 +10,36 @@ import { paginate } from '../../shared/pagination';
 import { createAuditLog } from '../../shared/audit';
 import { AppError } from '../../middleware/errorHandler';
 
-const toOid = (id: string) => new mongoose.Types.ObjectId(id);
+// ─── Dashboard Stats ─────────────────────────────────
+export async function getDashboardStats(collegeId: string) {
+  const [inquiries, applicants, submittedApplicants, offers, acceptedOffers, admissions, examScores, counseling, inquiryByStatusAgg, applicantByStatusAgg] = await Promise.all([
+    Inquiry.countDocuments({ collegeId }),
+    Applicant.countDocuments({ collegeId }),
+    Applicant.countDocuments({ collegeId, status: 'submitted' }),
+    AdmissionOffer.countDocuments({ collegeId }),
+    AdmissionOffer.countDocuments({ collegeId, status: 'accepted' }),
+    Admission.countDocuments({ collegeId }),
+    EntranceExamScore.countDocuments({ collegeId }),
+    CounselingAllotment.countDocuments({ collegeId }),
+    Inquiry.aggregate([{ $match: { collegeId: new mongoose.Types.ObjectId(collegeId) } }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
+    Applicant.aggregate([{ $match: { collegeId: new mongoose.Types.ObjectId(collegeId) } }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
+  ]);
+
+  const inquiryByStatus: Record<string, number> = {};
+  for (const r of inquiryByStatusAgg) inquiryByStatus[r._id] = r.count;
+
+  const applicantByStatus: Record<string, number> = {};
+  for (const r of applicantByStatusAgg) applicantByStatus[r._id] = r.count;
+
+  return {
+    // Flat fields for dashboard page
+    inquiries, applicants, submittedApplicants, offers, acceptedOffers, admissions, examScores, counseling,
+    // Structured fields for admissions hub page
+    totals: { inquiries, applicants, offers, admissions },
+    inquiryByStatus,
+    applicantByStatus,
+  };
+}
 
 // ─── Inquiries ───────────────────────────────────────────────
 
@@ -240,41 +269,3 @@ export async function createAdmission(collegeId: string, data: any, performedBy:
   return doc;
 }
 
-// ─── Dashboard Stats ─────────────────────────────────────────
-
-export async function getDashboardStats(collegeId: string) {
-  const [inquiries, applicants, offers, admissions] = await Promise.all([
-    Inquiry.countDocuments({ collegeId }),
-    Applicant.countDocuments({ collegeId }),
-    AdmissionOffer.countDocuments({ collegeId }),
-    Admission.countDocuments({ collegeId }),
-  ]);
-
-  const oid = toOid(collegeId);
-  const inquiryByStatus = await Inquiry.aggregate([
-    { $match: { collegeId: oid } },
-    { $group: { _id: '$status', count: { $sum: 1 } } },
-  ]);
-
-  const applicantByStatus = await Applicant.aggregate([
-    { $match: { collegeId: oid } },
-    { $group: { _id: '$status', count: { $sum: 1 } } },
-  ]);
-
-  // Count offers from Applicant model's offerStatus
-  const offeredApplicants = await Applicant.countDocuments({ collegeId, status: { $in: ['offered', 'accepted'] } });
-
-  // Count enrolled from Applicant model
-  const enrolledApplicants = await Applicant.countDocuments({ collegeId, status: 'enrolled' });
-
-  return {
-    totals: {
-      inquiries,
-      applicants,
-      offers: offers || offeredApplicants,
-      admissions: admissions || enrolledApplicants,
-    },
-    inquiryByStatus: Object.fromEntries(inquiryByStatus.map(r => [r._id, r.count])),
-    applicantByStatus: Object.fromEntries(applicantByStatus.map(r => [r._id, r.count])),
-  };
-}

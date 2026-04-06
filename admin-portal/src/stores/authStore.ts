@@ -1,12 +1,17 @@
 import { create } from 'zustand';
 
 interface User { id: string; name: string; email: string; role: string; personaType: string; }
+interface CollegeRef { _id: string; name: string; code: string; status: string; }
 
 interface AuthState {
   user: User | null;
   token: string | null;
   collegeId: string | null;
-  setAuth: (user: User, token: string, collegeId: string) => void;
+  collegeName: string | null;
+  colleges: CollegeRef[];
+  isSuperAdmin: boolean;
+  setAuth: (user: User, token: string, collegeId?: string, colleges?: CollegeRef[]) => void;
+  selectCollege: (collegeId: string, collegeName: string) => void;
   logout: () => void;
 }
 
@@ -14,14 +19,34 @@ export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   token: localStorage.getItem('token'),
   collegeId: localStorage.getItem('collegeId'),
-  setAuth: (user, token, collegeId) => {
+  collegeName: localStorage.getItem('collegeName'),
+  colleges: JSON.parse(localStorage.getItem('colleges') || '[]'),
+  isSuperAdmin: localStorage.getItem('isSuperAdmin') === 'true',
+  setAuth: (user, token, collegeId?, colleges?) => {
     localStorage.setItem('token', token);
+    const isSuperAdmin = user.role === 'super_admin';
+    if (collegeId) {
+      localStorage.setItem('collegeId', collegeId);
+    }
+    if (colleges) {
+      localStorage.setItem('colleges', JSON.stringify(colleges));
+    }
+    if (isSuperAdmin) {
+      localStorage.setItem('isSuperAdmin', 'true');
+    }
+    set({ user, token, collegeId: collegeId || null, colleges: colleges || [], isSuperAdmin });
+  },
+  selectCollege: (collegeId, collegeName) => {
     localStorage.setItem('collegeId', collegeId);
-    set({ user, token, collegeId });
+    localStorage.setItem('collegeName', collegeName);
+    set({ collegeId, collegeName });
   },
   logout: () => {
     localStorage.removeItem('token');
     localStorage.removeItem('collegeId');
-    set({ user: null, token: null, collegeId: null });
+    localStorage.removeItem('collegeName');
+    localStorage.removeItem('colleges');
+    localStorage.removeItem('isSuperAdmin');
+    set({ user: null, token: null, collegeId: null, collegeName: null, colleges: [], isSuperAdmin: false });
   },
 }));
