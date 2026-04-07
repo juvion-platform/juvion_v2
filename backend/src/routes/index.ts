@@ -1,6 +1,7 @@
 import { Router } from 'express';
 
 import admissionsRouter from '../modules/admissions/routes';
+import admissionsWorkflowRouter from '../modules/admissions/workflow.routes';
 import peopleRouter from '../modules/people/routes';
 import academicsRouter from '../modules/academics/routes';
 import financeRouter from '../modules/finance/routes';
@@ -19,6 +20,7 @@ const router = Router();
 
 // M01–M12 + Juvi module routes
 router.use('/admissions', admissionsRouter);    // M01
+router.use('/admissions/workflow', admissionsWorkflowRouter);  // W01 Workflow
 router.use('/people', peopleRouter);            // M02
 router.use('/academics', academicsRouter);      // M03
 router.use('/finance', financeRouter);          // M04

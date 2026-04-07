@@ -8,12 +8,27 @@ import { errorHandler } from './middleware/errorHandler';
 import apiRouter from './routes';
 import authRouter from './modules/auth/routes';
 
+// Register workflow definitions
+import './shared/workflow/definitions';
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
 app.use(helmet());
+
+// CORS: support multiple allowed origins via comma-separated ALLOWED_ORIGINS env var
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || process.env.CLIENT_URL || 'http://localhost:5173')
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
+
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  origin(origin, callback) {
+    // Allow requests with no origin (curl, server-to-server, mobile apps)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    callback(new Error(`Origin ${origin} not allowed by CORS`));
+  },
   credentials: true,
 }));
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));

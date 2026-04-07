@@ -2,6 +2,7 @@ import { Schema, model, Document } from 'mongoose';
 
 export interface IInquiry extends Document {
   collegeId: Schema.Types.ObjectId;
+  academicYearId?: Schema.Types.ObjectId;
   // Personal
   name: string; fatherName?: string; phone: string; altPhone?: string; email?: string;
   gender?: string; dateOfBirth?: Date;
@@ -16,12 +17,20 @@ export interface IInquiry extends Document {
   date: Date; status: string; leadScore?: number;
   notes?: string; followUpDate?: Date;
   assignedTo?: string;
+  // W01 enhancements
+  leadGrade?: string;            // 'hot' | 'warm' | 'cold' | 'dormant'
+  tags?: string[];
+  lastInteractionAt?: Date;
+  interactionCount?: number;
+  importBatchId?: Schema.Types.ObjectId;
+  workflowInstanceId?: Schema.Types.ObjectId;
   // Conversion
   convertedToApplicantId?: Schema.Types.ObjectId;
 }
 
 const schema = new Schema<IInquiry>({
   collegeId: { type: Schema.Types.ObjectId, required: true, index: true },
+  academicYearId: { type: Schema.Types.ObjectId, ref: 'AcademicYear' },
   // Personal
   name: { type: String, required: true },
   fatherName: String,
@@ -51,6 +60,13 @@ const schema = new Schema<IInquiry>({
   notes: String,
   followUpDate: Date,
   assignedTo: String,
+  // W01 enhancements
+  leadGrade: { type: String, enum: ['hot', 'warm', 'cold', 'dormant'] },
+  tags: [String],
+  lastInteractionAt: Date,
+  interactionCount: { type: Number, default: 0 },
+  importBatchId: { type: Schema.Types.ObjectId, ref: 'LeadImportBatch' },
+  workflowInstanceId: { type: Schema.Types.ObjectId, ref: 'WorkflowInstance' },
   // Conversion
   convertedToApplicantId: { type: Schema.Types.ObjectId, ref: 'Applicant' },
 }, { timestamps: true });

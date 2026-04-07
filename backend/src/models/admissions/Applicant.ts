@@ -3,6 +3,7 @@ import { Schema, model, Document } from 'mongoose';
 export interface IApplicant extends Document {
   collegeId: Schema.Types.ObjectId;
   inquiryId?: Schema.Types.ObjectId;
+  academicYearId?: Schema.Types.ObjectId;
   applicationNumber: string;
   // Personal
   name: string;
@@ -58,11 +59,21 @@ export interface IApplicant extends Document {
   admissionDate?: Date;
   enrollmentNumber?: string;
   admittedBy?: string;
+  // W01 enhancements
+  admissionType?: string;         // 'fresh' | 'lateral'
+  eligibilityStatus?: string;     // 'pending' | 'eligible' | 'ineligible' | 'conditional' | 'edge_case'
+  eligibilityVerifiedAt?: Date;
+  eligibilityVerifiedBy?: string;
+  eligibilityNotes?: string;
+  meritScore?: number;
+  workflowInstanceId?: Schema.Types.ObjectId;
+  importBatchId?: Schema.Types.ObjectId;
 }
 
 const schema = new Schema<IApplicant>({
   collegeId: { type: Schema.Types.ObjectId, required: true, index: true },
   inquiryId: { type: Schema.Types.ObjectId, ref: 'Inquiry' },
+  academicYearId: { type: Schema.Types.ObjectId, ref: 'AcademicYear' },
   applicationNumber: { type: String, required: true },
   // Personal
   name: { type: String, required: true },
@@ -122,6 +133,15 @@ const schema = new Schema<IApplicant>({
   admissionDate: Date,
   enrollmentNumber: String,
   admittedBy: String,
+  // W01 enhancements
+  admissionType: { type: String, enum: ['fresh', 'lateral'] },
+  eligibilityStatus: { type: String, enum: ['pending', 'eligible', 'ineligible', 'conditional', 'edge_case'] },
+  eligibilityVerifiedAt: Date,
+  eligibilityVerifiedBy: String,
+  eligibilityNotes: String,
+  meritScore: Number,
+  workflowInstanceId: { type: Schema.Types.ObjectId, ref: 'WorkflowInstance' },
+  importBatchId: { type: Schema.Types.ObjectId, ref: 'LeadImportBatch' },
 }, { timestamps: true });
 
 schema.index({ collegeId: 1, applicationNumber: 1 }, { unique: true });
