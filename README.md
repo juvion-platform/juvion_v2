@@ -32,7 +32,7 @@ A comprehensive **Indian College ERP** built as a MERN + TypeScript monorepo. Co
 docker compose up mongodb redis
 
 npm install
-npm run dev:backend     # Express API on :3001
+npm run dev:backend     # Express API on :3003
 npm run dev:portal      # React admin portal on :5173
 npm run seed -w backend # Seed development data
 ```

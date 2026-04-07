@@ -11,7 +11,7 @@ Multi-tenant college ERP built as a MERN monorepo (MongoDB, Express, React 19, N
 # Or: docker compose up mongodb redis
 
 npm install                     # installs all workspaces
-npm run dev:backend             # backend on :3001
+npm run dev:backend             # backend on :3003
 npm run dev:portal              # admin portal on :5173
 npm run seed -w backend         # seed dev data
 npm run typecheck               # check both workspaces
@@ -21,8 +21,8 @@ npm run typecheck               # check both workspaces
 
 ```
 juvion_v2/
-  backend/           Express API (port 3001)
-  admin-portal/      React 19 + Vite (port 5173, proxies /api -> :3001)
+  backend/           Express API (port 3003)
+  admin-portal/      React 19 + Vite (port 5173, proxies /api -> :3003)
   tsconfig.base.json Shared TS config (strict, noUnusedLocals, noUncheckedIndexedAccess)
   docker-compose.yml MongoDB 7, Redis 7, backend, admin-portal
 ```
@@ -137,7 +137,7 @@ Tailwind CSS with a custom color palette (`primary-*`, `navy`). Icons from `luci
 
 ```
 NODE_ENV=development
-PORT=3001
+PORT=3003
 MONGO_URI=mongodb://localhost:27017/juvion_v2
 REDIS_URL=redis://localhost:6379
 JWT_SECRET=dev-secret
