@@ -1,19 +1,28 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getStudent, createStudent, updateStudent } from '../../services/people';
+import { getStudent, createStudent, listParents, updateStudent } from '../../services/people';
 import { listRegulations, listProgrammes, listBranches, listBatches } from '../../services/academics';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 
 const STATUSES = ['prospective', 'active', 'year_back', 'detained', 'graduated', 'exited', 'alumni'] as const;
 const QUOTAS = ['convener', 'management', 'nri'] as const;
 const GENDERS = ['male', 'female', 'other'] as const;
+const ONBOARDING_STATUSES = ['not_started', 'in_progress', 'completed'] as const;
 
 const emptyForm = {
-  name: '', phone: '', email: '', gender: '', dob: '', aadhaar: '',
+  name: '', phone: '', alternatePhone: '', email: '', gender: '', dob: '', aadhaar: '', preferredLanguage: '',
+  emergencyContactName: '', emergencyContactPhone: '', emergencyContactRelationship: '', biometricEnrolled: false,
   admissionYear: new Date().getFullYear().toString(), category: '', quota: '', rollNumber: '',
   regulationId: '', programmeId: '', branchId: '', batchId: '',
+  primaryParentId: '', feeResponsibleParentId: '',
   status: 'active',
+  onboardingStatus: 'not_started',
+  profileVerified: false,
+  documentsVerified: false,
+  feePlanConfirmed: false,
+  portalAccessShared: false,
+  idCardIssued: false,
   // Address
   line1: '', line2: '', city: '', state: '', pincode: '',
 };
@@ -38,21 +47,37 @@ export default function StudentFormPage() {
   const { data: programmesData } = useQuery({ queryKey: ['programmes'], queryFn: () => listProgrammes(1, 200) });
   const { data: branchesData } = useQuery({ queryKey: ['branches'], queryFn: () => listBranches(1, 200) });
   const { data: batchesData } = useQuery({ queryKey: ['batches'], queryFn: () => listBatches(1, 200) });
+  const { data: parentsData } = useQuery({ queryKey: ['parents-ref', 'all'], queryFn: () => listParents(1, 200) });
 
   useEffect(() => {
     if (existing) {
       const p = existing.person || existing.personId || {};
       const addr = p.address || {};
+      const emergency = p.emergencyContact || {};
+      const checklist = existing.onboardingChecklist || {};
       setForm({
-        name: p.name || '', phone: p.phone || '', email: p.email || '', gender: p.gender || '',
+        name: p.name || '', phone: p.phone || '', alternatePhone: p.alternatePhone || '', email: p.email || '', gender: p.gender || '',
         dob: p.dob ? p.dob.substring(0, 10) : '', aadhaar: p.aadhaar || '',
+        preferredLanguage: p.preferredLanguage || '',
+        emergencyContactName: emergency.name || '',
+        emergencyContactPhone: emergency.phone || '',
+        emergencyContactRelationship: emergency.relationship || '',
+        biometricEnrolled: !!p.biometricEnrolled,
         admissionYear: String(existing.admissionYear || ''), category: existing.category || '',
         quota: existing.quota || '', rollNumber: existing.rollNumber || '',
         regulationId: existing.regulationId?._id || existing.regulationId || '',
         programmeId: existing.programmeId?._id || existing.programmeId || '',
         branchId: existing.branchId?._id || existing.branchId || '',
         batchId: existing.batchId?._id || existing.batchId || '',
+        primaryParentId: existing.primaryParentId?._id || existing.primaryParentId || '',
+        feeResponsibleParentId: existing.feeResponsibleParentId?._id || existing.feeResponsibleParentId || '',
         status: existing.status || 'active',
+        onboardingStatus: existing.onboardingStatus || 'not_started',
+        profileVerified: !!checklist.profileVerified,
+        documentsVerified: !!checklist.documentsVerified,
+        feePlanConfirmed: !!checklist.feePlanConfirmed,
+        portalAccessShared: !!checklist.portalAccessShared,
+        idCardIssued: !!checklist.idCardIssued,
         line1: addr.line1 || '', line2: addr.line2 || '', city: addr.city || '',
         state: addr.state || '', pincode: addr.pincode || '',
       });
@@ -75,6 +100,28 @@ export default function StudentFormPage() {
     const address: any = {};
     ['line1', 'line2', 'city', 'state', 'pincode'].forEach(k => { if ((payload as any)[k]) address[k] = (payload as any)[k]; delete (payload as any)[k]; });
     if (Object.keys(address).length > 0) payload.address = address;
+    const emergencyContact: any = {};
+    if (payload.emergencyContactName) emergencyContact.name = payload.emergencyContactName;
+    if (payload.emergencyContactPhone) emergencyContact.phone = payload.emergencyContactPhone;
+    if (payload.emergencyContactRelationship) emergencyContact.relationship = payload.emergencyContactRelationship;
+    delete payload.emergencyContactName;
+    delete payload.emergencyContactPhone;
+    delete payload.emergencyContactRelationship;
+    if (Object.keys(emergencyContact).length > 0) payload.emergencyContact = emergencyContact;
+    payload.primaryParentId = payload.primaryParentId || null;
+    payload.feeResponsibleParentId = payload.feeResponsibleParentId || null;
+    payload.onboardingChecklist = {
+      profileVerified: !!payload.profileVerified,
+      documentsVerified: !!payload.documentsVerified,
+      feePlanConfirmed: !!payload.feePlanConfirmed,
+      portalAccessShared: !!payload.portalAccessShared,
+      idCardIssued: !!payload.idCardIssued,
+    };
+    delete payload.profileVerified;
+    delete payload.documentsVerified;
+    delete payload.feePlanConfirmed;
+    delete payload.portalAccessShared;
+    delete payload.idCardIssued;
     Object.keys(payload).forEach(k => { if (payload[k] === '') delete payload[k]; });
     if (isEdit) updateMut.mutate({ id, data: payload });
     else createMut.mutate(payload);
@@ -123,10 +170,19 @@ export default function StudentFormPage() {
           <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-4">
             <div><label className={lbl}>Name <span className="text-red-500">*</span></label><input required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className={inp} placeholder="Full name" /></div>
             <div><label className={lbl}>Phone <span className="text-red-500">*</span></label><input required value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} className={inp} placeholder="10-digit mobile" /></div>
+            <div><label className={lbl}>Alternate Phone</label><input value={form.alternatePhone} onChange={e => setForm(f => ({ ...f, alternatePhone: e.target.value }))} className={inp} placeholder="Backup contact number" /></div>
             <div><label className={lbl}>Email</label><input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} className={inp} /></div>
             <div><label className={lbl}>Gender</label><select value={form.gender} onChange={e => setForm(f => ({ ...f, gender: e.target.value }))} className={inp}><option value="">Select...</option>{GENDERS.map(g => <option key={g} value={g} className="capitalize">{g}</option>)}</select></div>
             <div><label className={lbl}>Date of Birth</label><input type="date" value={form.dob} onChange={e => setForm(f => ({ ...f, dob: e.target.value }))} className={inp} /></div>
             <div><label className={lbl}>Aadhaar</label><input value={form.aadhaar} onChange={e => setForm(f => ({ ...f, aadhaar: e.target.value }))} className={inp} maxLength={12} placeholder="12-digit Aadhaar" /></div>
+            <div><label className={lbl}>Preferred Language</label><input value={form.preferredLanguage} onChange={e => setForm(f => ({ ...f, preferredLanguage: e.target.value }))} className={inp} placeholder="e.g. English, Telugu" /></div>
+            <div><label className={lbl}>Emergency Contact Name</label><input value={form.emergencyContactName} onChange={e => setForm(f => ({ ...f, emergencyContactName: e.target.value }))} className={inp} placeholder="Primary emergency contact" /></div>
+            <div><label className={lbl}>Emergency Contact Phone</label><input value={form.emergencyContactPhone} onChange={e => setForm(f => ({ ...f, emergencyContactPhone: e.target.value }))} className={inp} placeholder="Emergency phone number" /></div>
+            <div><label className={lbl}>Emergency Contact Relationship</label><input value={form.emergencyContactRelationship} onChange={e => setForm(f => ({ ...f, emergencyContactRelationship: e.target.value }))} className={inp} placeholder="e.g. Mother, Guardian" /></div>
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 pt-7">
+              <input type="checkbox" checked={form.biometricEnrolled} onChange={e => setForm(f => ({ ...f, biometricEnrolled: e.target.checked }))} className="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+              Biometric enrolled
+            </label>
           </div>
         </section>
 
@@ -185,6 +241,68 @@ export default function StudentFormPage() {
             <div><label className={lbl}>Quota</label><select value={form.quota} onChange={e => setForm(f => ({ ...f, quota: e.target.value }))} className={inp}><option value="">Select...</option>{QUOTAS.map(q => <option key={q} value={q} className="capitalize">{q}</option>)}</select></div>
             <div><label className={lbl}>Category</label><input value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className={inp} placeholder="e.g. OC, BC-A, SC, ST" /></div>
             <div><label className={lbl}>Status</label><select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className={inp}>{STATUSES.map(s => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}</select></div>
+          </div>
+        </section>
+
+        <section className="bg-white rounded-xl border shadow-sm">
+          <div className="px-5 py-4 border-b bg-navy/[0.03] rounded-t-xl">
+            <h3 className="font-semibold text-navy-dark">Guardian Linkage</h3>
+            <p className="text-xs text-gray-500 mt-0.5">Map the student to the primary and fee-responsible guardian records</p>
+          </div>
+          <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <div className="flex items-center justify-between mb-1"><label className="text-sm font-medium text-gray-700">Primary Guardian</label><Link to="/people/parents" className="text-xs text-primary-600 hover:underline">+ Manage</Link></div>
+              <select value={form.primaryParentId} onChange={e => setForm(f => ({ ...f, primaryParentId: e.target.value }))} className={inp}>
+                <option value="">Select...</option>
+                {(parentsData?.items || []).map((parent: any) => <option key={parent._id} value={parent._id}>{parent.person?.name || parent.personId?.name || parent._id} ({parent.relationship})</option>)}
+              </select>
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-1"><label className="text-sm font-medium text-gray-700">Fee Responsible Guardian</label><Link to="/people/parents" className="text-xs text-primary-600 hover:underline">+ Manage</Link></div>
+              <select value={form.feeResponsibleParentId} onChange={e => setForm(f => ({ ...f, feeResponsibleParentId: e.target.value }))} className={inp}>
+                <option value="">Select...</option>
+                {(parentsData?.items || []).map((parent: any) => <option key={parent._id} value={parent._id}>{parent.person?.name || parent.personId?.name || parent._id} ({parent.relationship})</option>)}
+              </select>
+            </div>
+          </div>
+        </section>
+
+        <section className="bg-white rounded-xl border shadow-sm">
+          <div className="px-5 py-4 border-b bg-navy/[0.03] rounded-t-xl">
+            <h3 className="font-semibold text-navy-dark">Onboarding</h3>
+            <p className="text-xs text-gray-500 mt-0.5">Track student onboarding readiness after admission</p>
+          </div>
+          <div className="p-5 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className={lbl}>Onboarding Status</label>
+                <select value={form.onboardingStatus} onChange={e => setForm(f => ({ ...f, onboardingStatus: e.target.value }))} className={inp}>
+                  {ONBOARDING_STATUSES.map(status => <option key={status} value={status}>{status.replace(/_/g, ' ')}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                <input type="checkbox" checked={form.profileVerified} onChange={e => setForm(f => ({ ...f, profileVerified: e.target.checked }))} className="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+                Profile verified
+              </label>
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                <input type="checkbox" checked={form.documentsVerified} onChange={e => setForm(f => ({ ...f, documentsVerified: e.target.checked }))} className="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+                Documents verified
+              </label>
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                <input type="checkbox" checked={form.feePlanConfirmed} onChange={e => setForm(f => ({ ...f, feePlanConfirmed: e.target.checked }))} className="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+                Fee plan confirmed
+              </label>
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                <input type="checkbox" checked={form.portalAccessShared} onChange={e => setForm(f => ({ ...f, portalAccessShared: e.target.checked }))} className="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+                Portal access shared
+              </label>
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                <input type="checkbox" checked={form.idCardIssued} onChange={e => setForm(f => ({ ...f, idCardIssued: e.target.checked }))} className="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+                ID card issued
+              </label>
+            </div>
           </div>
         </section>
 

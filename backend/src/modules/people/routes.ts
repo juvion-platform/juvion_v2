@@ -47,11 +47,14 @@ router.delete('/staff/:id', ctrl.deleteStaff);
 
 // Parents
 router.get('/parents', ctrl.listParents);
+router.get('/parents/:id', ctrl.getParent);
 router.post('/parents', validate(createParentSchema), ctrl.createParent);
 router.put('/parents/:id', validate(updateParentSchema), ctrl.updateParent);
+router.delete('/parents/:id', ctrl.deleteParent);
 
 // Organizations
 router.get('/organizations', ctrl.listOrganizations);
+router.get('/organizations/:id', ctrl.getOrganization);
 router.post('/organizations', validate(createOrganizationSchema), ctrl.createOrganization);
 router.put('/organizations/:id', validate(updateOrganizationSchema), ctrl.updateOrganization);
 router.delete('/organizations/:id', ctrl.deleteOrganization);

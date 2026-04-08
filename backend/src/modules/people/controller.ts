@@ -85,16 +85,25 @@ export async function deleteStaff(req: AuthRequest, res: Response, next: NextFun
 export async function listParents(req: AuthRequest, res: Response, next: NextFunction) {
   try { const q = qp(req); res.json(await svc.listParents(req.collegeId!, q.page, q.limit, q.search)); } catch (e) { next(e); }
 }
+export async function getParent(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await svc.getParent(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }
+}
 export async function createParent(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.status(201).json(await svc.createParent(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
 }
 export async function updateParent(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await svc.updateParent(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
 }
+export async function deleteParent(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await svc.deleteParent(req.collegeId!, req.params.id as string, who(req))); } catch (e) { next(e); }
+}
 
 // ─── Organizations ───────────────────────────────────
 export async function listOrganizations(req: AuthRequest, res: Response, next: NextFunction) {
   try { const q = qp(req); res.json(await svc.listOrganizations(req.collegeId!, q.page, q.limit, q.search)); } catch (e) { next(e); }
+}
+export async function getOrganization(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await svc.getOrganization(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }
 }
 export async function createOrganization(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.status(201).json(await svc.createOrganization(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }

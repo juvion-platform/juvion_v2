@@ -916,10 +916,11 @@ export default function WorkflowPage() {
     enabled: Boolean(selectedInstanceId),
     refetchInterval: selectedInstanceId && liveMode ? 10000 : false,
   });
-  const { data: inquiries } = useQuery({
+  const { data: inquiries, isFetching: startInquiriesLoading, refetch: refetchStartInquiries } = useQuery({
     queryKey: ['workflow-start-inquiries'],
     queryFn: () => listInquiries(1, 100),
     enabled: startOpen,
+    refetchOnMount: 'always',
   });
   const { data: academicYears } = useQuery({
     queryKey: ['workflow-academic-years'],
@@ -954,6 +955,11 @@ export default function WorkflowPage() {
       setStartForm((form) => ({ ...form, academicYearId: current._id }));
     }
   }, [academicYears, startForm.academicYearId]);
+
+  useEffect(() => {
+    if (!startOpen) return;
+    void refetchStartInquiries();
+  }, [startOpen, refetchStartInquiries]);
 
   const startMutation = useMutation({
     mutationFn: startWorkflow,
@@ -1002,7 +1008,11 @@ export default function WorkflowPage() {
 
   const workflowInstances = instances?.items || [];
   const queueItems = taskQueue?.items || [];
-  const pendingStartInquiries = (inquiries?.items || []).filter((item: any) => item.status !== 'converted' && item.status !== 'lost');
+  const pendingStartInquiries = (inquiries?.items || []).filter((item: any) => (
+    item.status !== 'converted'
+    && item.status !== 'lost'
+    && !item.workflowInstanceId
+  ));
   const currentAcademicYearId = startForm.academicYearId || academicYears?.items?.find((item: any) => item.isCurrent)?._id || '';
 
   const instanceColumns = [
@@ -1191,18 +1201,31 @@ export default function WorkflowPage() {
       <Modal open={startOpen} onClose={() => setStartOpen(false)} title="Start Admissions Workflow">
         <form onSubmit={handleStartWorkflow} className="space-y-4">
           <div className="rounded-lg border border-sky-100 bg-sky-50 px-4 py-3 text-sm text-sky-900">
-            W01 starts from an inquiry. Pick the inquiry to operationalize and the academic year context for downstream seat and offer steps.
+            W01 starts from an inquiry. The picker only shows inquiries that are not lost, not converted, and not already linked to another workflow.
           </div>
           <div>
             <label className={LABEL_CLASS}>Inquiry</label>
-            <select required value={startForm.inquiryId} onChange={(e) => setStartForm((form) => ({ ...form, inquiryId: e.target.value }))} className={INPUT_CLASS}>
-              <option value="">Select inquiry</option>
+            <select
+              required
+              value={startForm.inquiryId}
+              onChange={(e) => setStartForm((form) => ({ ...form, inquiryId: e.target.value }))}
+              className={INPUT_CLASS}
+              disabled={startInquiriesLoading || pendingStartInquiries.length === 0}
+            >
+              <option value="">
+                {startInquiriesLoading ? 'Loading inquiries...' : pendingStartInquiries.length === 0 ? 'No startable inquiries found' : 'Select inquiry'}
+              </option>
               {pendingStartInquiries.map((item: any) => (
                 <option key={item._id} value={item._id}>
-                  {item.name} • {item.phone} • {item.programmeInterest || 'No programme'}
+                  {item.name} • {item.phone} • {item.programmeInterest || 'No programme'} • {item.status}
                 </option>
               ))}
             </select>
+            {!startInquiriesLoading && pendingStartInquiries.length === 0 && (
+              <p className="mt-2 text-xs text-amber-700">
+                No eligible inquiries are available for workflow start in the current college context.
+              </p>
+            )}
           </div>
           <div>
             <label className={LABEL_CLASS}>Academic year</label>
@@ -1215,7 +1238,7 @@ export default function WorkflowPage() {
           </div>
           <div className="flex justify-end gap-3 border-t pt-4">
             <button type="button" onClick={() => setStartOpen(false)} className="rounded-lg border px-4 py-2 text-sm">Cancel</button>
-            <button type="submit" disabled={startMutation.isPending} className="rounded-lg bg-primary-600 px-4 py-2 text-sm text-white disabled:opacity-50">
+            <button type="submit" disabled={startMutation.isPending || pendingStartInquiries.length === 0} className="rounded-lg bg-primary-600 px-4 py-2 text-sm text-white disabled:opacity-50">
               {startMutation.isPending ? 'Starting...' : 'Start workflow'}
             </button>
           </div>

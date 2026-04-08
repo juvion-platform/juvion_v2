@@ -53,6 +53,7 @@ export default function PaymentsPage() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const payload: any = { ...form, amount: Number(form.amount) };
+    if (!editing) delete payload.receiptNumber;
     if (!payload.transactionRef) delete payload.transactionRef;
     if (!payload.remarks) delete payload.remarks;
     if (editing) updateMut.mutate({ id: editing._id, data: payload });
@@ -107,7 +108,19 @@ export default function PaymentsPage() {
                 ))}
               </select>
             </div>
-            <div><label className={lbl}>Receipt Number *</label><input required value={form.receiptNumber} onChange={e => setForm(f => ({ ...f, receiptNumber: e.target.value }))} className={inp} /></div>
+            {editing ? (
+              <div>
+                <label className={lbl}>Receipt Number *</label>
+                <input required value={form.receiptNumber} onChange={e => setForm(f => ({ ...f, receiptNumber: e.target.value }))} className={inp} />
+              </div>
+            ) : (
+              <div>
+                <label className={lbl}>Receipt Number</label>
+                <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-500">
+                  Auto-generated when the payment is saved
+                </div>
+              </div>
+            )}
             <div><label className={lbl}>Amount *</label><input required type="number" min={0} value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} className={inp} /></div>
             <div><label className={lbl}>Payment Mode *</label>
               <select required value={form.paymentMode} onChange={e => setForm(f => ({ ...f, paymentMode: e.target.value }))} className={inp}>

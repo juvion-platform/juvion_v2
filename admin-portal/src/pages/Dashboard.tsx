@@ -45,14 +45,14 @@ export default function Dashboard() {
 
       {/* ── Top KPI Row ──────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Students" value={v(people?.activeStudents)} icon={Users} color="bg-primary-50 text-primary-500" to="/people" />
-        <StatCard label="Active Faculty" value={v(people?.activeFaculty)} icon={GraduationCap} color="bg-teal-50 text-teal-600" to="/people" />
-        <StatCard label="Total Payments" value={v(finance?.payments)} icon={IndianRupee} color="bg-orange-50 text-orange-500" to="/finance" />
-        <StatCard label="Placement Offers" value={v(placement?.offersAccepted)} icon={TrendingUp} color="bg-accent-50 text-accent-500" to="/placement" />
-        <StatCard label="New Admissions" value={v(admissions?.admissions)} icon={UserPlus} color="bg-primary-100 text-primary-700" to="/admissions" />
-        <StatCard label="Active Courses" value={v(academics?.courseOfferings)} icon={BookOpen} color="bg-teal-100 text-teal-700" to="/academics" />
-        <StatCard label="Hostel Blocks" value={v(welfare?.hostelBlocks)} icon={Heart} color="bg-accent-100 text-accent-600" to="/welfare" />
-        <StatCard label="Buildings" value={v(campusOps?.buildings)} icon={Building2} color="bg-orange-100 text-orange-600" to="/campus" />
+        <StatCard label="Total Students" value={v(people?.activeStudents)} icon={Users} color="bg-primary-50 text-primary-500" to="/people/students" />
+        <StatCard label="Active Faculty" value={v(people?.activeFaculty)} icon={GraduationCap} color="bg-teal-50 text-teal-600" to="/people/faculty" />
+        <StatCard label="Total Payments" value={v(finance?.payments)} icon={IndianRupee} color="bg-orange-50 text-orange-500" to="/finance/payments" />
+        <StatCard label="Placement Offers" value={v(placement?.offersAccepted)} icon={TrendingUp} color="bg-accent-50 text-accent-500" to="/placement/offers" />
+        <StatCard label="New Admissions" value={v(admissions?.admissions)} icon={UserPlus} color="bg-primary-100 text-primary-700" to="/admissions/enrollments" />
+        <StatCard label="Active Courses" value={v(academics?.courseOfferings)} icon={BookOpen} color="bg-teal-100 text-teal-700" to="/academics/offerings" />
+        <StatCard label="Hostel Blocks" value={v(welfare?.hostelBlocks)} icon={Heart} color="bg-accent-100 text-accent-600" to="/welfare/hostel-blocks" />
+        <StatCard label="Buildings" value={v(campusOps?.buildings)} icon={Building2} color="bg-orange-100 text-orange-600" to="/campus/buildings" />
       </div>
 
       {/* ── Module Summary Cards ──────────────────────────── */}

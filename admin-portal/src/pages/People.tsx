@@ -11,6 +11,8 @@ import StaffPage from './people/StaffPage';
 import StudentFormPage from './people/StudentFormPage';
 import FacultyFormPage from './people/FacultyFormPage';
 import StaffFormPage from './people/StaffFormPage';
+import ParentsPage from './people/ParentsPage';
+import OrganizationsPage from './people/OrganizationsPage';
 
 const CARDS = [
   { to: 'students', icon: GraduationCap, label: 'Students', desc: 'Student profiles & enrollment', iconBg: 'bg-primary-50 text-primary-600', border: 'border-primary-200 hover:border-primary-400', statKey: 'students' },
@@ -197,6 +199,8 @@ export default function People() {
         <Route path="staff" element={<StaffPage />} />
         <Route path="staff/new" element={<StaffFormPage />} />
         <Route path="staff/:id/edit" element={<StaffFormPage />} />
+        <Route path="parents" element={<ParentsPage />} />
+        <Route path="organizations" element={<OrganizationsPage />} />
       </Routes>
     </SubPageWrapper>
   );

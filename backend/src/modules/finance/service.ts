@@ -177,7 +177,17 @@ export async function getPayment(collegeId: string, id: string) {
 }
 
 export async function createPayment(collegeId: string, data: any, who: string) {
-  const doc = await Payment.create({ ...data, collegeId });
+  const paymentDate = data.paymentDate ? new Date(data.paymentDate) : new Date();
+  const receiptNumber = typeof data.receiptNumber === 'string' && data.receiptNumber.trim().length > 0
+    ? data.receiptNumber.trim()
+    : await generateReceiptNumber(collegeId, paymentDate);
+
+  const doc = await Payment.create({
+    ...data,
+    collegeId,
+    receiptNumber,
+    paymentDate,
+  });
   // Update allocated line items
   if (data.allocations?.length) {
     for (const alloc of data.allocations) {
@@ -209,6 +219,22 @@ export async function deletePayment(collegeId: string, id: string, who: string) 
   if (!doc) throw new AppError(404, 'Payment not found');
   await createAuditLog({ collegeId, entityType: 'Payment', entityId: id, entityName: doc.receiptNumber, action: 'delete', changes: [], performedBy: who });
   return doc;
+}
+
+async function generateReceiptNumber(collegeId: string, paymentDate: Date) {
+  const year = paymentDate.getFullYear();
+  const prefix = `RCP-${year}-`;
+  const latestReceipt = await Payment.findOne({
+    collegeId,
+    receiptNumber: { $regex: `^${prefix}` },
+  }).sort({ receiptNumber: -1 }).select('receiptNumber').lean();
+
+  const latestSequence = latestReceipt?.receiptNumber
+    ? Number(latestReceipt.receiptNumber.slice(prefix.length))
+    : 0;
+  const nextSequence = Number.isFinite(latestSequence) ? latestSequence + 1 : 1;
+
+  return `${prefix}${String(nextSequence).padStart(3, '0')}`;
 }
 
 // ═══ Scholarships ═════════════════════════════════════════

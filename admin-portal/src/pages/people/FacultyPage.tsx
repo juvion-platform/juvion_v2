@@ -33,6 +33,17 @@ export default function FacultyPage() {
     { key: 'designation', label: 'Designation' },
     { key: 'department', label: 'Department', render: (r: any) => r.department?.name || '—' },
     { key: 'qualification', label: 'Qualification', render: (r: any) => r.qualification || '—' },
+    { key: 'profileCompleteness', label: 'Profile', render: (r: any) => {
+      const score = r.profileCompleteness;
+      if (!score) return '—';
+      return (
+        <div title={score.missing?.length ? `Missing: ${score.missing.join(', ')}` : 'Profile complete'}>
+          <Badge variant={score.status === 'complete' ? 'success' : score.status === 'progressing' ? 'warning' : 'default'}>
+            {score.percent}% complete
+          </Badge>
+        </div>
+      );
+    } },
     { key: 'contractType', label: 'Contract', render: (r: any) => <span className="capitalize">{r.contractType}</span> },
     { key: 'status', label: 'Status', render: (r: any) => <Badge variant={STATUS_COLOR[r.status]}>{r.status?.replace(/_/g, ' ')}</Badge> },
     { key: 'actions', label: '', render: (r: any) => (

@@ -36,6 +36,29 @@ export default function StudentsPage() {
     { key: 'admissionYear', label: 'Year' },
     { key: 'programme', label: 'Programme', render: (r: any) => r.programme?.name || '—' },
     { key: 'branch', label: 'Branch', render: (r: any) => r.branch?.name || '—' },
+    { key: 'guardian', label: 'Fee Guardian', render: (r: any) => r.feeResponsibleParentPerson?.name || '—' },
+    { key: 'profileCompleteness', label: 'Profile', render: (r: any) => {
+      const score = r.profileCompleteness;
+      if (!score) return '—';
+      return (
+        <div title={score.missing?.length ? `Missing: ${score.missing.join(', ')}` : 'Profile complete'}>
+          <Badge variant={score.status === 'complete' ? 'success' : score.status === 'progressing' ? 'warning' : 'default'}>
+            {score.percent}% complete
+          </Badge>
+        </div>
+      );
+    } },
+    { key: 'onboardingCompleteness', label: 'Onboarding', render: (r: any) => {
+      const score = r.onboardingCompleteness;
+      if (!score) return '—';
+      return (
+        <div title={score.missing?.length ? `Pending: ${score.missing.join(', ')}` : 'Onboarding complete'}>
+          <Badge variant={score.status === 'completed' ? 'success' : score.status === 'in_progress' ? 'warning' : 'default'}>
+            {score.percent}% onboarded
+          </Badge>
+        </div>
+      );
+    } },
     { key: 'status', label: 'Status', render: (r: any) => <Badge variant={STATUS_COLOR[r.status]}>{r.status?.replace(/_/g, ' ')}</Badge> },
     { key: 'actions', label: '', render: (r: any) => (
       <div className="flex gap-1">

@@ -8,12 +8,20 @@ import { Organization } from '../../models/people/Organization';
 import { paginate } from '../../shared/pagination';
 import { createAuditLog } from '../../shared/audit';
 import { AppError } from '../../middleware/errorHandler';
+import {
+  getFacultyProfileCompleteness,
+  getOrganizationProfileCompleteness,
+  getParentProfileCompleteness,
+  getStaffProfileCompleteness,
+  getStudentOnboardingCompleteness,
+  getStudentProfileCompleteness,
+} from './profileCompleteness';
 
 const toOid = (id: string) => new mongoose.Types.ObjectId(id);
 
 // ─── Dashboard Stats ─────────────────────────────────
 export async function getDashboardStats(collegeId: string) {
-  const [persons, students, activeStudents, faculty, activeFaculty, staff, activeStaff, parents] = await Promise.all([
+  const [persons, students, activeStudents, faculty, activeFaculty, staff, activeStaff, parents, organizations] = await Promise.all([
     Person.countDocuments({ collegeId }),
     Student.countDocuments({ collegeId }),
     Student.countDocuments({ collegeId, status: 'active' }),
@@ -22,8 +30,9 @@ export async function getDashboardStats(collegeId: string) {
     Staff.countDocuments({ collegeId }),
     Staff.countDocuments({ collegeId, status: 'active' }),
     Parent.countDocuments({ collegeId }),
+    Organization.countDocuments({ collegeId }),
   ]);
-  return { persons, students, activeStudents, faculty, activeFaculty, staff, activeStaff, parents };
+  return { persons, students, activeStudents, faculty, activeFaculty, staff, activeStaff, parents, organizations };
 }
 
 // ─── Helpers ─────────────────────────────────────────
@@ -35,10 +44,45 @@ async function createPersonRecord(collegeId: string, data: any) {
     name: data.name,
     phone: data.phone,
   };
-  ['email', 'aadhaar', 'dob', 'gender', 'address', 'photo'].forEach(k => {
-    if (data[k]) personFields[k] = data[k];
+  ['email', 'aadhaar', 'dob', 'gender', 'alternatePhone', 'preferredLanguage', 'address', 'emergencyContact', 'photo', 'biometricEnrolled'].forEach(k => {
+    if (data[k] !== undefined) personFields[k] = data[k];
   });
   return Person.create(personFields);
+}
+
+function buildStudentOnboardingFields(data: any) {
+  const fields: any = {};
+  if (data.onboardingStatus !== undefined) fields.onboardingStatus = data.onboardingStatus;
+  if (data.onboardingChecklist !== undefined) fields.onboardingChecklist = data.onboardingChecklist;
+  if (data.onboardingCompletedAt !== undefined) {
+    fields.onboardingCompletedAt = data.onboardingCompletedAt ? new Date(data.onboardingCompletedAt) : undefined;
+  } else if (data.onboardingStatus === 'completed') {
+    fields.onboardingCompletedAt = new Date();
+  }
+  if (data.onboardingStatus && data.onboardingStatus !== 'completed' && data.onboardingCompletedAt === undefined) {
+    fields.onboardingCompletedAt = undefined;
+  }
+  return fields;
+}
+
+async function syncStudentParentLinks(collegeId: string, studentId: string, previousParentIds: string[], nextParentIds: string[]) {
+  const previous = new Set(previousParentIds.filter(Boolean));
+  const next = new Set(nextParentIds.filter(Boolean));
+  const toRemove = [...previous].filter(id => !next.has(id));
+  const toAdd = [...next].filter(id => !previous.has(id));
+
+  if (toRemove.length > 0) {
+    await Parent.updateMany(
+      { collegeId, _id: { $in: toRemove } },
+      { $pull: { linkedStudents: toOid(studentId) } },
+    );
+  }
+  if (toAdd.length > 0) {
+    await Parent.updateMany(
+      { collegeId, _id: { $in: toAdd } },
+      { $addToSet: { linkedStudents: toOid(studentId) } },
+    );
+  }
 }
 
 // ─── Persons (raw) ───────────────────────────────────
@@ -123,6 +167,14 @@ export async function listStudents(collegeId: string, page: number, limit: numbe
     { $unwind: { path: '$branch', preserveNullAndEmptyArrays: true } },
     { $lookup: { from: 'batches', localField: 'batchId', foreignField: '_id', as: 'batch' } },
     { $unwind: { path: '$batch', preserveNullAndEmptyArrays: true } },
+    { $lookup: { from: 'parents', localField: 'primaryParentId', foreignField: '_id', as: 'primaryParent' } },
+    { $unwind: { path: '$primaryParent', preserveNullAndEmptyArrays: true } },
+    { $lookup: { from: 'people', localField: 'primaryParent.personId', foreignField: '_id', as: 'primaryParentPerson' } },
+    { $unwind: { path: '$primaryParentPerson', preserveNullAndEmptyArrays: true } },
+    { $lookup: { from: 'parents', localField: 'feeResponsibleParentId', foreignField: '_id', as: 'feeResponsibleParent' } },
+    { $unwind: { path: '$feeResponsibleParent', preserveNullAndEmptyArrays: true } },
+    { $lookup: { from: 'people', localField: 'feeResponsibleParent.personId', foreignField: '_id', as: 'feeResponsibleParentPerson' } },
+    { $unwind: { path: '$feeResponsibleParentPerson', preserveNullAndEmptyArrays: true } },
   ];
   if (search) pipeline.push({ $match: { 'person.name': { $regex: search, $options: 'i' } } });
 
@@ -131,13 +183,34 @@ export async function listStudents(collegeId: string, page: number, limit: numbe
     Student.aggregate([...pipeline, { $count: 'total' }]),
   ]);
   const total = countResult[0]?.total || 0;
-  return { items, total, page, pages: Math.ceil(total / limit) };
+  return {
+    items: items.map(item => ({
+      ...item,
+      profileCompleteness: getStudentProfileCompleteness(item),
+      onboardingCompleteness: getStudentOnboardingCompleteness(item),
+    })),
+    total,
+    page,
+    pages: Math.ceil(total / limit),
+  };
 }
 
-export async function getStudent(collegeId: string, id: string) {
-  const doc = await Student.findOne({ _id: id, collegeId }).populate('personId').populate('regulationId').populate('programmeId').populate('branchId').populate('batchId').lean();
+export async function getStudent(collegeId: string, id: string): Promise<any> {
+  const doc = await Student.findOne({ _id: id, collegeId })
+    .populate('personId')
+    .populate('regulationId')
+    .populate('programmeId')
+    .populate('branchId')
+    .populate('batchId')
+    .populate({ path: 'primaryParentId', populate: { path: 'personId' } })
+    .populate({ path: 'feeResponsibleParentId', populate: { path: 'personId' } })
+    .lean();
   if (!doc) throw new AppError(404, 'Student not found');
-  return doc;
+  return {
+    ...doc,
+    profileCompleteness: getStudentProfileCompleteness(doc),
+    onboardingCompleteness: getStudentOnboardingCompleteness(doc),
+  };
 }
 
 export async function createStudent(collegeId: string, data: any, performedBy: string) {
@@ -147,24 +220,41 @@ export async function createStudent(collegeId: string, data: any, performedBy: s
     personId: person._id,
     admissionYear: data.admissionYear,
     status: data.status || 'active',
+    onboardingStatus: data.onboardingStatus || 'not_started',
   };
-  ['category', 'quota', 'rollNumber', 'regulationId', 'programmeId', 'branchId', 'batchId'].forEach(k => { if (data[k]) studentFields[k] = data[k]; });
+  ['category', 'quota', 'rollNumber', 'regulationId', 'programmeId', 'branchId', 'batchId', 'primaryParentId', 'feeResponsibleParentId'].forEach(k => { if (data[k]) studentFields[k] = data[k]; });
+  Object.assign(studentFields, buildStudentOnboardingFields(data));
   const doc = await Student.create(studentFields);
+  await syncStudentParentLinks(
+    collegeId,
+    String(doc._id),
+    [],
+    [data.primaryParentId, data.feeResponsibleParentId].filter(Boolean),
+  );
   await createAuditLog({ collegeId, entityType: 'Student', entityId: String(doc._id), entityName: data.name, action: 'create', changes: [], performedBy });
   return { ...doc.toObject(), person: person.toObject() };
 }
 
-export async function updateStudent(collegeId: string, id: string, data: any, performedBy: string) {
+export async function updateStudent(collegeId: string, id: string, data: any, performedBy: string): Promise<any> {
   const student = await Student.findOne({ _id: id, collegeId });
   if (!student) throw new AppError(404, 'Student not found');
+  const previousPrimaryParentId = student.primaryParentId ? String(student.primaryParentId) : '';
+  const previousFeeResponsibleParentId = student.feeResponsibleParentId ? String(student.feeResponsibleParentId) : '';
+  const previousParentIds = [previousPrimaryParentId, previousFeeResponsibleParentId].filter(Boolean);
 
   const personFields: any = {};
-  ['name', 'phone', 'email', 'aadhaar', 'dob', 'gender', 'address'].forEach(k => { if (data[k] !== undefined) personFields[k] = data[k]; });
+  ['name', 'phone', 'alternatePhone', 'email', 'aadhaar', 'dob', 'gender', 'preferredLanguage', 'address', 'emergencyContact', 'photo', 'biometricEnrolled'].forEach(k => { if (data[k] !== undefined) personFields[k] = data[k]; });
   if (Object.keys(personFields).length > 0) await Person.findByIdAndUpdate(student.personId, { $set: personFields });
 
   const studentFields: any = {};
-  ['admissionYear', 'category', 'quota', 'rollNumber', 'status', 'regulationId', 'programmeId', 'branchId', 'batchId'].forEach(k => { if (data[k] !== undefined) studentFields[k] = data[k]; });
+  ['admissionYear', 'category', 'quota', 'rollNumber', 'status', 'regulationId', 'programmeId', 'branchId', 'batchId', 'primaryParentId', 'feeResponsibleParentId'].forEach(k => { if (data[k] !== undefined) studentFields[k] = data[k]; });
+  Object.assign(studentFields, buildStudentOnboardingFields(data));
   if (Object.keys(studentFields).length > 0) await Student.findByIdAndUpdate(id, { $set: studentFields });
+  const nextParentIds = [
+    data.primaryParentId !== undefined ? data.primaryParentId : previousPrimaryParentId,
+    data.feeResponsibleParentId !== undefined ? data.feeResponsibleParentId : previousFeeResponsibleParentId,
+  ].filter(Boolean);
+  await syncStudentParentLinks(collegeId, id, previousParentIds, nextParentIds);
 
   await createAuditLog({ collegeId, entityType: 'Student', entityId: id, entityName: data.name || 'Student', action: 'update', changes: [], performedBy });
   return getStudent(collegeId, id);
@@ -198,13 +288,18 @@ export async function listFaculty(collegeId: string, page: number, limit: number
     Faculty.aggregate([...pipeline, { $count: 'total' }]),
   ]);
   const total = countResult[0]?.total || 0;
-  return { items, total, page, pages: Math.ceil(total / limit) };
+  return {
+    items: items.map(item => ({ ...item, profileCompleteness: getFacultyProfileCompleteness(item) })),
+    total,
+    page,
+    pages: Math.ceil(total / limit),
+  };
 }
 
-export async function getFaculty(collegeId: string, id: string) {
+export async function getFaculty(collegeId: string, id: string): Promise<any> {
   const doc = await Faculty.findOne({ _id: id, collegeId }).populate('personId').populate('departmentId').lean();
   if (!doc) throw new AppError(404, 'Faculty not found');
-  return doc;
+  return { ...doc, profileCompleteness: getFacultyProfileCompleteness(doc) };
 }
 
 export async function createFaculty(collegeId: string, data: any, performedBy: string) {
@@ -225,7 +320,7 @@ export async function updateFaculty(collegeId: string, id: string, data: any, pe
   if (!fac) throw new AppError(404, 'Faculty not found');
 
   const personFields: any = {};
-  ['name', 'phone', 'email', 'aadhaar', 'dob', 'gender', 'address'].forEach(k => { if (data[k] !== undefined) personFields[k] = data[k]; });
+  ['name', 'phone', 'alternatePhone', 'email', 'aadhaar', 'dob', 'gender', 'preferredLanguage', 'address', 'emergencyContact', 'photo', 'biometricEnrolled'].forEach(k => { if (data[k] !== undefined) personFields[k] = data[k]; });
   if (Object.keys(personFields).length > 0) await Person.findByIdAndUpdate(fac.personId, { $set: personFields });
 
   const facFields: any = {};
@@ -265,13 +360,18 @@ export async function listStaff(collegeId: string, page: number, limit: number, 
     Staff.aggregate([...pipeline, { $count: 'total' }]),
   ]);
   const total = countResult[0]?.total || 0;
-  return { items, total, page, pages: Math.ceil(total / limit) };
+  return {
+    items: items.map(item => ({ ...item, profileCompleteness: getStaffProfileCompleteness(item) })),
+    total,
+    page,
+    pages: Math.ceil(total / limit),
+  };
 }
 
-export async function getStaff(collegeId: string, id: string) {
+export async function getStaff(collegeId: string, id: string): Promise<any> {
   const doc = await Staff.findOne({ _id: id, collegeId }).populate('personId').populate('departmentId').lean();
   if (!doc) throw new AppError(404, 'Staff not found');
-  return doc;
+  return { ...doc, profileCompleteness: getStaffProfileCompleteness(doc) };
 }
 
 export async function createStaff(collegeId: string, data: any, performedBy: string) {
@@ -292,7 +392,7 @@ export async function updateStaff(collegeId: string, id: string, data: any, perf
   if (!s) throw new AppError(404, 'Staff not found');
 
   const personFields: any = {};
-  ['name', 'phone', 'email', 'aadhaar', 'dob', 'gender', 'address'].forEach(k => { if (data[k] !== undefined) personFields[k] = data[k]; });
+  ['name', 'phone', 'alternatePhone', 'email', 'aadhaar', 'dob', 'gender', 'preferredLanguage', 'address', 'emergencyContact', 'photo', 'biometricEnrolled'].forEach(k => { if (data[k] !== undefined) personFields[k] = data[k]; });
   if (Object.keys(personFields).length > 0) await Person.findByIdAndUpdate(s.personId, { $set: personFields });
 
   const staffFields: any = {};
@@ -329,7 +429,12 @@ export async function listParents(collegeId: string, page: number, limit: number
     Parent.aggregate([...pipeline, { $count: 'total' }]),
   ]);
   const total = countResult[0]?.total || 0;
-  return { items, total, page, pages: Math.ceil(total / limit) };
+  return {
+    items: items.map(item => ({ ...item, profileCompleteness: getParentProfileCompleteness(item) })),
+    total,
+    page,
+    pages: Math.ceil(total / limit),
+  };
 }
 
 export async function createParent(collegeId: string, data: any, performedBy: string) {
@@ -339,25 +444,46 @@ export async function createParent(collegeId: string, data: any, performedBy: st
     relationship: data.relationship,
     linkedStudents: data.linkedStudents || [],
     primaryContact: data.primaryContact || false,
+    occupation: data.occupation,
+    employer: data.employer,
+    annualIncomeBand: data.annualIncomeBand,
+    isFeeResponsible: data.isFeeResponsible || false,
+    communicationPreference: data.communicationPreference,
   });
   await createAuditLog({ collegeId, entityType: 'Parent', entityId: String(doc._id), entityName: data.name, action: 'create', changes: [], performedBy });
   return { ...doc.toObject(), person: person.toObject() };
 }
 
-export async function updateParent(collegeId: string, id: string, data: any, performedBy: string) {
+export async function getParent(collegeId: string, id: string): Promise<any> {
+  const doc = await Parent.findOne({ _id: id, collegeId }).populate('personId').populate({
+    path: 'linkedStudents',
+    populate: { path: 'personId' },
+  }).lean();
+  if (!doc) throw new AppError(404, 'Parent not found');
+  return { ...doc, profileCompleteness: getParentProfileCompleteness(doc) };
+}
+
+export async function updateParent(collegeId: string, id: string, data: any, performedBy: string): Promise<any> {
   const parent = await Parent.findOne({ _id: id, collegeId });
   if (!parent) throw new AppError(404, 'Parent not found');
 
   const personFields: any = {};
-  ['name', 'phone', 'email', 'gender'].forEach(k => { if (data[k] !== undefined) personFields[k] = data[k]; });
+  ['name', 'phone', 'alternatePhone', 'email', 'aadhaar', 'dob', 'gender', 'preferredLanguage', 'address', 'emergencyContact', 'photo', 'biometricEnrolled'].forEach(k => { if (data[k] !== undefined) personFields[k] = data[k]; });
   if (Object.keys(personFields).length > 0) await Person.findByIdAndUpdate(parent.personId, { $set: personFields });
 
   const parentFields: any = {};
-  ['relationship', 'linkedStudents', 'primaryContact'].forEach(k => { if (data[k] !== undefined) parentFields[k] = data[k]; });
+  ['relationship', 'linkedStudents', 'primaryContact', 'occupation', 'employer', 'annualIncomeBand', 'isFeeResponsible', 'communicationPreference'].forEach(k => { if (data[k] !== undefined) parentFields[k] = data[k]; });
   if (Object.keys(parentFields).length > 0) await Parent.findByIdAndUpdate(id, { $set: parentFields });
 
   await createAuditLog({ collegeId, entityType: 'Parent', entityId: id, entityName: data.name || 'Parent', action: 'update', changes: [], performedBy });
-  return { updated: true };
+  return getParent(collegeId, id);
+}
+
+export async function deleteParent(collegeId: string, id: string, performedBy: string) {
+  const doc = await Parent.findOneAndDelete({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Parent not found');
+  await createAuditLog({ collegeId, entityType: 'Parent', entityId: id, entityName: 'Parent', action: 'delete', changes: [], performedBy });
+  return { deleted: true };
 }
 
 // ─── Organizations ───────────────────────────────────
@@ -365,13 +491,23 @@ export async function updateParent(collegeId: string, id: string, data: any, per
 export async function listOrganizations(collegeId: string, page: number, limit: number, search?: string) {
   const filter: any = { collegeId };
   if (search) filter.name = { $regex: search, $options: 'i' };
-  return paginate(Organization, filter, page, limit, { createdAt: -1 });
+  const result = await paginate(Organization, filter, page, limit, { createdAt: -1 });
+  return {
+    ...result,
+    items: result.items.map(item => ({ ...item, profileCompleteness: getOrganizationProfileCompleteness(item) })),
+  };
 }
 
 export async function createOrganization(collegeId: string, data: any, performedBy: string) {
   const doc = await Organization.create({ ...data, collegeId });
   await createAuditLog({ collegeId, entityType: 'Organization', entityId: String(doc._id), entityName: data.name, action: 'create', changes: [], performedBy });
   return doc;
+}
+
+export async function getOrganization(collegeId: string, id: string): Promise<any> {
+  const doc = await Organization.findOne({ _id: id, collegeId }).lean();
+  if (!doc) throw new AppError(404, 'Organization not found');
+  return { ...doc, profileCompleteness: getOrganizationProfileCompleteness(doc) };
 }
 
 export async function updateOrganization(collegeId: string, id: string, data: any, performedBy: string) {
@@ -387,4 +523,3 @@ export async function deleteOrganization(collegeId: string, id: string, performe
   await createAuditLog({ collegeId, entityType: 'Organization', entityId: id, entityName: doc.name, action: 'delete', changes: [], performedBy });
   return { deleted: true };
 }
-

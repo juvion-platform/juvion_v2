@@ -37,12 +37,15 @@ export const deleteStaff = (id: string) => api.delete(`${BASE}/staff/${id}`).the
 // ── Parents ──────────────────────────────────────────
 export const listParents = (page = 1, limit = 20, search?: string) =>
   api.get(`${BASE}/parents`, { params: { page, limit, search } }).then(r => r.data);
+export const getParent = (id: string) => api.get(`${BASE}/parents/${id}`).then(r => r.data);
 export const createParent = (data: any) => api.post(`${BASE}/parents`, data).then(r => r.data);
 export const updateParent = (id: string, data: any) => api.put(`${BASE}/parents/${id}`, data).then(r => r.data);
+export const deleteParent = (id: string) => api.delete(`${BASE}/parents/${id}`).then(r => r.data);
 
 // ── Organizations ────────────────────────────────────
 export const listOrganizations = (page = 1, limit = 20, search?: string) =>
   api.get(`${BASE}/organizations`, { params: { page, limit, search } }).then(r => r.data);
+export const getOrganization = (id: string) => api.get(`${BASE}/organizations/${id}`).then(r => r.data);
 export const createOrganization = (data: any) => api.post(`${BASE}/organizations`, data).then(r => r.data);
 export const updateOrganization = (id: string, data: any) => api.put(`${BASE}/organizations/${id}`, data).then(r => r.data);
 export const deleteOrganization = (id: string) => api.delete(`${BASE}/organizations/${id}`).then(r => r.data);

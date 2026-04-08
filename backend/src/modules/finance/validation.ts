@@ -51,7 +51,7 @@ export const updateFeeLineItemSchema = createFeeLineItemSchema.partial();
 
 export const createPaymentSchema = z.object({
   studentId: z.string().min(1),
-  receiptNumber: z.string().min(1),
+  receiptNumber: z.string().min(1).optional(),
   amount: z.number().min(0),
   paymentMode: z.enum(['cash', 'cheque', 'dd', 'online', 'upi', 'neft', 'rtgs', 'card']),
   transactionRef: z.string().optional(),

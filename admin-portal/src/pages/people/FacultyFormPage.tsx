@@ -10,7 +10,8 @@ const CONTRACT_TYPES = ['regular', 'contract', 'adjunct', 'visiting'] as const;
 const GENDERS = ['male', 'female', 'other'] as const;
 
 const emptyForm = {
-  name: '', phone: '', email: '', gender: '', dob: '', aadhaar: '',
+  name: '', phone: '', alternatePhone: '', email: '', gender: '', dob: '', aadhaar: '', preferredLanguage: '',
+  emergencyContactName: '', emergencyContactPhone: '', emergencyContactRelationship: '', biometricEnrolled: false,
   employeeCode: '', designation: '', specialization: '', qualification: '',
   departmentId: '', contractType: 'regular', status: 'active',
   // Address
@@ -39,9 +40,15 @@ export default function FacultyFormPage() {
     if (existing) {
       const p = existing.person || existing.personId || {};
       const addr = p.address || {};
+      const emergency = p.emergencyContact || {};
       setForm({
-        name: p.name || '', phone: p.phone || '', email: p.email || '', gender: p.gender || '',
+        name: p.name || '', phone: p.phone || '', alternatePhone: p.alternatePhone || '', email: p.email || '', gender: p.gender || '',
         dob: p.dob ? p.dob.substring(0, 10) : '', aadhaar: p.aadhaar || '',
+        preferredLanguage: p.preferredLanguage || '',
+        emergencyContactName: emergency.name || '',
+        emergencyContactPhone: emergency.phone || '',
+        emergencyContactRelationship: emergency.relationship || '',
+        biometricEnrolled: !!p.biometricEnrolled,
         employeeCode: existing.employeeCode || '', designation: existing.designation || '',
         specialization: existing.specialization || '', qualification: existing.qualification || '',
         departmentId: existing.departmentId?._id || existing.departmentId || '',
@@ -67,6 +74,14 @@ export default function FacultyFormPage() {
     const address: any = {};
     ['line1', 'line2', 'city', 'state', 'pincode'].forEach(k => { if ((payload as any)[k]) address[k] = (payload as any)[k]; delete (payload as any)[k]; });
     if (Object.keys(address).length > 0) payload.address = address;
+    const emergencyContact: any = {};
+    if (payload.emergencyContactName) emergencyContact.name = payload.emergencyContactName;
+    if (payload.emergencyContactPhone) emergencyContact.phone = payload.emergencyContactPhone;
+    if (payload.emergencyContactRelationship) emergencyContact.relationship = payload.emergencyContactRelationship;
+    delete payload.emergencyContactName;
+    delete payload.emergencyContactPhone;
+    delete payload.emergencyContactRelationship;
+    if (Object.keys(emergencyContact).length > 0) payload.emergencyContact = emergencyContact;
     Object.keys(payload).forEach(k => { if (payload[k] === '') delete payload[k]; });
     if (isEdit) updateMut.mutate({ id, data: payload });
     else createMut.mutate(payload);
@@ -115,10 +130,19 @@ export default function FacultyFormPage() {
           <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-4">
             <div><label className={lbl}>Name <span className="text-red-500">*</span></label><input required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className={inp} placeholder="Full name" /></div>
             <div><label className={lbl}>Phone <span className="text-red-500">*</span></label><input required value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} className={inp} placeholder="10-digit mobile" /></div>
+            <div><label className={lbl}>Alternate Phone</label><input value={form.alternatePhone} onChange={e => setForm(f => ({ ...f, alternatePhone: e.target.value }))} className={inp} placeholder="Backup contact number" /></div>
             <div><label className={lbl}>Email</label><input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} className={inp} /></div>
             <div><label className={lbl}>Gender</label><select value={form.gender} onChange={e => setForm(f => ({ ...f, gender: e.target.value }))} className={inp}><option value="">Select...</option>{GENDERS.map(g => <option key={g} value={g} className="capitalize">{g}</option>)}</select></div>
             <div><label className={lbl}>Date of Birth</label><input type="date" value={form.dob} onChange={e => setForm(f => ({ ...f, dob: e.target.value }))} className={inp} /></div>
             <div><label className={lbl}>Aadhaar</label><input value={form.aadhaar} onChange={e => setForm(f => ({ ...f, aadhaar: e.target.value }))} className={inp} maxLength={12} placeholder="12-digit Aadhaar" /></div>
+            <div><label className={lbl}>Preferred Language</label><input value={form.preferredLanguage} onChange={e => setForm(f => ({ ...f, preferredLanguage: e.target.value }))} className={inp} placeholder="e.g. English, Telugu" /></div>
+            <div><label className={lbl}>Emergency Contact Name</label><input value={form.emergencyContactName} onChange={e => setForm(f => ({ ...f, emergencyContactName: e.target.value }))} className={inp} placeholder="Primary emergency contact" /></div>
+            <div><label className={lbl}>Emergency Contact Phone</label><input value={form.emergencyContactPhone} onChange={e => setForm(f => ({ ...f, emergencyContactPhone: e.target.value }))} className={inp} placeholder="Emergency phone number" /></div>
+            <div><label className={lbl}>Emergency Contact Relationship</label><input value={form.emergencyContactRelationship} onChange={e => setForm(f => ({ ...f, emergencyContactRelationship: e.target.value }))} className={inp} placeholder="e.g. Spouse, Parent" /></div>
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 pt-7">
+              <input type="checkbox" checked={form.biometricEnrolled} onChange={e => setForm(f => ({ ...f, biometricEnrolled: e.target.checked }))} className="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+              Biometric enrolled
+            </label>
           </div>
         </section>
 
