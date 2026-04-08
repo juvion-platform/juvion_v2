@@ -9,8 +9,11 @@ const api = axios.create({
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   const collegeId = localStorage.getItem('collegeId');
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  if (collegeId) config.headers['x-college-id'] = collegeId;
+  const url = config.url || '';
+  const isLoginRequest = url === '/auth/login' || url.endsWith('/auth/login');
+
+  if (token && !isLoginRequest) config.headers.Authorization = `Bearer ${token}`;
+  if (collegeId && !isLoginRequest) config.headers['x-college-id'] = collegeId;
   return config;
 });
 

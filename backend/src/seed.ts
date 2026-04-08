@@ -7,7 +7,7 @@ import {
   // Academic Structure
   AcademicYear, Regulation, Department, Programme, Branch, Batch, Section, Semester,
   // Academic Ops
-  Course, CourseOffering,
+  Course, CourseOffering, CurriculumMap,
   // Finance
   FeeStructure, FeeLineItem, StudentFeeAccount, Invoice, Payment, Budget, Expense,
   Scholarship, ScholarshipAllocation, Concession,
@@ -87,6 +87,7 @@ async function seed() {
     Semester.deleteMany({ collegeId: CID }),
     Course.deleteMany({ collegeId: CID }),
     CourseOffering.deleteMany({ collegeId: CID }),
+    CurriculumMap.deleteMany({ collegeId: CID }),
     FeeStructure.deleteMany({ collegeId: CID }),
     FeeLineItem.deleteMany({ collegeId: CID }),
     StudentFeeAccount.deleteMany({ collegeId: CID }),
@@ -608,6 +609,83 @@ async function seed() {
       ],
       totalAmount: 180000,
     },
+    {
+      collegeId: CID, academicYearId: ay2024._id, programmeId: progBTech._id, branchId: brECE._id, quota: 'management', year: 1,
+      components: [
+        { name: 'Tuition Fee', amount: 220000, isRefundable: false },
+        { name: 'Development Fee', amount: 30000, isRefundable: false },
+        { name: 'Lab Fee', amount: 15000, isRefundable: false },
+        { name: 'Library Fee', amount: 5000, isRefundable: false },
+        { name: 'Caution Deposit', amount: 10000, isRefundable: true },
+      ],
+      totalAmount: 280000,
+    },
+    {
+      collegeId: CID, academicYearId: ay2024._id, programmeId: progBTech._id, branchId: brEEE._id, quota: 'convener', year: 1,
+      components: [
+        { name: 'Tuition Fee', amount: 120000, isRefundable: false },
+        { name: 'Development Fee', amount: 18000, isRefundable: false },
+        { name: 'Lab Fee', amount: 12000, isRefundable: false },
+        { name: 'Library Fee', amount: 5000, isRefundable: false },
+        { name: 'Caution Deposit', amount: 10000, isRefundable: true },
+      ],
+      totalAmount: 165000,
+    },
+    {
+      collegeId: CID, academicYearId: ay2024._id, programmeId: progBTech._id, branchId: brEEE._id, quota: 'management', year: 1,
+      components: [
+        { name: 'Tuition Fee', amount: 185000, isRefundable: false },
+        { name: 'Development Fee', amount: 25000, isRefundable: false },
+        { name: 'Lab Fee', amount: 12000, isRefundable: false },
+        { name: 'Library Fee', amount: 5000, isRefundable: false },
+        { name: 'Caution Deposit', amount: 10000, isRefundable: true },
+      ],
+      totalAmount: 237000,
+    },
+    {
+      collegeId: CID, academicYearId: ay2024._id, programmeId: progBTech._id, branchId: brMECH._id, quota: 'convener', year: 1,
+      components: [
+        { name: 'Tuition Fee', amount: 125000, isRefundable: false },
+        { name: 'Development Fee', amount: 18000, isRefundable: false },
+        { name: 'Workshop Fee', amount: 15000, isRefundable: false },
+        { name: 'Library Fee', amount: 5000, isRefundable: false },
+        { name: 'Caution Deposit', amount: 10000, isRefundable: true },
+      ],
+      totalAmount: 173000,
+    },
+    {
+      collegeId: CID, academicYearId: ay2024._id, programmeId: progBTech._id, branchId: brMECH._id, quota: 'management', year: 1,
+      components: [
+        { name: 'Tuition Fee', amount: 195000, isRefundable: false },
+        { name: 'Development Fee', amount: 25000, isRefundable: false },
+        { name: 'Workshop Fee', amount: 15000, isRefundable: false },
+        { name: 'Library Fee', amount: 5000, isRefundable: false },
+        { name: 'Caution Deposit', amount: 10000, isRefundable: true },
+      ],
+      totalAmount: 250000,
+    },
+    {
+      collegeId: CID, academicYearId: ay2024._id, programmeId: progBTech._id, branchId: brCIVIL._id, quota: 'convener', year: 1,
+      components: [
+        { name: 'Tuition Fee', amount: 115000, isRefundable: false },
+        { name: 'Development Fee', amount: 18000, isRefundable: false },
+        { name: 'Workshop Fee', amount: 12000, isRefundable: false },
+        { name: 'Library Fee', amount: 5000, isRefundable: false },
+        { name: 'Caution Deposit', amount: 10000, isRefundable: true },
+      ],
+      totalAmount: 160000,
+    },
+    {
+      collegeId: CID, academicYearId: ay2024._id, programmeId: progBTech._id, branchId: brCIVIL._id, quota: 'management', year: 1,
+      components: [
+        { name: 'Tuition Fee', amount: 175000, isRefundable: false },
+        { name: 'Development Fee', amount: 22000, isRefundable: false },
+        { name: 'Workshop Fee', amount: 12000, isRefundable: false },
+        { name: 'Library Fee', amount: 5000, isRefundable: false },
+        { name: 'Caution Deposit', amount: 10000, isRefundable: true },
+      ],
+      totalAmount: 224000,
+    },
   ]);
   console.log('Fee Structures created');
 
@@ -691,8 +769,33 @@ async function seed() {
     { collegeId: CID, code: 'EC502', name: 'Embedded Systems', regulationId: regR22._id, departmentId: deptECE._id, credits: 4, lectureHrs: 3, tutorialHrs: 0, practicalHrs: 2, type: 'theory', isElective: false },
     { collegeId: CID, code: 'ME501', name: 'Heat Transfer', regulationId: regR22._id, departmentId: deptMECH._id, credits: 3, lectureHrs: 3, tutorialHrs: 0, practicalHrs: 0, type: 'theory', isElective: false },
     { collegeId: CID, code: 'CS601', name: 'Cloud Computing', regulationId: regR22._id, departmentId: deptCSE._id, credits: 3, lectureHrs: 3, tutorialHrs: 0, practicalHrs: 0, type: 'theory', isElective: true },
+    { collegeId: CID, code: 'CSE101', name: 'Problem Solving with C', regulationId: regR22._id, departmentId: deptCSE._id, credits: 4, lectureHrs: 3, tutorialHrs: 0, practicalHrs: 2, type: 'theory', isElective: false },
+    { collegeId: CID, code: 'CSE102', name: 'Digital Fundamentals', regulationId: regR22._id, departmentId: deptCSE._id, credits: 3, lectureHrs: 3, tutorialHrs: 0, practicalHrs: 0, type: 'theory', isElective: false },
+    { collegeId: CID, code: 'ECE101', name: 'Basic Electronic Circuits', regulationId: regR22._id, departmentId: deptECE._id, credits: 4, lectureHrs: 3, tutorialHrs: 0, practicalHrs: 2, type: 'theory', isElective: false },
+    { collegeId: CID, code: 'ECE102', name: 'Signals and Systems Foundations', regulationId: regR22._id, departmentId: deptECE._id, credits: 3, lectureHrs: 3, tutorialHrs: 0, practicalHrs: 0, type: 'theory', isElective: false },
+    { collegeId: CID, code: 'EEE101', name: 'Basic Electrical Engineering', regulationId: regR22._id, departmentId: deptEEE._id, credits: 4, lectureHrs: 3, tutorialHrs: 0, practicalHrs: 2, type: 'theory', isElective: false },
+    { collegeId: CID, code: 'EEE102', name: 'Circuit Analysis', regulationId: regR22._id, departmentId: deptEEE._id, credits: 3, lectureHrs: 3, tutorialHrs: 1, practicalHrs: 0, type: 'theory', isElective: false },
+    { collegeId: CID, code: 'ME101', name: 'Engineering Mechanics', regulationId: regR22._id, departmentId: deptMECH._id, credits: 4, lectureHrs: 3, tutorialHrs: 1, practicalHrs: 0, type: 'theory', isElective: false },
+    { collegeId: CID, code: 'ME102', name: 'Workshop Practice', regulationId: regR22._id, departmentId: deptMECH._id, credits: 2, lectureHrs: 0, tutorialHrs: 0, practicalHrs: 4, type: 'lab', isElective: false },
+    { collegeId: CID, code: 'CE101', name: 'Engineering Graphics', regulationId: regR22._id, departmentId: deptCIVIL._id, credits: 3, lectureHrs: 2, tutorialHrs: 0, practicalHrs: 2, type: 'theory', isElective: false },
+    { collegeId: CID, code: 'CE102', name: 'Civil Engineering Materials', regulationId: regR22._id, departmentId: deptCIVIL._id, credits: 3, lectureHrs: 3, tutorialHrs: 0, practicalHrs: 0, type: 'theory', isElective: false },
   ]);
   console.log('Courses created');
+
+  // --- First-year curriculum maps for workflow provisioning ---
+  await CurriculumMap.create([
+    { collegeId: CID, regulationId: regR22._id, programmeId: progBTech._id, branchId: brCSE._id, semester: 1, courseId: courses[8]._id, isElective: false },
+    { collegeId: CID, regulationId: regR22._id, programmeId: progBTech._id, branchId: brCSE._id, semester: 1, courseId: courses[9]._id, isElective: false },
+    { collegeId: CID, regulationId: regR22._id, programmeId: progBTech._id, branchId: brECE._id, semester: 1, courseId: courses[10]._id, isElective: false },
+    { collegeId: CID, regulationId: regR22._id, programmeId: progBTech._id, branchId: brECE._id, semester: 1, courseId: courses[11]._id, isElective: false },
+    { collegeId: CID, regulationId: regR22._id, programmeId: progBTech._id, branchId: brEEE._id, semester: 1, courseId: courses[12]._id, isElective: false },
+    { collegeId: CID, regulationId: regR22._id, programmeId: progBTech._id, branchId: brEEE._id, semester: 1, courseId: courses[13]._id, isElective: false },
+    { collegeId: CID, regulationId: regR22._id, programmeId: progBTech._id, branchId: brMECH._id, semester: 1, courseId: courses[14]._id, isElective: false },
+    { collegeId: CID, regulationId: regR22._id, programmeId: progBTech._id, branchId: brMECH._id, semester: 1, courseId: courses[15]._id, isElective: false },
+    { collegeId: CID, regulationId: regR22._id, programmeId: progBTech._id, branchId: brCIVIL._id, semester: 1, courseId: courses[16]._id, isElective: false },
+    { collegeId: CID, regulationId: regR22._id, programmeId: progBTech._id, branchId: brCIVIL._id, semester: 1, courseId: courses[17]._id, isElective: false },
+  ]);
+  console.log('Curriculum Maps created');
 
   // --- Hostel Allocations ---
   await HostelAllocation.create([

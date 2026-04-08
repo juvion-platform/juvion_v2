@@ -3,6 +3,21 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import api from '../services/api';
 
+const sampleAccounts = [
+  {
+    label: 'Super Admin',
+    email: 'super@juvion.dev',
+    password: 'admin123',
+    hint: 'Use this to access the college selector.',
+  },
+  {
+    label: 'JIT Admin',
+    email: 'admin@jit.edu.in',
+    password: 'admin123',
+    hint: 'Use this to sign directly into the JIT dashboard.',
+  },
+] as const;
+
 export default function Login() {
   const navigate = useNavigate();
   const setAuth = useAuthStore((s) => s.setAuth);
@@ -10,6 +25,12 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  function applySampleCredentials(account: (typeof sampleAccounts)[number]) {
+    setEmail(account.email);
+    setPassword(account.password);
+    setError('');
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -32,12 +53,6 @@ export default function Login() {
       setLoading(false);
     }
   }
-
-  const demoAccounts = [
-    { label: 'Super Admin', email: 'super@juvion.dev', password: 'admin123' },
-    { label: 'College Admin (JIT)', email: 'admin@jit.edu.in', password: 'admin123' },
-  ];
-
   return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #0F2744 0%, #1A365D 50%, #0F2744 100%)' }}>
       <div className="w-full max-w-md">
@@ -95,17 +110,30 @@ export default function Login() {
             {loading ? 'Signing in...' : 'Sign in'}
           </button>
 
-          <div className="border-t border-gray-100 pt-4">
-            <div className="space-y-1.5">
-              {demoAccounts.map((acc) => (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-800">Sample credentials</h3>
+              <p className="mt-1 text-xs text-slate-500">Seeded accounts from the development database.</p>
+            </div>
+
+            <div className="mt-3 space-y-3">
+              {sampleAccounts.map((account) => (
                 <button
-                  key={acc.email}
+                  key={account.email}
                   type="button"
-                  onClick={() => { setEmail(acc.email); setPassword(acc.password); setError(''); }}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+                  onClick={() => applySampleCredentials(account)}
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-left transition hover:border-teal-300 hover:bg-teal-50"
                 >
-                  <span className="text-xs font-medium text-gray-600">{acc.label}</span>
-                  <span className="text-xs text-gray-400 font-mono">{acc.email}</span>
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-medium text-slate-800">{account.label}</div>
+                      <div className="mt-1 text-xs text-slate-600">{account.email}</div>
+                    </div>
+                    <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">
+                      {account.password}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs text-slate-500">{account.hint}</p>
                 </button>
               ))}
             </div>

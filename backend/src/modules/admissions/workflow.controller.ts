@@ -35,6 +35,20 @@ export async function completeTask(req: AuthRequest, res: Response, next: NextFu
   } catch (e) { next(e); }
 }
 
+export async function triggerWorkflowStep(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const result = await engine.triggerWorkflowStep({
+      instanceId: req.params.instanceId as string,
+      collegeId: req.collegeId!,
+      stepId: req.body.stepId,
+      triggeredBy: who(req),
+      metadata: req.body.metadata,
+      notes: req.body.notes,
+    });
+    res.status(201).json(result);
+  } catch (e) { next(e); }
+}
+
 export async function failTask(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const task = await engine.failTask(req.params.taskId as string, req.collegeId!, who(req), req.body.reason);

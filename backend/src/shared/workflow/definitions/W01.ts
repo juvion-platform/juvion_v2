@@ -8,7 +8,7 @@ const W01: WorkflowDefinition = {
   id: 'W01',
   name: 'Student Intake & Onboarding',
   version: 1,
-  entityType: 'Applicant',
+  entityType: 'Inquiry',
 
   phases: [
     // ─── Phase 1: Lead Capture & Enquiry ──────────────────

@@ -10,6 +10,7 @@ import authRouter from './modules/auth/routes';
 
 // Register workflow definitions
 import './shared/workflow/definitions';
+import './modules/admissions/workflow.handlers';
 
 const app = express();
 const PORT = process.env.PORT || 3003;

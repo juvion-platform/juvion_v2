@@ -15,23 +15,24 @@ export interface IDocumentChecklist extends Document {
   fraudNotes?: string;
 }
 
+const documentItemSchema = new Schema({
+  name: String,
+  type: String,
+  required: Boolean,
+  uploaded: Boolean,
+  verified: Boolean,
+  verifiedBy: String,
+  verificationDate: Date,
+  fileUrl: String,
+  ocrConfidence: Number,
+  ocrExtractedData: { type: Schema.Types.Mixed },
+  ocrStatus: { type: String, enum: ['pending', 'processing', 'verified', 'flagged', 'deficient'] },
+}, { _id: false });
+
 const schema = new Schema<IDocumentChecklist>({
   collegeId: { type: Schema.Types.ObjectId, required: true, index: true },
   applicantId: { type: Schema.Types.ObjectId, ref: 'Applicant', required: true },
-  documents: [{
-    name: String,
-    type: String,
-    required: Boolean,
-    uploaded: Boolean,
-    verified: Boolean,
-    verifiedBy: String,
-    verificationDate: Date,
-    // W01 AI fields
-    fileUrl: String,
-    ocrConfidence: Number,
-    ocrExtractedData: { type: Schema.Types.Mixed },
-    ocrStatus: { type: String, enum: ['pending', 'processing', 'verified', 'flagged', 'deficient'] },
-  }],
+  documents: [documentItemSchema],
   status: { type: String, enum: ['pending', 'partial', 'complete', 'verified'], default: 'pending' },
   // W01 enhancements
   ocrJobId: String,

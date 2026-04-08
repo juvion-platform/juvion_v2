@@ -5,6 +5,7 @@
 import { WorkflowInstance, IWorkflowInstance } from '../../models/workflow/WorkflowInstance';
 import { WorkflowTask, IWorkflowTask } from '../../models/workflow/WorkflowTask';
 import { getWorkflowDef, WorkflowStepDef, WorkflowStatus } from './WorkflowDefinition';
+import { executeWorkflowStepHandler } from './StepHandlers';
 import { eventBus } from '../events';
 import { createAuditLog } from '../audit';
 import { AppError } from '../../middleware/errorHandler';
@@ -24,6 +25,15 @@ export interface CompleteTaskInput {
   collegeId: string;
   completedBy: string;
   result?: Record<string, any>;
+  notes?: string;
+}
+
+export interface TriggerWorkflowStepInput {
+  instanceId: string;
+  collegeId: string;
+  stepId: string;
+  triggeredBy: string;
+  metadata?: Record<string, any>;
   notes?: string;
 }
 
@@ -94,6 +104,17 @@ export async function completeTask(input: CompleteTaskInput): Promise<{ task: IW
   task.notes = input.notes;
   await task.save();
 
+  const handlerOutcome = await executeWorkflowStepHandler(def.id, task.stepId, {
+    instance,
+    task,
+    result: task.result || {},
+    completedBy: input.completedBy,
+  });
+  if (handlerOutcome?.result) {
+    task.result = handlerOutcome.result;
+    await task.save();
+  }
+
   // Record in instance history
   instance.history.push({ step: task.stepId, status: 'completed', at: new Date(), by: input.completedBy });
 
@@ -110,42 +131,99 @@ export async function completeTask(input: CompleteTaskInput): Promise<{ task: IW
     });
   }
 
-  // Find next step via transitions
-  const nextTransition = def.transitions.find(t => t.from === task.stepId && t.event === 'complete');
-
-  if (!nextTransition || def.terminalSteps.includes(task.stepId)) {
-    // Workflow complete
-    instance.status = 'completed';
-    instance.completedAt = new Date();
-    instance.currentStep = task.stepId;
-    await instance.save();
-
-    eventBus.emit('workflow:completed', {
-      instanceId: instance._id,
-      workflowId: def.id,
-      entityType: instance.entityType,
-      entityId: instance.entityId,
-      collegeId: instance.collegeId,
+  const parentGroupTaskId = typeof task.metadata?.parentGroupTaskId === 'string' ? task.metadata.parentGroupTaskId : undefined;
+  if (parentGroupTaskId) {
+    const siblingTasks = await WorkflowTask.find({
+      collegeId: input.collegeId,
+      workflowInstanceId: task.workflowInstanceId,
+      'metadata.parentGroupTaskId': parentGroupTaskId,
     });
-  } else {
-    // Advance to next step
-    const nextStep = def.phases.flatMap(p => p.steps).find(s => s.id === nextTransition.to);
-    if (!nextStep) throw new AppError(500, `Next step '${nextTransition.to}' not found`);
 
-    instance.currentStep = nextStep.id;
-    instance.currentPhase = nextStep.phase;
-    instance.history.push({ step: nextStep.id, status: 'in_progress', at: new Date(), by: 'system' });
-    await instance.save();
-
-    // Create the next task(s)
-    if (nextStep.type === 'parallel_group' && nextStep.parallelSteps?.length) {
-      for (const subStepId of nextStep.parallelSteps) {
-        const subStep = def.phases.flatMap(p => p.steps).find(s => s.id === subStepId);
-        if (subStep) await createTask(instance, subStep, 'system');
-      }
-    } else {
-      await createTask(instance, nextStep, 'system');
+    if (!siblingTasks.every(t => isTerminalTaskStatus(t.status))) {
+      await instance.save();
+      return { task, instance };
     }
+
+    const parentGroupTask = await WorkflowTask.findOne({ _id: parentGroupTaskId, collegeId: input.collegeId });
+    if (!parentGroupTask) throw new AppError(500, 'Parallel workflow group task not found');
+
+    if (parentGroupTask.status !== 'completed') {
+      parentGroupTask.status = 'completed';
+      parentGroupTask.completedAt = new Date();
+      parentGroupTask.completedBy = input.completedBy;
+      parentGroupTask.result = {
+        completedSteps: siblingTasks.map(t => t.stepId),
+      };
+      await parentGroupTask.save();
+
+      instance.history.push({ step: parentGroupTask.stepId, status: 'completed', at: new Date(), by: input.completedBy });
+    }
+
+    await advanceWorkflow(instance, def, parentGroupTask.stepId, parentGroupTask.result);
+  } else {
+    await advanceWorkflow(instance, def, task.stepId, input.result);
+  }
+
+  return { task, instance };
+}
+
+// ─── Trigger an optional step on an existing workflow ──────
+export async function triggerWorkflowStep(input: TriggerWorkflowStepInput): Promise<{ task: IWorkflowTask; instance: IWorkflowInstance }> {
+  const instance = await WorkflowInstance.findOne({ _id: input.instanceId, collegeId: input.collegeId });
+  if (!instance) throw new AppError(404, 'Workflow instance not found');
+
+  const def = getWorkflowDef(instance.workflowId, instance.workflowVersion);
+  if (!def) throw new AppError(500, 'Workflow definition not found');
+
+  const stepDef = def.phases.flatMap((phase) => phase.steps).find((step) => step.id === input.stepId);
+  if (!stepDef) throw new AppError(404, `Workflow step '${input.stepId}' not found`);
+
+  const existingOpenTask = await WorkflowTask.findOne({
+    collegeId: input.collegeId,
+    workflowInstanceId: instance._id,
+    stepId: input.stepId,
+    status: { $in: ['pending', 'in_progress', 'blocked'] },
+  });
+  if (existingOpenTask) {
+    throw new AppError(400, `Step '${input.stepId}' is already active for this workflow`);
+  }
+
+  const existingCompletedTask = await WorkflowTask.findOne({
+    collegeId: input.collegeId,
+    workflowInstanceId: instance._id,
+    stepId: input.stepId,
+    status: 'completed',
+  });
+  if (existingCompletedTask) {
+    throw new AppError(400, `Step '${input.stepId}' has already been completed for this workflow`);
+  }
+
+  instance.status = 'active';
+  instance.completedAt = undefined;
+  instance.currentPhase = stepDef.phase;
+  instance.currentStep = stepDef.id;
+  instance.metadata = {
+    ...(instance.metadata || {}),
+    ...(input.metadata || {}),
+  };
+  instance.history.push({
+    step: stepDef.id,
+    status: 'in_progress',
+    at: new Date(),
+    by: input.triggeredBy,
+    ...(input.notes ? { notes: input.notes } : {}),
+  });
+  await instance.save();
+
+  const task = await createTask(instance, stepDef, input.triggeredBy);
+  if (input.notes || (input.metadata && Object.keys(input.metadata).length > 0)) {
+    task.notes = input.notes;
+    task.metadata = {
+      ...(task.metadata || {}),
+      ...(input.metadata || {}),
+      triggeredManually: true,
+    };
+    await task.save();
   }
 
   return { task, instance };
@@ -261,9 +339,123 @@ async function createTask(instance: IWorkflowInstance, stepDef: WorkflowStepDef,
     aiAutonomy: stepDef.aiAutonomy,
     entityType: instance.entityType,
     entityId: instance.entityId,
-    status: stepDef.type === 'automated' ? 'in_progress' : 'pending',
+    status: stepDef.type === 'automated' || stepDef.type === 'parallel_group' ? 'in_progress' : 'pending',
     dueAt: stepDef.timeout ? new Date(Date.now() + stepDef.timeout * 3600000) : undefined,
     metadata: stepDef.metadata || {},
     createdBy,
   });
+}
+
+async function advanceWorkflow(
+  instance: IWorkflowInstance,
+  def: NonNullable<ReturnType<typeof getWorkflowDef>>,
+  completedStepId: string,
+  result?: Record<string, any>,
+): Promise<void> {
+  const nextTransition = getNextTransition(def, completedStepId, instance.metadata, result);
+
+  if (!nextTransition || def.terminalSteps.includes(completedStepId)) {
+    instance.status = isCancellationTerminalStep(def, completedStepId) ? 'cancelled' : 'completed';
+    instance.completedAt = new Date();
+    instance.currentStep = completedStepId;
+    await instance.save();
+
+    eventBus.emit('workflow:completed', {
+      instanceId: instance._id,
+      workflowId: def.id,
+      entityType: instance.entityType,
+      entityId: instance.entityId,
+      collegeId: instance.collegeId,
+    });
+    return;
+  }
+
+  const nextStep = def.phases.flatMap(p => p.steps).find(s => s.id === nextTransition.to);
+  if (!nextStep) throw new AppError(500, `Next step '${nextTransition.to}' not found`);
+
+  instance.currentStep = nextStep.id;
+  instance.currentPhase = nextStep.phase;
+  instance.history.push({ step: nextStep.id, status: 'in_progress', at: new Date(), by: 'system' });
+  await instance.save();
+
+  if (nextStep.type === 'parallel_group' && nextStep.parallelSteps?.length) {
+    const groupTask = await createTask(instance, nextStep, 'system');
+    for (const subStepId of nextStep.parallelSteps) {
+      const subStep = def.phases.flatMap(p => p.steps).find(s => s.id === subStepId);
+      if (!subStep) continue;
+      await createTask(instance, {
+        ...subStep,
+        metadata: {
+          ...(subStep.metadata || {}),
+          parentGroupTaskId: String(groupTask._id),
+          parentGroupStepId: nextStep.id,
+        },
+      }, 'system');
+    }
+    return;
+  }
+
+  await createTask(instance, nextStep, 'system');
+}
+
+function getNextTransition(
+  def: NonNullable<ReturnType<typeof getWorkflowDef>>,
+  stepId: string,
+  instanceMetadata: Record<string, any>,
+  result?: Record<string, any>,
+) {
+  return def.transitions.find((transition) => (
+    transition.from === stepId
+    && transition.event === 'complete'
+    && evaluateGuard(transition.guard, instanceMetadata, result)
+  ));
+}
+
+function evaluateGuard(
+  guard: string | undefined,
+  instanceMetadata: Record<string, any>,
+  result?: Record<string, any>,
+): boolean {
+  if (!guard) return true;
+
+  const context = {
+    ...(instanceMetadata || {}),
+    ...(result || {}),
+  };
+
+  switch (guard) {
+    case 'has_flagged_documents':
+      return context.hasFlaggedDocuments === true || Number(context.flaggedDocumentsCount || 0) > 0;
+    case 'all_documents_verified':
+      if (context.allDocumentsVerified === true) return true;
+      if (context.hasFlaggedDocuments === false) return true;
+      if (context.flaggedDocumentsCount !== undefined) return Number(context.flaggedDocumentsCount) === 0;
+      return false;
+    case 'is_edge_case':
+      return context.isEdgeCase === true;
+    case 'is_eligible':
+      return context.isEligible === true || context.eligibilityStatus === 'eligible';
+    case 'negotiation_requested':
+      return context.negotiationRequested === true;
+    case 'no_negotiation':
+      if (context.noNegotiation === true) return true;
+      if (context.negotiationRequested === false) return true;
+      return context.negotiationRequested === undefined;
+    default:
+      return Boolean(context[guard]);
+  }
+}
+
+function isTerminalTaskStatus(status: string): boolean {
+  return ['completed', 'failed', 'skipped'].includes(status);
+}
+
+function isCancellationTerminalStep(
+  def: NonNullable<ReturnType<typeof getWorkflowDef>>,
+  stepId: string,
+): boolean {
+  if (!def.terminalSteps.includes(stepId)) return false;
+
+  const step = def.phases.flatMap((phase) => phase.steps).find((item) => item.id === stepId);
+  return step?.phase === 'M01.6_CANCEL';
 }

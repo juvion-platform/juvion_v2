@@ -1,6 +1,7 @@
 import api from './api';
 
 const BASE = '/admissions';
+const WORKFLOW_BASE = '/admissions/workflow';
 
 // ─── Stats ─────────────────────────────────────────────
 export const getStats = () => api.get(`${BASE}/stats`).then(r => r.data);
@@ -77,3 +78,34 @@ export const listEnrollments = (page = 1, limit = 20) =>
 
 export const createEnrollment = (data: any) =>
   api.post(`${BASE}/enrollments`, data).then(r => r.data);
+
+// ─── Workflow ──────────────────────────────────────────
+export const getWorkflowStats = () =>
+  api.get(`${WORKFLOW_BASE}/stats`).then(r => r.data);
+
+export const listWorkflowInstances = (page = 1, limit = 20, status?: string) =>
+  api.get(`${WORKFLOW_BASE}/instances`, { params: { workflowId: 'W01', page, limit, status } }).then(r => r.data);
+
+export const getWorkflowStatus = (instanceId: string) =>
+  api.get(`${WORKFLOW_BASE}/instances/${instanceId}`).then(r => r.data);
+
+export const startWorkflow = (data: any) =>
+  api.post(`${WORKFLOW_BASE}/instances`, data).then(r => r.data);
+
+export const triggerWorkflowStep = (instanceId: string, data: any) =>
+  api.post(`${WORKFLOW_BASE}/instances/${instanceId}/trigger-step`, data).then(r => r.data);
+
+export const completeWorkflowTask = (taskId: string, data: any) =>
+  api.post(`${WORKFLOW_BASE}/tasks/${taskId}/complete`, data).then(r => r.data);
+
+export const failWorkflowTask = (taskId: string, reason: string) =>
+  api.post(`${WORKFLOW_BASE}/tasks/${taskId}/fail`, { reason }).then(r => r.data);
+
+export const skipWorkflowTask = (taskId: string, reason: string) =>
+  api.post(`${WORKFLOW_BASE}/tasks/${taskId}/skip`, { reason }).then(r => r.data);
+
+export const listWorkflowTasks = (page = 1, limit = 20, status?: string, phase?: string) =>
+  api.get(`${WORKFLOW_BASE}/tasks`, { params: { page, limit, status, phase } }).then(r => r.data);
+
+export const listWorkflowAllotmentRounds = (academicYearId?: string) =>
+  api.get(`${WORKFLOW_BASE}/allotment-rounds`, { params: { academicYearId } }).then(r => r.data);

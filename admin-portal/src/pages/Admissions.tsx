@@ -1,7 +1,7 @@
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { getStats } from '../services/admissions';
-import { UserPlus, Users, Gift, GraduationCap, ArrowLeft, TrendingUp } from 'lucide-react';
+import { getStats, getWorkflowStats } from '../services/admissions';
+import { UserPlus, Users, Gift, GraduationCap, ArrowLeft, TrendingUp, GitBranch } from 'lucide-react';
 
 import InquiriesPage from './admissions/InquiriesPage';
 import InquiryFormPage from './admissions/InquiryFormPage';
@@ -11,6 +11,7 @@ import CounselingPage from './admissions/CounselingPage';
 import OffersPage from './admissions/OffersPage';
 import DocumentsPage from './admissions/DocumentsPage';
 import EnrollmentsPage from './admissions/EnrollmentsPage';
+import WorkflowPage from './admissions/WorkflowPage';
 
 const PHASE_CARDS = [
   { to: 'inquiries', icon: UserPlus, label: 'Inquiries', desc: 'Lead tracking & follow-ups', iconBg: 'bg-primary-50 text-primary-600', border: 'border-primary-200 hover:border-primary-400', statKey: 'inquiries' },
@@ -22,6 +23,7 @@ const PHASE_CARDS = [
 function AdmissionsHome() {
   const navigate = useNavigate();
   const { data: stats } = useQuery({ queryKey: ['admissions-stats'], queryFn: getStats });
+  const { data: workflowStats } = useQuery({ queryKey: ['workflow-stats'], queryFn: getWorkflowStats });
 
   return (
     <div>
@@ -54,6 +56,34 @@ function AdmissionsHome() {
           );
         })}
       </div>
+
+      <button
+        onClick={() => navigate('workflow')}
+        className="mb-8 w-full rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-950 via-slate-900 to-teal-900 px-6 py-5 text-left text-white shadow-sm transition hover:shadow-lg"
+      >
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-start gap-4">
+            <div className="rounded-xl bg-white/10 p-3 text-teal-200">
+              <GitBranch size={24} />
+            </div>
+            <div>
+              <div className="text-xs uppercase tracking-[0.24em] text-teal-200">Workflow Console</div>
+              <div className="mt-2 text-xl font-semibold">Operate W01 as a live admissions state machine</div>
+              <p className="mt-1 text-sm text-slate-300">Start inquiry workflows, inspect instances, and work pending step actions from one place.</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3 text-sm lg:min-w-[260px]">
+            <div className="rounded-xl bg-white/10 px-4 py-3">
+              <div className="text-slate-300">Active</div>
+              <div className="mt-1 text-2xl font-bold">{workflowStats?.activeWorkflows || 0}</div>
+            </div>
+            <div className="rounded-xl bg-white/10 px-4 py-3">
+              <div className="text-slate-300">Pending Tasks</div>
+              <div className="mt-1 text-2xl font-bold">{workflowStats?.pendingTasks || 0}</div>
+            </div>
+          </div>
+        </div>
+      </button>
 
       {/* Status Breakdown */}
       {stats && (
@@ -128,6 +158,7 @@ export default function Admissions() {
         <Route path="offers" element={<OffersPage />} />
         <Route path="documents" element={<DocumentsPage />} />
         <Route path="enrollments" element={<EnrollmentsPage />} />
+        <Route path="workflow" element={<WorkflowPage />} />
       </Routes>
     </SubPageWrapper>
   );

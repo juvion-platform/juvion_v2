@@ -15,6 +15,12 @@ export const completeTaskSchema = z.object({
   notes: z.string().optional(),
 });
 
+export const triggerWorkflowStepSchema = z.object({
+  stepId: z.string().min(1),
+  metadata: z.record(z.any()).optional(),
+  notes: z.string().optional(),
+});
+
 export const failOrSkipTaskSchema = z.object({
   reason: z.string().min(1, 'Reason is required'),
 });

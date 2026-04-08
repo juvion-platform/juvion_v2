@@ -27,12 +27,19 @@ export const useAuthStore = create<AuthState>((set) => ({
     const isSuperAdmin = user.role === 'super_admin';
     if (collegeId) {
       localStorage.setItem('collegeId', collegeId);
+    } else {
+      localStorage.removeItem('collegeId');
+      localStorage.removeItem('collegeName');
     }
-    if (colleges) {
+    if (colleges && colleges.length > 0) {
       localStorage.setItem('colleges', JSON.stringify(colleges));
+    } else {
+      localStorage.removeItem('colleges');
     }
     if (isSuperAdmin) {
       localStorage.setItem('isSuperAdmin', 'true');
+    } else {
+      localStorage.removeItem('isSuperAdmin');
     }
     set({ user, token, collegeId: collegeId || null, colleges: colleges || [], isSuperAdmin });
   },

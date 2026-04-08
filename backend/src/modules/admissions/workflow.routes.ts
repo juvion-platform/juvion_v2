@@ -6,7 +6,7 @@ import { authenticate } from '../../middleware/authenticate';
 import { validate } from '../../middleware/validate';
 import * as ctrl from './workflow.controller';
 import {
-  startWorkflowSchema, completeTaskSchema, failOrSkipTaskSchema,
+  startWorkflowSchema, completeTaskSchema, triggerWorkflowStepSchema, failOrSkipTaskSchema,
   createLeadInteractionSchema, createImportBatchSchema,
   upsertSeatInventorySchema,
   createAllotmentRoundSchema, updateAllotmentRoundSchema,
@@ -24,6 +24,7 @@ router.get('/stats', ctrl.getWorkflowStats);
 router.get('/instances', ctrl.listWorkflowInstances);
 router.get('/instances/:instanceId', ctrl.getWorkflowStatus);
 router.post('/instances', validate(startWorkflowSchema), ctrl.startWorkflow);
+router.post('/instances/:instanceId/trigger-step', validate(triggerWorkflowStepSchema), ctrl.triggerWorkflowStep);
 router.post('/tasks/:taskId/complete', validate(completeTaskSchema), ctrl.completeTask);
 router.post('/tasks/:taskId/fail', validate(failOrSkipTaskSchema), ctrl.failTask);
 router.post('/tasks/:taskId/skip', validate(failOrSkipTaskSchema), ctrl.skipTask);
