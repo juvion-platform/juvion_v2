@@ -55,6 +55,45 @@ export default function Dashboard() {
         <StatCard label="Buildings" value={v(campusOps?.buildings)} icon={Building2} color="bg-orange-100 text-orange-600" to="/campus/buildings" />
       </div>
 
+      <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Link to="/people/students?needsAttention=true" className="bg-white rounded-xl border border-amber-200 shadow-sm p-5 hover:shadow-md hover:border-amber-300 transition-all">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-xs font-medium uppercase tracking-wide text-amber-600">Onboarding Attention</div>
+              <div className="mt-2 text-3xl font-bold text-navy">{v(people?.onboardingNeedsAttention)}</div>
+              <div className="mt-1 text-sm text-gray-500">Students blocked or incomplete in onboarding</div>
+            </div>
+            <div className="rounded-xl bg-amber-50 p-3 text-amber-600">
+              <UserPlus size={22} />
+            </div>
+          </div>
+        </Link>
+        <Link to="/people/students?needsAttention=true" className="bg-white rounded-xl border border-rose-200 shadow-sm p-5 hover:shadow-md hover:border-rose-300 transition-all">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-xs font-medium uppercase tracking-wide text-rose-600">Missing Fee Guardian</div>
+              <div className="mt-2 text-3xl font-bold text-navy">{v(people?.missingFeeResponsibleGuardians)}</div>
+              <div className="mt-1 text-sm text-gray-500">Students without a fee responsible guardian</div>
+            </div>
+            <div className="rounded-xl bg-rose-50 p-3 text-rose-600">
+              <Users size={22} />
+            </div>
+          </div>
+        </Link>
+        <Link to="/people/students?onboardingStatus=completed" className="bg-white rounded-xl border border-emerald-200 shadow-sm p-5 hover:shadow-md hover:border-emerald-300 transition-all">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-xs font-medium uppercase tracking-wide text-emerald-600">Onboarding Complete</div>
+              <div className="mt-2 text-3xl font-bold text-navy">{v(people?.onboardingCompleted)}</div>
+              <div className="mt-1 text-sm text-gray-500">Students fully ready after admissions</div>
+            </div>
+            <div className="rounded-xl bg-emerald-50 p-3 text-emerald-600">
+              <GraduationCap size={22} />
+            </div>
+          </div>
+        </Link>
+      </div>
+
       {/* ── Module Summary Cards ──────────────────────────── */}
       <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
 

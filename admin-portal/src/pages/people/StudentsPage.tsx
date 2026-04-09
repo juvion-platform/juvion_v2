@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { listStudents, deleteStudent } from '../../services/people';
 import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
@@ -11,17 +11,30 @@ const STATUS_COLOR: Record<string, string> = {
   graduated: 'teal', exited: 'danger', alumni: 'purple',
 };
 const STATUSES = ['prospective', 'active', 'year_back', 'detained', 'graduated', 'exited', 'alumni'] as const;
+const ONBOARDING_STATUSES = ['not_started', 'in_progress', 'completed'] as const;
 
 export default function StudentsPage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [page, setPage] = useState(1);
-  const [filterStatus, setFilterStatus] = useState('');
-  const [search, setSearch] = useState('');
+  const [filterStatus, setFilterStatus] = useState(searchParams.get('status') || '');
+  const [filterOnboardingStatus, setFilterOnboardingStatus] = useState(searchParams.get('onboardingStatus') || '');
+  const [needsAttention, setNeedsAttention] = useState(searchParams.get('needsAttention') === 'true' || searchParams.get('needsAttention') === '1');
+  const [search, setSearch] = useState(searchParams.get('search') || '');
+
+  function syncSearchParams(next: { status?: string; onboardingStatus?: string; search?: string; needsAttention?: boolean }) {
+    const params = new URLSearchParams();
+    if (next.status) params.set('status', next.status);
+    if (next.onboardingStatus) params.set('onboardingStatus', next.onboardingStatus);
+    if (next.search) params.set('search', next.search);
+    if (next.needsAttention) params.set('needsAttention', 'true');
+    setSearchParams(params, { replace: true });
+  }
 
   const { data, isLoading } = useQuery({
-    queryKey: ['students', page, filterStatus, search],
-    queryFn: () => listStudents(page, 20, filterStatus || undefined, search || undefined),
+    queryKey: ['students', page, filterStatus, search, filterOnboardingStatus, needsAttention],
+    queryFn: () => listStudents(page, 20, filterStatus || undefined, search || undefined, filterOnboardingStatus || undefined, needsAttention),
   });
 
   const deleteMut = useMutation({
@@ -75,13 +88,41 @@ export default function StudentsPage() {
         <div className="flex gap-3">
           <div className="relative">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-400" />
-            <input placeholder="Search name..." value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}
+            <input placeholder="Search name..." value={search} onChange={e => {
+              const value = e.target.value;
+              setSearch(value);
+              setPage(1);
+              syncSearchParams({ status: filterStatus, onboardingStatus: filterOnboardingStatus, search: value, needsAttention });
+            }}
               className="pl-9 pr-3 py-2 border rounded-lg text-sm w-48" />
           </div>
-          <select value={filterStatus} onChange={e => { setFilterStatus(e.target.value); setPage(1); }} className="border rounded-lg px-3 py-2 text-sm">
+          <select value={filterStatus} onChange={e => {
+            const value = e.target.value;
+            setFilterStatus(value);
+            setPage(1);
+            syncSearchParams({ status: value, onboardingStatus: filterOnboardingStatus, search, needsAttention });
+          }} className="border rounded-lg px-3 py-2 text-sm">
             <option value="">All Statuses</option>
             {STATUSES.map(s => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
           </select>
+          <select value={filterOnboardingStatus} onChange={e => {
+            const value = e.target.value;
+            setFilterOnboardingStatus(value);
+            setPage(1);
+            syncSearchParams({ status: filterStatus, onboardingStatus: value, search, needsAttention });
+          }} className="border rounded-lg px-3 py-2 text-sm">
+            <option value="">All Onboarding</option>
+            {ONBOARDING_STATUSES.map(s => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
+          </select>
+          <label className="flex items-center gap-2 border rounded-lg px-3 py-2 text-sm text-gray-700">
+            <input type="checkbox" checked={needsAttention} onChange={e => {
+              const checked = e.target.checked;
+              setNeedsAttention(checked);
+              setPage(1);
+              syncSearchParams({ status: filterStatus, onboardingStatus: filterOnboardingStatus, search, needsAttention: checked });
+            }} className="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+            Needs action
+          </label>
           <button onClick={() => navigate('/people/students/new')} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700">
             <Plus size={16} className="text-white" /> Add Student
           </button>

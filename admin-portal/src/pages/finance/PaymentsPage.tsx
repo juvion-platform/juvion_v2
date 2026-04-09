@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listPayments, createPayment, updatePayment, deletePayment } from '../../services/finance';
-import { listStudents } from '../../services/people';
+import { getStudent, listStudents } from '../../services/people';
 import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
+import StudentFinanceReadinessCard from '../../components/StudentFinanceReadinessCard';
 import { Plus, Pencil, Trash2, ExternalLink } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 
 const PAYMENT_MODES = ['cash', 'cheque', 'dd', 'online', 'upi', 'neft', 'rtgs', 'card'] as const;
 const STATUSES = ['success', 'pending', 'failed', 'reversed'] as const;
@@ -17,16 +18,38 @@ const manageLink = "inline-flex items-center gap-0.5 text-xs text-primary-500 ho
 
 export default function PaymentsPage() {
   const qc = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [page, setPage] = useState(1);
+  const [studentFilter, setStudentFilter] = useState(searchParams.get('studentId') || '');
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [form, setForm] = useState({ studentId: '', receiptNumber: '', amount: '', paymentMode: 'cash', transactionRef: '', paymentDate: '', status: 'pending', remarks: '' });
 
-  const { data, isLoading } = useQuery({ queryKey: ['payments', page], queryFn: () => listPayments(page, 20) });
+  const { data, isLoading } = useQuery({
+    queryKey: ['payments', page, studentFilter, statusFilter],
+    queryFn: () => listPayments(page, 20, studentFilter || undefined, statusFilter || undefined),
+  });
   const { data: students } = useQuery({ queryKey: ['students-all'], queryFn: () => listStudents(1, 100) });
+  const { data: selectedStudent, isFetching: studentReadinessLoading } = useQuery({
+    queryKey: ['student-finance-readiness', form.studentId],
+    queryFn: () => getStudent(form.studentId),
+    enabled: modalOpen && Boolean(form.studentId),
+  });
+
+  const financeBlocked = useMemo(() => Boolean(form.studentId) && Boolean(selectedStudent) && !selectedStudent.feeResponsibleParentId, [form.studentId, selectedStudent]);
+  const financeReadinessPending = Boolean(form.studentId) && studentReadinessLoading;
+
+  function syncSearch(next: { studentId?: string; status?: string }) {
+    const params = new URLSearchParams();
+    if (next.studentId) params.set('studentId', next.studentId);
+    if (next.status) params.set('status', next.status);
+    setSearchParams(params, { replace: true });
+  }
 
   const createMut = useMutation({ mutationFn: createPayment, onSuccess: () => { qc.invalidateQueries({ queryKey: ['payments'] }); closeModal(); } });
   const updateMut = useMutation({ mutationFn: ({ id, data }: any) => updatePayment(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['payments'] }); closeModal(); } });
+  const quickUpdateMut = useMutation({ mutationFn: ({ id, data }: any) => updatePayment(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['payments'] }); } });
   const deleteMut = useMutation({ mutationFn: deletePayment, onSuccess: () => { qc.invalidateQueries({ queryKey: ['payments'] }); } });
 
   function openCreate() {
@@ -60,6 +83,10 @@ export default function PaymentsPage() {
     else createMut.mutate(payload);
   }
 
+  function quickTransition(row: any, nextStatus: string) {
+    quickUpdateMut.mutate({ id: row._id, data: { status: nextStatus } });
+  }
+
   const columns = [
     { key: 'studentId', label: 'Student', render: (r: any) => <span className="font-medium text-navy">{r.studentId?.personId?.name || r.studentId?.rollNumber || '—'}</span> },
     { key: 'receiptNumber', label: 'Receipt #' },
@@ -68,7 +95,27 @@ export default function PaymentsPage() {
     { key: 'paymentDate', label: 'Date', render: (r: any) => r.paymentDate ? new Date(r.paymentDate).toLocaleDateString() : '-' },
     { key: 'status', label: 'Status', render: (r: any) => <Badge variant={STATUS_COLOR[r.status] || 'default'}>{r.status}</Badge> },
     { key: 'actions', label: '', render: (r: any) => (
-      <div className="flex gap-1">
+      <div className="flex flex-wrap justify-end gap-1">
+        {r.status === 'pending' && (
+          <>
+            <button onClick={(e) => { e.stopPropagation(); quickTransition(r, 'success'); }} disabled={quickUpdateMut.isPending} className="rounded-md bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50">
+              Mark success
+            </button>
+            <button onClick={(e) => { e.stopPropagation(); quickTransition(r, 'failed'); }} disabled={quickUpdateMut.isPending} className="rounded-md bg-rose-50 px-2 py-1 text-xs font-medium text-rose-700 hover:bg-rose-100 disabled:opacity-50">
+              Mark failed
+            </button>
+          </>
+        )}
+        {r.status === 'success' && (
+          <button onClick={(e) => { e.stopPropagation(); quickTransition(r, 'reversed'); }} disabled={quickUpdateMut.isPending} className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200 disabled:opacity-50">
+            Reverse
+          </button>
+        )}
+        {r.status === 'failed' && (
+          <button onClick={(e) => { e.stopPropagation(); quickTransition(r, 'pending'); }} disabled={quickUpdateMut.isPending} className="rounded-md bg-sky-50 px-2 py-1 text-xs font-medium text-sky-700 hover:bg-sky-100 disabled:opacity-50">
+            Retry
+          </button>
+        )}
         <button onClick={(e) => { e.stopPropagation(); openEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
         <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this payment?')) deleteMut.mutate(r._id); }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
       </div>
@@ -84,6 +131,31 @@ export default function PaymentsPage() {
         </button>
       </div>
 
+      <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+        <select value={studentFilter} onChange={(e) => {
+          const value = e.target.value;
+          setStudentFilter(value);
+          setPage(1);
+          syncSearch({ studentId: value, status: statusFilter });
+        }} className={inp}>
+          <option value="">All Students</option>
+          {(students?.items || []).map((s: any) => (
+            <option key={s._id} value={s._id}>
+              {s.person?.name || s.rollNumber || s._id}
+            </option>
+          ))}
+        </select>
+        <select value={statusFilter} onChange={(e) => {
+          const value = e.target.value;
+          setStatusFilter(value);
+          setPage(1);
+          syncSearch({ studentId: studentFilter, status: value });
+        }} className={inp}>
+          <option value="">All Statuses</option>
+          {STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
+        </select>
+      </div>
+
       <DataTable columns={columns} data={data?.items || []} loading={isLoading} />
 
       {data && data.pages > 1 && (
@@ -96,6 +168,10 @@ export default function PaymentsPage() {
 
       <Modal open={modalOpen} onClose={closeModal} title={editing ? 'Edit Payment' : 'New Payment'}>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {form.studentId && (
+            <StudentFinanceReadinessCard student={selectedStudent} loading={financeReadinessPending} />
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={lbl}>Student * <Link to="/people" target="_blank" className={manageLink}>+ Manage <ExternalLink size={10} /></Link></label>
@@ -138,8 +214,8 @@ export default function PaymentsPage() {
           </div>
           <div className="flex justify-end gap-3 pt-2 border-t">
             <button type="button" onClick={closeModal} className="px-4 py-2 border rounded-lg text-sm">Cancel</button>
-            <button type="submit" disabled={createMut.isPending || updateMut.isPending} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
-              {createMut.isPending || updateMut.isPending ? 'Saving...' : editing ? 'Update' : 'Create'}
+            <button type="submit" disabled={createMut.isPending || updateMut.isPending || (!editing && (financeBlocked || financeReadinessPending))} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
+              {createMut.isPending || updateMut.isPending ? 'Saving...' : financeReadinessPending ? 'Checking student...' : editing ? 'Update' : 'Create'}
             </button>
           </div>
         </form>

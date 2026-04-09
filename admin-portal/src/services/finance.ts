@@ -42,8 +42,8 @@ export const deleteFeeLineItem = (id: string) =>
   api.delete(`${BASE}/fee-line-items/${id}`).then(r => r.data);
 
 // ─── Payments ─────────────────────────────────────────────
-export const listPayments = (page = 1, limit = 20, studentId?: string) =>
-  api.get(`${BASE}/payments`, { params: { page, limit, studentId } }).then(r => r.data);
+export const listPayments = (page = 1, limit = 20, studentId?: string, status?: string) =>
+  api.get(`${BASE}/payments`, { params: { page, limit, studentId, status } }).then(r => r.data);
 export const getPayment = (id: string) =>
   api.get(`${BASE}/payments/${id}`).then(r => r.data);
 export const createPayment = (data: any) =>
@@ -66,8 +66,8 @@ export const deleteScholarship = (id: string) =>
   api.delete(`${BASE}/scholarships/${id}`).then(r => r.data);
 
 // ─── Scholarship Allocations ──────────────────────────────
-export const listScholarshipAllocations = (page = 1, limit = 20, scholarshipId?: string) =>
-  api.get(`${BASE}/scholarship-allocations`, { params: { page, limit, scholarshipId } }).then(r => r.data);
+export const listScholarshipAllocations = (page = 1, limit = 20, scholarshipId?: string, studentId?: string, status?: string) =>
+  api.get(`${BASE}/scholarship-allocations`, { params: { page, limit, scholarshipId, studentId, status } }).then(r => r.data);
 export const createScholarshipAllocation = (data: any) =>
   api.post(`${BASE}/scholarship-allocations`, data).then(r => r.data);
 export const updateScholarshipAllocation = (id: string, data: any) =>
@@ -106,8 +106,8 @@ export const deleteFinePenalty = (id: string) =>
   api.delete(`${BASE}/fines/${id}`).then(r => r.data);
 
 // ─── Invoices ─────────────────────────────────────────────
-export const listInvoices = (page = 1, limit = 20, status?: string) =>
-  api.get(`${BASE}/invoices`, { params: { page, limit, status } }).then(r => r.data);
+export const listInvoices = (page = 1, limit = 20, status?: string, studentId?: string) =>
+  api.get(`${BASE}/invoices`, { params: { page, limit, status, studentId } }).then(r => r.data);
 export const getInvoice = (id: string) =>
   api.get(`${BASE}/invoices/${id}`).then(r => r.data);
 export const createInvoice = (data: any) =>
@@ -162,8 +162,8 @@ export const deletePaymentGatewayLog = (id: string) =>
   api.delete(`${BASE}/gateway-logs/${id}`).then(r => r.data);
 
 // ─── Fee Reminders ────────────────────────────────────────
-export const listFeeReminders = (page = 1, limit = 20, studentId?: string) =>
-  api.get(`${BASE}/reminders`, { params: { page, limit, studentId } }).then(r => r.data);
+export const listFeeReminders = (page = 1, limit = 20, studentId?: string, channel?: string, status?: string) =>
+  api.get(`${BASE}/reminders`, { params: { page, limit, studentId, channel, status } }).then(r => r.data);
 export const createFeeReminder = (data: any) =>
   api.post(`${BASE}/reminders`, data).then(r => r.data);
 export const updateFeeReminder = (id: string, data: any) =>

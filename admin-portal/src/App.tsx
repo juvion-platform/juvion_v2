@@ -1,23 +1,25 @@
+import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './stores/authStore';
 import DashboardLayout from './layouts/DashboardLayout';
-import Login from './pages/Login';
-import CollegeSelector from './pages/CollegeSelector';
-import CollegeManagement from './pages/CollegeManagement';
-import Dashboard from './pages/Dashboard';
-import Admissions from './pages/Admissions';
-import People from './pages/People';
-import Academics from './pages/Academics';
-import Finance from './pages/Finance';
-import HR from './pages/HR';
-import Welfare from './pages/Welfare';
-import Placement from './pages/Placement';
-import CampusOps from './pages/CampusOps';
-import StudentDev from './pages/StudentDev';
-import Compliance from './pages/Compliance';
-import Governance from './pages/Governance';
-import Platform from './pages/Platform';
-import Juvi from './pages/Juvi';
+
+const Login = lazy(() => import('./pages/Login'));
+const CollegeSelector = lazy(() => import('./pages/CollegeSelector'));
+const CollegeManagement = lazy(() => import('./pages/CollegeManagement'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Admissions = lazy(() => import('./pages/Admissions'));
+const People = lazy(() => import('./pages/People'));
+const Academics = lazy(() => import('./pages/Academics'));
+const Finance = lazy(() => import('./pages/Finance'));
+const HR = lazy(() => import('./pages/HR'));
+const Welfare = lazy(() => import('./pages/Welfare'));
+const Placement = lazy(() => import('./pages/Placement'));
+const CampusOps = lazy(() => import('./pages/CampusOps'));
+const StudentDev = lazy(() => import('./pages/StudentDev'));
+const Compliance = lazy(() => import('./pages/Compliance'));
+const Governance = lazy(() => import('./pages/Governance'));
+const Platform = lazy(() => import('./pages/Platform'));
+const Juvi = lazy(() => import('./pages/Juvi'));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const token = useAuthStore((s) => s.token);
@@ -35,14 +37,28 @@ function RequireCollege({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function PageFallback() {
+  return (
+    <div className="flex min-h-[40vh] items-center justify-center">
+      <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500 shadow-sm">
+        Loading page...
+      </div>
+    </div>
+  );
+}
+
+function renderLazyPage(node: React.ReactNode) {
+  return <Suspense fallback={<PageFallback />}>{node}</Suspense>;
+}
+
 export default function App() {
   return (
     <Routes>
-      <Route path="/login" element={<Login />} />
+      <Route path="/login" element={renderLazyPage(<Login />)} />
 
       {/* Superadmin-only routes */}
-      <Route path="/select-college" element={<ProtectedRoute><CollegeSelector /></ProtectedRoute>} />
-      <Route path="/colleges" element={<ProtectedRoute><CollegeManagement /></ProtectedRoute>} />
+      <Route path="/select-college" element={<ProtectedRoute>{renderLazyPage(<CollegeSelector />)}</ProtectedRoute>} />
+      <Route path="/colleges" element={<ProtectedRoute>{renderLazyPage(<CollegeManagement />)}</ProtectedRoute>} />
 
       {/* College-scoped routes (need a selected college) */}
       <Route
@@ -52,20 +68,20 @@ export default function App() {
           </RequireCollege>
         }
       >
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/admissions/*" element={<Admissions />} />
-        <Route path="/people/*" element={<People />} />
-        <Route path="/academics/*" element={<Academics />} />
-        <Route path="/finance/*" element={<Finance />} />
-        <Route path="/hr/*" element={<HR />} />
-        <Route path="/welfare/*" element={<Welfare />} />
-        <Route path="/placement/*" element={<Placement />} />
-        <Route path="/campus/*" element={<CampusOps />} />
-        <Route path="/student-dev/*" element={<StudentDev />} />
-        <Route path="/compliance/*" element={<Compliance />} />
-        <Route path="/governance/*" element={<Governance />} />
-        <Route path="/platform/*" element={<Platform />} />
-        <Route path="/juvi/*" element={<Juvi />} />
+        <Route path="/" element={renderLazyPage(<Dashboard />)} />
+        <Route path="/admissions/*" element={renderLazyPage(<Admissions />)} />
+        <Route path="/people/*" element={renderLazyPage(<People />)} />
+        <Route path="/academics/*" element={renderLazyPage(<Academics />)} />
+        <Route path="/finance/*" element={renderLazyPage(<Finance />)} />
+        <Route path="/hr/*" element={renderLazyPage(<HR />)} />
+        <Route path="/welfare/*" element={renderLazyPage(<Welfare />)} />
+        <Route path="/placement/*" element={renderLazyPage(<Placement />)} />
+        <Route path="/campus/*" element={renderLazyPage(<CampusOps />)} />
+        <Route path="/student-dev/*" element={renderLazyPage(<StudentDev />)} />
+        <Route path="/compliance/*" element={renderLazyPage(<Compliance />)} />
+        <Route path="/governance/*" element={renderLazyPage(<Governance />)} />
+        <Route path="/platform/*" element={renderLazyPage(<Platform />)} />
+        <Route path="/juvi/*" element={renderLazyPage(<Juvi />)} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

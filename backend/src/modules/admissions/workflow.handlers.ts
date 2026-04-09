@@ -842,6 +842,14 @@ registerWorkflowStepHandler('W01', 'provision_m02', async ({ instance, result, c
       batchId: provisioningContext.batch?._id,
       rollNumber,
       status: 'active',
+      onboardingStatus: 'in_progress',
+      onboardingChecklist: {
+        profileVerified: true,
+        documentsVerified: true,
+        feePlanConfirmed: false,
+        portalAccessShared: false,
+        idCardIssued: false,
+      },
     });
     await createAuditLog({
       collegeId: String(instance.collegeId),
@@ -864,6 +872,14 @@ registerWorkflowStepHandler('W01', 'provision_m02', async ({ instance, result, c
       batchId: provisioningContext.batch?._id,
       rollNumber: student.rollNumber || rollNumber,
       status: 'active',
+      onboardingStatus: student.onboardingStatus === 'completed' ? 'completed' : 'in_progress',
+      onboardingChecklist: compactMetadata({
+        profileVerified: true,
+        documentsVerified: true,
+        feePlanConfirmed: student.onboardingChecklist?.feePlanConfirmed,
+        portalAccessShared: student.onboardingChecklist?.portalAccessShared,
+        idCardIssued: student.onboardingChecklist?.idCardIssued,
+      }),
     }));
     await student.save();
   }
@@ -1532,6 +1548,33 @@ registerWorkflowStepHandler('W01', 'onboarding_complete', async ({ instance, res
       enrollmentNumber: typeof result.enrollmentNumber === 'string' ? result.enrollmentNumber : undefined,
     },
   });
+
+  if (admission.studentId) {
+    const student = await Student.findOne({ _id: admission.studentId, collegeId: instance.collegeId });
+    if (student) {
+      const nextChecklist = {
+        profileVerified: true,
+        documentsVerified: true,
+        feePlanConfirmed: Boolean(student.onboardingChecklist?.feePlanConfirmed && student.feeResponsibleParentId),
+        portalAccessShared: true,
+        idCardIssued: Boolean(student.onboardingChecklist?.idCardIssued),
+      };
+
+      const canCompleteOnboarding = Boolean(
+        student.feeResponsibleParentId &&
+        nextChecklist.profileVerified &&
+        nextChecklist.documentsVerified &&
+        nextChecklist.feePlanConfirmed &&
+        nextChecklist.portalAccessShared &&
+        nextChecklist.idCardIssued,
+      );
+
+      student.onboardingChecklist = nextChecklist as any;
+      student.onboardingStatus = canCompleteOnboarding ? 'completed' : 'in_progress';
+      student.onboardingCompletedAt = canCompleteOnboarding ? new Date() : undefined;
+      await student.save();
+    }
+  }
 });
 
 registerWorkflowStepHandler('W01', 'cancel_request', async ({ instance, result, completedBy }) => {

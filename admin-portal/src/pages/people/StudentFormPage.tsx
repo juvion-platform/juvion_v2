@@ -36,6 +36,7 @@ export default function StudentFormPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [form, setForm] = useState(emptyForm);
+  const [validationError, setValidationError] = useState('');
 
   const { data: existing, isLoading: loadingExisting } = useQuery({
     queryKey: ['student', id],
@@ -95,6 +96,27 @@ export default function StudentFormPage() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setValidationError('');
+
+    const checklistComplete = [
+      form.profileVerified,
+      form.documentsVerified,
+      form.feePlanConfirmed,
+      form.portalAccessShared,
+      form.idCardIssued,
+    ].every(Boolean);
+
+    if (form.onboardingStatus === 'completed') {
+      if (!form.feeResponsibleParentId) {
+        setValidationError('Fee responsible guardian is required before onboarding can be marked completed.');
+        return;
+      }
+      if (!checklistComplete) {
+        setValidationError('Complete the onboarding checklist before marking onboarding completed.');
+        return;
+      }
+    }
+
     const payload: any = { ...form, admissionYear: Number(form.admissionYear) };
     // Build address object
     const address: any = {};
@@ -154,9 +176,9 @@ export default function StudentFormPage() {
         </button>
       </div>
 
-      {error && (
+      {(validationError || error) && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-          {(error as any)?.response?.data?.error || (error as any)?.response?.data?.details?.map((d: any) => d.message).join(', ') || 'Something went wrong.'}
+          {validationError || (error as any)?.response?.data?.error || (error as any)?.response?.data?.details?.map((d: any) => d.message).join(', ') || 'Something went wrong.'}
         </div>
       )}
 
@@ -273,6 +295,9 @@ export default function StudentFormPage() {
             <p className="text-xs text-gray-500 mt-0.5">Track student onboarding readiness after admission</p>
           </div>
           <div className="p-5 space-y-4">
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              Onboarding can be marked completed only after a fee responsible guardian is linked and every checklist item is done.
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className={lbl}>Onboarding Status</label>

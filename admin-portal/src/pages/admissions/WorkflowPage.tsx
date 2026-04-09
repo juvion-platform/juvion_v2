@@ -29,6 +29,7 @@ import {
   triggerWorkflowStep,
 } from '../../services/admissions';
 import { listAcademicYears, listBranches, listProgrammes } from '../../services/academics';
+import { getStudent } from '../../services/people';
 
 const STATUS_VARIANT: Record<string, string> = {
   active: 'info',
@@ -916,6 +917,13 @@ export default function WorkflowPage() {
     enabled: Boolean(selectedInstanceId),
     refetchInterval: selectedInstanceId && liveMode ? 10000 : false,
   });
+  const detailStudentId = workflowDetail?.instance?.metadata?.studentId;
+  const { data: workflowStudent } = useQuery({
+    queryKey: ['workflow-detail-student', detailStudentId],
+    queryFn: () => getStudent(detailStudentId),
+    enabled: Boolean(detailStudentId),
+    refetchInterval: detailStudentId && liveMode ? 10000 : false,
+  });
   const { data: inquiries, isFetching: startInquiriesLoading, refetch: refetchStartInquiries } = useQuery({
     queryKey: ['workflow-start-inquiries'],
     queryFn: () => listInquiries(1, 100),
@@ -1296,6 +1304,56 @@ export default function WorkflowPage() {
                 <div className="mt-1 font-semibold text-slate-900">{formatDateTime(workflowDetail.instance.createdAt)}</div>
               </div>
             </div>
+
+            {workflowStudent && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="text-xs uppercase tracking-[0.2em] text-amber-700">Student Onboarding</div>
+                    <div className="mt-1 text-lg font-semibold text-slate-900">
+                      {workflowStudent.personId?.name || workflowStudent.person?.name || workflowStudent.rollNumber || workflowStudent._id}
+                    </div>
+                    <div className="mt-1 text-sm text-slate-600">
+                      Roll: {workflowStudent.rollNumber || '—'} • Onboarding status: {workflowStudent.onboardingStatus?.replace(/_/g, ' ') || '—'}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant={workflowStudent.profileCompleteness?.status === 'complete' ? 'success' : workflowStudent.profileCompleteness?.status === 'progressing' ? 'warning' : 'default'}>
+                      {workflowStudent.profileCompleteness?.percent || 0}% profile
+                    </Badge>
+                    <Badge variant={workflowStudent.onboardingCompleteness?.status === 'completed' ? 'success' : workflowStudent.onboardingCompleteness?.status === 'in_progress' ? 'warning' : 'default'}>
+                      {workflowStudent.onboardingCompleteness?.percent || 0}% onboarded
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="rounded-lg border border-white/60 bg-white/70 p-4">
+                    <div className="text-xs uppercase tracking-wide text-slate-500">Guardian linkage</div>
+                    <div className="mt-2 space-y-1 text-sm text-slate-700">
+                      <div>Primary guardian: {workflowStudent.primaryParentId?.personId?.name || 'Missing'}</div>
+                      <div>Fee guardian: {workflowStudent.feeResponsibleParentId?.personId?.name || 'Missing'}</div>
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-white/60 bg-white/70 p-4">
+                    <div className="text-xs uppercase tracking-wide text-slate-500">Current blockers</div>
+                    {(() => {
+                      const blockers = [
+                        !workflowStudent.feeResponsibleParentId ? 'Fee responsible guardian not linked' : null,
+                        ...(workflowStudent.onboardingCompleteness?.missing || []),
+                      ].filter(Boolean);
+                      return blockers.length > 0 ? (
+                        <ul className="mt-2 space-y-1 text-sm text-slate-700">
+                          {blockers.map((item) => <li key={item}>• {item}</li>)}
+                        </ul>
+                      ) : (
+                        <div className="mt-2 text-sm text-emerald-700">No blockers. Student onboarding is fully ready.</div>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="rounded-xl border bg-slate-950 p-4 text-slate-100">
               <div className="text-xs uppercase tracking-[0.2em] text-teal-300">Workflow Metadata</div>

@@ -14,11 +14,24 @@ import { FinancialLedger } from '../../models/finance/FinancialLedger';
 import { PaymentGatewayLog } from '../../models/finance/PaymentGatewayLog';
 import { FeeReminder } from '../../models/finance/FeeReminder';
 import { FinancialReport } from '../../models/finance/FinancialReport';
+import { Student } from '../../models/people/Student';
 import { paginate } from '../../shared/pagination';
 import { createAuditLog } from '../../shared/audit';
 import { AppError } from '../../middleware/errorHandler';
 
 const STUDENT_POPULATE = { path: 'studentId', populate: { path: 'personId' } };
+
+async function assertStudentFeeGuardianReady(collegeId: string, studentId?: string) {
+  if (!studentId) return;
+
+  const student = await Student.findOne({ _id: studentId, collegeId }).lean();
+  if (!student) {
+    throw new AppError(404, 'Student not found');
+  }
+  if (!student.feeResponsibleParentId) {
+    throw new AppError(400, 'Fee responsible guardian is required before creating finance records for this student');
+  }
+}
 
 // ─── Dashboard Stats ──────────────────────────────────────
 export async function getStats(collegeId: string) {
@@ -108,6 +121,7 @@ export async function getStudentFeeAccount(collegeId: string, id: string) {
 }
 
 export async function createStudentFeeAccount(collegeId: string, data: any, who: string) {
+  await assertStudentFeeGuardianReady(collegeId, data.studentId);
   const doc = await StudentFeeAccount.create({ ...data, collegeId });
   await createAuditLog({ collegeId, entityType: 'StudentFeeAccount', entityId: String(doc._id), entityName: `Fee Account`, action: 'create', changes: [], performedBy: who });
   return doc;
@@ -143,6 +157,7 @@ export async function getFeeLineItem(collegeId: string, id: string) {
 }
 
 export async function createFeeLineItem(collegeId: string, data: any, who: string) {
+  await assertStudentFeeGuardianReady(collegeId, data.studentId);
   const doc = await FeeLineItem.create({ ...data, collegeId });
   await createAuditLog({ collegeId, entityType: 'FeeLineItem', entityId: String(doc._id), entityName: `${data.component}`, action: 'create', changes: [], performedBy: who });
   return doc;
@@ -164,9 +179,10 @@ export async function deleteFeeLineItem(collegeId: string, id: string, who: stri
 
 // ═══ Payments ═════════════════════════════════════════════
 
-export async function listPayments(collegeId: string, page = 1, limit = 20, studentId?: string) {
+export async function listPayments(collegeId: string, page = 1, limit = 20, studentId?: string, status?: string) {
   const filter: any = { collegeId };
   if (studentId) filter.studentId = studentId;
+  if (status) filter.status = status;
   return paginate(Payment, filter, page, limit, { createdAt: -1 }, [STUDENT_POPULATE] as any);
 }
 
@@ -177,6 +193,7 @@ export async function getPayment(collegeId: string, id: string) {
 }
 
 export async function createPayment(collegeId: string, data: any, who: string) {
+  await assertStudentFeeGuardianReady(collegeId, data.studentId);
   const paymentDate = data.paymentDate ? new Date(data.paymentDate) : new Date();
   const receiptNumber = typeof data.receiptNumber === 'string' && data.receiptNumber.trim().length > 0
     ? data.receiptNumber.trim()
@@ -273,13 +290,16 @@ export async function deleteScholarship(collegeId: string, id: string, who: stri
 
 // ═══ Scholarship Allocations ══════════════════════════════
 
-export async function listScholarshipAllocations(collegeId: string, page = 1, limit = 20, scholarshipId?: string) {
+export async function listScholarshipAllocations(collegeId: string, page = 1, limit = 20, scholarshipId?: string, studentId?: string, status?: string) {
   const filter: any = { collegeId };
   if (scholarshipId) filter.scholarshipId = scholarshipId;
+  if (studentId) filter.studentId = studentId;
+  if (status) filter.status = status;
   return paginate(ScholarshipAllocation, filter, page, limit, { createdAt: -1 }, ['scholarshipId', STUDENT_POPULATE] as any);
 }
 
 export async function createScholarshipAllocation(collegeId: string, data: any, who: string) {
+  await assertStudentFeeGuardianReady(collegeId, data.studentId);
   const doc = await ScholarshipAllocation.create({ ...data, collegeId });
   await createAuditLog({ collegeId, entityType: 'ScholarshipAllocation', entityId: String(doc._id), entityName: `Allocation`, action: 'create', changes: [], performedBy: who });
   return doc;
@@ -308,6 +328,7 @@ export async function listConcessions(collegeId: string, page = 1, limit = 20, s
 }
 
 export async function createConcession(collegeId: string, data: any, who: string) {
+  await assertStudentFeeGuardianReady(collegeId, data.studentId);
   const doc = await Concession.create({ ...data, collegeId });
   await createAuditLog({ collegeId, entityType: 'Concession', entityId: String(doc._id), entityName: data.type, action: 'create', changes: [], performedBy: who });
   return doc;
@@ -336,6 +357,7 @@ export async function listRefunds(collegeId: string, page = 1, limit = 20, stude
 }
 
 export async function createRefund(collegeId: string, data: any, who: string) {
+  await assertStudentFeeGuardianReady(collegeId, data.studentId);
   const doc = await Refund.create({ ...data, collegeId });
   await createAuditLog({ collegeId, entityType: 'Refund', entityId: String(doc._id), entityName: `Refund ₹${data.amount}`, action: 'create', changes: [], performedBy: who });
   return doc;
@@ -364,6 +386,7 @@ export async function listFinePenalties(collegeId: string, page = 1, limit = 20,
 }
 
 export async function createFinePenalty(collegeId: string, data: any, who: string) {
+  await assertStudentFeeGuardianReady(collegeId, data.studentId);
   const doc = await FinePenalty.create({ ...data, collegeId });
   await createAuditLog({ collegeId, entityType: 'FinePenalty', entityId: String(doc._id), entityName: data.type, action: 'create', changes: [], performedBy: who });
   return doc;
@@ -385,9 +408,10 @@ export async function deleteFinePenalty(collegeId: string, id: string, who: stri
 
 // ═══ Invoices ═════════════════════════════════════════════
 
-export async function listInvoices(collegeId: string, page = 1, limit = 20, status?: string) {
+export async function listInvoices(collegeId: string, page = 1, limit = 20, status?: string, studentId?: string) {
   const filter: any = { collegeId };
   if (status) filter.status = status;
+  if (studentId) filter.studentId = studentId;
   return paginate(Invoice, filter, page, limit, { createdAt: -1 }, [STUDENT_POPULATE] as any);
 }
 
@@ -398,6 +422,7 @@ export async function getInvoice(collegeId: string, id: string) {
 }
 
 export async function createInvoice(collegeId: string, data: any, who: string) {
+  await assertStudentFeeGuardianReady(collegeId, data.studentId);
   const doc = await Invoice.create({ ...data, collegeId });
   await createAuditLog({ collegeId, entityType: 'Invoice', entityId: String(doc._id), entityName: data.invoiceNumber, action: 'create', changes: [], performedBy: who });
   return doc;
@@ -543,13 +568,16 @@ export async function deletePaymentGatewayLog(collegeId: string, id: string, who
 
 // ═══ Fee Reminders ════════════════════════════════════════
 
-export async function listFeeReminders(collegeId: string, page = 1, limit = 20, studentId?: string) {
+export async function listFeeReminders(collegeId: string, page = 1, limit = 20, studentId?: string, channel?: string, status?: string) {
   const filter: any = { collegeId };
   if (studentId) filter.studentId = studentId;
+  if (channel) filter.channel = channel;
+  if (status) filter.status = status;
   return paginate(FeeReminder, filter, page, limit, { createdAt: -1 }, [STUDENT_POPULATE] as any);
 }
 
 export async function createFeeReminder(collegeId: string, data: any, who: string) {
+  await assertStudentFeeGuardianReady(collegeId, data.studentId);
   const doc = await FeeReminder.create({ ...data, collegeId });
   await createAuditLog({ collegeId, entityType: 'FeeReminder', entityId: String(doc._id), entityName: data.channel, action: 'create', changes: [], performedBy: who });
   return doc;

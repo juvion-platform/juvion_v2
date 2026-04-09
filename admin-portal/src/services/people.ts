@@ -11,8 +11,8 @@ export const getPerson = (id: string) => api.get(`${BASE}/persons/${id}`).then(r
 export const deletePerson = (id: string) => api.delete(`${BASE}/persons/${id}`).then(r => r.data);
 
 // ── Students ─────────────────────────────────────────
-export const listStudents = (page = 1, limit = 20, status?: string, search?: string) =>
-  api.get(`${BASE}/students`, { params: { page, limit, status, search } }).then(r => r.data);
+export const listStudents = (page = 1, limit = 20, status?: string, search?: string, onboardingStatus?: string, needsAttention?: boolean) =>
+  api.get(`${BASE}/students`, { params: { page, limit, status, search, onboardingStatus, needsAttention } }).then(r => r.data);
 export const getStudent = (id: string) => api.get(`${BASE}/students/${id}`).then(r => r.data);
 export const createStudent = (data: any) => api.post(`${BASE}/students`, data).then(r => r.data);
 export const updateStudent = (id: string, data: any) => api.put(`${BASE}/students/${id}`, data).then(r => r.data);

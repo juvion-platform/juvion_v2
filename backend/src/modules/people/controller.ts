@@ -5,7 +5,26 @@ import * as svc from './service';
 const who = (req: AuthRequest) => req.user?.name || 'System';
 const qp = (req: AuthRequest) => {
   const q = req.query as Record<string, string | undefined>;
-  return { page: +(q.page || '1'), limit: +(q.limit || '20'), status: q.status, search: q.search };
+  return {
+    page: +(q.page || '1'),
+    limit: +(q.limit || '20'),
+    status: q.status,
+    search: q.search,
+    onboardingStatus: q.onboardingStatus,
+    needsAttention: q.needsAttention === 'true' || q.needsAttention === '1',
+  };
+};
+
+const studentQp = (req: AuthRequest) => {
+  const q = qp(req);
+  return {
+    page: q.page,
+    limit: q.limit,
+    status: q.status,
+    search: q.search,
+    onboardingStatus: q.onboardingStatus,
+    needsAttention: q.needsAttention,
+  };
 };
 
 // ─── Dashboard Stats ─────────────────────────────────
@@ -32,7 +51,10 @@ export async function deletePerson(req: AuthRequest, res: Response, next: NextFu
 
 // ─── Students ────────────────────────────────────────
 export async function listStudents(req: AuthRequest, res: Response, next: NextFunction) {
-  try { const q = qp(req); res.json(await svc.listStudents(req.collegeId!, q.page, q.limit, q.status, q.search)); } catch (e) { next(e); }
+  try {
+    const q = studentQp(req);
+    res.json(await svc.listStudents(req.collegeId!, q.page, q.limit, q.status, q.search, q.onboardingStatus, q.needsAttention));
+  } catch (e) { next(e); }
 }
 export async function getStudent(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await svc.getStudent(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }

@@ -21,7 +21,21 @@ const toOid = (id: string) => new mongoose.Types.ObjectId(id);
 
 // ─── Dashboard Stats ─────────────────────────────────
 export async function getDashboardStats(collegeId: string) {
-  const [persons, students, activeStudents, faculty, activeFaculty, staff, activeStaff, parents, organizations] = await Promise.all([
+  const onboardingNeedsAttentionFilter = {
+    collegeId,
+    onboardingStatus: { $in: ['not_started', 'in_progress'] },
+    $or: [
+      { feeResponsibleParentId: { $exists: false } },
+      { feeResponsibleParentId: null },
+      { 'onboardingChecklist.profileVerified': { $ne: true } },
+      { 'onboardingChecklist.documentsVerified': { $ne: true } },
+      { 'onboardingChecklist.feePlanConfirmed': { $ne: true } },
+      { 'onboardingChecklist.portalAccessShared': { $ne: true } },
+      { 'onboardingChecklist.idCardIssued': { $ne: true } },
+    ],
+  };
+
+  const [persons, students, activeStudents, faculty, activeFaculty, staff, activeStaff, parents, organizations, onboardingInProgress, onboardingCompleted, onboardingNeedsAttention, missingFeeResponsibleGuardians] = await Promise.all([
     Person.countDocuments({ collegeId }),
     Student.countDocuments({ collegeId }),
     Student.countDocuments({ collegeId, status: 'active' }),
@@ -31,8 +45,33 @@ export async function getDashboardStats(collegeId: string) {
     Staff.countDocuments({ collegeId, status: 'active' }),
     Parent.countDocuments({ collegeId }),
     Organization.countDocuments({ collegeId }),
+    Student.countDocuments({ collegeId, onboardingStatus: 'in_progress' }),
+    Student.countDocuments({ collegeId, onboardingStatus: 'completed' }),
+    Student.countDocuments(onboardingNeedsAttentionFilter),
+    Student.countDocuments({
+      collegeId,
+      status: { $in: ['active', 'prospective'] },
+      $or: [
+        { feeResponsibleParentId: { $exists: false } },
+        { feeResponsibleParentId: null },
+      ],
+    }),
   ]);
-  return { persons, students, activeStudents, faculty, activeFaculty, staff, activeStaff, parents, organizations };
+  return {
+    persons,
+    students,
+    activeStudents,
+    faculty,
+    activeFaculty,
+    staff,
+    activeStaff,
+    parents,
+    organizations,
+    onboardingInProgress,
+    onboardingCompleted,
+    onboardingNeedsAttention,
+    missingFeeResponsibleGuardians,
+  };
 }
 
 // ─── Helpers ─────────────────────────────────────────
@@ -63,6 +102,41 @@ function buildStudentOnboardingFields(data: any) {
     fields.onboardingCompletedAt = undefined;
   }
   return fields;
+}
+
+function getMergedOnboardingChecklist(currentChecklist: any, incomingChecklist: any) {
+  return {
+    profileVerified: incomingChecklist?.profileVerified ?? currentChecklist?.profileVerified ?? false,
+    documentsVerified: incomingChecklist?.documentsVerified ?? currentChecklist?.documentsVerified ?? false,
+    feePlanConfirmed: incomingChecklist?.feePlanConfirmed ?? currentChecklist?.feePlanConfirmed ?? false,
+    portalAccessShared: incomingChecklist?.portalAccessShared ?? currentChecklist?.portalAccessShared ?? false,
+    idCardIssued: incomingChecklist?.idCardIssued ?? currentChecklist?.idCardIssued ?? false,
+  };
+}
+
+function assertStudentOnboardingRules(input: {
+  onboardingStatus?: string;
+  feeResponsibleParentId?: string | null;
+  onboardingChecklist?: any;
+}) {
+  if (input.onboardingStatus !== 'completed') return;
+
+  if (!input.feeResponsibleParentId) {
+    throw new AppError(400, 'Fee responsible guardian is required before onboarding can be marked completed');
+  }
+
+  const checklist = input.onboardingChecklist || {};
+  const missing = [
+    checklist.profileVerified ? null : 'profile verification',
+    checklist.documentsVerified ? null : 'document verification',
+    checklist.feePlanConfirmed ? null : 'fee plan confirmation',
+    checklist.portalAccessShared ? null : 'portal access sharing',
+    checklist.idCardIssued ? null : 'ID card issuance',
+  ].filter(Boolean);
+
+  if (missing.length > 0) {
+    throw new AppError(400, `Complete the onboarding checklist before marking onboarding completed: ${missing.join(', ')}`);
+  }
 }
 
 async function syncStudentParentLinks(collegeId: string, studentId: string, previousParentIds: string[], nextParentIds: string[]) {
@@ -150,9 +224,22 @@ export async function deletePerson(collegeId: string, id: string, performedBy: s
 
 // ─── Students ────────────────────────────────────────
 
-export async function listStudents(collegeId: string, page: number, limit: number, status?: string, search?: string) {
+export async function listStudents(collegeId: string, page: number, limit: number, status?: string, search?: string, onboardingStatus?: string, needsAttention = false) {
   const filter: any = { collegeId: toOid(collegeId) };
   if (status) filter.status = status;
+  if (onboardingStatus) filter.onboardingStatus = onboardingStatus;
+  if (needsAttention) {
+    filter.onboardingStatus = { $in: ['not_started', 'in_progress'] };
+    filter.$or = [
+      { feeResponsibleParentId: { $exists: false } },
+      { feeResponsibleParentId: null },
+      { 'onboardingChecklist.profileVerified': { $ne: true } },
+      { 'onboardingChecklist.documentsVerified': { $ne: true } },
+      { 'onboardingChecklist.feePlanConfirmed': { $ne: true } },
+      { 'onboardingChecklist.portalAccessShared': { $ne: true } },
+      { 'onboardingChecklist.idCardIssued': { $ne: true } },
+    ];
+  }
   const skip = (page - 1) * limit;
 
   const pipeline: any[] = [
@@ -215,6 +302,12 @@ export async function getStudent(collegeId: string, id: string): Promise<any> {
 
 export async function createStudent(collegeId: string, data: any, performedBy: string) {
   const person = await createPersonRecord(collegeId, data);
+  const mergedChecklist = getMergedOnboardingChecklist(undefined, data.onboardingChecklist);
+  assertStudentOnboardingRules({
+    onboardingStatus: data.onboardingStatus || 'not_started',
+    feeResponsibleParentId: data.feeResponsibleParentId || null,
+    onboardingChecklist: mergedChecklist,
+  });
   const studentFields: any = {
     collegeId,
     personId: person._id,
@@ -224,6 +317,7 @@ export async function createStudent(collegeId: string, data: any, performedBy: s
   };
   ['category', 'quota', 'rollNumber', 'regulationId', 'programmeId', 'branchId', 'batchId', 'primaryParentId', 'feeResponsibleParentId'].forEach(k => { if (data[k]) studentFields[k] = data[k]; });
   Object.assign(studentFields, buildStudentOnboardingFields(data));
+  studentFields.onboardingChecklist = mergedChecklist;
   const doc = await Student.create(studentFields);
   await syncStudentParentLinks(
     collegeId,
@@ -249,6 +343,15 @@ export async function updateStudent(collegeId: string, id: string, data: any, pe
   const studentFields: any = {};
   ['admissionYear', 'category', 'quota', 'rollNumber', 'status', 'regulationId', 'programmeId', 'branchId', 'batchId', 'primaryParentId', 'feeResponsibleParentId'].forEach(k => { if (data[k] !== undefined) studentFields[k] = data[k]; });
   Object.assign(studentFields, buildStudentOnboardingFields(data));
+  const mergedChecklist = getMergedOnboardingChecklist(student.onboardingChecklist, data.onboardingChecklist);
+  assertStudentOnboardingRules({
+    onboardingStatus: data.onboardingStatus !== undefined ? data.onboardingStatus : student.onboardingStatus,
+    feeResponsibleParentId: data.feeResponsibleParentId !== undefined
+      ? data.feeResponsibleParentId
+      : (student.feeResponsibleParentId ? String(student.feeResponsibleParentId) : null),
+    onboardingChecklist: mergedChecklist,
+  });
+  studentFields.onboardingChecklist = mergedChecklist;
   if (Object.keys(studentFields).length > 0) await Student.findByIdAndUpdate(id, { $set: studentFields });
   const nextParentIds = [
     data.primaryParentId !== undefined ? data.primaryParentId : previousPrimaryParentId,

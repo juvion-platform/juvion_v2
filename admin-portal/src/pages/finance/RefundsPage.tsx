@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listRefunds, createRefund, updateRefund, deleteRefund, listPayments } from '../../services/finance';
-import { listStudents } from '../../services/people';
+import { getStudent, listStudents } from '../../services/people';
 import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
+import StudentFinanceReadinessCard from '../../components/StudentFinanceReadinessCard';
 import { Plus, Pencil, Trash2, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -25,12 +26,20 @@ export default function RefundsPage() {
   const { data, isLoading } = useQuery({ queryKey: ['refunds', page], queryFn: () => listRefunds(page, 20) });
   const { data: studentsData } = useQuery({ queryKey: ['students-lookup'], queryFn: () => listStudents(1, 100) });
   const { data: paymentsData } = useQuery({ queryKey: ['payments-lookup'], queryFn: () => listPayments(1, 100) });
+  const { data: selectedStudent, isFetching: studentReadinessLoading } = useQuery({
+    queryKey: ['student-finance-readiness', form.studentId],
+    queryFn: () => getStudent(form.studentId),
+    enabled: modalOpen && Boolean(form.studentId),
+  });
 
   const students: any[] = studentsData?.items || [];
   const payments: any[] = paymentsData?.items || [];
+  const financeBlocked = useMemo(() => Boolean(form.studentId) && Boolean(selectedStudent) && !selectedStudent.feeResponsibleParentId, [form.studentId, selectedStudent]);
+  const financeReadinessPending = Boolean(form.studentId) && studentReadinessLoading;
 
   const createMut = useMutation({ mutationFn: createRefund, onSuccess: () => { qc.invalidateQueries({ queryKey: ['refunds'] }); closeModal(); } });
   const updateMut = useMutation({ mutationFn: ({ id, data }: any) => updateRefund(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['refunds'] }); closeModal(); } });
+  const quickUpdateMut = useMutation({ mutationFn: ({ id, data }: any) => updateRefund(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['refunds'] }); } });
   const deleteMut = useMutation({ mutationFn: deleteRefund, onSuccess: () => { qc.invalidateQueries({ queryKey: ['refunds'] }); } });
 
   function openCreate() {
@@ -66,6 +75,14 @@ export default function RefundsPage() {
     return s.person?.name || s.rollNumber || s._id;
   }
 
+  function quickTransition(row: any, nextStatus: string) {
+    const payload: any = { status: nextStatus };
+    if (nextStatus === 'processed' && !row.processedDate) {
+      payload.processedDate = new Date().toISOString().slice(0, 10);
+    }
+    quickUpdateMut.mutate({ id: row._id, data: payload });
+  }
+
   const columns = [
     { key: 'studentId', label: 'Student', render: (r: any) => <span className="font-medium text-navy">{r.studentId?.personId?.name || r.studentId?.rollNumber || '—'}</span> },
     { key: 'amount', label: 'Amount', render: (r: any) => `₹${Number(r.amount).toLocaleString()}` },
@@ -73,7 +90,22 @@ export default function RefundsPage() {
     { key: 'refundMode', label: 'Mode', render: (r: any) => <Badge variant="info">{r.refundMode}</Badge> },
     { key: 'status', label: 'Status', render: (r: any) => <Badge variant={STATUS_COLOR[r.status] || 'default'}>{r.status}</Badge> },
     { key: 'actions', label: '', render: (r: any) => (
-      <div className="flex gap-1">
+      <div className="flex flex-wrap justify-end gap-1">
+        {r.status === 'requested' && (
+          <>
+            <button onClick={(e) => { e.stopPropagation(); quickTransition(r, 'approved'); }} disabled={quickUpdateMut.isPending} className="rounded-md bg-sky-50 px-2 py-1 text-xs font-medium text-sky-700 hover:bg-sky-100 disabled:opacity-50">
+              Approve
+            </button>
+            <button onClick={(e) => { e.stopPropagation(); quickTransition(r, 'rejected'); }} disabled={quickUpdateMut.isPending} className="rounded-md bg-rose-50 px-2 py-1 text-xs font-medium text-rose-700 hover:bg-rose-100 disabled:opacity-50">
+              Reject
+            </button>
+          </>
+        )}
+        {r.status === 'approved' && (
+          <button onClick={(e) => { e.stopPropagation(); quickTransition(r, 'processed'); }} disabled={quickUpdateMut.isPending} className="rounded-md bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50">
+            Process
+          </button>
+        )}
         <button onClick={(e) => { e.stopPropagation(); openEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
         <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this refund?')) deleteMut.mutate(r._id); }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
       </div>
@@ -101,6 +133,10 @@ export default function RefundsPage() {
 
       <Modal open={modalOpen} onClose={closeModal} title={editing ? 'Edit Refund' : 'New Refund'}>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {form.studentId && (
+            <StudentFinanceReadinessCard student={selectedStudent} loading={financeReadinessPending} />
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={lbl}>Student * <Link to="/people" target="_blank" className={manageLink}>+ Manage <ExternalLink size={10} /></Link></label>
@@ -132,8 +168,8 @@ export default function RefundsPage() {
           </div>
           <div className="flex justify-end gap-3 pt-2 border-t">
             <button type="button" onClick={closeModal} className="px-4 py-2 border rounded-lg text-sm">Cancel</button>
-            <button type="submit" disabled={createMut.isPending || updateMut.isPending} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
-              {createMut.isPending || updateMut.isPending ? 'Saving...' : editing ? 'Update' : 'Create'}
+            <button type="submit" disabled={createMut.isPending || updateMut.isPending || (!editing && (financeBlocked || financeReadinessPending))} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
+              {createMut.isPending || updateMut.isPending ? 'Saving...' : financeReadinessPending ? 'Checking student...' : editing ? 'Update' : 'Create'}
             </button>
           </div>
         </form>

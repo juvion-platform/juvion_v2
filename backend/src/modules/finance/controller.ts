@@ -73,8 +73,8 @@ export async function deleteFeeLineItem(req: AuthRequest, res: Response, next: N
 
 export async function listPayments(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const { page, limit, studentId } = req.query as any;
-    res.json(await service.listPayments(req.collegeId!, Number(page) || 1, Number(limit) || 20, studentId));
+    const { page, limit, studentId, status } = req.query as any;
+    res.json(await service.listPayments(req.collegeId!, Number(page) || 1, Number(limit) || 20, studentId, status));
   } catch (err) { next(err); }
 }
 export async function getPayment(req: AuthRequest, res: Response, next: NextFunction) {
@@ -115,8 +115,8 @@ export async function deleteScholarship(req: AuthRequest, res: Response, next: N
 
 export async function listScholarshipAllocations(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const { page, limit, scholarshipId } = req.query as any;
-    res.json(await service.listScholarshipAllocations(req.collegeId!, Number(page) || 1, Number(limit) || 20, scholarshipId));
+    const { page, limit, scholarshipId, studentId, status } = req.query as any;
+    res.json(await service.listScholarshipAllocations(req.collegeId!, Number(page) || 1, Number(limit) || 20, scholarshipId, studentId, status));
   } catch (err) { next(err); }
 }
 export async function createScholarshipAllocation(req: AuthRequest, res: Response, next: NextFunction) {
@@ -187,8 +187,8 @@ export async function deleteFinePenalty(req: AuthRequest, res: Response, next: N
 
 export async function listInvoices(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const { page, limit, status } = req.query as any;
-    res.json(await service.listInvoices(req.collegeId!, Number(page) || 1, Number(limit) || 20, status));
+    const { page, limit, status, studentId } = req.query as any;
+    res.json(await service.listInvoices(req.collegeId!, Number(page) || 1, Number(limit) || 20, status, studentId));
   } catch (err) { next(err); }
 }
 export async function getInvoice(req: AuthRequest, res: Response, next: NextFunction) {
@@ -280,8 +280,8 @@ export async function deletePaymentGatewayLog(req: AuthRequest, res: Response, n
 
 export async function listFeeReminders(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const { page, limit, studentId } = req.query as any;
-    res.json(await service.listFeeReminders(req.collegeId!, Number(page) || 1, Number(limit) || 20, studentId));
+    const { page, limit, studentId, channel, status } = req.query as any;
+    res.json(await service.listFeeReminders(req.collegeId!, Number(page) || 1, Number(limit) || 20, studentId, channel, status));
   } catch (err) { next(err); }
 }
 export async function createFeeReminder(req: AuthRequest, res: Response, next: NextFunction) {

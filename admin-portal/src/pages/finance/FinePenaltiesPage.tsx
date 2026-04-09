@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listFinePenalties, createFinePenalty, updateFinePenalty, deleteFinePenalty } from '../../services/finance';
-import { listStudents } from '../../services/people';
+import { getStudent, listStudents } from '../../services/people';
 import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
+import StudentFinanceReadinessCard from '../../components/StudentFinanceReadinessCard';
 import { Plus, Pencil, Trash2, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -24,10 +25,18 @@ export default function FinePenaltiesPage() {
 
   const { data, isLoading } = useQuery({ queryKey: ['fines', page], queryFn: () => listFinePenalties(page, 20) });
   const { data: studentsData } = useQuery({ queryKey: ['students-list'], queryFn: () => listStudents(1, 100) });
+  const { data: selectedStudent, isFetching: studentReadinessLoading } = useQuery({
+    queryKey: ['student-finance-readiness', form.studentId],
+    queryFn: () => getStudent(form.studentId),
+    enabled: modalOpen && Boolean(form.studentId),
+  });
   const students: any[] = studentsData?.items || [];
+  const financeBlocked = useMemo(() => Boolean(form.studentId) && Boolean(selectedStudent) && !selectedStudent.feeResponsibleParentId, [form.studentId, selectedStudent]);
+  const financeReadinessPending = Boolean(form.studentId) && studentReadinessLoading;
 
   const createMut = useMutation({ mutationFn: createFinePenalty, onSuccess: () => { qc.invalidateQueries({ queryKey: ['fines'] }); closeModal(); } });
   const updateMut = useMutation({ mutationFn: ({ id, data }: any) => updateFinePenalty(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['fines'] }); closeModal(); } });
+  const quickUpdateMut = useMutation({ mutationFn: ({ id, data }: any) => updateFinePenalty(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['fines'] }); } });
   const deleteMut = useMutation({ mutationFn: deleteFinePenalty, onSuccess: () => { qc.invalidateQueries({ queryKey: ['fines'] }); } });
 
   function openCreate() {
@@ -59,6 +68,12 @@ export default function FinePenaltiesPage() {
     else createMut.mutate(payload);
   }
 
+  function quickTransition(row: any, nextStatus: string) {
+    const payload: any = { status: nextStatus };
+    if (nextStatus === 'paid') payload.paidAmount = row.amount;
+    quickUpdateMut.mutate({ id: row._id, data: payload });
+  }
+
   const columns = [
     { key: 'studentId', label: 'Student', render: (r: any) => <span className="font-medium text-navy">{r.studentId?.personId?.name || r.studentId?.rollNumber || '\u2014'}</span> },
     { key: 'type', label: 'Type', render: (r: any) => <Badge variant="info">{r.type}</Badge> },
@@ -67,7 +82,17 @@ export default function FinePenaltiesPage() {
     { key: 'paidAmount', label: 'Paid', render: (r: any) => `₹${Number(r.paidAmount || 0).toLocaleString()}` },
     { key: 'status', label: 'Status', render: (r: any) => <Badge variant={STATUS_COLOR[r.status] || 'default'}>{r.status}</Badge> },
     { key: 'actions', label: '', render: (r: any) => (
-      <div className="flex gap-1">
+      <div className="flex flex-wrap justify-end gap-1">
+        {(r.status === 'pending' || r.status === 'partial') && (
+          <>
+            <button onClick={(e) => { e.stopPropagation(); quickTransition(r, 'paid'); }} disabled={quickUpdateMut.isPending} className="rounded-md bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50">
+              Mark paid
+            </button>
+            <button onClick={(e) => { e.stopPropagation(); quickTransition(r, 'waived'); }} disabled={quickUpdateMut.isPending} className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200 disabled:opacity-50">
+              Waive
+            </button>
+          </>
+        )}
         <button onClick={(e) => { e.stopPropagation(); openEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
         <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this fine?')) deleteMut.mutate(r._id); }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
       </div>
@@ -95,6 +120,10 @@ export default function FinePenaltiesPage() {
 
       <Modal open={modalOpen} onClose={closeModal} title={editing ? 'Edit Fine' : 'New Fine'}>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {form.studentId && (
+            <StudentFinanceReadinessCard student={selectedStudent} loading={financeReadinessPending} />
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={lbl}>Student * <Link to="/people" target="_blank" className={manageLink}>+ Manage <ExternalLink size={10} /></Link></label>
@@ -124,8 +153,8 @@ export default function FinePenaltiesPage() {
           </div>
           <div className="flex justify-end gap-3 pt-2 border-t">
             <button type="button" onClick={closeModal} className="px-4 py-2 border rounded-lg text-sm">Cancel</button>
-            <button type="submit" disabled={createMut.isPending || updateMut.isPending} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
-              {createMut.isPending || updateMut.isPending ? 'Saving...' : editing ? 'Update' : 'Create'}
+            <button type="submit" disabled={createMut.isPending || updateMut.isPending || (!editing && (financeBlocked || financeReadinessPending))} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
+              {createMut.isPending || updateMut.isPending ? 'Saving...' : financeReadinessPending ? 'Checking student...' : editing ? 'Update' : 'Create'}
             </button>
           </div>
         </form>

@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listInvoices, createInvoice, updateInvoice, deleteInvoice } from '../../services/finance';
-import { listStudents } from '../../services/people';
+import { getStudent, listStudents } from '../../services/people';
 import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
+import StudentFinanceReadinessCard from '../../components/StudentFinanceReadinessCard';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 
 const TYPES = ['fee', 'hostel', 'transport', 'other'] as const;
 const STATUSES = ['draft', 'issued', 'paid', 'overdue', 'cancelled'] as const;
@@ -15,18 +17,39 @@ const lbl = "block text-sm font-medium text-gray-700 mb-1";
 
 export default function InvoicesPage() {
   const qc = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [page, setPage] = useState(1);
+  const [studentFilter, setStudentFilter] = useState(searchParams.get('studentId') || '');
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [form, setForm] = useState({ invoiceNumber: '', studentId: '', type: 'fee', totalAmount: '', dueDate: '', status: 'draft', issuedDate: '' });
 
-  const { data, isLoading } = useQuery({ queryKey: ['invoices', page], queryFn: () => listInvoices(page, 20) });
+  const { data, isLoading } = useQuery({
+    queryKey: ['invoices', page, statusFilter, studentFilter],
+    queryFn: () => listInvoices(page, 20, statusFilter || undefined, studentFilter || undefined),
+  });
   const { data: studentsData } = useQuery({ queryKey: ['students-list'], queryFn: () => listStudents(1, 100) });
+  const { data: selectedStudent, isFetching: studentReadinessLoading } = useQuery({
+    queryKey: ['student-finance-readiness', form.studentId],
+    queryFn: () => getStudent(form.studentId),
+    enabled: modalOpen && Boolean(form.studentId),
+  });
 
   const students = studentsData?.items || [];
+  const financeBlocked = useMemo(() => Boolean(form.studentId) && Boolean(selectedStudent) && !selectedStudent.feeResponsibleParentId, [form.studentId, selectedStudent]);
+  const financeReadinessPending = Boolean(form.studentId) && studentReadinessLoading;
+
+  function syncSearch(next: { studentId?: string; status?: string }) {
+    const params = new URLSearchParams();
+    if (next.studentId) params.set('studentId', next.studentId);
+    if (next.status) params.set('status', next.status);
+    setSearchParams(params, { replace: true });
+  }
 
   const createMut = useMutation({ mutationFn: createInvoice, onSuccess: () => { qc.invalidateQueries({ queryKey: ['invoices'] }); closeModal(); } });
   const updateMut = useMutation({ mutationFn: ({ id, data }: any) => updateInvoice(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['invoices'] }); closeModal(); } });
+  const quickUpdateMut = useMutation({ mutationFn: ({ id, data }: any) => updateInvoice(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['invoices'] }); } });
   const deleteMut = useMutation({ mutationFn: deleteInvoice, onSuccess: () => { qc.invalidateQueries({ queryKey: ['invoices'] }); } });
 
   function openCreate() {
@@ -58,6 +81,14 @@ export default function InvoicesPage() {
     else createMut.mutate(payload);
   }
 
+  function quickTransition(row: any, nextStatus: string) {
+    const payload: any = { status: nextStatus };
+    if (nextStatus === 'issued' && !row.issuedDate) {
+      payload.issuedDate = new Date().toISOString().slice(0, 10);
+    }
+    quickUpdateMut.mutate({ id: row._id, data: payload });
+  }
+
   function studentLabel(s: any) {
     return s.person?.name || s.rollNumber || s._id;
   }
@@ -70,7 +101,29 @@ export default function InvoicesPage() {
     { key: 'dueDate', label: 'Due Date', render: (r: any) => r.dueDate ? new Date(r.dueDate).toLocaleDateString() : '-' },
     { key: 'status', label: 'Status', render: (r: any) => <Badge variant={STATUS_COLOR[r.status] || 'default'}>{r.status}</Badge> },
     { key: 'actions', label: '', render: (r: any) => (
-      <div className="flex gap-1">
+      <div className="flex flex-wrap justify-end gap-1">
+        {r.status === 'draft' && (
+          <>
+            <button onClick={(e) => { e.stopPropagation(); quickTransition(r, 'issued'); }} disabled={quickUpdateMut.isPending} className="rounded-md bg-sky-50 px-2 py-1 text-xs font-medium text-sky-700 hover:bg-sky-100 disabled:opacity-50">
+              Issue
+            </button>
+            <button onClick={(e) => { e.stopPropagation(); quickTransition(r, 'cancelled'); }} disabled={quickUpdateMut.isPending} className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200 disabled:opacity-50">
+              Cancel
+            </button>
+          </>
+        )}
+        {(r.status === 'issued' || r.status === 'overdue') && (
+          <>
+            <button onClick={(e) => { e.stopPropagation(); quickTransition(r, 'paid'); }} disabled={quickUpdateMut.isPending} className="rounded-md bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50">
+              Mark paid
+            </button>
+            {r.status === 'issued' && (
+              <button onClick={(e) => { e.stopPropagation(); quickTransition(r, 'overdue'); }} disabled={quickUpdateMut.isPending} className="rounded-md bg-rose-50 px-2 py-1 text-xs font-medium text-rose-700 hover:bg-rose-100 disabled:opacity-50">
+                Mark overdue
+              </button>
+            )}
+          </>
+        )}
         <button onClick={(e) => { e.stopPropagation(); openEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
         <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this invoice?')) deleteMut.mutate(r._id); }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
       </div>
@@ -86,6 +139,27 @@ export default function InvoicesPage() {
         </button>
       </div>
 
+      <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+        <select value={studentFilter} onChange={(e) => {
+          const value = e.target.value;
+          setStudentFilter(value);
+          setPage(1);
+          syncSearch({ studentId: value, status: statusFilter });
+        }} className={inp}>
+          <option value="">All Students</option>
+          {students.map((s: any) => <option key={s._id} value={s._id}>{studentLabel(s)}</option>)}
+        </select>
+        <select value={statusFilter} onChange={(e) => {
+          const value = e.target.value;
+          setStatusFilter(value);
+          setPage(1);
+          syncSearch({ studentId: studentFilter, status: value });
+        }} className={inp}>
+          <option value="">All Statuses</option>
+          {STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
+        </select>
+      </div>
+
       <DataTable columns={columns} data={data?.items || []} loading={isLoading} />
 
       {data && data.pages > 1 && (
@@ -98,6 +172,10 @@ export default function InvoicesPage() {
 
       <Modal open={modalOpen} onClose={closeModal} title={editing ? 'Edit Invoice' : 'New Invoice'}>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {form.studentId && (
+            <StudentFinanceReadinessCard student={selectedStudent} loading={financeReadinessPending} />
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div><label className={lbl}>Invoice Number *</label><input required value={form.invoiceNumber} onChange={e => setForm(f => ({ ...f, invoiceNumber: e.target.value }))} className={inp} /></div>
             <div><label className={lbl}>Student</label>
@@ -122,8 +200,8 @@ export default function InvoicesPage() {
           </div>
           <div className="flex justify-end gap-3 pt-2 border-t">
             <button type="button" onClick={closeModal} className="px-4 py-2 border rounded-lg text-sm">Cancel</button>
-            <button type="submit" disabled={createMut.isPending || updateMut.isPending} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
-              {createMut.isPending || updateMut.isPending ? 'Saving...' : editing ? 'Update' : 'Create'}
+            <button type="submit" disabled={createMut.isPending || updateMut.isPending || (!editing && Boolean(form.studentId) && (financeBlocked || financeReadinessPending))} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
+              {createMut.isPending || updateMut.isPending ? 'Saving...' : financeReadinessPending ? 'Checking student...' : editing ? 'Update' : 'Create'}
             </button>
           </div>
         </form>
