@@ -85,6 +85,26 @@ export async function getMe(userId: string) {
   };
 }
 
+export async function refreshToken(userId: string) {
+  const user = await User.findById(userId).select('-password');
+  if (!user || !user.isActive) throw new AppError(401, 'User not found or inactive');
+
+  const isSuperAdmin = user.role === 'super_admin';
+  const payload: Record<string, unknown> = {
+    id: String(user._id),
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    personaType: user.personaType,
+  };
+  if (!isSuperAdmin && user.collegeId) {
+    payload.collegeId = String(user.collegeId);
+  }
+
+  const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+  return { token };
+}
+
 export async function createUser(collegeId: string, data: { email: string; password: string; name: string; role?: string; personaType?: string; personId?: string }) {
   const existing = await User.findOne({ email: data.email, collegeId });
   if (existing) throw new AppError(409, 'User with this email already exists');
