@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authenticate } from '../../middleware/authenticate';
+import { authorize } from '../../middleware/authorize';
 import { validate } from '../../middleware/validate';
 import * as ctrl from './controller';
 import {
@@ -15,45 +16,45 @@ const router = Router();
 router.use(authenticate);
 
 // Dashboard
-router.get('/stats', ctrl.dashboardStats);
+router.get('/stats', authorize('admissions', 'read'), ctrl.dashboardStats);
 
 // Inquiries
-router.get('/inquiries', ctrl.listInquiries);
-router.get('/inquiries/:id', ctrl.getInquiry);
-router.post('/inquiries', validate(createInquirySchema), ctrl.createInquiry);
-router.put('/inquiries/:id', validate(updateInquirySchema), ctrl.updateInquiry);
-router.delete('/inquiries/:id', ctrl.deleteInquiry);
-router.post('/inquiries/:id/convert', validate(convertInquirySchema), ctrl.convertInquiry);
+router.get('/inquiries', authorize('admissions', 'read'), ctrl.listInquiries);
+router.get('/inquiries/:id', authorize('admissions', 'read'), ctrl.getInquiry);
+router.post('/inquiries', authorize('admissions', 'create'), validate(createInquirySchema), ctrl.createInquiry);
+router.put('/inquiries/:id', authorize('admissions', 'update'), validate(updateInquirySchema), ctrl.updateInquiry);
+router.delete('/inquiries/:id', authorize('admissions', 'delete'), ctrl.deleteInquiry);
+router.post('/inquiries/:id/convert', authorize('admissions', 'create'), validate(convertInquirySchema), ctrl.convertInquiry);
 
 // Applicants
-router.get('/applicants', ctrl.listApplicants);
-router.get('/applicants/:id', ctrl.getApplicant);
-router.post('/applicants', validate(createApplicantSchema), ctrl.createApplicant);
-router.put('/applicants/:id', validate(updateApplicantSchema), ctrl.updateApplicant);
+router.get('/applicants', authorize('admissions', 'read'), ctrl.listApplicants);
+router.get('/applicants/:id', authorize('admissions', 'read'), ctrl.getApplicant);
+router.post('/applicants', authorize('admissions', 'create'), validate(createApplicantSchema), ctrl.createApplicant);
+router.put('/applicants/:id', authorize('admissions', 'update'), validate(updateApplicantSchema), ctrl.updateApplicant);
 
 // Entrance Exam Scores
-router.get('/exam-scores', ctrl.listExamScores);
-router.post('/exam-scores', validate(createExamScoreSchema), ctrl.createExamScore);
-router.put('/exam-scores/:id', validate(createExamScoreSchema.partial()), ctrl.updateExamScore);
+router.get('/exam-scores', authorize('admissions', 'read'), ctrl.listExamScores);
+router.post('/exam-scores', authorize('admissions', 'create'), validate(createExamScoreSchema), ctrl.createExamScore);
+router.put('/exam-scores/:id', authorize('admissions', 'update'), validate(createExamScoreSchema.partial()), ctrl.updateExamScore);
 
 // Counseling Allotments
-router.get('/counseling', ctrl.listCounselingAllotments);
-router.post('/counseling', validate(createCounselingSchema), ctrl.createCounselingAllotment);
-router.put('/counseling/:id', validate(createCounselingSchema.partial()), ctrl.updateCounselingAllotment);
+router.get('/counseling', authorize('admissions', 'read'), ctrl.listCounselingAllotments);
+router.post('/counseling', authorize('admissions', 'create'), validate(createCounselingSchema), ctrl.createCounselingAllotment);
+router.put('/counseling/:id', authorize('admissions', 'update'), validate(createCounselingSchema.partial()), ctrl.updateCounselingAllotment);
 
 // Admission Offers
-router.get('/offers', ctrl.listOffers);
-router.post('/offers', validate(createOfferSchema), ctrl.createOffer);
-router.put('/offers/:id', validate(updateOfferSchema), ctrl.updateOffer);
+router.get('/offers', authorize('admissions', 'read'), ctrl.listOffers);
+router.post('/offers', authorize('admissions', 'create'), validate(createOfferSchema), ctrl.createOffer);
+router.put('/offers/:id', authorize('admissions', 'update'), validate(updateOfferSchema), ctrl.updateOffer);
 
 // Document Checklists
-router.get('/documents', ctrl.listDocumentChecklists);
-router.get('/documents/:applicantId', ctrl.getDocumentChecklist);
-router.put('/documents/:applicantId', validate(upsertDocChecklistSchema), ctrl.upsertDocumentChecklist);
+router.get('/documents', authorize('admissions', 'read'), ctrl.listDocumentChecklists);
+router.get('/documents/:applicantId', authorize('admissions', 'read'), ctrl.getDocumentChecklist);
+router.put('/documents/:applicantId', authorize('admissions', 'update'), validate(upsertDocChecklistSchema), ctrl.upsertDocumentChecklist);
 
 // Admissions (Final)
-router.get('/enrollments', ctrl.listAdmissions);
-router.get('/enrollments/:id', ctrl.getAdmission);
-router.post('/enrollments', validate(createAdmissionSchema), ctrl.createAdmission);
+router.get('/enrollments', authorize('admissions', 'read'), ctrl.listAdmissions);
+router.get('/enrollments/:id', authorize('admissions', 'read'), ctrl.getAdmission);
+router.post('/enrollments', authorize('admissions', 'create'), validate(createAdmissionSchema), ctrl.createAdmission);
 
 export default router;

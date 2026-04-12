@@ -176,3 +176,28 @@ export async function updateWhatsAppLog(req: AuthRequest, res: Response, next: N
 export async function deleteWhatsAppLog(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.deleteWhatsAppLog(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
 }
+
+// ═══ RBAC Policies ═══════════════════════════════════════
+
+export async function listRbacPolicies(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page, limit, role, module: mod } = req.query as any;
+    res.json(await service.listRbacPolicies(req.collegeId!, Number(page) || 1, Number(limit) || 50, role, mod));
+  } catch (err) { next(err); }
+}
+
+export async function getRbacPolicy(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.getRbacPolicy(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+
+export async function createRbacPolicy(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await service.createRbacPolicy(req.collegeId!, req.body, req.user?.name || 'System')); } catch (err) { next(err); }
+}
+
+export async function updateRbacPolicy(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.updateRbacPolicy(req.collegeId!, req.params.id as string, req.body, req.user?.name || 'System')); } catch (err) { next(err); }
+}
+
+export async function deleteRbacPolicy(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.deleteRbacPolicy(req.collegeId!, req.params.id as string, req.user?.name || 'System')); } catch (err) { next(err); }
+}

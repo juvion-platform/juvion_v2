@@ -1,45 +1,58 @@
 # Juvion v2 – Entity Model Reference
 
-Total: 193 models across 16 entity groups
+> **Status**: DRAFT | Last updated: April 2026
+>
+> For full field definitions and indexes, see `architecture-spec.md` (Section 3: Entity Groups).
+> This file provides quick model-to-file lookup with key fields for the most-referenced entity groups.
+
+Total: 205 models across 16 entity groups + 4 root/workflow models
 
 ---
 
-## Admissions (7 models)
+## Admissions (15 models)
 
 | Model | File |
 |-------|------|
 | Admission | `models/admissions/Admission.ts` |
+| AdmissionCancellation | `models/admissions/AdmissionCancellation.ts` |
 | AdmissionOffer | `models/admissions/AdmissionOffer.ts` |
+| AllotmentResult | `models/admissions/AllotmentResult.ts` |
+| AllotmentRound | `models/admissions/AllotmentRound.ts` |
 | Applicant | `models/admissions/Applicant.ts` |
 | CounselingAllotment | `models/admissions/CounselingAllotment.ts` |
 | DocumentChecklist | `models/admissions/DocumentChecklist.ts` |
 | EntranceExamScore | `models/admissions/EntranceExamScore.ts` |
+| FeeNegotiation | `models/admissions/FeeNegotiation.ts` |
 | Inquiry | `models/admissions/Inquiry.ts` |
+| LeadImportBatch | `models/admissions/LeadImportBatch.ts` |
+| LeadInteraction | `models/admissions/LeadInteraction.ts` |
+| SeatInventory | `models/admissions/SeatInventory.ts` |
+| Waitlist | `models/admissions/Waitlist.ts` |
 
 ## People (7 models)
 
-| Model | File |
-|-------|------|
-| ExternalPerson | `models/people/ExternalPerson.ts` |
-| Faculty | `models/people/Faculty.ts` |
-| Organization | `models/people/Organization.ts` |
-| Parent | `models/people/Parent.ts` |
-| Person | `models/people/Person.ts` |
-| Staff | `models/people/Staff.ts` |
-| Student | `models/people/Student.ts` |
+| Model | File | Key Fields |
+|-------|------|------------|
+| Person | `models/people/Person.ts` | firstName, lastName, email, phone, aadhaarNumber, dateOfBirth, gender, address, emergencyContact, photo |
+| Student | `models/people/Student.ts` | personId→Person, admissionYear, programmeId, branchId, batchId, rollNumber, category, quota, regulationId, status |
+| Faculty | `models/people/Faculty.ts` | personId→Person, employeeId, departmentId, designation, specialization, experience, qualifications, isMentor |
+| Staff | `models/people/Staff.ts` | personId→Person, employeeId, departmentId, designation, staffType, joiningDate, status |
+| Parent | `models/people/Parent.ts` | personId→Person, studentIds[], relationship, occupation, income, isFeeResponsible |
+| ExternalPerson | `models/people/ExternalPerson.ts` | personId→Person, organizationId→Organization, designation, purpose, validFrom, validTo |
+| Organization | `models/people/Organization.ts` | name, type, contactPerson, email, phone, address, website, partnershipType, isActive |
 
 ## Academic Structure (8 models)
 
-| Model | File |
-|-------|------|
-| AcademicYear | `models/academic-structure/AcademicYear.ts` |
-| Batch | `models/academic-structure/Batch.ts` |
-| Branch | `models/academic-structure/Branch.ts` |
-| Department | `models/academic-structure/Department.ts` |
-| Programme | `models/academic-structure/Programme.ts` |
-| Regulation | `models/academic-structure/Regulation.ts` |
-| Section | `models/academic-structure/Section.ts` |
-| Semester | `models/academic-structure/Semester.ts` |
+| Model | File | Key Fields |
+|-------|------|------------|
+| Regulation | `models/academic-structure/Regulation.ts` | code, name, effectiveFromYear, effectiveToYear, totalCredits, maxYears, isActive |
+| Programme | `models/academic-structure/Programme.ts` | code, name, level (UG/PG/Diploma/PhD), durationYears, regulationId |
+| Branch | `models/academic-structure/Branch.ts` | code, name, programmeId, departmentId, intake |
+| Department | `models/academic-structure/Department.ts` | code, name, hodId→Faculty |
+| Batch | `models/academic-structure/Batch.ts` | code, name, admissionYear, programmeId, regulationId |
+| Section | `models/academic-structure/Section.ts` | name, branchId, batchId, year, semester, capacity, classAdvisorId |
+| AcademicYear | `models/academic-structure/AcademicYear.ts` | code, label, startDate, endDate, isCurrent |
+| Semester | `models/academic-structure/Semester.ts` | academicYearId, number, year, startDate, endDate, status |
 
 ## Academic Ops (21 models)
 
@@ -276,4 +289,18 @@ Total: 193 models across 16 entity groups
 | JuviMessage | `models/juvi/JuviMessage.ts` |
 | JuviPersonaConfig | `models/juvi/JuviPersonaConfig.ts` |
 | JuviUsageMetric | `models/juvi/JuviUsageMetric.ts` |
+
+## Root-Level Models (2 models)
+
+| Model | File | Key Fields |
+|-------|------|------------|
+| College | `models/College.ts` | name, code, address, contactEmail, contactPhone, logo, subscription (plan/status/expiresAt), settings, status |
+| User | `models/User.ts` | collegeId, email, password, name, role (super_admin/admin/principal/hod/faculty/staff/student/parent), personaType, personId→Person, isActive |
+
+## Workflow (2 models)
+
+| Model | File | Key Fields |
+|-------|------|------------|
+| WorkflowInstance | `models/workflow/WorkflowInstance.ts` | workflowId, workflowVersion, entityType, entityId, academicYearId, currentPhase, currentStep, status, initiatedBy, history[] |
+| WorkflowTask | `models/workflow/WorkflowTask.ts` | workflowInstanceId, stepId, stepName, phase, type, assigneeRole, assigneeId, aiAutonomy, status, dueAt, completedBy, result |
 

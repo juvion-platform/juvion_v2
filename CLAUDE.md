@@ -29,7 +29,9 @@ juvion_v2/
 
 ### Backend Modules (M01-M12 + Juvi)
 
-Each module under `backend/src/modules/<name>/` has: `models.ts`, `service.ts`, `routes.ts`, `controller.ts`, `validation.ts`
+Each module under `backend/src/modules/<name>/` has: `service.ts`, `routes.ts`, `controller.ts`, `validation.ts`, `index.ts`
+
+> **Note**: Models live separately in `backend/src/models/<entity-group>/`, not inside module directories.
 
 | Route prefix    | Module        | Code |
 |-----------------|---------------|------|
@@ -46,6 +48,10 @@ Each module under `backend/src/modules/<name>/` has: `models.ts`, `service.ts`, 
 | /api/governance | Governance    | M11  |
 | /api/platform   | Platform      | M12  |
 | /api/juvi       | Juvi AI       | -    |
+| /api/auth       | Auth          | -    |
+| /api/colleges   | Colleges      | -    |
+
+> **Note**: EG09 (Facilities), EG10 (Library), and EG14 (Communication) models are served through M08 Campus Ops under `/api/campus`.
 
 ### Frontend Pages
 

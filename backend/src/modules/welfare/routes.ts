@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authenticate } from '../../middleware/authenticate';
+import { authorize } from '../../middleware/authorize';
 import { validate } from '../../middleware/validate';
 import * as ctrl from './controller';
 import {
@@ -25,118 +26,118 @@ const router = Router();
 router.use(authenticate);
 
 // Dashboard
-router.get('/stats', ctrl.dashboardStats);
+router.get('/stats', authorize('welfare', 'read'), ctrl.dashboardStats);
 
 // Hostel Blocks
-router.get('/hostel-blocks', ctrl.listHostelBlocks);
-router.get('/hostel-blocks/:id', ctrl.getHostelBlock);
-router.post('/hostel-blocks', validate(createHostelBlockSchema), ctrl.createHostelBlock);
-router.put('/hostel-blocks/:id', validate(updateHostelBlockSchema), ctrl.updateHostelBlock);
-router.delete('/hostel-blocks/:id', ctrl.deleteHostelBlock);
+router.get('/hostel-blocks', authorize('welfare', 'read'), ctrl.listHostelBlocks);
+router.get('/hostel-blocks/:id', authorize('welfare', 'read'), ctrl.getHostelBlock);
+router.post('/hostel-blocks', authorize('welfare', 'create'), validate(createHostelBlockSchema), ctrl.createHostelBlock);
+router.put('/hostel-blocks/:id', authorize('welfare', 'update'), validate(updateHostelBlockSchema), ctrl.updateHostelBlock);
+router.delete('/hostel-blocks/:id', authorize('welfare', 'delete'), ctrl.deleteHostelBlock);
 
 // Hostel Rooms
-router.get('/hostel-rooms', ctrl.listHostelRooms);
-router.get('/hostel-rooms/:id', ctrl.getHostelRoom);
-router.post('/hostel-rooms', validate(createHostelRoomSchema), ctrl.createHostelRoom);
-router.put('/hostel-rooms/:id', validate(updateHostelRoomSchema), ctrl.updateHostelRoom);
-router.delete('/hostel-rooms/:id', ctrl.deleteHostelRoom);
+router.get('/hostel-rooms', authorize('welfare', 'read'), ctrl.listHostelRooms);
+router.get('/hostel-rooms/:id', authorize('welfare', 'read'), ctrl.getHostelRoom);
+router.post('/hostel-rooms', authorize('welfare', 'create'), validate(createHostelRoomSchema), ctrl.createHostelRoom);
+router.put('/hostel-rooms/:id', authorize('welfare', 'update'), validate(updateHostelRoomSchema), ctrl.updateHostelRoom);
+router.delete('/hostel-rooms/:id', authorize('welfare', 'delete'), ctrl.deleteHostelRoom);
 
 // Hostel Allocations
-router.get('/hostel-allocations', ctrl.listHostelAllocations);
-router.get('/hostel-allocations/:id', ctrl.getHostelAllocation);
-router.post('/hostel-allocations', validate(createHostelAllocationSchema), ctrl.createHostelAllocation);
-router.put('/hostel-allocations/:id', validate(updateHostelAllocationSchema), ctrl.updateHostelAllocation);
-router.delete('/hostel-allocations/:id', ctrl.deleteHostelAllocation);
+router.get('/hostel-allocations', authorize('welfare', 'read'), ctrl.listHostelAllocations);
+router.get('/hostel-allocations/:id', authorize('welfare', 'read'), ctrl.getHostelAllocation);
+router.post('/hostel-allocations', authorize('welfare', 'create'), validate(createHostelAllocationSchema), ctrl.createHostelAllocation);
+router.put('/hostel-allocations/:id', authorize('welfare', 'update'), validate(updateHostelAllocationSchema), ctrl.updateHostelAllocation);
+router.delete('/hostel-allocations/:id', authorize('welfare', 'delete'), ctrl.deleteHostelAllocation);
 
 // Hostel Visitor Logs
-router.get('/hostel-visitor-logs', ctrl.listHostelVisitorLogs);
-router.get('/hostel-visitor-logs/:id', ctrl.getHostelVisitorLog);
-router.post('/hostel-visitor-logs', validate(createHostelVisitorLogSchema), ctrl.createHostelVisitorLog);
-router.put('/hostel-visitor-logs/:id', validate(updateHostelVisitorLogSchema), ctrl.updateHostelVisitorLog);
-router.delete('/hostel-visitor-logs/:id', ctrl.deleteHostelVisitorLog);
+router.get('/hostel-visitor-logs', authorize('welfare', 'read'), ctrl.listHostelVisitorLogs);
+router.get('/hostel-visitor-logs/:id', authorize('welfare', 'read'), ctrl.getHostelVisitorLog);
+router.post('/hostel-visitor-logs', authorize('welfare', 'create'), validate(createHostelVisitorLogSchema), ctrl.createHostelVisitorLog);
+router.put('/hostel-visitor-logs/:id', authorize('welfare', 'update'), validate(updateHostelVisitorLogSchema), ctrl.updateHostelVisitorLog);
+router.delete('/hostel-visitor-logs/:id', authorize('welfare', 'delete'), ctrl.deleteHostelVisitorLog);
 
 // Mess Menus
-router.get('/mess-menus', ctrl.listMessMenus);
-router.get('/mess-menus/:id', ctrl.getMessMenu);
-router.post('/mess-menus', validate(createMessMenuSchema), ctrl.createMessMenu);
-router.put('/mess-menus/:id', validate(updateMessMenuSchema), ctrl.updateMessMenu);
-router.delete('/mess-menus/:id', ctrl.deleteMessMenu);
+router.get('/mess-menus', authorize('welfare', 'read'), ctrl.listMessMenus);
+router.get('/mess-menus/:id', authorize('welfare', 'read'), ctrl.getMessMenu);
+router.post('/mess-menus', authorize('welfare', 'create'), validate(createMessMenuSchema), ctrl.createMessMenu);
+router.put('/mess-menus/:id', authorize('welfare', 'update'), validate(updateMessMenuSchema), ctrl.updateMessMenu);
+router.delete('/mess-menus/:id', authorize('welfare', 'delete'), ctrl.deleteMessMenu);
 
 // Mess Feedbacks
-router.get('/mess-feedbacks', ctrl.listMessFeedbacks);
-router.get('/mess-feedbacks/:id', ctrl.getMessFeedback);
-router.post('/mess-feedbacks', validate(createMessFeedbackSchema), ctrl.createMessFeedback);
-router.put('/mess-feedbacks/:id', validate(updateMessFeedbackSchema), ctrl.updateMessFeedback);
-router.delete('/mess-feedbacks/:id', ctrl.deleteMessFeedback);
+router.get('/mess-feedbacks', authorize('welfare', 'read'), ctrl.listMessFeedbacks);
+router.get('/mess-feedbacks/:id', authorize('welfare', 'read'), ctrl.getMessFeedback);
+router.post('/mess-feedbacks', authorize('welfare', 'create'), validate(createMessFeedbackSchema), ctrl.createMessFeedback);
+router.put('/mess-feedbacks/:id', authorize('welfare', 'update'), validate(updateMessFeedbackSchema), ctrl.updateMessFeedback);
+router.delete('/mess-feedbacks/:id', authorize('welfare', 'delete'), ctrl.deleteMessFeedback);
 
 // Transport Routes
-router.get('/transport-routes', ctrl.listTransportRoutes);
-router.get('/transport-routes/:id', ctrl.getTransportRoute);
-router.post('/transport-routes', validate(createTransportRouteSchema), ctrl.createTransportRoute);
-router.put('/transport-routes/:id', validate(updateTransportRouteSchema), ctrl.updateTransportRoute);
-router.delete('/transport-routes/:id', ctrl.deleteTransportRoute);
+router.get('/transport-routes', authorize('welfare', 'read'), ctrl.listTransportRoutes);
+router.get('/transport-routes/:id', authorize('welfare', 'read'), ctrl.getTransportRoute);
+router.post('/transport-routes', authorize('welfare', 'create'), validate(createTransportRouteSchema), ctrl.createTransportRoute);
+router.put('/transport-routes/:id', authorize('welfare', 'update'), validate(updateTransportRouteSchema), ctrl.updateTransportRoute);
+router.delete('/transport-routes/:id', authorize('welfare', 'delete'), ctrl.deleteTransportRoute);
 
 // Transport Allocations
-router.get('/transport-allocations', ctrl.listTransportAllocations);
-router.get('/transport-allocations/:id', ctrl.getTransportAllocation);
-router.post('/transport-allocations', validate(createTransportAllocationSchema), ctrl.createTransportAllocation);
-router.put('/transport-allocations/:id', validate(updateTransportAllocationSchema), ctrl.updateTransportAllocation);
-router.delete('/transport-allocations/:id', ctrl.deleteTransportAllocation);
+router.get('/transport-allocations', authorize('welfare', 'read'), ctrl.listTransportAllocations);
+router.get('/transport-allocations/:id', authorize('welfare', 'read'), ctrl.getTransportAllocation);
+router.post('/transport-allocations', authorize('welfare', 'create'), validate(createTransportAllocationSchema), ctrl.createTransportAllocation);
+router.put('/transport-allocations/:id', authorize('welfare', 'update'), validate(updateTransportAllocationSchema), ctrl.updateTransportAllocation);
+router.delete('/transport-allocations/:id', authorize('welfare', 'delete'), ctrl.deleteTransportAllocation);
 
 // Health Records
-router.get('/health-records', ctrl.listHealthRecords);
-router.get('/health-records/:id', ctrl.getHealthRecord);
-router.post('/health-records', validate(createHealthRecordSchema), ctrl.createHealthRecord);
-router.put('/health-records/:id', validate(updateHealthRecordSchema), ctrl.updateHealthRecord);
-router.delete('/health-records/:id', ctrl.deleteHealthRecord);
+router.get('/health-records', authorize('welfare', 'read'), ctrl.listHealthRecords);
+router.get('/health-records/:id', authorize('welfare', 'read'), ctrl.getHealthRecord);
+router.post('/health-records', authorize('welfare', 'create'), validate(createHealthRecordSchema), ctrl.createHealthRecord);
+router.put('/health-records/:id', authorize('welfare', 'update'), validate(updateHealthRecordSchema), ctrl.updateHealthRecord);
+router.delete('/health-records/:id', authorize('welfare', 'delete'), ctrl.deleteHealthRecord);
 
 // Medical Visits
-router.get('/medical-visits', ctrl.listMedicalVisits);
-router.get('/medical-visits/:id', ctrl.getMedicalVisit);
-router.post('/medical-visits', validate(createMedicalVisitSchema), ctrl.createMedicalVisit);
-router.put('/medical-visits/:id', validate(updateMedicalVisitSchema), ctrl.updateMedicalVisit);
-router.delete('/medical-visits/:id', ctrl.deleteMedicalVisit);
+router.get('/medical-visits', authorize('welfare', 'read'), ctrl.listMedicalVisits);
+router.get('/medical-visits/:id', authorize('welfare', 'read'), ctrl.getMedicalVisit);
+router.post('/medical-visits', authorize('welfare', 'create'), validate(createMedicalVisitSchema), ctrl.createMedicalVisit);
+router.put('/medical-visits/:id', authorize('welfare', 'update'), validate(updateMedicalVisitSchema), ctrl.updateMedicalVisit);
+router.delete('/medical-visits/:id', authorize('welfare', 'delete'), ctrl.deleteMedicalVisit);
 
 // Counseling Sessions
-router.get('/counseling-sessions', ctrl.listCounselingSessions);
-router.get('/counseling-sessions/:id', ctrl.getCounselingSession);
-router.post('/counseling-sessions', validate(createCounselingSessionSchema), ctrl.createCounselingSession);
-router.put('/counseling-sessions/:id', validate(updateCounselingSessionSchema), ctrl.updateCounselingSession);
-router.delete('/counseling-sessions/:id', ctrl.deleteCounselingSession);
+router.get('/counseling-sessions', authorize('welfare', 'read'), ctrl.listCounselingSessions);
+router.get('/counseling-sessions/:id', authorize('welfare', 'read'), ctrl.getCounselingSession);
+router.post('/counseling-sessions', authorize('welfare', 'create'), validate(createCounselingSessionSchema), ctrl.createCounselingSession);
+router.put('/counseling-sessions/:id', authorize('welfare', 'update'), validate(updateCounselingSessionSchema), ctrl.updateCounselingSession);
+router.delete('/counseling-sessions/:id', authorize('welfare', 'delete'), ctrl.deleteCounselingSession);
 
 // Crisis Alerts
-router.get('/crisis-alerts', ctrl.listCrisisAlerts);
-router.get('/crisis-alerts/:id', ctrl.getCrisisAlert);
-router.post('/crisis-alerts', validate(createCrisisAlertSchema), ctrl.createCrisisAlert);
-router.put('/crisis-alerts/:id', validate(updateCrisisAlertSchema), ctrl.updateCrisisAlert);
-router.delete('/crisis-alerts/:id', ctrl.deleteCrisisAlert);
+router.get('/crisis-alerts', authorize('welfare', 'read'), ctrl.listCrisisAlerts);
+router.get('/crisis-alerts/:id', authorize('welfare', 'read'), ctrl.getCrisisAlert);
+router.post('/crisis-alerts', authorize('welfare', 'create'), validate(createCrisisAlertSchema), ctrl.createCrisisAlert);
+router.put('/crisis-alerts/:id', authorize('welfare', 'update'), validate(updateCrisisAlertSchema), ctrl.updateCrisisAlert);
+router.delete('/crisis-alerts/:id', authorize('welfare', 'delete'), ctrl.deleteCrisisAlert);
 
 // Anti-Ragging Complaints
-router.get('/anti-ragging-complaints', ctrl.listAntiRaggingComplaints);
-router.get('/anti-ragging-complaints/:id', ctrl.getAntiRaggingComplaint);
-router.post('/anti-ragging-complaints', validate(createAntiRaggingComplaintSchema), ctrl.createAntiRaggingComplaint);
-router.put('/anti-ragging-complaints/:id', validate(updateAntiRaggingComplaintSchema), ctrl.updateAntiRaggingComplaint);
-router.delete('/anti-ragging-complaints/:id', ctrl.deleteAntiRaggingComplaint);
+router.get('/anti-ragging-complaints', authorize('welfare', 'read'), ctrl.listAntiRaggingComplaints);
+router.get('/anti-ragging-complaints/:id', authorize('welfare', 'read'), ctrl.getAntiRaggingComplaint);
+router.post('/anti-ragging-complaints', authorize('welfare', 'create'), validate(createAntiRaggingComplaintSchema), ctrl.createAntiRaggingComplaint);
+router.put('/anti-ragging-complaints/:id', authorize('welfare', 'update'), validate(updateAntiRaggingComplaintSchema), ctrl.updateAntiRaggingComplaint);
+router.delete('/anti-ragging-complaints/:id', authorize('welfare', 'delete'), ctrl.deleteAntiRaggingComplaint);
 
 // Student Grievances
-router.get('/student-grievances', ctrl.listStudentGrievances);
-router.get('/student-grievances/:id', ctrl.getStudentGrievance);
-router.post('/student-grievances', validate(createStudentGrievanceSchema), ctrl.createStudentGrievance);
-router.put('/student-grievances/:id', validate(updateStudentGrievanceSchema), ctrl.updateStudentGrievance);
-router.delete('/student-grievances/:id', ctrl.deleteStudentGrievance);
+router.get('/student-grievances', authorize('welfare', 'read'), ctrl.listStudentGrievances);
+router.get('/student-grievances/:id', authorize('welfare', 'read'), ctrl.getStudentGrievance);
+router.post('/student-grievances', authorize('welfare', 'create'), validate(createStudentGrievanceSchema), ctrl.createStudentGrievance);
+router.put('/student-grievances/:id', authorize('welfare', 'update'), validate(updateStudentGrievanceSchema), ctrl.updateStudentGrievance);
+router.delete('/student-grievances/:id', authorize('welfare', 'delete'), ctrl.deleteStudentGrievance);
 
 // Insurance Claims
-router.get('/insurance-claims', ctrl.listInsuranceClaims);
-router.get('/insurance-claims/:id', ctrl.getInsuranceClaim);
-router.post('/insurance-claims', validate(createInsuranceClaimSchema), ctrl.createInsuranceClaim);
-router.put('/insurance-claims/:id', validate(updateInsuranceClaimSchema), ctrl.updateInsuranceClaim);
-router.delete('/insurance-claims/:id', ctrl.deleteInsuranceClaim);
+router.get('/insurance-claims', authorize('welfare', 'read'), ctrl.listInsuranceClaims);
+router.get('/insurance-claims/:id', authorize('welfare', 'read'), ctrl.getInsuranceClaim);
+router.post('/insurance-claims', authorize('welfare', 'create'), validate(createInsuranceClaimSchema), ctrl.createInsuranceClaim);
+router.put('/insurance-claims/:id', authorize('welfare', 'update'), validate(updateInsuranceClaimSchema), ctrl.updateInsuranceClaim);
+router.delete('/insurance-claims/:id', authorize('welfare', 'delete'), ctrl.deleteInsuranceClaim);
 
 // Parent Meetings
-router.get('/parent-meetings', ctrl.listParentMeetings);
-router.get('/parent-meetings/:id', ctrl.getParentMeeting);
-router.post('/parent-meetings', validate(createParentMeetingSchema), ctrl.createParentMeeting);
-router.put('/parent-meetings/:id', validate(updateParentMeetingSchema), ctrl.updateParentMeeting);
-router.delete('/parent-meetings/:id', ctrl.deleteParentMeeting);
+router.get('/parent-meetings', authorize('welfare', 'read'), ctrl.listParentMeetings);
+router.get('/parent-meetings/:id', authorize('welfare', 'read'), ctrl.getParentMeeting);
+router.post('/parent-meetings', authorize('welfare', 'create'), validate(createParentMeetingSchema), ctrl.createParentMeeting);
+router.put('/parent-meetings/:id', authorize('welfare', 'update'), validate(updateParentMeetingSchema), ctrl.updateParentMeeting);
+router.delete('/parent-meetings/:id', authorize('welfare', 'delete'), ctrl.deleteParentMeeting);
 
 export default router;

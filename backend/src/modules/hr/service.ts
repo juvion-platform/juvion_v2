@@ -20,6 +20,8 @@ import { ResearchProject } from '../../models/hr/ResearchProject';
 import { paginate } from '../../shared/pagination';
 import { createAuditLog } from '../../shared/audit';
 import { AppError } from '../../middleware/errorHandler';
+import { AuthScope } from '../../shared/rbac/types';
+import { applyAuthScope } from '../../shared/rbac/apply-scope';
 
 const EMPLOYEE_POPULATE = { path: 'employeeId', populate: { path: 'personId' } };
 const REVIEWER_POPULATE = { path: 'reviewerId', populate: { path: 'personId' } };
@@ -54,10 +56,11 @@ export async function getStats(collegeId: string) {
 
 // ═══ Employee ════════════════════════════════════════════
 
-export async function listEmployees(collegeId: string, page = 1, limit = 20, departmentId?: string, status?: string) {
+export async function listEmployees(collegeId: string, page = 1, limit = 20, departmentId?: string, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (departmentId) filter.departmentId = departmentId;
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(Employee, filter, page, limit, { createdAt: -1 }, ['personId', 'departmentId']);
 }
 
@@ -89,8 +92,10 @@ export async function deleteEmployee(collegeId: string, id: string, who: string)
 
 // ═══ Leave Type ══════════════════════════════════════════
 
-export async function listLeaveTypes(collegeId: string, page = 1, limit = 20) {
-  return paginate(LeaveType, { collegeId }, page, limit, { name: 1 });
+export async function listLeaveTypes(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(LeaveType, filter, page, limit, { name: 1 });
 }
 
 export async function getLeaveType(collegeId: string, id: string) {
@@ -121,10 +126,11 @@ export async function deleteLeaveType(collegeId: string, id: string, who: string
 
 // ═══ Leave Application ═══════════════════════════════════
 
-export async function listLeaveApplications(collegeId: string, page = 1, limit = 20, employeeId?: string, status?: string) {
+export async function listLeaveApplications(collegeId: string, page = 1, limit = 20, employeeId?: string, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (employeeId) filter.employeeId = employeeId;
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'employeeId' });
   return paginate(LeaveApplication, filter, page, limit, { createdAt: -1 }, [EMPLOYEE_POPULATE, 'leaveTypeId'] as any);
 }
 
@@ -156,10 +162,11 @@ export async function deleteLeaveApplication(collegeId: string, id: string, who:
 
 // ═══ Leave Balance ═══════════════════════════════════════
 
-export async function listLeaveBalances(collegeId: string, page = 1, limit = 20, employeeId?: string, academicYearId?: string) {
+export async function listLeaveBalances(collegeId: string, page = 1, limit = 20, employeeId?: string, academicYearId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (employeeId) filter.employeeId = employeeId;
   if (academicYearId) filter.academicYearId = academicYearId;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'employeeId' });
   return paginate(LeaveBalance, filter, page, limit, { createdAt: -1 }, [EMPLOYEE_POPULATE, 'leaveTypeId', 'academicYearId'] as any);
 }
 
@@ -185,9 +192,10 @@ export async function deleteLeaveBalance(collegeId: string, id: string, who: str
 
 // ═══ Employee Attendance ═════════════════════════════════
 
-export async function listEmployeeAttendance(collegeId: string, page = 1, limit = 20, employeeId?: string) {
+export async function listEmployeeAttendance(collegeId: string, page = 1, limit = 20, employeeId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (employeeId) filter.employeeId = employeeId;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'employeeId' });
   return paginate(EmployeeAttendance, filter, page, limit, { date: -1 }, [EMPLOYEE_POPULATE] as any);
 }
 
@@ -213,9 +221,10 @@ export async function deleteEmployeeAttendance(collegeId: string, id: string, wh
 
 // ═══ Pay Structure ═══════════════════════════════════════
 
-export async function listPayStructures(collegeId: string, page = 1, limit = 20, employeeId?: string) {
+export async function listPayStructures(collegeId: string, page = 1, limit = 20, employeeId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (employeeId) filter.employeeId = employeeId;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(PayStructure, filter, page, limit, { effectiveFrom: -1 }, [EMPLOYEE_POPULATE] as any);
 }
 
@@ -247,11 +256,12 @@ export async function deletePayStructure(collegeId: string, id: string, who: str
 
 // ═══ Payroll ═════════════════════════════════════════════
 
-export async function listPayrolls(collegeId: string, page = 1, limit = 20, employeeId?: string, month?: number, year?: number) {
+export async function listPayrolls(collegeId: string, page = 1, limit = 20, employeeId?: string, month?: number, year?: number, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (employeeId) filter.employeeId = employeeId;
   if (month) filter.month = month;
   if (year) filter.year = year;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'employeeId' });
   return paginate(Payroll, filter, page, limit, { year: -1, month: -1 }, [EMPLOYEE_POPULATE] as any);
 }
 
@@ -283,10 +293,11 @@ export async function deletePayroll(collegeId: string, id: string, who: string) 
 
 // ═══ Appraisal ═══════════════════════════════════════════
 
-export async function listAppraisals(collegeId: string, page = 1, limit = 20, employeeId?: string, academicYearId?: string) {
+export async function listAppraisals(collegeId: string, page = 1, limit = 20, employeeId?: string, academicYearId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (employeeId) filter.employeeId = employeeId;
   if (academicYearId) filter.academicYearId = academicYearId;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'employeeId' });
   return paginate(Appraisal, filter, page, limit, { createdAt: -1 }, [EMPLOYEE_POPULATE, REVIEWER_POPULATE, 'academicYearId'] as any);
 }
 
@@ -318,9 +329,10 @@ export async function deleteAppraisal(collegeId: string, id: string, who: string
 
 // ═══ Promotion ═══════════════════════════════════════════
 
-export async function listPromotions(collegeId: string, page = 1, limit = 20, employeeId?: string) {
+export async function listPromotions(collegeId: string, page = 1, limit = 20, employeeId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (employeeId) filter.employeeId = employeeId;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'employeeId' });
   return paginate(Promotion, filter, page, limit, { effectiveDate: -1 }, [EMPLOYEE_POPULATE] as any);
 }
 
@@ -346,9 +358,10 @@ export async function deletePromotion(collegeId: string, id: string, who: string
 
 // ═══ Training ════════════════════════════════════════════
 
-export async function listTrainings(collegeId: string, page = 1, limit = 20, status?: string) {
+export async function listTrainings(collegeId: string, page = 1, limit = 20, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(Training, filter, page, limit, { startDate: -1 });
 }
 
@@ -380,9 +393,10 @@ export async function deleteTraining(collegeId: string, id: string, who: string)
 
 // ═══ Training Participant ════════════════════════════════
 
-export async function listTrainingParticipants(collegeId: string, page = 1, limit = 20, trainingId?: string) {
+export async function listTrainingParticipants(collegeId: string, page = 1, limit = 20, trainingId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (trainingId) filter.trainingId = trainingId;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'employeeId' });
   return paginate(TrainingParticipant, filter, page, limit, { createdAt: -1 }, [EMPLOYEE_POPULATE, 'trainingId'] as any);
 }
 
@@ -408,9 +422,10 @@ export async function deleteTrainingParticipant(collegeId: string, id: string, w
 
 // ═══ Qualification ═══════════════════════════════════════
 
-export async function listQualifications(collegeId: string, page = 1, limit = 20, personId?: string) {
+export async function listQualifications(collegeId: string, page = 1, limit = 20, personId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (personId) filter.personId = personId;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'personId' });
   return paginate(Qualification, filter, page, limit, { yearOfPassing: -1 }, ['personId']);
 }
 
@@ -436,9 +451,10 @@ export async function deleteQualification(collegeId: string, id: string, who: st
 
 // ═══ Grievance ═══════════════════════════════════════════
 
-export async function listGrievances(collegeId: string, page = 1, limit = 20, status?: string) {
+export async function listGrievances(collegeId: string, page = 1, limit = 20, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'raisedBy' });
   return paginate(Grievance, filter, page, limit, { createdAt: -1 }, ['raisedBy', 'assignedTo']);
 }
 
@@ -470,9 +486,10 @@ export async function deleteGrievance(collegeId: string, id: string, who: string
 
 // ═══ On Duty ═════════════════════════════════════════════
 
-export async function listOnDuty(collegeId: string, page = 1, limit = 20, employeeId?: string) {
+export async function listOnDuty(collegeId: string, page = 1, limit = 20, employeeId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (employeeId) filter.employeeId = employeeId;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'employeeId' });
   return paginate(OnDuty, filter, page, limit, { fromDate: -1 }, [EMPLOYEE_POPULATE] as any);
 }
 
@@ -498,9 +515,10 @@ export async function deleteOnDuty(collegeId: string, id: string, who: string) {
 
 // ═══ Exit Process ════════════════════════════════════════
 
-export async function listExitProcesses(collegeId: string, page = 1, limit = 20, employeeId?: string) {
+export async function listExitProcesses(collegeId: string, page = 1, limit = 20, employeeId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (employeeId) filter.employeeId = employeeId;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'employeeId' });
   return paginate(ExitProcess, filter, page, limit, { createdAt: -1 }, [EMPLOYEE_POPULATE] as any);
 }
 
@@ -532,9 +550,10 @@ export async function deleteExitProcess(collegeId: string, id: string, who: stri
 
 // ═══ Recruitment ═════════════════════════════════════════
 
-export async function listRecruitments(collegeId: string, page = 1, limit = 20, status?: string) {
+export async function listRecruitments(collegeId: string, page = 1, limit = 20, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(Recruitment, filter, page, limit, { postedDate: -1 }, ['departmentId']);
 }
 
@@ -566,10 +585,11 @@ export async function deleteRecruitment(collegeId: string, id: string, who: stri
 
 // ═══ Job Application ═════════════════════════════════════
 
-export async function listJobApplications(collegeId: string, page = 1, limit = 20, recruitmentId?: string, status?: string) {
+export async function listJobApplications(collegeId: string, page = 1, limit = 20, recruitmentId?: string, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (recruitmentId) filter.recruitmentId = recruitmentId;
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(JobApplication, filter, page, limit, { createdAt: -1 }, ['recruitmentId']);
 }
 
@@ -601,9 +621,10 @@ export async function deleteJobApplication(collegeId: string, id: string, who: s
 
 // ═══ Publication ═════════════════════════════════════════
 
-export async function listPublications(collegeId: string, page = 1, limit = 20, facultyId?: string) {
+export async function listPublications(collegeId: string, page = 1, limit = 20, facultyId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (facultyId) filter.facultyId = facultyId;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(Publication, filter, page, limit, { publishedDate: -1 }, [FACULTY_POPULATE] as any);
 }
 
@@ -635,9 +656,10 @@ export async function deletePublication(collegeId: string, id: string, who: stri
 
 // ═══ Research Project ════════════════════════════════════
 
-export async function listResearchProjects(collegeId: string, page = 1, limit = 20, principalInvestigatorId?: string) {
+export async function listResearchProjects(collegeId: string, page = 1, limit = 20, principalInvestigatorId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (principalInvestigatorId) filter.principalInvestigatorId = principalInvestigatorId;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(ResearchProject, filter, page, limit, { startDate: -1 }, [PI_POPULATE] as any);
 }
 

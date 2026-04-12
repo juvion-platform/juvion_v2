@@ -1,7 +1,7 @@
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getPlatformStats } from '../services/platform';
-import { ArrowLeft, Megaphone, FileText, Bell, ClipboardList, MessageSquare, Mail, Smartphone, MessageCircle } from 'lucide-react';
+import { ArrowLeft, Megaphone, FileText, Bell, ClipboardList, MessageSquare, Mail, Smartphone, MessageCircle, Shield } from 'lucide-react';
 
 import AnnouncementsPage from './platform/AnnouncementsPage';
 import CircularsPage from './platform/CircularsPage';
@@ -11,6 +11,7 @@ import SurveyResponsesPage from './platform/SurveyResponsesPage';
 import EmailLogsPage from './platform/EmailLogsPage';
 import SMSLogsPage from './platform/SMSLogsPage';
 import WhatsAppLogsPage from './platform/WhatsAppLogsPage';
+import RbacPoliciesPage from './platform/RbacPolicies';
 
 function PlatformHome() {
   const navigate = useNavigate();
@@ -103,6 +104,16 @@ function PlatformHome() {
           );
         })}
       </div>
+
+      {/* Administration */}
+      <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3 mt-8">Administration</h3>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <button onClick={() => navigate('rbac-policies')} className="bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all border-gray-200 hover:border-gray-400">
+          <div className="inline-flex p-2.5 rounded-lg mb-3 bg-purple-50 text-purple-600"><Shield size={22} /></div>
+          <div className="font-semibold text-navy-dark text-sm">RBAC Policies</div>
+          <p className="text-xs text-gray-500 mt-1">Manage access control policies</p>
+        </button>
+      </div>
     </div>
   );
 }
@@ -138,6 +149,7 @@ export default function Platform() {
         <Route path="email-logs" element={<EmailLogsPage />} />
         <Route path="sms-logs" element={<SMSLogsPage />} />
         <Route path="whatsapp-logs" element={<WhatsAppLogsPage />} />
+        <Route path="rbac-policies" element={<RbacPoliciesPage />} />
       </Routes>
     </SubPageWrapper>
   );

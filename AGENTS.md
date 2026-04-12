@@ -11,7 +11,7 @@ Multi-tenant college ERP built as a MERN monorepo (MongoDB, Express, React 19, N
 # Or: docker compose up mongodb redis
 
 npm install                     # installs all workspaces
-npm run dev:backend             # backend on :3001
+npm run dev:backend             # backend on :3003
 npm run dev:portal              # admin portal on :5173
 npm run seed -w backend         # seed dev data
 npm run typecheck               # check both workspaces
@@ -21,15 +21,17 @@ npm run typecheck               # check both workspaces
 
 ```
 juvion_v2/
-  backend/           Express API (port 3001)
-  admin-portal/      React 19 + Vite (port 5173, proxies /api -> :3001)
+  backend/           Express API (port 3003)
+  admin-portal/      React 19 + Vite (port 5173, proxies /api -> :3003)
   tsconfig.base.json Shared TS config (strict, noUnusedLocals, noUncheckedIndexedAccess)
   docker-compose.yml MongoDB 7, Redis 7, backend, admin-portal
 ```
 
 ### Backend Modules (M01-M12 + Juvi)
 
-Each module under `backend/src/modules/<name>/` has: `models.ts`, `service.ts`, `routes.ts`, `controller.ts`, `validation.ts`
+Each module under `backend/src/modules/<name>/` has: `service.ts`, `routes.ts`, `controller.ts`, `validation.ts`, `index.ts`
+
+> **Note**: Models live separately in `backend/src/models/<entity-group>/`, not inside module directories.
 
 | Route prefix    | Module        | Code |
 |-----------------|---------------|------|
@@ -46,6 +48,10 @@ Each module under `backend/src/modules/<name>/` has: `models.ts`, `service.ts`, 
 | /api/governance | Governance    | M11  |
 | /api/platform   | Platform      | M12  |
 | /api/juvi       | Juvi AI       | -    |
+| /api/auth       | Auth          | -    |
+| /api/colleges   | Colleges      | -    |
+
+> **Note**: EG09 (Facilities), EG10 (Library), and EG14 (Communication) models are served through M08 Campus Ops under `/api/campus`.
 
 ### Frontend Pages
 
@@ -137,7 +143,7 @@ Tailwind CSS with a custom color palette (`primary-*`, `navy`). Icons from `luci
 
 ```
 NODE_ENV=development
-PORT=3001
+PORT=3003
 MONGO_URI=mongodb://localhost:27017/juvion_v2
 REDIS_URL=redis://localhost:6379
 JWT_SECRET=dev-secret

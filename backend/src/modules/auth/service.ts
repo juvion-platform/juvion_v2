@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { User } from '../../models/User';
 import { AppError } from '../../middleware/errorHandler';
+import { resolvePermissions } from '../../shared/rbac/resolve-permissions';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
 const JWT_EXPIRES_IN = '7d';
@@ -69,6 +70,9 @@ export async function login(email: string, password: string, collegeId?: string)
     result.collegeId = String(user.collegeId);
   }
 
+  const targetCollegeId = isSuperAdmin ? undefined : String(user.collegeId);
+  result.permissions = await resolvePermissions(targetCollegeId, user.role, user.personaType);
+
   return result;
 }
 
@@ -83,6 +87,30 @@ export async function getMe(userId: string) {
     personaType: user.personaType,
     collegeId: String(user.collegeId),
   };
+}
+
+export async function refreshToken(userId: string) {
+  const user = await User.findById(userId).select('-password');
+  if (!user || !user.isActive) throw new AppError(401, 'User not found or inactive');
+
+  const isSuperAdmin = user.role === 'super_admin';
+  const payload: Record<string, unknown> = {
+    id: String(user._id),
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    personaType: user.personaType,
+  };
+  if (!isSuperAdmin && user.collegeId) {
+    payload.collegeId = String(user.collegeId);
+  }
+
+  const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+
+  const targetCollegeId = isSuperAdmin ? undefined : (user.collegeId ? String(user.collegeId) : undefined);
+  const permissions = await resolvePermissions(targetCollegeId, user.role, user.personaType);
+
+  return { token, permissions };
 }
 
 export async function createUser(collegeId: string, data: { email: string; password: string; name: string; role?: string; personaType?: string; personId?: string }) {

@@ -10,9 +10,11 @@ interface AuthState {
   collegeName: string | null;
   colleges: CollegeRef[];
   isSuperAdmin: boolean;
-  setAuth: (user: User, token: string, collegeId?: string, colleges?: CollegeRef[]) => void;
+  permissions: string[];
+  setAuth: (user: User, token: string, collegeId?: string, colleges?: CollegeRef[], permissions?: string[]) => void;
   selectCollege: (collegeId: string, collegeName: string) => void;
   logout: () => void;
+  hasPermission: (module: string, action: string) => boolean;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -22,7 +24,8 @@ export const useAuthStore = create<AuthState>((set) => ({
   collegeName: localStorage.getItem('collegeName'),
   colleges: JSON.parse(localStorage.getItem('colleges') || '[]'),
   isSuperAdmin: localStorage.getItem('isSuperAdmin') === 'true',
-  setAuth: (user, token, collegeId?, colleges?) => {
+  permissions: JSON.parse(localStorage.getItem('permissions') || '[]'),
+  setAuth: (user, token, collegeId?, colleges?, permissions?) => {
     localStorage.setItem('token', token);
     const isSuperAdmin = user.role === 'super_admin';
     if (collegeId) {
@@ -41,7 +44,13 @@ export const useAuthStore = create<AuthState>((set) => ({
     } else {
       localStorage.removeItem('isSuperAdmin');
     }
-    set({ user, token, collegeId: collegeId || null, colleges: colleges || [], isSuperAdmin });
+    const resolvedPermissions = permissions || [];
+    if (resolvedPermissions.length > 0) {
+      localStorage.setItem('permissions', JSON.stringify(resolvedPermissions));
+    } else {
+      localStorage.removeItem('permissions');
+    }
+    set({ user, token, collegeId: collegeId || null, colleges: colleges || [], isSuperAdmin, permissions: resolvedPermissions });
   },
   selectCollege: (collegeId, collegeName) => {
     localStorage.setItem('collegeId', collegeId);
@@ -54,6 +63,11 @@ export const useAuthStore = create<AuthState>((set) => ({
     localStorage.removeItem('collegeName');
     localStorage.removeItem('colleges');
     localStorage.removeItem('isSuperAdmin');
-    set({ user: null, token: null, collegeId: null, collegeName: null, colleges: [], isSuperAdmin: false });
+    localStorage.removeItem('permissions');
+    set({ user: null, token: null, collegeId: null, collegeName: null, colleges: [], isSuperAdmin: false, permissions: [] });
+  },
+  hasPermission: (module, action) => {
+    const perms = useAuthStore.getState().permissions;
+    return perms.includes(`${module}:${action}`) || perms.includes(`${module}:*`) || perms.includes('*:*');
   },
 }));

@@ -12,7 +12,7 @@ export async function dashboardStats(req: AuthRequest, res: Response, next: Next
 // ═══ Placement Season ════════════════════════════════════
 
 export async function listPlacementSeasons(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listPlacementSeasons(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listPlacementSeasons(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getPlacementSeason(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getPlacementSeason(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -30,7 +30,7 @@ export async function deletePlacementSeason(req: AuthRequest, res: Response, nex
 // ═══ Company ═════════════════════════════════════════════
 
 export async function listCompanies(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listCompanies(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listCompanies(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getCompany(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getCompany(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -50,7 +50,7 @@ export async function deleteCompany(req: AuthRequest, res: Response, next: NextF
 export async function listJobPostings(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, placementSeasonId } = req.query as any;
-    res.json(await service.listJobPostings(req.collegeId!, Number(page) || 1, Number(limit) || 20, placementSeasonId));
+    res.json(await service.listJobPostings(req.collegeId!, Number(page) || 1, Number(limit) || 20, placementSeasonId, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getJobPosting(req: AuthRequest, res: Response, next: NextFunction) {
@@ -71,7 +71,7 @@ export async function deleteJobPosting(req: AuthRequest, res: Response, next: Ne
 export async function listPlacementRegistrations(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, jobPostingId } = req.query as any;
-    res.json(await service.listPlacementRegistrations(req.collegeId!, Number(page) || 1, Number(limit) || 20, jobPostingId));
+    res.json(await service.listPlacementRegistrations(req.collegeId!, Number(page) || 1, Number(limit) || 20, jobPostingId, req.authScope));
   } catch (err) { next(err); }
 }
 export async function createPlacementRegistration(req: AuthRequest, res: Response, next: NextFunction) {
@@ -89,7 +89,7 @@ export async function deletePlacementRegistration(req: AuthRequest, res: Respons
 export async function listPlacementRounds(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, jobPostingId } = req.query as any;
-    res.json(await service.listPlacementRounds(req.collegeId!, Number(page) || 1, Number(limit) || 20, jobPostingId));
+    res.json(await service.listPlacementRounds(req.collegeId!, Number(page) || 1, Number(limit) || 20, jobPostingId, req.authScope));
   } catch (err) { next(err); }
 }
 export async function createPlacementRound(req: AuthRequest, res: Response, next: NextFunction) {
@@ -107,7 +107,7 @@ export async function deletePlacementRound(req: AuthRequest, res: Response, next
 export async function listRoundResults(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, roundId } = req.query as any;
-    res.json(await service.listRoundResults(req.collegeId!, Number(page) || 1, Number(limit) || 20, roundId));
+    res.json(await service.listRoundResults(req.collegeId!, Number(page) || 1, Number(limit) || 20, roundId, req.authScope));
   } catch (err) { next(err); }
 }
 export async function createRoundResult(req: AuthRequest, res: Response, next: NextFunction) {
@@ -125,7 +125,7 @@ export async function deleteRoundResult(req: AuthRequest, res: Response, next: N
 export async function listPlacementOffers(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, studentId } = req.query as any;
-    res.json(await service.listPlacementOffers(req.collegeId!, Number(page) || 1, Number(limit) || 20, studentId));
+    res.json(await service.listPlacementOffers(req.collegeId!, Number(page) || 1, Number(limit) || 20, studentId, req.authScope));
   } catch (err) { next(err); }
 }
 export async function createPlacementOffer(req: AuthRequest, res: Response, next: NextFunction) {
@@ -141,7 +141,7 @@ export async function deletePlacementOffer(req: AuthRequest, res: Response, next
 // ═══ Internship Posting ══════════════════════════════════
 
 export async function listInternshipPostings(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listInternshipPostings(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listInternshipPostings(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function createInternshipPosting(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.status(201).json(await service.createInternshipPosting(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
@@ -158,7 +158,7 @@ export async function deleteInternshipPosting(req: AuthRequest, res: Response, n
 export async function listInternshipApplications(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, internshipId } = req.query as any;
-    res.json(await service.listInternshipApplications(req.collegeId!, Number(page) || 1, Number(limit) || 20, internshipId));
+    res.json(await service.listInternshipApplications(req.collegeId!, Number(page) || 1, Number(limit) || 20, internshipId, req.authScope));
   } catch (err) { next(err); }
 }
 export async function createInternshipApplication(req: AuthRequest, res: Response, next: NextFunction) {
@@ -174,7 +174,7 @@ export async function deleteInternshipApplication(req: AuthRequest, res: Respons
 // ═══ Placement Training ══════════════════════════════════
 
 export async function listPlacementTrainings(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listPlacementTrainings(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listPlacementTrainings(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function createPlacementTraining(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.status(201).json(await service.createPlacementTraining(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
@@ -191,7 +191,7 @@ export async function deletePlacementTraining(req: AuthRequest, res: Response, n
 export async function listTrainingAttendance(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, trainingId } = req.query as any;
-    res.json(await service.listTrainingAttendance(req.collegeId!, Number(page) || 1, Number(limit) || 20, trainingId));
+    res.json(await service.listTrainingAttendance(req.collegeId!, Number(page) || 1, Number(limit) || 20, trainingId, req.authScope));
   } catch (err) { next(err); }
 }
 export async function createTrainingAttendance(req: AuthRequest, res: Response, next: NextFunction) {
@@ -209,7 +209,7 @@ export async function deleteTrainingAttendance(req: AuthRequest, res: Response, 
 export async function listMockInterviews(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, studentId } = req.query as any;
-    res.json(await service.listMockInterviews(req.collegeId!, Number(page) || 1, Number(limit) || 20, studentId));
+    res.json(await service.listMockInterviews(req.collegeId!, Number(page) || 1, Number(limit) || 20, studentId, req.authScope));
   } catch (err) { next(err); }
 }
 export async function createMockInterview(req: AuthRequest, res: Response, next: NextFunction) {
@@ -227,7 +227,7 @@ export async function deleteMockInterview(req: AuthRequest, res: Response, next:
 export async function listHigherStudiesApplications(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, studentId } = req.query as any;
-    res.json(await service.listHigherStudiesApplications(req.collegeId!, Number(page) || 1, Number(limit) || 20, studentId));
+    res.json(await service.listHigherStudiesApplications(req.collegeId!, Number(page) || 1, Number(limit) || 20, studentId, req.authScope));
   } catch (err) { next(err); }
 }
 export async function createHigherStudiesApplication(req: AuthRequest, res: Response, next: NextFunction) {
@@ -243,7 +243,7 @@ export async function deleteHigherStudiesApplication(req: AuthRequest, res: Resp
 // ═══ Entrepreneur Profile ════════════════════════════════
 
 export async function listEntrepreneurProfiles(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listEntrepreneurProfiles(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listEntrepreneurProfiles(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function createEntrepreneurProfile(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.status(201).json(await service.createEntrepreneurProfile(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
@@ -258,7 +258,7 @@ export async function deleteEntrepreneurProfile(req: AuthRequest, res: Response,
 // ═══ Alumni Profile ══════════════════════════════════════
 
 export async function listAlumniProfiles(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listAlumniProfiles(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listAlumniProfiles(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function createAlumniProfile(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.status(201).json(await service.createAlumniProfile(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
@@ -273,7 +273,7 @@ export async function deleteAlumniProfile(req: AuthRequest, res: Response, next:
 // ═══ Alumni Event ════════════════════════════════════════
 
 export async function listAlumniEvents(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listAlumniEvents(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listAlumniEvents(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function createAlumniEvent(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.status(201).json(await service.createAlumniEvent(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
@@ -290,7 +290,7 @@ export async function deleteAlumniEvent(req: AuthRequest, res: Response, next: N
 export async function listPlacementReports(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, placementSeasonId } = req.query as any;
-    res.json(await service.listPlacementReports(req.collegeId!, Number(page) || 1, Number(limit) || 20, placementSeasonId));
+    res.json(await service.listPlacementReports(req.collegeId!, Number(page) || 1, Number(limit) || 20, placementSeasonId, req.authScope));
   } catch (err) { next(err); }
 }
 export async function createPlacementReport(req: AuthRequest, res: Response, next: NextFunction) {

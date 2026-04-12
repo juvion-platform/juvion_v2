@@ -1,5 +1,7 @@
 # Juvion v2 – Architecture Specification
 
+> **Status**: DRAFT | Last updated: April 2026
+
 ## 1. Overview
 
 Juvion v2 is a comprehensive **Indian College ERP** built as a MERN + TypeScript monorepo. It covers the full lifecycle of engineering college operations — from admissions and academics to placements, compliance, and AI-assisted decision-making via the Juvi assistant.
@@ -11,6 +13,83 @@ Juvion v2 is a comprehensive **Indian College ERP** built as a MERN + TypeScript
 - **Queue**: BullMQ + Redis (async jobs, events)
 - **AI**: Juvi — persona-based AI assistant (M13)
 - **Multi-tenancy**: `collegeId` on every entity
+
+### System Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        CLIENTS                                       │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐              │
+│  │ Admin Portal  │  │  Juvi App    │  │  Mobile App  │              │
+│  │ React 19      │  │  (planned)   │  │  (planned)   │              │
+│  │ :5173         │  │              │  │              │              │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘              │
+└─────────┼──────────────────┼──────────────────┼─────────────────────┘
+          │ HTTPS            │                  │
+          ▼                  ▼                  ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                     EXPRESS API (:3003)                               │
+│                                                                      │
+│  ┌─────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────────┐    │
+│  │ Helmet  │  │  CORS    │  │ Morgan   │  │  authenticate    │    │
+│  │ (sec)   │→ │ (origins)│→ │ (logging)│→ │  (JWT + collegeId)│    │
+│  └─────────┘  └──────────┘  └──────────┘  └────────┬─────────┘    │
+│                                                      │              │
+│  ┌──────────────────────────────────────────────────────────────┐  │
+│  │                    MODULE ROUTERS                             │  │
+│  │                                                              │  │
+│  │  /api/auth        /api/colleges     /api/admissions (M01)   │  │
+│  │  /api/people (M02)  /api/academics (M03)  /api/finance (M04)│  │
+│  │  /api/hr (M05)      /api/welfare (M06)    /api/placement(M07)│  │
+│  │  /api/campus (M08)  /api/student-dev(M09) /api/compliance(M10)│ │
+│  │  /api/governance(M11) /api/platform (M12) /api/juvi (M13)   │  │
+│  │                                                              │  │
+│  │  Each: routes.ts → controller.ts → service.ts → Model       │  │
+│  │        + validate(zodSchema) middleware                      │  │
+│  └──────────────────────────────────────────────────────────────┘  │
+│                          │                    │                      │
+└──────────────────────────┼────────────────────┼─────────────────────┘
+                           │                    │
+          ┌────────────────┼────────────────────┼─────────────────┐
+          │                ▼                    ▼                  │
+          │  ┌──────────────────┐  ┌──────────────────────┐      │
+          │  │    MongoDB 7     │  │      Redis 7          │      │
+          │  │                  │  │                        │      │
+          │  │  205 Models      │  │  ┌──────────┐        │      │
+          │  │  16 Entity Groups│  │  │ BullMQ   │        │      │
+          │  │  collegeId on    │  │  │ Job Queue│        │      │
+          │  │  every document  │  │  └──────────┘        │      │
+          │  │                  │  │  ┌──────────┐        │      │
+          │  │  ┌────────────┐ │  │  │ Cache    │        │      │
+          │  │  │ AuditLog   │ │  │  │ (sessions)│        │      │
+          │  │  │ (all CUD)  │ │  │  └──────────┘        │      │
+          │  │  └────────────┘ │  │                        │      │
+          │  └──────────────────┘  └──────────────────────┘      │
+          │                DATA LAYER                              │
+          └───────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                    EVENT BUS (EventEmitter → BullMQ)                 │
+│                                                                      │
+│  admissions:applicant:enrolled  ──→  M02, M04, M06                  │
+│  finance:payment:received       ──→  M04 (account), M14 (SMS)       │
+│  academics:attendance:low       ──→  M06 (counselor), M14 (parent)  │
+│  placement:offer:accepted       ──→  M02 (student status)           │
+│  welfare:crisis:detected        ──→  M14 (emergency), M11 (alert)   │
+│                                                                      │
+│  Pattern: module:entity:action                                       │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                    EXTERNAL INTEGRATIONS (planned)                    │
+│                                                                      │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────────┐  │
+│  │ Razorpay │  │ WhatsApp │  │ EAMCET   │  │ DigiLocker       │  │
+│  │ CCAvenue │  │ Business │  │ ECET     │  │ (doc verify)     │  │
+│  │(payments)│  │  (notif) │  │ (import) │  │                  │  │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────────────┘  │
+└─────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -31,21 +110,56 @@ Juvion v2 is a comprehensive **Indian College ERP** built as a MERN + TypeScript
 | M11 | Governance | `/api/governance` | Committees, Meetings, Policies, Governing Body, Strategic Goals |
 | M12 | Platform | `/api/platform` | Settings, Users, Roles, Audit Logs, Integrations |
 | M13 | Juvi AI | `/api/juvi` | Conversations, Messages, Actions, Knowledge Base, Insights, Persona Config, Feedback, Usage Metrics |
+| — | Auth | `/api/auth` | Login, token management |
+| — | Colleges | `/api/colleges` | College CRUD, tenant management |
+
+> **Note**: EG09 (Facilities, 14 models), EG10 (Library, 9 models), and EG14 (Communication, 8 models) do not have their own backend modules — their APIs are served through **M08 Campus Ops** under `/api/campus`.
 
 ---
 
-## 3. Entity Groups (EG00–EG15) — 193 Models
+## 3. Entity Groups (EG00–EG15) — 205 Models
 
-### EG00: Admissions (7 models)
+> **Note**: Model count includes 15 Admissions models, 2 root-level models (College, User), and 2 Workflow models not assigned to an entity group.
+
+> **EG↔Module numbering**: Entity Groups (EG) and Modules (M) use independent numbering because entity groups are organised by data domain while modules are organised by business function. The mapping is:
+>
+> | EG | Entity Group | Served By |
+> |----|-------------|-----------|
+> | EG00 | Admissions | M01 |
+> | EG01 | People | M02 |
+> | EG02 | Academic Structure | M03 |
+> | EG03 | Academic Ops | M03 |
+> | EG04 | Finance | M04 |
+> | EG05 | HR | M05 |
+> | EG06 | Placement | M07 |
+> | EG07 | Welfare | M06 |
+> | EG08 | Campus | M08 |
+> | EG09 | Facilities | M08 |
+> | EG10 | Library | M08 |
+> | EG11 | Student Dev | M09 |
+> | EG12 | Governance | M11 |
+> | EG13 | Compliance | M10 |
+> | EG14 | Communication | M08 (notifications) / M12 (platform) |
+> | EG15 | Juvi AI | Juvi (M13) |
+
+### EG00: Admissions (15 models)
 | Model | Key Fields | Indexes |
 |-------|-----------|---------|
-| Inquiry | name, phone, source, programmeInterest, status, leadScore | collegeId+status |
-| Applicant | personId→Person, programmeId→Programme, applicationNumber, academicYear, status | collegeId+applicationNumber (unique) |
-| EntranceExamScore | applicantId→Applicant, examName (EAMCET/JEE/ECET), rank, score, category | collegeId+applicantId+examName |
-| CounselingAllotment | applicantId→Applicant, allotmentRound, seatType, branchId→Branch, status | collegeId+applicantId |
-| AdmissionOffer | applicantId→Applicant, programmeId, branchId, feeQuoted, validUntil, status | collegeId+applicantId |
-| DocumentChecklist | applicantId→Applicant, documents[{name, required, submitted, verified}], overallStatus | collegeId+applicantId |
-| Admission | applicantId→Applicant, studentId→Student, admittedDate, admissionType, status | collegeId+applicantId (unique) |
+| Inquiry | name, phone, source, programmeInterest, status, leadScore, leadGrade, tags, workflowInstanceId | collegeId+status |
+| Applicant | inquiryId→Inquiry, academicYearId, applicationNumber, name, phone, email, gender, dateOfBirth, tenthPercentage, interPercentage | collegeId+applicationNumber (unique) |
+| EntranceExamScore | applicantId→Applicant, examType (EAMCET/JEE/ECET), rank, score, year | collegeId+applicantId+examType |
+| CounselingAllotment | applicantId→Applicant, allotmentOrder, collegeCode, branchCode, round, status | collegeId+applicantId |
+| AdmissionOffer | applicantId→Applicant, programmeId, branchId, feeQuoted, validityDate, status, negotiatedFee, waiverAmount | collegeId+applicantId |
+| DocumentChecklist | applicantId→Applicant, documents[], status, ocrJobId, ocrStatus, fraudFlagged | collegeId+applicantId |
+| Admission | applicantId→Applicant, studentId→Student, academicYearId, admissionDate, admissionType, workflowInstanceId, provisioningStatus | collegeId+applicantId (unique) |
+| AdmissionCancellation | admissionId→Admission, applicantId, studentId, cancellationType, reason, reversals[], refundAmount, seatReleased, waitlistPromotionTriggered | collegeId+admissionId |
+| AllotmentRound | academicYearId, roundNumber, name, type, status, criteria, applicationDeadline, publishDate | collegeId+academicYearId+roundNumber |
+| AllotmentResult | allotmentRoundId→AllotmentRound, applicantId, meritRank, meritScore, allottedProgrammeId, allottedBranchId, status | collegeId+allotmentRoundId+applicantId |
+| FeeNegotiation | applicantId, offerId→AdmissionOffer, originalFee, requestedWaiver, aiRecommendedWaiver, aiConfidence, approvedWaiver, finalFee, status | collegeId+offerId |
+| LeadImportBatch | academicYearId, source (eamcet/ecet/manual_csv/website), fileName, status, totalRecords, successCount, failedCount | collegeId+academicYearId |
+| LeadInteraction | inquiryId→Inquiry, type (phone_call/whatsapp/sms/email/walk_in/ai_conversation), direction, summary, outcome | collegeId+inquiryId |
+| SeatInventory | academicYearId, programmeId, branchId, sanctionedIntake, convenerSeats, managementSeats, nriSeats, totalFilled, fillPercentage | collegeId+academicYearId+programmeId+branchId |
+| Waitlist | academicYearId, applicantId, programmeId, branchId, allotmentRoundId, waitlistPosition, meritScore, quota, status | collegeId+academicYearId+applicantId |
 
 ### EG01: People (7 models)
 | Model | Key Fields |
@@ -154,6 +268,14 @@ Juvion v2 is a comprehensive **Indian College ERP** built as a MERN + TypeScript
 - JuviConversation, JuviMessage, JuviAction
 - JuviKnowledgeBase, JuviInsight
 - JuviPersonaConfig, JuviFeedback, JuviUsageMetric
+
+### Root-Level Models (2 models)
+- College — multi-tenant college entity (name, code, address, subscription, settings, status)
+- User — platform login and RBAC (collegeId, email, password, role, personaType, personId)
+
+### Workflow Models (2 models)
+- WorkflowInstance — tracks state of a cross-module workflow (workflowId, entityType, entityId, currentPhase, currentStep, status, history[])
+- WorkflowTask — individual task within a workflow instance (workflowInstanceId, stepName, assigneeRole, aiAutonomy, status, result)
 
 ---
 
@@ -516,7 +638,155 @@ Indexed by `entityType + entityId + timestamp` for fast entity history lookups.
 
 ---
 
-## 14. Future Roadmap
+## 14. Security
+
+### Authentication Flow
+
+1. **Login** (`POST /api/auth/login`) — accepts email + password (+ optional `collegeId`). Returns a JWT valid for 7 days.
+2. **Token payload** — `{ id, name, email, role, personaType, collegeId? }`. Super-admins have no `collegeId` in the token.
+3. **Request auth** — every protected route passes through `authenticate` middleware which verifies the JWT via `jsonwebtoken` (HS256, secret from `JWT_SECRET` env var).
+4. **College scoping** — `collegeId` is extracted from the `x-college-id` header (takes precedence) or from the JWT payload. Super-admins use the header to scope into any college.
+5. **Dev bypass** — when `NODE_ENV=development` and no `Authorization` header, the middleware injects a synthetic `super_admin` user with the default `DEV_COLLEGE_ID`. **Must be disabled in production.**
+
+### Password Handling
+
+- bcryptjs with 10 salt rounds.
+- No password-reset or email-verification flow exists yet (planned).
+
+### RBAC
+
+- Permission strings follow `module:action` format (e.g., `finance:create`, `academics:grade`).
+- `authorize(...permissions)` middleware exists but **is currently a pass-through** — all authenticated users are allowed. Hardcoded bypass for `L-PRIN` and `L-TRUST` persona types.
+- **Status**: RBAC enforcement is not yet implemented. All authorization currently depends on authentication + `collegeId` scoping only.
+
+### Multi-Tenancy Isolation
+
+- Every query filters by `collegeId` — a user cannot access another college's data even by guessing an ObjectId (returns 404).
+- Super-admins can scope into any college via the `x-college-id` header.
+
+### Headers & Middleware
+
+- **Helmet** — enabled with defaults (CSP, X-Frame-Options, X-Content-Type-Options, etc.).
+- **CORS** — dynamic origin whitelist from `ALLOWED_ORIGINS` env var; allows credentials.
+- **Body limit** — 10 MB JSON (needed for bulk imports; consider reducing for standard routes).
+- **Rate limiting** — not yet implemented. Login endpoint is unprotected against brute force.
+
+### Known Security Gaps
+
+| Gap | Severity | Plan |
+|-----|----------|------|
+| RBAC not enforced | High | Implement role-permission matrix lookup in `authorize.ts` |
+| No rate limiting | High | Add `express-rate-limit` on `/api/auth/login` and globally |
+| Header `x-college-id` can override JWT for non-superadmins | High | Restrict header override to `super_admin` role only |
+| No token refresh | Medium | Add refresh token rotation |
+| No password reset | Medium | Add email-based reset flow |
+| JWT secret defaults to `'dev-secret'` | Medium | Fail startup if `JWT_SECRET` not set in production |
+| No token revocation/logout | Low | Stateless JWT — acceptable if refresh tokens are added |
+
+---
+
+## 15. Scalability & Performance
+
+### Current Design
+
+- **Single MongoDB database** with logical multi-tenancy via `collegeId`. All 205 models share one database.
+- **Indexes** — every model has `collegeId` indexed. Key query paths have compound indexes (e.g., `collegeId + applicationNumber`).
+- **Redis** — used for BullMQ job queues and cache. Single Redis instance.
+
+### Known Limits
+
+| Dimension | Current Capacity | Bottleneck |
+|-----------|-----------------|------------|
+| Colleges | ~10-20 | Single DB; index size grows linearly |
+| Concurrent users | ~500 | Single Node.js process; no clustering |
+| Model count | 205 | Mongoose connection pool; startup model registration |
+| Bulk imports | ~10K rows | 10 MB body limit; synchronous processing |
+
+### Scaling Path
+
+1. **Short-term** — Node.js clustering (`cluster` module or PM2) for multi-core utilisation.
+2. **Medium-term** — MongoDB read replicas for report/analytics queries; Redis Sentinel for cache HA.
+3. **Long-term** — Database-per-college sharding if college count exceeds ~50; consider migrating heavy analytics to a read-optimised store.
+
+### Performance Considerations
+
+- `paginate()` helper limits all list queries; no unbounded result sets.
+- Mongoose `lean()` should be used on read-only queries to skip hydration overhead.
+- BullMQ handles async work (notifications, report generation) to keep API response times low.
+
+---
+
+## 16. Monitoring & Observability
+
+### Current State
+
+| Capability | Status |
+|-----------|--------|
+| Request logging | Morgan (`dev` / `combined` by format) |
+| Audit trail | `AuditLog` model captures all CUD operations |
+| Error handling | Centralised `errorHandler` middleware; `AppError` class |
+| Health check | Not implemented |
+| Metrics | Not implemented |
+| Alerting | Not implemented |
+
+### Planned
+
+1. **Health endpoint** — `GET /api/health` returning DB, Redis, and queue connectivity.
+2. **Structured logging** — migrate from Morgan to pino/winston with JSON output for log aggregation.
+3. **APM** — application performance monitoring (Datadog, New Relic, or OpenTelemetry) for request tracing.
+4. **Dashboards** — queue depth, error rates, response latency, active users per college.
+
+---
+
+## 17. Deployment & Environments
+
+### Current State
+
+| Environment | Status |
+|-------------|--------|
+| Local dev | Docker Compose (MongoDB 7, Redis 7) + `ts-node-dev` |
+| Staging | Not configured |
+| Production | Manual deployment (planned: containerised) |
+| CI/CD | Not configured (planned: GitHub Actions) |
+
+### Docker Compose
+
+The `docker-compose.yml` runs MongoDB, Redis, backend, and admin-portal. Backend builds from a Dockerfile; frontend is served via Vite dev server locally and a static build in production.
+
+### Deployment Plan
+
+1. **Container images** — backend and admin-portal built as Docker images.
+2. **CI/CD** — GitHub Actions: lint → typecheck → test → build → deploy.
+3. **Hosting** — AWS (ECS or EKS) or GCP (Cloud Run). MongoDB Atlas for managed database. ElastiCache for Redis.
+4. **Rollback** — container image tags pinned to git SHA; rollback = redeploy previous tag.
+
+### Backup & Disaster Recovery
+
+| Item | Strategy |
+|------|----------|
+| Database | MongoDB Atlas automated backups (daily, 7-day retention) or `mongodump` cron for self-hosted |
+| File uploads | S3 with versioning enabled |
+| Redis | Ephemeral (cache + queues); no backup needed — jobs are retried on restart |
+| RTO target | < 1 hour (re-deploy from latest image + restore DB backup) |
+| RPO target | < 24 hours (daily backup cadence) |
+
+---
+
+## 18. Trade-offs & Architectural Decisions
+
+| Decision | Alternatives Considered | Rationale |
+|----------|------------------------|-----------|
+| **MongoDB** over PostgreSQL | PostgreSQL with relational schemas | ERP has deeply nested, variable-shape documents (e.g., DocumentChecklist items, curriculum structures). MongoDB's flexible schema accelerates iteration. Trade-off: no foreign key constraints — referential integrity enforced in application code. |
+| **Monorepo** over microservices | Separate repos per module; microservice per module | 12 modules with heavy cross-module references (e.g., admissions→people→finance). Microservices would require an API gateway and distributed transactions for workflows like enrolment. Monorepo keeps deployment simple and cross-module calls are in-process. |
+| **Single database** over DB-per-tenant | Dedicated MongoDB database per college | Simplicity at current scale (< 20 colleges). `collegeId` filtering is sufficient. DB-per-tenant adds operational overhead for backups, migrations, and connection management. Migration path exists if needed. |
+| **BullMQ** over RabbitMQ/Kafka | RabbitMQ for durable messaging; Kafka for event streaming | BullMQ runs on Redis (already in stack), requires no additional infrastructure. Sufficient for job queues and event processing at current scale. Trade-off: no built-in dead-letter exchanges or consumer groups. |
+| **Zustand** over Redux | Redux Toolkit; React Context | Zustand is minimal and requires less boilerplate. Only client-side state is auth + UI preferences — no need for Redux's middleware ecosystem. Server state handled entirely by React Query. |
+| **EventEmitter** (migrating to BullMQ) | Direct service-to-service calls | Loose coupling between modules. Trade-off: EventEmitter is in-process and non-durable — events lost on crash. BullMQ migration adds durability. |
+| **Tailwind CSS** over component libraries | Material UI, Ant Design, Chakra | Full design control needed for the Indian college domain (custom forms, dense data tables). Component libraries impose opinionated styling that would fight the design. |
+
+---
+
+## 19. Future Roadmap
 
 1. **BullMQ migration** — Replace EventEmitter with durable job queues
 2. **OpenAPI docs** — Auto-generate from Zod schemas

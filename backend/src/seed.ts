@@ -57,6 +57,8 @@ import {
 } from './models';
 import { User } from './models/User';
 import { College } from './models/College';
+import { Policy as RBACPolicy } from './models/platform/Policy';
+import { DEFAULT_POLICIES } from './shared/rbac/defaults';
 import bcrypt from 'bcryptjs';
 
 const CID = new mongoose.Types.ObjectId('000000000000000000000001');
@@ -1840,6 +1842,14 @@ async function seed() {
     { collegeId: CID, date: new Date('2025-03-20'), personaType: 'student', totalConversations: 52, totalMessages: 210, totalTokens: 29000, avgResponseTime: 1.1, satisfactionScore: 4.3, topIntents: [{ intent: 'fee_query', count: 30 }, { intent: 'placement_query', count: 22 }, { intent: 'hostel_query', count: 8 }] },
   ]);
   console.log('Juvi Usage Metrics created');
+
+  // ========================================================================
+  // RBAC DEFAULT POLICIES
+  // ========================================================================
+  // Seed default RBAC policies
+  await RBACPolicy.deleteMany({ collegeId: { $exists: false } });
+  await RBACPolicy.insertMany(DEFAULT_POLICIES.map((p) => ({ ...p, createdBy: 'seed' })));
+  console.log(`Seeded ${DEFAULT_POLICIES.length} default RBAC policies`);
 
   // ========================================================================
   // DONE

@@ -12,7 +12,7 @@ export async function dashboardStats(req: AuthRequest, res: Response, next: Next
 // ═══ Hostel Block ════════════════════════════════════════
 
 export async function listHostelBlocks(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listHostelBlocks(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listHostelBlocks(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getHostelBlock(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getHostelBlock(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -32,7 +32,7 @@ export async function deleteHostelBlock(req: AuthRequest, res: Response, next: N
 export async function listHostelRooms(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, blockId } = req.query as any;
-    res.json(await service.listHostelRooms(req.collegeId!, Number(page) || 1, Number(limit) || 20, blockId));
+    res.json(await service.listHostelRooms(req.collegeId!, Number(page) || 1, Number(limit) || 20, blockId, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getHostelRoom(req: AuthRequest, res: Response, next: NextFunction) {
@@ -53,7 +53,7 @@ export async function deleteHostelRoom(req: AuthRequest, res: Response, next: Ne
 export async function listHostelAllocations(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, studentId, status } = req.query as any;
-    res.json(await service.listHostelAllocations(req.collegeId!, Number(page) || 1, Number(limit) || 20, studentId, status));
+    res.json(await service.listHostelAllocations(req.collegeId!, Number(page) || 1, Number(limit) || 20, studentId, status, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getHostelAllocation(req: AuthRequest, res: Response, next: NextFunction) {
@@ -74,7 +74,7 @@ export async function deleteHostelAllocation(req: AuthRequest, res: Response, ne
 export async function listHostelVisitorLogs(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, studentId } = req.query as any;
-    res.json(await service.listHostelVisitorLogs(req.collegeId!, Number(page) || 1, Number(limit) || 20, studentId));
+    res.json(await service.listHostelVisitorLogs(req.collegeId!, Number(page) || 1, Number(limit) || 20, studentId, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getHostelVisitorLog(req: AuthRequest, res: Response, next: NextFunction) {
@@ -95,7 +95,7 @@ export async function deleteHostelVisitorLog(req: AuthRequest, res: Response, ne
 export async function listMessMenus(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, day } = req.query as any;
-    res.json(await service.listMessMenus(req.collegeId!, Number(page) || 1, Number(limit) || 20, day));
+    res.json(await service.listMessMenus(req.collegeId!, Number(page) || 1, Number(limit) || 20, day, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getMessMenu(req: AuthRequest, res: Response, next: NextFunction) {
@@ -116,7 +116,7 @@ export async function deleteMessMenu(req: AuthRequest, res: Response, next: Next
 export async function listMessFeedbacks(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, mealType } = req.query as any;
-    res.json(await service.listMessFeedbacks(req.collegeId!, Number(page) || 1, Number(limit) || 20, mealType));
+    res.json(await service.listMessFeedbacks(req.collegeId!, Number(page) || 1, Number(limit) || 20, mealType, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getMessFeedback(req: AuthRequest, res: Response, next: NextFunction) {
@@ -135,7 +135,7 @@ export async function deleteMessFeedback(req: AuthRequest, res: Response, next: 
 // ═══ Transport Route ═════════════════════════════════════
 
 export async function listTransportRoutes(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listTransportRoutes(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listTransportRoutes(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getTransportRoute(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getTransportRoute(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -155,7 +155,7 @@ export async function deleteTransportRoute(req: AuthRequest, res: Response, next
 export async function listTransportAllocations(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, routeId, status } = req.query as any;
-    res.json(await service.listTransportAllocations(req.collegeId!, Number(page) || 1, Number(limit) || 20, routeId, status));
+    res.json(await service.listTransportAllocations(req.collegeId!, Number(page) || 1, Number(limit) || 20, routeId, status, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getTransportAllocation(req: AuthRequest, res: Response, next: NextFunction) {
@@ -174,7 +174,7 @@ export async function deleteTransportAllocation(req: AuthRequest, res: Response,
 // ═══ Health Record ═══════════════════════════════════════
 
 export async function listHealthRecords(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listHealthRecords(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listHealthRecords(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getHealthRecord(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getHealthRecord(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -192,7 +192,7 @@ export async function deleteHealthRecord(req: AuthRequest, res: Response, next: 
 // ═══ Medical Visit ═══════════════════════════════════════
 
 export async function listMedicalVisits(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listMedicalVisits(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listMedicalVisits(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getMedicalVisit(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getMedicalVisit(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -212,7 +212,7 @@ export async function deleteMedicalVisit(req: AuthRequest, res: Response, next: 
 export async function listCounselingSessions(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, type } = req.query as any;
-    res.json(await service.listCounselingSessions(req.collegeId!, Number(page) || 1, Number(limit) || 20, type));
+    res.json(await service.listCounselingSessions(req.collegeId!, Number(page) || 1, Number(limit) || 20, type, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getCounselingSession(req: AuthRequest, res: Response, next: NextFunction) {
@@ -233,7 +233,7 @@ export async function deleteCounselingSession(req: AuthRequest, res: Response, n
 export async function listCrisisAlerts(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, status } = req.query as any;
-    res.json(await service.listCrisisAlerts(req.collegeId!, Number(page) || 1, Number(limit) || 20, status));
+    res.json(await service.listCrisisAlerts(req.collegeId!, Number(page) || 1, Number(limit) || 20, status, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getCrisisAlert(req: AuthRequest, res: Response, next: NextFunction) {
@@ -254,7 +254,7 @@ export async function deleteCrisisAlert(req: AuthRequest, res: Response, next: N
 export async function listAntiRaggingComplaints(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, status } = req.query as any;
-    res.json(await service.listAntiRaggingComplaints(req.collegeId!, Number(page) || 1, Number(limit) || 20, status));
+    res.json(await service.listAntiRaggingComplaints(req.collegeId!, Number(page) || 1, Number(limit) || 20, status, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getAntiRaggingComplaint(req: AuthRequest, res: Response, next: NextFunction) {
@@ -275,7 +275,7 @@ export async function deleteAntiRaggingComplaint(req: AuthRequest, res: Response
 export async function listStudentGrievances(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, status } = req.query as any;
-    res.json(await service.listStudentGrievances(req.collegeId!, Number(page) || 1, Number(limit) || 20, status));
+    res.json(await service.listStudentGrievances(req.collegeId!, Number(page) || 1, Number(limit) || 20, status, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getStudentGrievance(req: AuthRequest, res: Response, next: NextFunction) {
@@ -296,7 +296,7 @@ export async function deleteStudentGrievance(req: AuthRequest, res: Response, ne
 export async function listInsuranceClaims(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, status } = req.query as any;
-    res.json(await service.listInsuranceClaims(req.collegeId!, Number(page) || 1, Number(limit) || 20, status));
+    res.json(await service.listInsuranceClaims(req.collegeId!, Number(page) || 1, Number(limit) || 20, status, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getInsuranceClaim(req: AuthRequest, res: Response, next: NextFunction) {
@@ -317,7 +317,7 @@ export async function deleteInsuranceClaim(req: AuthRequest, res: Response, next
 export async function listParentMeetings(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, status } = req.query as any;
-    res.json(await service.listParentMeetings(req.collegeId!, Number(page) || 1, Number(limit) || 20, status));
+    res.json(await service.listParentMeetings(req.collegeId!, Number(page) || 1, Number(limit) || 20, status, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getParentMeeting(req: AuthRequest, res: Response, next: NextFunction) {

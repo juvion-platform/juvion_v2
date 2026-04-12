@@ -9,6 +9,8 @@ import { JuviUsageMetric } from '../../models/juvi/JuviUsageMetric';
 import { paginate } from '../../shared/pagination';
 import { createAuditLog } from '../../shared/audit';
 import { AppError } from '../../middleware/errorHandler';
+import { AuthScope } from '../../shared/rbac/types';
+import { applyAuthScope } from '../../shared/rbac/apply-scope';
 
 // ─── Dashboard Stats ──────────────────────────────────────
 export async function getStats(collegeId: string) {
@@ -34,8 +36,10 @@ export async function getStats(collegeId: string) {
 
 // ═══ Conversations ═══════════════════════════════════════
 
-export async function listConversations(collegeId: string, page = 1, limit = 20) {
-  return paginate(JuviConversation, { collegeId }, page, limit, { lastMessageAt: -1 });
+export async function listConversations(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'userId' });
+  return paginate(JuviConversation, filter, page, limit, { lastMessageAt: -1 });
 }
 
 export async function getConversation(collegeId: string, id: string) {
@@ -66,9 +70,10 @@ export async function deleteConversation(collegeId: string, id: string, who: str
 
 // ═══ Messages ════════════════════════════════════════════
 
-export async function listMessages(collegeId: string, page = 1, limit = 20, conversationId?: string) {
+export async function listMessages(collegeId: string, page = 1, limit = 20, conversationId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (conversationId) filter.conversationId = conversationId;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(JuviMessage, filter, page, limit, { createdAt: -1 }, ['conversationId']);
 }
 
@@ -100,9 +105,10 @@ export async function deleteMessage(collegeId: string, id: string, who: string) 
 
 // ═══ Actions ═════════════════════════════════════════════
 
-export async function listActions(collegeId: string, page = 1, limit = 20, conversationId?: string) {
+export async function listActions(collegeId: string, page = 1, limit = 20, conversationId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (conversationId) filter.conversationId = conversationId;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(JuviAction, filter, page, limit, { createdAt: -1 }, ['conversationId']);
 }
 
@@ -134,10 +140,11 @@ export async function deleteAction(collegeId: string, id: string, who: string) {
 
 // ═══ Insights ════════════════════════════════════════════
 
-export async function listInsights(collegeId: string, page = 1, limit = 20, type?: string, status?: string) {
+export async function listInsights(collegeId: string, page = 1, limit = 20, type?: string, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (type) filter.type = type;
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(JuviInsight, filter, page, limit, { generatedAt: -1 });
 }
 
@@ -169,9 +176,10 @@ export async function deleteInsight(collegeId: string, id: string, who: string) 
 
 // ═══ Knowledge Base ══════════════════════════════════════
 
-export async function listKnowledgeBase(collegeId: string, page = 1, limit = 20, category?: string) {
+export async function listKnowledgeBase(collegeId: string, page = 1, limit = 20, category?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (category) filter.category = category;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(JuviKnowledgeBase, filter, page, limit, { createdAt: -1 });
 }
 
@@ -203,8 +211,10 @@ export async function deleteKnowledgeBase(collegeId: string, id: string, who: st
 
 // ═══ Persona Configs ═════════════════════════════════════
 
-export async function listPersonaConfigs(collegeId: string, page = 1, limit = 20) {
-  return paginate(JuviPersonaConfig, { collegeId }, page, limit, { createdAt: -1 });
+export async function listPersonaConfigs(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(JuviPersonaConfig, filter, page, limit, { createdAt: -1 });
 }
 
 export async function getPersonaConfig(collegeId: string, id: string) {
@@ -235,8 +245,10 @@ export async function deletePersonaConfig(collegeId: string, id: string, who: st
 
 // ═══ Feedback ════════════════════════════════════════════
 
-export async function listFeedback(collegeId: string, page = 1, limit = 20) {
-  return paginate(JuviFeedback, { collegeId }, page, limit, { createdAt: -1 }, ['messageId']);
+export async function listFeedback(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'userId' });
+  return paginate(JuviFeedback, filter, page, limit, { createdAt: -1 }, ['messageId']);
 }
 
 export async function getFeedback(collegeId: string, id: string) {
@@ -267,9 +279,10 @@ export async function deleteFeedback(collegeId: string, id: string, who: string)
 
 // ═══ Usage Metrics ═══════════════════════════════════════
 
-export async function listUsageMetrics(collegeId: string, page = 1, limit = 20, personaType?: string) {
+export async function listUsageMetrics(collegeId: string, page = 1, limit = 20, personaType?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (personaType) filter.personaType = personaType;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(JuviUsageMetric, filter, page, limit, { date: -1 });
 }
 

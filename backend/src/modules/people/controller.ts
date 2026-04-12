@@ -34,7 +34,7 @@ export async function dashboardStats(req: AuthRequest, res: Response, next: Next
 
 // ─── Persons ─────────────────────────────────────────
 export async function listPersons(req: AuthRequest, res: Response, next: NextFunction) {
-  try { const q = qp(req); res.json(await svc.listPersons(req.collegeId!, q.page, q.limit, q.search)); } catch (e) { next(e); }
+  try { const q = qp(req); res.json(await svc.listPersons(req.collegeId!, q.page, q.limit, q.search, req.authScope)); } catch (e) { next(e); }
 }
 export async function getPerson(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await svc.getPerson(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }
@@ -53,7 +53,7 @@ export async function deletePerson(req: AuthRequest, res: Response, next: NextFu
 export async function listStudents(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const q = studentQp(req);
-    res.json(await svc.listStudents(req.collegeId!, q.page, q.limit, q.status, q.search, q.onboardingStatus, q.needsAttention));
+    res.json(await svc.listStudents(req.collegeId!, q.page, q.limit, q.status, q.search, q.onboardingStatus, q.needsAttention, req.authScope));
   } catch (e) { next(e); }
 }
 export async function getStudent(req: AuthRequest, res: Response, next: NextFunction) {
@@ -71,7 +71,7 @@ export async function deleteStudent(req: AuthRequest, res: Response, next: NextF
 
 // ─── Faculty ─────────────────────────────────────────
 export async function listFaculty(req: AuthRequest, res: Response, next: NextFunction) {
-  try { const q = qp(req); res.json(await svc.listFaculty(req.collegeId!, q.page, q.limit, q.status, q.search)); } catch (e) { next(e); }
+  try { const q = qp(req); res.json(await svc.listFaculty(req.collegeId!, q.page, q.limit, q.status, q.search, req.authScope)); } catch (e) { next(e); }
 }
 export async function getFaculty(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await svc.getFaculty(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }
@@ -88,7 +88,7 @@ export async function deleteFaculty(req: AuthRequest, res: Response, next: NextF
 
 // ─── Staff ───────────────────────────────────────────
 export async function listStaff(req: AuthRequest, res: Response, next: NextFunction) {
-  try { const q = qp(req); res.json(await svc.listStaff(req.collegeId!, q.page, q.limit, q.status, q.search)); } catch (e) { next(e); }
+  try { const q = qp(req); res.json(await svc.listStaff(req.collegeId!, q.page, q.limit, q.status, q.search, req.authScope)); } catch (e) { next(e); }
 }
 export async function getStaff(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await svc.getStaff(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }
@@ -105,7 +105,7 @@ export async function deleteStaff(req: AuthRequest, res: Response, next: NextFun
 
 // ─── Parents ─────────────────────────────────────────
 export async function listParents(req: AuthRequest, res: Response, next: NextFunction) {
-  try { const q = qp(req); res.json(await svc.listParents(req.collegeId!, q.page, q.limit, q.search)); } catch (e) { next(e); }
+  try { const q = qp(req); res.json(await svc.listParents(req.collegeId!, q.page, q.limit, q.search, req.authScope)); } catch (e) { next(e); }
 }
 export async function getParent(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await svc.getParent(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }
@@ -122,7 +122,7 @@ export async function deleteParent(req: AuthRequest, res: Response, next: NextFu
 
 // ─── Organizations ───────────────────────────────────
 export async function listOrganizations(req: AuthRequest, res: Response, next: NextFunction) {
-  try { const q = qp(req); res.json(await svc.listOrganizations(req.collegeId!, q.page, q.limit, q.search)); } catch (e) { next(e); }
+  try { const q = qp(req); res.json(await svc.listOrganizations(req.collegeId!, q.page, q.limit, q.search, req.authScope)); } catch (e) { next(e); }
 }
 export async function getOrganization(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await svc.getOrganization(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }

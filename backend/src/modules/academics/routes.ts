@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authenticate } from '../../middleware/authenticate';
+import { authorize } from '../../middleware/authorize';
 import { validate } from '../../middleware/validate';
 import * as ctrl from './controller';
 import {
@@ -38,206 +39,206 @@ const router = Router();
 router.use(authenticate);
 
 // Dashboard
-router.get('/stats', ctrl.dashboardStats);
+router.get('/stats', authorize('academics', 'read'), ctrl.dashboardStats);
 
 // Regulations
-router.get('/regulations', ctrl.listRegulations);
-router.get('/regulations/:id', ctrl.getRegulation);
-router.post('/regulations', validate(createRegulationSchema), ctrl.createRegulation);
-router.put('/regulations/:id', validate(updateRegulationSchema), ctrl.updateRegulation);
-router.delete('/regulations/:id', ctrl.deleteRegulation);
+router.get('/regulations', authorize('academics', 'read'), ctrl.listRegulations);
+router.get('/regulations/:id', authorize('academics', 'read'), ctrl.getRegulation);
+router.post('/regulations', authorize('academics', 'create'), validate(createRegulationSchema), ctrl.createRegulation);
+router.put('/regulations/:id', authorize('academics', 'update'), validate(updateRegulationSchema), ctrl.updateRegulation);
+router.delete('/regulations/:id', authorize('academics', 'delete'), ctrl.deleteRegulation);
 
 // Programmes
-router.get('/programmes', ctrl.listProgrammes);
-router.get('/programmes/:id', ctrl.getProgramme);
-router.post('/programmes', validate(createProgrammeSchema), ctrl.createProgramme);
-router.put('/programmes/:id', validate(updateProgrammeSchema), ctrl.updateProgramme);
-router.delete('/programmes/:id', ctrl.deleteProgramme);
+router.get('/programmes', authorize('academics', 'read'), ctrl.listProgrammes);
+router.get('/programmes/:id', authorize('academics', 'read'), ctrl.getProgramme);
+router.post('/programmes', authorize('academics', 'create'), validate(createProgrammeSchema), ctrl.createProgramme);
+router.put('/programmes/:id', authorize('academics', 'update'), validate(updateProgrammeSchema), ctrl.updateProgramme);
+router.delete('/programmes/:id', authorize('academics', 'delete'), ctrl.deleteProgramme);
 
 // Departments
-router.get('/departments', ctrl.listDepartments);
-router.get('/departments/:id', ctrl.getDepartment);
-router.post('/departments', validate(createDepartmentSchema), ctrl.createDepartment);
-router.put('/departments/:id', validate(updateDepartmentSchema), ctrl.updateDepartment);
-router.delete('/departments/:id', ctrl.deleteDepartment);
+router.get('/departments', authorize('academics', 'read'), ctrl.listDepartments);
+router.get('/departments/:id', authorize('academics', 'read'), ctrl.getDepartment);
+router.post('/departments', authorize('academics', 'create'), validate(createDepartmentSchema), ctrl.createDepartment);
+router.put('/departments/:id', authorize('academics', 'update'), validate(updateDepartmentSchema), ctrl.updateDepartment);
+router.delete('/departments/:id', authorize('academics', 'delete'), ctrl.deleteDepartment);
 
 // Branches
-router.get('/branches', ctrl.listBranches);
-router.get('/branches/:id', ctrl.getBranch);
-router.post('/branches', validate(createBranchSchema), ctrl.createBranch);
-router.put('/branches/:id', validate(updateBranchSchema), ctrl.updateBranch);
-router.delete('/branches/:id', ctrl.deleteBranch);
+router.get('/branches', authorize('academics', 'read'), ctrl.listBranches);
+router.get('/branches/:id', authorize('academics', 'read'), ctrl.getBranch);
+router.post('/branches', authorize('academics', 'create'), validate(createBranchSchema), ctrl.createBranch);
+router.put('/branches/:id', authorize('academics', 'update'), validate(updateBranchSchema), ctrl.updateBranch);
+router.delete('/branches/:id', authorize('academics', 'delete'), ctrl.deleteBranch);
 
 // Batches
-router.get('/batches', ctrl.listBatches);
-router.get('/batches/:id', ctrl.getBatch);
-router.post('/batches', validate(createBatchSchema), ctrl.createBatch);
-router.put('/batches/:id', validate(updateBatchSchema), ctrl.updateBatch);
-router.delete('/batches/:id', ctrl.deleteBatch);
+router.get('/batches', authorize('academics', 'read'), ctrl.listBatches);
+router.get('/batches/:id', authorize('academics', 'read'), ctrl.getBatch);
+router.post('/batches', authorize('academics', 'create'), validate(createBatchSchema), ctrl.createBatch);
+router.put('/batches/:id', authorize('academics', 'update'), validate(updateBatchSchema), ctrl.updateBatch);
+router.delete('/batches/:id', authorize('academics', 'delete'), ctrl.deleteBatch);
 
 // Sections
-router.get('/sections', ctrl.listSections);
-router.get('/sections/:id', ctrl.getSection);
-router.post('/sections', validate(createSectionSchema), ctrl.createSection);
-router.put('/sections/:id', validate(updateSectionSchema), ctrl.updateSection);
-router.delete('/sections/:id', ctrl.deleteSection);
+router.get('/sections', authorize('academics', 'read'), ctrl.listSections);
+router.get('/sections/:id', authorize('academics', 'read'), ctrl.getSection);
+router.post('/sections', authorize('academics', 'create'), validate(createSectionSchema), ctrl.createSection);
+router.put('/sections/:id', authorize('academics', 'update'), validate(updateSectionSchema), ctrl.updateSection);
+router.delete('/sections/:id', authorize('academics', 'delete'), ctrl.deleteSection);
 
 // Academic Years
-router.get('/academic-years', ctrl.listAcademicYears);
-router.get('/academic-years/:id', ctrl.getAcademicYear);
-router.post('/academic-years', validate(createAcademicYearSchema), ctrl.createAcademicYear);
-router.put('/academic-years/:id', validate(updateAcademicYearSchema), ctrl.updateAcademicYear);
-router.delete('/academic-years/:id', ctrl.deleteAcademicYear);
+router.get('/academic-years', authorize('academics', 'read'), ctrl.listAcademicYears);
+router.get('/academic-years/:id', authorize('academics', 'read'), ctrl.getAcademicYear);
+router.post('/academic-years', authorize('academics', 'create'), validate(createAcademicYearSchema), ctrl.createAcademicYear);
+router.put('/academic-years/:id', authorize('academics', 'update'), validate(updateAcademicYearSchema), ctrl.updateAcademicYear);
+router.delete('/academic-years/:id', authorize('academics', 'delete'), ctrl.deleteAcademicYear);
 
 // Semesters
-router.get('/semesters', ctrl.listSemesters);
-router.get('/semesters/:id', ctrl.getSemester);
-router.post('/semesters', validate(createSemesterSchema), ctrl.createSemester);
-router.put('/semesters/:id', validate(updateSemesterSchema), ctrl.updateSemester);
-router.delete('/semesters/:id', ctrl.deleteSemester);
+router.get('/semesters', authorize('academics', 'read'), ctrl.listSemesters);
+router.get('/semesters/:id', authorize('academics', 'read'), ctrl.getSemester);
+router.post('/semesters', authorize('academics', 'create'), validate(createSemesterSchema), ctrl.createSemester);
+router.put('/semesters/:id', authorize('academics', 'update'), validate(updateSemesterSchema), ctrl.updateSemester);
+router.delete('/semesters/:id', authorize('academics', 'delete'), ctrl.deleteSemester);
 
 // Courses
-router.get('/courses', ctrl.listCourses);
-router.get('/courses/:id', ctrl.getCourse);
-router.post('/courses', validate(createCourseSchema), ctrl.createCourse);
-router.put('/courses/:id', validate(updateCourseSchema), ctrl.updateCourse);
-router.delete('/courses/:id', ctrl.deleteCourse);
+router.get('/courses', authorize('academics', 'read'), ctrl.listCourses);
+router.get('/courses/:id', authorize('academics', 'read'), ctrl.getCourse);
+router.post('/courses', authorize('academics', 'create'), validate(createCourseSchema), ctrl.createCourse);
+router.put('/courses/:id', authorize('academics', 'update'), validate(updateCourseSchema), ctrl.updateCourse);
+router.delete('/courses/:id', authorize('academics', 'delete'), ctrl.deleteCourse);
 
 // Curriculum Maps
-router.get('/curriculum', ctrl.listCurriculumMaps);
-router.post('/curriculum', validate(createCurriculumMapSchema), ctrl.createCurriculumMap);
-router.put('/curriculum/:id', validate(updateCurriculumMapSchema), ctrl.updateCurriculumMap);
-router.delete('/curriculum/:id', ctrl.deleteCurriculumMap);
+router.get('/curriculum', authorize('academics', 'read'), ctrl.listCurriculumMaps);
+router.post('/curriculum', authorize('academics', 'create'), validate(createCurriculumMapSchema), ctrl.createCurriculumMap);
+router.put('/curriculum/:id', authorize('academics', 'update'), validate(updateCurriculumMapSchema), ctrl.updateCurriculumMap);
+router.delete('/curriculum/:id', authorize('academics', 'delete'), ctrl.deleteCurriculumMap);
 
 // Course Offerings
-router.get('/offerings', ctrl.listCourseOfferings);
-router.get('/offerings/:id', ctrl.getCourseOffering);
-router.post('/offerings', validate(createCourseOfferingSchema), ctrl.createCourseOffering);
-router.put('/offerings/:id', validate(updateCourseOfferingSchema), ctrl.updateCourseOffering);
-router.delete('/offerings/:id', ctrl.deleteCourseOffering);
+router.get('/offerings', authorize('academics', 'read'), ctrl.listCourseOfferings);
+router.get('/offerings/:id', authorize('academics', 'read'), ctrl.getCourseOffering);
+router.post('/offerings', authorize('academics', 'create'), validate(createCourseOfferingSchema), ctrl.createCourseOffering);
+router.put('/offerings/:id', authorize('academics', 'update'), validate(updateCourseOfferingSchema), ctrl.updateCourseOffering);
+router.delete('/offerings/:id', authorize('academics', 'delete'), ctrl.deleteCourseOffering);
 
 // Enrollments
-router.get('/enrollments', ctrl.listEnrollments);
-router.post('/enrollments', validate(createEnrollmentSchema), ctrl.createEnrollment);
-router.put('/enrollments/:id', validate(updateEnrollmentSchema), ctrl.updateEnrollment);
-router.delete('/enrollments/:id', ctrl.deleteEnrollment);
+router.get('/enrollments', authorize('academics', 'read'), ctrl.listEnrollments);
+router.post('/enrollments', authorize('academics', 'create'), validate(createEnrollmentSchema), ctrl.createEnrollment);
+router.put('/enrollments/:id', authorize('academics', 'update'), validate(updateEnrollmentSchema), ctrl.updateEnrollment);
+router.delete('/enrollments/:id', authorize('academics', 'delete'), ctrl.deleteEnrollment);
 
 // ═══ Phase 3: Scheduling ═══════════════════════════════════
 
 // Academic Calendar
-router.get('/academic-calendar', ctrl.listCalendarEvents);
-router.post('/academic-calendar', validate(createAcademicCalendarSchema), ctrl.createCalendarEvent);
-router.put('/academic-calendar/:id', validate(updateAcademicCalendarSchema), ctrl.updateCalendarEvent);
-router.delete('/academic-calendar/:id', ctrl.deleteCalendarEvent);
+router.get('/academic-calendar', authorize('academics', 'read'), ctrl.listCalendarEvents);
+router.post('/academic-calendar', authorize('academics', 'create'), validate(createAcademicCalendarSchema), ctrl.createCalendarEvent);
+router.put('/academic-calendar/:id', authorize('academics', 'update'), validate(updateAcademicCalendarSchema), ctrl.updateCalendarEvent);
+router.delete('/academic-calendar/:id', authorize('academics', 'delete'), ctrl.deleteCalendarEvent);
 
 // Timetables
-router.get('/timetables', ctrl.listTimetables);
-router.get('/timetables/:id', ctrl.getTimetable);
-router.post('/timetables', validate(createTimetableSchema), ctrl.createTimetable);
-router.put('/timetables/:id', validate(updateTimetableSchema), ctrl.updateTimetable);
-router.delete('/timetables/:id', ctrl.deleteTimetable);
+router.get('/timetables', authorize('academics', 'read'), ctrl.listTimetables);
+router.get('/timetables/:id', authorize('academics', 'read'), ctrl.getTimetable);
+router.post('/timetables', authorize('academics', 'create'), validate(createTimetableSchema), ctrl.createTimetable);
+router.put('/timetables/:id', authorize('academics', 'update'), validate(updateTimetableSchema), ctrl.updateTimetable);
+router.delete('/timetables/:id', authorize('academics', 'delete'), ctrl.deleteTimetable);
 
 // Timetable Slots
-router.get('/timetable-slots', ctrl.listTimetableSlots);
-router.post('/timetable-slots', validate(createTimetableSlotSchema), ctrl.createTimetableSlot);
-router.put('/timetable-slots/:id', validate(updateTimetableSlotSchema), ctrl.updateTimetableSlot);
-router.delete('/timetable-slots/:id', ctrl.deleteTimetableSlot);
+router.get('/timetable-slots', authorize('academics', 'read'), ctrl.listTimetableSlots);
+router.post('/timetable-slots', authorize('academics', 'create'), validate(createTimetableSlotSchema), ctrl.createTimetableSlot);
+router.put('/timetable-slots/:id', authorize('academics', 'update'), validate(updateTimetableSlotSchema), ctrl.updateTimetableSlot);
+router.delete('/timetable-slots/:id', authorize('academics', 'delete'), ctrl.deleteTimetableSlot);
 
 // ═══ Phase 4: Attendance ═══════════════════════════════════
 
 // Attendance Sessions
-router.get('/attendance-sessions', ctrl.listAttendanceSessions);
-router.get('/attendance-sessions/:id', ctrl.getAttendanceSession);
-router.post('/attendance-sessions', validate(createAttendanceSessionSchema), ctrl.createAttendanceSession);
-router.put('/attendance-sessions/:id', validate(updateAttendanceSessionSchema), ctrl.updateAttendanceSession);
-router.delete('/attendance-sessions/:id', ctrl.deleteAttendanceSession);
+router.get('/attendance-sessions', authorize('academics', 'read'), ctrl.listAttendanceSessions);
+router.get('/attendance-sessions/:id', authorize('academics', 'read'), ctrl.getAttendanceSession);
+router.post('/attendance-sessions', authorize('academics', 'create'), validate(createAttendanceSessionSchema), ctrl.createAttendanceSession);
+router.put('/attendance-sessions/:id', authorize('academics', 'update'), validate(updateAttendanceSessionSchema), ctrl.updateAttendanceSession);
+router.delete('/attendance-sessions/:id', authorize('academics', 'delete'), ctrl.deleteAttendanceSession);
 
 // Attendance Records
-router.get('/attendance-records', ctrl.listAttendanceRecords);
-router.post('/attendance-records', validate(createAttendanceRecordSchema), ctrl.createAttendanceRecord);
-router.post('/attendance-records/bulk', ctrl.bulkCreateAttendanceRecords);
-router.put('/attendance-records/:id', validate(updateAttendanceRecordSchema), ctrl.updateAttendanceRecord);
-router.delete('/attendance-records/:id', ctrl.deleteAttendanceRecord);
+router.get('/attendance-records', authorize('academics', 'read'), ctrl.listAttendanceRecords);
+router.post('/attendance-records', authorize('academics', 'create'), validate(createAttendanceRecordSchema), ctrl.createAttendanceRecord);
+router.post('/attendance-records/bulk', authorize('academics', 'create'), ctrl.bulkCreateAttendanceRecords);
+router.put('/attendance-records/:id', authorize('academics', 'update'), validate(updateAttendanceRecordSchema), ctrl.updateAttendanceRecord);
+router.delete('/attendance-records/:id', authorize('academics', 'delete'), ctrl.deleteAttendanceRecord);
 
 // ═══ Phase 5: Internal Assessments ═════════════════════════
 
 // Internal Assessments
-router.get('/internal-assessments', ctrl.listInternalAssessments);
-router.get('/internal-assessments/:id', ctrl.getInternalAssessment);
-router.post('/internal-assessments', validate(createInternalAssessmentSchema), ctrl.createInternalAssessment);
-router.put('/internal-assessments/:id', validate(updateInternalAssessmentSchema), ctrl.updateInternalAssessment);
-router.delete('/internal-assessments/:id', ctrl.deleteInternalAssessment);
+router.get('/internal-assessments', authorize('academics', 'read'), ctrl.listInternalAssessments);
+router.get('/internal-assessments/:id', authorize('academics', 'read'), ctrl.getInternalAssessment);
+router.post('/internal-assessments', authorize('academics', 'create'), validate(createInternalAssessmentSchema), ctrl.createInternalAssessment);
+router.put('/internal-assessments/:id', authorize('academics', 'update'), validate(updateInternalAssessmentSchema), ctrl.updateInternalAssessment);
+router.delete('/internal-assessments/:id', authorize('academics', 'delete'), ctrl.deleteInternalAssessment);
 
 // Internal Marks
-router.get('/internal-marks', ctrl.listInternalMarks);
-router.post('/internal-marks', validate(createInternalMarkSchema), ctrl.createInternalMark);
-router.post('/internal-marks/bulk', ctrl.bulkCreateInternalMarks);
-router.put('/internal-marks/:id', validate(updateInternalMarkSchema), ctrl.updateInternalMark);
-router.delete('/internal-marks/:id', ctrl.deleteInternalMark);
+router.get('/internal-marks', authorize('academics', 'read'), ctrl.listInternalMarks);
+router.post('/internal-marks', authorize('academics', 'create'), validate(createInternalMarkSchema), ctrl.createInternalMark);
+router.post('/internal-marks/bulk', authorize('academics', 'create'), ctrl.bulkCreateInternalMarks);
+router.put('/internal-marks/:id', authorize('academics', 'update'), validate(updateInternalMarkSchema), ctrl.updateInternalMark);
+router.delete('/internal-marks/:id', authorize('academics', 'delete'), ctrl.deleteInternalMark);
 
 // ═══ Phase 6: Exams ════════════════════════════════════════
 
 // Exam Registrations
-router.get('/exam-registrations', ctrl.listExamRegistrations);
-router.post('/exam-registrations', validate(createExamRegistrationSchema), ctrl.createExamRegistration);
-router.put('/exam-registrations/:id', validate(updateExamRegistrationSchema), ctrl.updateExamRegistration);
-router.delete('/exam-registrations/:id', ctrl.deleteExamRegistration);
+router.get('/exam-registrations', authorize('academics', 'read'), ctrl.listExamRegistrations);
+router.post('/exam-registrations', authorize('academics', 'create'), validate(createExamRegistrationSchema), ctrl.createExamRegistration);
+router.put('/exam-registrations/:id', authorize('academics', 'update'), validate(updateExamRegistrationSchema), ctrl.updateExamRegistration);
+router.delete('/exam-registrations/:id', authorize('academics', 'delete'), ctrl.deleteExamRegistration);
 
 // Exam Schedules
-router.get('/exam-schedules', ctrl.listExamSchedules);
-router.post('/exam-schedules', validate(createExamScheduleSchema), ctrl.createExamSchedule);
-router.put('/exam-schedules/:id', validate(updateExamScheduleSchema), ctrl.updateExamSchedule);
-router.delete('/exam-schedules/:id', ctrl.deleteExamSchedule);
+router.get('/exam-schedules', authorize('academics', 'read'), ctrl.listExamSchedules);
+router.post('/exam-schedules', authorize('academics', 'create'), validate(createExamScheduleSchema), ctrl.createExamSchedule);
+router.put('/exam-schedules/:id', authorize('academics', 'update'), validate(updateExamScheduleSchema), ctrl.updateExamSchedule);
+router.delete('/exam-schedules/:id', authorize('academics', 'delete'), ctrl.deleteExamSchedule);
 
 // External Marks
-router.get('/external-marks', ctrl.listExternalMarks);
-router.post('/external-marks', validate(createExternalMarkSchema), ctrl.createExternalMark);
-router.put('/external-marks/:id', validate(updateExternalMarkSchema), ctrl.updateExternalMark);
-router.delete('/external-marks/:id', ctrl.deleteExternalMark);
+router.get('/external-marks', authorize('academics', 'read'), ctrl.listExternalMarks);
+router.post('/external-marks', authorize('academics', 'create'), validate(createExternalMarkSchema), ctrl.createExternalMark);
+router.put('/external-marks/:id', authorize('academics', 'update'), validate(updateExternalMarkSchema), ctrl.updateExternalMark);
+router.delete('/external-marks/:id', authorize('academics', 'delete'), ctrl.deleteExternalMark);
 
 // ═══ Phase 7: Results ══════════════════════════════════════
 
 // Grade Cards
-router.get('/grade-cards', ctrl.listGradeCards);
-router.post('/grade-cards', validate(createGradeCardSchema), ctrl.createGradeCard);
-router.put('/grade-cards/:id', validate(updateGradeCardSchema), ctrl.updateGradeCard);
-router.delete('/grade-cards/:id', ctrl.deleteGradeCard);
+router.get('/grade-cards', authorize('academics', 'read'), ctrl.listGradeCards);
+router.post('/grade-cards', authorize('academics', 'create'), validate(createGradeCardSchema), ctrl.createGradeCard);
+router.put('/grade-cards/:id', authorize('academics', 'update'), validate(updateGradeCardSchema), ctrl.updateGradeCard);
+router.delete('/grade-cards/:id', authorize('academics', 'delete'), ctrl.deleteGradeCard);
 
 // Semester Results
-router.get('/semester-results', ctrl.listSemesterResults);
-router.post('/semester-results', validate(createSemesterResultSchema), ctrl.createSemesterResult);
-router.put('/semester-results/:id', validate(updateSemesterResultSchema), ctrl.updateSemesterResult);
-router.delete('/semester-results/:id', ctrl.deleteSemesterResult);
+router.get('/semester-results', authorize('academics', 'read'), ctrl.listSemesterResults);
+router.post('/semester-results', authorize('academics', 'create'), validate(createSemesterResultSchema), ctrl.createSemesterResult);
+router.put('/semester-results/:id', authorize('academics', 'update'), validate(updateSemesterResultSchema), ctrl.updateSemesterResult);
+router.delete('/semester-results/:id', authorize('academics', 'delete'), ctrl.deleteSemesterResult);
 
 // ═══ Phase 8: OBE & Miscellaneous ══════════════════════════
 
 // Course Outcomes
-router.get('/course-outcomes', ctrl.listCourseOutcomes);
-router.post('/course-outcomes', validate(createCourseOutcomeSchema), ctrl.createCourseOutcome);
-router.put('/course-outcomes/:id', validate(updateCourseOutcomeSchema), ctrl.updateCourseOutcome);
-router.delete('/course-outcomes/:id', ctrl.deleteCourseOutcome);
+router.get('/course-outcomes', authorize('academics', 'read'), ctrl.listCourseOutcomes);
+router.post('/course-outcomes', authorize('academics', 'create'), validate(createCourseOutcomeSchema), ctrl.createCourseOutcome);
+router.put('/course-outcomes/:id', authorize('academics', 'update'), validate(updateCourseOutcomeSchema), ctrl.updateCourseOutcome);
+router.delete('/course-outcomes/:id', authorize('academics', 'delete'), ctrl.deleteCourseOutcome);
 
 // Program Outcomes
-router.get('/program-outcomes', ctrl.listProgramOutcomes);
-router.post('/program-outcomes', validate(createProgramOutcomeSchema), ctrl.createProgramOutcome);
-router.put('/program-outcomes/:id', validate(updateProgramOutcomeSchema), ctrl.updateProgramOutcome);
-router.delete('/program-outcomes/:id', ctrl.deleteProgramOutcome);
+router.get('/program-outcomes', authorize('academics', 'read'), ctrl.listProgramOutcomes);
+router.post('/program-outcomes', authorize('academics', 'create'), validate(createProgramOutcomeSchema), ctrl.createProgramOutcome);
+router.put('/program-outcomes/:id', authorize('academics', 'update'), validate(updateProgramOutcomeSchema), ctrl.updateProgramOutcome);
+router.delete('/program-outcomes/:id', authorize('academics', 'delete'), ctrl.deleteProgramOutcome);
 
 // Elective Allocations
-router.get('/elective-allocations', ctrl.listElectiveAllocations);
-router.post('/elective-allocations', validate(createElectiveAllocationSchema), ctrl.createElectiveAllocation);
-router.put('/elective-allocations/:id', validate(updateElectiveAllocationSchema), ctrl.updateElectiveAllocation);
-router.delete('/elective-allocations/:id', ctrl.deleteElectiveAllocation);
+router.get('/elective-allocations', authorize('academics', 'read'), ctrl.listElectiveAllocations);
+router.post('/elective-allocations', authorize('academics', 'create'), validate(createElectiveAllocationSchema), ctrl.createElectiveAllocation);
+router.put('/elective-allocations/:id', authorize('academics', 'update'), validate(updateElectiveAllocationSchema), ctrl.updateElectiveAllocation);
+router.delete('/elective-allocations/:id', authorize('academics', 'delete'), ctrl.deleteElectiveAllocation);
 
 // Lesson Plans
-router.get('/lesson-plans', ctrl.listLessonPlans);
-router.post('/lesson-plans', validate(createLessonPlanSchema), ctrl.createLessonPlan);
-router.put('/lesson-plans/:id', validate(updateLessonPlanSchema), ctrl.updateLessonPlan);
-router.delete('/lesson-plans/:id', ctrl.deleteLessonPlan);
+router.get('/lesson-plans', authorize('academics', 'read'), ctrl.listLessonPlans);
+router.post('/lesson-plans', authorize('academics', 'create'), validate(createLessonPlanSchema), ctrl.createLessonPlan);
+router.put('/lesson-plans/:id', authorize('academics', 'update'), validate(updateLessonPlanSchema), ctrl.updateLessonPlan);
+router.delete('/lesson-plans/:id', authorize('academics', 'delete'), ctrl.deleteLessonPlan);
 
 // Course Feedback
-router.get('/course-feedback', ctrl.listCourseFeedback);
-router.post('/course-feedback', validate(createCourseFeedbackSchema), ctrl.createCourseFeedback);
-router.delete('/course-feedback/:id', ctrl.deleteCourseFeedback);
+router.get('/course-feedback', authorize('academics', 'read'), ctrl.listCourseFeedback);
+router.post('/course-feedback', authorize('academics', 'create'), validate(createCourseFeedbackSchema), ctrl.createCourseFeedback);
+router.delete('/course-feedback/:id', authorize('academics', 'delete'), ctrl.deleteCourseFeedback);
 
 export default router;

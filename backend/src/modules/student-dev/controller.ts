@@ -14,7 +14,7 @@ export async function dashboardStats(req: AuthRequest, res: Response, next: Next
 export async function listClubs(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, type } = req.query as any;
-    res.json(await service.listClubs(req.collegeId!, Number(page) || 1, Number(limit) || 20, type));
+    res.json(await service.listClubs(req.collegeId!, Number(page) || 1, Number(limit) || 20, type, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getClub(req: AuthRequest, res: Response, next: NextFunction) {
@@ -35,7 +35,7 @@ export async function deleteClub(req: AuthRequest, res: Response, next: NextFunc
 export async function listClubMemberships(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, clubId, status } = req.query as any;
-    res.json(await service.listClubMemberships(req.collegeId!, Number(page) || 1, Number(limit) || 20, clubId, status));
+    res.json(await service.listClubMemberships(req.collegeId!, Number(page) || 1, Number(limit) || 20, clubId, status, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getClubMembership(req: AuthRequest, res: Response, next: NextFunction) {
@@ -56,7 +56,7 @@ export async function deleteClubMembership(req: AuthRequest, res: Response, next
 export async function listEvents(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, type, status } = req.query as any;
-    res.json(await service.listEvents(req.collegeId!, Number(page) || 1, Number(limit) || 20, type, status));
+    res.json(await service.listEvents(req.collegeId!, Number(page) || 1, Number(limit) || 20, type, status, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getEvent(req: AuthRequest, res: Response, next: NextFunction) {
@@ -77,7 +77,7 @@ export async function deleteEvent(req: AuthRequest, res: Response, next: NextFun
 export async function listEventRegistrations(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, eventId, status } = req.query as any;
-    res.json(await service.listEventRegistrations(req.collegeId!, Number(page) || 1, Number(limit) || 20, eventId, status));
+    res.json(await service.listEventRegistrations(req.collegeId!, Number(page) || 1, Number(limit) || 20, eventId, status, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getEventRegistration(req: AuthRequest, res: Response, next: NextFunction) {
@@ -98,7 +98,7 @@ export async function deleteEventRegistration(req: AuthRequest, res: Response, n
 export async function listAchievements(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, category, level } = req.query as any;
-    res.json(await service.listAchievements(req.collegeId!, Number(page) || 1, Number(limit) || 20, category, level));
+    res.json(await service.listAchievements(req.collegeId!, Number(page) || 1, Number(limit) || 20, category, level, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getAchievement(req: AuthRequest, res: Response, next: NextFunction) {
@@ -119,7 +119,7 @@ export async function deleteAchievement(req: AuthRequest, res: Response, next: N
 export async function listMentoringSessions(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, status } = req.query as any;
-    res.json(await service.listMentoringSessions(req.collegeId!, Number(page) || 1, Number(limit) || 20, status));
+    res.json(await service.listMentoringSessions(req.collegeId!, Number(page) || 1, Number(limit) || 20, status, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getMentoringSession(req: AuthRequest, res: Response, next: NextFunction) {
@@ -140,7 +140,7 @@ export async function deleteMentoringSession(req: AuthRequest, res: Response, ne
 export async function listSportsTeams(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, category } = req.query as any;
-    res.json(await service.listSportsTeams(req.collegeId!, Number(page) || 1, Number(limit) || 20, category));
+    res.json(await service.listSportsTeams(req.collegeId!, Number(page) || 1, Number(limit) || 20, category, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getSportsTeam(req: AuthRequest, res: Response, next: NextFunction) {
@@ -161,7 +161,7 @@ export async function deleteSportsTeam(req: AuthRequest, res: Response, next: Ne
 export async function listSportsTeamMembers(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, teamId } = req.query as any;
-    res.json(await service.listSportsTeamMembers(req.collegeId!, Number(page) || 1, Number(limit) || 20, teamId));
+    res.json(await service.listSportsTeamMembers(req.collegeId!, Number(page) || 1, Number(limit) || 20, teamId, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getSportsTeamMember(req: AuthRequest, res: Response, next: NextFunction) {
@@ -182,7 +182,7 @@ export async function deleteSportsTeamMember(req: AuthRequest, res: Response, ne
 export async function listNSSActivities(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, type, status } = req.query as any;
-    res.json(await service.listNSSActivities(req.collegeId!, Number(page) || 1, Number(limit) || 20, type, status));
+    res.json(await service.listNSSActivities(req.collegeId!, Number(page) || 1, Number(limit) || 20, type, status, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getNSSActivity(req: AuthRequest, res: Response, next: NextFunction) {
@@ -203,7 +203,7 @@ export async function deleteNSSActivity(req: AuthRequest, res: Response, next: N
 export async function listNSSParticipants(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, activityId } = req.query as any;
-    res.json(await service.listNSSParticipants(req.collegeId!, Number(page) || 1, Number(limit) || 20, activityId));
+    res.json(await service.listNSSParticipants(req.collegeId!, Number(page) || 1, Number(limit) || 20, activityId, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getNSSParticipant(req: AuthRequest, res: Response, next: NextFunction) {
@@ -224,7 +224,7 @@ export async function deleteNSSParticipant(req: AuthRequest, res: Response, next
 export async function listSkillCertifications(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, provider } = req.query as any;
-    res.json(await service.listSkillCertifications(req.collegeId!, Number(page) || 1, Number(limit) || 20, provider));
+    res.json(await service.listSkillCertifications(req.collegeId!, Number(page) || 1, Number(limit) || 20, provider, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getSkillCertification(req: AuthRequest, res: Response, next: NextFunction) {
@@ -245,7 +245,7 @@ export async function deleteSkillCertification(req: AuthRequest, res: Response, 
 export async function listStudentProjects(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, type, status } = req.query as any;
-    res.json(await service.listStudentProjects(req.collegeId!, Number(page) || 1, Number(limit) || 20, type, status));
+    res.json(await service.listStudentProjects(req.collegeId!, Number(page) || 1, Number(limit) || 20, type, status, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getStudentProject(req: AuthRequest, res: Response, next: NextFunction) {
@@ -266,7 +266,7 @@ export async function deleteStudentProject(req: AuthRequest, res: Response, next
 export async function listCommunityProjects(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, status } = req.query as any;
-    res.json(await service.listCommunityProjects(req.collegeId!, Number(page) || 1, Number(limit) || 20, status));
+    res.json(await service.listCommunityProjects(req.collegeId!, Number(page) || 1, Number(limit) || 20, status, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getCommunityProject(req: AuthRequest, res: Response, next: NextFunction) {
@@ -287,7 +287,7 @@ export async function deleteCommunityProject(req: AuthRequest, res: Response, ne
 export async function listLeadershipRoles(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, body } = req.query as any;
-    res.json(await service.listLeadershipRoles(req.collegeId!, Number(page) || 1, Number(limit) || 20, body));
+    res.json(await service.listLeadershipRoles(req.collegeId!, Number(page) || 1, Number(limit) || 20, body, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getLeadershipRole(req: AuthRequest, res: Response, next: NextFunction) {

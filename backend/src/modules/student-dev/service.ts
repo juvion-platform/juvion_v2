@@ -15,6 +15,8 @@ import { LeadershipRole } from '../../models/student-dev/LeadershipRole';
 import { paginate } from '../../shared/pagination';
 import { createAuditLog } from '../../shared/audit';
 import { AppError } from '../../middleware/errorHandler';
+import { AuthScope } from '../../shared/rbac/types';
+import { applyAuthScope } from '../../shared/rbac/apply-scope';
 
 // ─── Dashboard Stats ──────────────────────────────────────
 export async function getStats(collegeId: string) {
@@ -61,9 +63,10 @@ export async function getStats(collegeId: string) {
 
 // ═══ Club ══════════════════════════════════════════════════
 
-export async function listClubs(collegeId: string, page = 1, limit = 20, type?: string) {
+export async function listClubs(collegeId: string, page = 1, limit = 20, type?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (type) filter.type = type;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(Club, filter, page, limit, { createdAt: -1 }, [
     { path: 'coordinatorId', populate: { path: 'personId' } },
     { path: 'facultyAdvisorId', populate: { path: 'personId' } },
@@ -100,10 +103,11 @@ export async function deleteClub(collegeId: string, id: string, who: string) {
 
 // ═══ Club Membership ═══════════════════════════════════════
 
-export async function listClubMemberships(collegeId: string, page = 1, limit = 20, clubId?: string, status?: string) {
+export async function listClubMemberships(collegeId: string, page = 1, limit = 20, clubId?: string, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (clubId) filter.clubId = clubId;
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
   return paginate(ClubMembership, filter, page, limit, { createdAt: -1 }, [
     { path: 'clubId' },
     { path: 'studentId', populate: { path: 'personId' } },
@@ -140,10 +144,11 @@ export async function deleteClubMembership(collegeId: string, id: string, who: s
 
 // ═══ Event ═════════════════════════════════════════════════
 
-export async function listEvents(collegeId: string, page = 1, limit = 20, type?: string, status?: string) {
+export async function listEvents(collegeId: string, page = 1, limit = 20, type?: string, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (type) filter.type = type;
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(Event, filter, page, limit, { startDate: -1 }, ['clubId', 'departmentId', 'coordinatorId']);
 }
 
@@ -175,10 +180,11 @@ export async function deleteEvent(collegeId: string, id: string, who: string) {
 
 // ═══ Event Registration ════════════════════════════════════
 
-export async function listEventRegistrations(collegeId: string, page = 1, limit = 20, eventId?: string, status?: string) {
+export async function listEventRegistrations(collegeId: string, page = 1, limit = 20, eventId?: string, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (eventId) filter.eventId = eventId;
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
   return paginate(EventRegistration, filter, page, limit, { registeredAt: -1 }, ['eventId', 'participantId']);
 }
 
@@ -210,10 +216,11 @@ export async function deleteEventRegistration(collegeId: string, id: string, who
 
 // ═══ Achievement ═══════════════════════════════════════════
 
-export async function listAchievements(collegeId: string, page = 1, limit = 20, category?: string, level?: string) {
+export async function listAchievements(collegeId: string, page = 1, limit = 20, category?: string, level?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (category) filter.category = category;
   if (level) filter.level = level;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
   return paginate(Achievement, filter, page, limit, { date: -1 }, [
     { path: 'studentId', populate: { path: 'personId' } },
     { path: 'verifiedBy' },
@@ -250,9 +257,10 @@ export async function deleteAchievement(collegeId: string, id: string, who: stri
 
 // ═══ Mentoring ═════════════════════════════════════════════
 
-export async function listMentoringSessions(collegeId: string, page = 1, limit = 20, status?: string) {
+export async function listMentoringSessions(collegeId: string, page = 1, limit = 20, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
   return paginate(Mentoring, filter, page, limit, { createdAt: -1 }, [
     { path: 'mentorId', populate: { path: 'personId' } },
     { path: 'menteeId', populate: { path: 'personId' } },
@@ -291,9 +299,10 @@ export async function deleteMentoringSession(collegeId: string, id: string, who:
 
 // ═══ Sports Team ═══════════════════════════════════════════
 
-export async function listSportsTeams(collegeId: string, page = 1, limit = 20, category?: string) {
+export async function listSportsTeams(collegeId: string, page = 1, limit = 20, category?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (category) filter.category = category;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(SportsTeam, filter, page, limit, { createdAt: -1 }, [
     { path: 'coachId' },
     { path: 'captain', populate: { path: 'personId' } },
@@ -332,9 +341,10 @@ export async function deleteSportsTeam(collegeId: string, id: string, who: strin
 
 // ═══ Sports Team Member ════════════════════════════════════
 
-export async function listSportsTeamMembers(collegeId: string, page = 1, limit = 20, teamId?: string) {
+export async function listSportsTeamMembers(collegeId: string, page = 1, limit = 20, teamId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (teamId) filter.teamId = teamId;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
   return paginate(SportsTeamMember, filter, page, limit, { createdAt: -1 }, [
     { path: 'teamId' },
     { path: 'studentId', populate: { path: 'personId' } },
@@ -371,10 +381,11 @@ export async function deleteSportsTeamMember(collegeId: string, id: string, who:
 
 // ═══ NSS Activity ══════════════════════════════════════════
 
-export async function listNSSActivities(collegeId: string, page = 1, limit = 20, type?: string, status?: string) {
+export async function listNSSActivities(collegeId: string, page = 1, limit = 20, type?: string, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (type) filter.type = type;
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(NSSActivity, filter, page, limit, { date: -1 }, ['coordinatorId']);
 }
 
@@ -406,9 +417,10 @@ export async function deleteNSSActivity(collegeId: string, id: string, who: stri
 
 // ═══ NSS Participant ═══════════════════════════════════════
 
-export async function listNSSParticipants(collegeId: string, page = 1, limit = 20, activityId?: string) {
+export async function listNSSParticipants(collegeId: string, page = 1, limit = 20, activityId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (activityId) filter.activityId = activityId;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
   return paginate(NSSParticipant, filter, page, limit, { createdAt: -1 }, [
     { path: 'activityId' },
     { path: 'studentId', populate: { path: 'personId' } },
@@ -445,9 +457,10 @@ export async function deleteNSSParticipant(collegeId: string, id: string, who: s
 
 // ═══ Skill Certification ══════════════════════════════════
 
-export async function listSkillCertifications(collegeId: string, page = 1, limit = 20, provider?: string) {
+export async function listSkillCertifications(collegeId: string, page = 1, limit = 20, provider?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (provider) filter.provider = provider;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
   return paginate(SkillCertification, filter, page, limit, { completedDate: -1 }, [
     { path: 'studentId', populate: { path: 'personId' } },
   ]);
@@ -482,10 +495,11 @@ export async function deleteSkillCertification(collegeId: string, id: string, wh
 
 // ═══ Student Project ═══════════════════════════════════════
 
-export async function listStudentProjects(collegeId: string, page = 1, limit = 20, type?: string, status?: string) {
+export async function listStudentProjects(collegeId: string, page = 1, limit = 20, type?: string, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (type) filter.type = type;
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
   return paginate(StudentProject, filter, page, limit, { createdAt: -1 }, [
     { path: 'teamMembers', populate: { path: 'personId' } },
     { path: 'guideId', populate: { path: 'personId' } },
@@ -522,9 +536,10 @@ export async function deleteStudentProject(collegeId: string, id: string, who: s
 
 // ═══ Community Project ════════════════════════════════════
 
-export async function listCommunityProjects(collegeId: string, page = 1, limit = 20, status?: string) {
+export async function listCommunityProjects(collegeId: string, page = 1, limit = 20, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(CommunityProject, filter, page, limit, { startDate: -1 }, [
     { path: 'leadStudentId', populate: { path: 'personId' } },
     { path: 'facultyMentorId', populate: { path: 'personId' } },
@@ -561,9 +576,10 @@ export async function deleteCommunityProject(collegeId: string, id: string, who:
 
 // ═══ Leadership Role ══════════════════════════════════════
 
-export async function listLeadershipRoles(collegeId: string, page = 1, limit = 20, body?: string) {
+export async function listLeadershipRoles(collegeId: string, page = 1, limit = 20, body?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (body) filter.body = body;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
   return paginate(LeadershipRole, filter, page, limit, { startDate: -1 }, [
     { path: 'studentId', populate: { path: 'personId' } },
     { path: 'academicYearId' },

@@ -11,6 +11,8 @@ import { LegalCase } from '../../models/compliance/LegalCase';
 import { paginate } from '../../shared/pagination';
 import { createAuditLog } from '../../shared/audit';
 import { AppError } from '../../middleware/errorHandler';
+import { AuthScope } from '../../shared/rbac/types';
+import { applyAuthScope } from '../../shared/rbac/apply-scope';
 
 const BODY_POPULATE = 'bodyId';
 const CYCLE_POPULATE = [{ path: 'accreditationCycleId', populate: { path: 'bodyId' } }];
@@ -56,8 +58,10 @@ export async function getStats(collegeId: string) {
 
 // ═══ Accreditation Body ═════════════════════════════════════
 
-export async function listAccreditationBodies(collegeId: string, page = 1, limit = 20) {
-  return paginate(AccreditationBody, { collegeId }, page, limit, { name: 1 });
+export async function listAccreditationBodies(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(AccreditationBody, filter, page, limit, { name: 1 });
 }
 
 export async function getAccreditationBody(collegeId: string, id: string) {
@@ -88,10 +92,11 @@ export async function deleteAccreditationBody(collegeId: string, id: string, who
 
 // ═══ Accreditation Cycle ════════════════════════════════════
 
-export async function listAccreditationCycles(collegeId: string, page = 1, limit = 20, bodyId?: string, status?: string) {
+export async function listAccreditationCycles(collegeId: string, page = 1, limit = 20, bodyId?: string, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (bodyId) filter.bodyId = bodyId;
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(AccreditationCycle, filter, page, limit, { createdAt: -1 }, [BODY_POPULATE]);
 }
 
@@ -123,10 +128,11 @@ export async function deleteAccreditationCycle(collegeId: string, id: string, wh
 
 // ═══ Compliance Criteria ════════════════════════════════════
 
-export async function listComplianceCriteria(collegeId: string, page = 1, limit = 20, accreditationCycleId?: string, status?: string) {
+export async function listComplianceCriteria(collegeId: string, page = 1, limit = 20, accreditationCycleId?: string, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (accreditationCycleId) filter.accreditationCycleId = accreditationCycleId;
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(ComplianceCriteria, filter, page, limit, { criterionNumber: 1 }, CYCLE_POPULATE);
 }
 
@@ -158,10 +164,11 @@ export async function deleteComplianceCriteria(collegeId: string, id: string, wh
 
 // ═══ Regulatory Filing ══════════════════════════════════════
 
-export async function listRegulatoryFilings(collegeId: string, page = 1, limit = 20, body?: string, status?: string) {
+export async function listRegulatoryFilings(collegeId: string, page = 1, limit = 20, body?: string, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (body) filter.body = body;
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(RegulatoryFiling, filter, page, limit, { dueDate: -1 });
 }
 
@@ -193,9 +200,10 @@ export async function deleteRegulatoryFiling(collegeId: string, id: string, who:
 
 // ═══ AICTE Approval ═════════════════════════════════════════
 
-export async function listAICTEApprovals(collegeId: string, page = 1, limit = 20, status?: string) {
+export async function listAICTEApprovals(collegeId: string, page = 1, limit = 20, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(AICTEApproval, filter, page, limit, { createdAt: -1 }, AICTE_POPULATE);
 }
 
@@ -227,9 +235,10 @@ export async function deleteAICTEApproval(collegeId: string, id: string, who: st
 
 // ═══ Affiliation Status ═════════════════════════════════════
 
-export async function listAffiliationStatuses(collegeId: string, page = 1, limit = 20, status?: string) {
+export async function listAffiliationStatuses(collegeId: string, page = 1, limit = 20, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(AffiliationStatus, filter, page, limit, { validTo: -1 }, [PROGRAMME_POPULATE]);
 }
 
@@ -261,10 +270,11 @@ export async function deleteAffiliationStatus(collegeId: string, id: string, who
 
 // ═══ Audit Finding ══════════════════════════════════════════
 
-export async function listAuditFindings(collegeId: string, page = 1, limit = 20, auditType?: string, status?: string) {
+export async function listAuditFindings(collegeId: string, page = 1, limit = 20, auditType?: string, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (auditType) filter.auditType = auditType;
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(AuditFinding, filter, page, limit, { auditDate: -1 });
 }
 
@@ -296,10 +306,11 @@ export async function deleteAuditFinding(collegeId: string, id: string, who: str
 
 // ═══ IQAC Report ════════════════════════════════════════════
 
-export async function listIQACReports(collegeId: string, page = 1, limit = 20, reportType?: string, status?: string) {
+export async function listIQACReports(collegeId: string, page = 1, limit = 20, reportType?: string, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (reportType) filter.reportType = reportType;
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(IQACReport, filter, page, limit, { createdAt: -1 }, [YEAR_POPULATE]);
 }
 
@@ -331,9 +342,10 @@ export async function deleteIQACReport(collegeId: string, id: string, who: strin
 
 // ═══ RTI Request ════════════════════════════════════════════
 
-export async function listRTIRequests(collegeId: string, page = 1, limit = 20, status?: string) {
+export async function listRTIRequests(collegeId: string, page = 1, limit = 20, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(RTIRequest, filter, page, limit, { applicationDate: -1 }, [PERSON_POPULATE]);
 }
 
@@ -365,10 +377,11 @@ export async function deleteRTIRequest(collegeId: string, id: string, who: strin
 
 // ═══ Legal Case ═════════════════════════════════════════════
 
-export async function listLegalCases(collegeId: string, page = 1, limit = 20, caseType?: string, status?: string) {
+export async function listLegalCases(collegeId: string, page = 1, limit = 20, caseType?: string, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (caseType) filter.caseType = caseType;
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(LegalCase, filter, page, limit, { filedDate: -1 });
 }
 

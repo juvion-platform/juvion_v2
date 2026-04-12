@@ -1,9 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { AuthScope } from '../shared/rbac/types';
 
 export interface AuthRequest extends Request {
   collegeId?: string;
   user?: { id: string; name: string; email: string; role: string; personaType: string };
+  authScope?: AuthScope;
 }
 
 export function authenticate(req: AuthRequest, res: Response, next: NextFunction) {
@@ -24,9 +26,13 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev-secret') as any;
     req.user = decoded;
 
-    // Superadmin scopes into a college via x-college-id header; they don't have collegeId in JWT
+    // Only super_admin can use x-college-id header to scope into another college
     const headerCollegeId = req.headers['x-college-id'] as string;
-    req.collegeId = headerCollegeId || decoded.collegeId;
+    if (headerCollegeId && decoded.role === 'super_admin') {
+      req.collegeId = headerCollegeId;
+    } else {
+      req.collegeId = decoded.collegeId;
+    }
 
     // Superadmins may access college-agnostic routes (like /colleges) without a collegeId
     if (!req.collegeId && decoded.role !== 'super_admin') {
