@@ -18,6 +18,8 @@ import { Student } from '../../models/people/Student';
 import { paginate } from '../../shared/pagination';
 import { createAuditLog } from '../../shared/audit';
 import { AppError } from '../../middleware/errorHandler';
+import { AuthScope } from '../../shared/rbac/types';
+import { applyAuthScope } from '../../shared/rbac/apply-scope';
 
 const STUDENT_POPULATE = { path: 'studentId', populate: { path: 'personId' } };
 
@@ -76,9 +78,10 @@ export async function getStats(collegeId: string) {
 
 // ═══ Fee Structure ════════════════════════════════════════
 
-export async function listFeeStructures(collegeId: string, page = 1, limit = 20, academicYearId?: string) {
+export async function listFeeStructures(collegeId: string, page = 1, limit = 20, academicYearId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (academicYearId) filter.academicYearId = academicYearId;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(FeeStructure, filter, page, limit, { createdAt: -1 }, ['academicYearId', 'programmeId', 'branchId']);
 }
 
@@ -110,8 +113,10 @@ export async function deleteFeeStructure(collegeId: string, id: string, who: str
 
 // ═══ Student Fee Account ══════════════════════════════════
 
-export async function listStudentFeeAccounts(collegeId: string, page = 1, limit = 20) {
-  return paginate(StudentFeeAccount, { collegeId }, page, limit, { createdAt: -1 }, [STUDENT_POPULATE] as any);
+export async function listStudentFeeAccounts(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
+  return paginate(StudentFeeAccount, filter, page, limit, { createdAt: -1 }, [STUDENT_POPULATE] as any);
 }
 
 export async function getStudentFeeAccount(collegeId: string, id: string) {
@@ -143,10 +148,11 @@ export async function deleteStudentFeeAccount(collegeId: string, id: string, who
 
 // ═══ Fee Line Items ═══════════════════════════════════════
 
-export async function listFeeLineItems(collegeId: string, page = 1, limit = 20, studentId?: string, status?: string) {
+export async function listFeeLineItems(collegeId: string, page = 1, limit = 20, studentId?: string, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (studentId) filter.studentId = studentId;
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
   return paginate(FeeLineItem, filter, page, limit, { createdAt: -1 }, [STUDENT_POPULATE, 'feeStructureId', 'academicYearId'] as any);
 }
 
@@ -179,10 +185,11 @@ export async function deleteFeeLineItem(collegeId: string, id: string, who: stri
 
 // ═══ Payments ═════════════════════════════════════════════
 
-export async function listPayments(collegeId: string, page = 1, limit = 20, studentId?: string, status?: string) {
+export async function listPayments(collegeId: string, page = 1, limit = 20, studentId?: string, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (studentId) filter.studentId = studentId;
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
   return paginate(Payment, filter, page, limit, { createdAt: -1 }, [STUDENT_POPULATE] as any);
 }
 
@@ -256,9 +263,10 @@ async function generateReceiptNumber(collegeId: string, paymentDate: Date) {
 
 // ═══ Scholarships ═════════════════════════════════════════
 
-export async function listScholarships(collegeId: string, page = 1, limit = 20, academicYearId?: string) {
+export async function listScholarships(collegeId: string, page = 1, limit = 20, academicYearId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (academicYearId) filter.academicYearId = academicYearId;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(Scholarship, filter, page, limit, { createdAt: -1 }, ['academicYearId']);
 }
 
@@ -290,11 +298,12 @@ export async function deleteScholarship(collegeId: string, id: string, who: stri
 
 // ═══ Scholarship Allocations ══════════════════════════════
 
-export async function listScholarshipAllocations(collegeId: string, page = 1, limit = 20, scholarshipId?: string, studentId?: string, status?: string) {
+export async function listScholarshipAllocations(collegeId: string, page = 1, limit = 20, scholarshipId?: string, studentId?: string, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (scholarshipId) filter.scholarshipId = scholarshipId;
   if (studentId) filter.studentId = studentId;
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
   return paginate(ScholarshipAllocation, filter, page, limit, { createdAt: -1 }, ['scholarshipId', STUDENT_POPULATE] as any);
 }
 
@@ -321,9 +330,10 @@ export async function deleteScholarshipAllocation(collegeId: string, id: string,
 
 // ═══ Concessions ══════════════════════════════════════════
 
-export async function listConcessions(collegeId: string, page = 1, limit = 20, studentId?: string) {
+export async function listConcessions(collegeId: string, page = 1, limit = 20, studentId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (studentId) filter.studentId = studentId;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
   return paginate(Concession, filter, page, limit, { createdAt: -1 }, [STUDENT_POPULATE, 'academicYearId'] as any);
 }
 
@@ -350,9 +360,10 @@ export async function deleteConcession(collegeId: string, id: string, who: strin
 
 // ═══ Refunds ══════════════════════════════════════════════
 
-export async function listRefunds(collegeId: string, page = 1, limit = 20, studentId?: string) {
+export async function listRefunds(collegeId: string, page = 1, limit = 20, studentId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (studentId) filter.studentId = studentId;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
   return paginate(Refund, filter, page, limit, { createdAt: -1 }, [STUDENT_POPULATE, 'paymentId'] as any);
 }
 
@@ -379,9 +390,10 @@ export async function deleteRefund(collegeId: string, id: string, who: string) {
 
 // ═══ Fines & Penalties ════════════════════════════════════
 
-export async function listFinePenalties(collegeId: string, page = 1, limit = 20, studentId?: string) {
+export async function listFinePenalties(collegeId: string, page = 1, limit = 20, studentId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (studentId) filter.studentId = studentId;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
   return paginate(FinePenalty, filter, page, limit, { createdAt: -1 }, [STUDENT_POPULATE] as any);
 }
 
@@ -408,10 +420,11 @@ export async function deleteFinePenalty(collegeId: string, id: string, who: stri
 
 // ═══ Invoices ═════════════════════════════════════════════
 
-export async function listInvoices(collegeId: string, page = 1, limit = 20, status?: string, studentId?: string) {
+export async function listInvoices(collegeId: string, page = 1, limit = 20, status?: string, studentId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (status) filter.status = status;
   if (studentId) filter.studentId = studentId;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
   return paginate(Invoice, filter, page, limit, { createdAt: -1 }, [STUDENT_POPULATE] as any);
 }
 
@@ -444,9 +457,10 @@ export async function deleteInvoice(collegeId: string, id: string, who: string) 
 
 // ═══ Budget ═══════════════════════════════════════════════
 
-export async function listBudgets(collegeId: string, page = 1, limit = 20, academicYearId?: string) {
+export async function listBudgets(collegeId: string, page = 1, limit = 20, academicYearId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (academicYearId) filter.academicYearId = academicYearId;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(Budget, filter, page, limit, { createdAt: -1 }, ['academicYearId', 'departmentId']);
 }
 
@@ -478,9 +492,10 @@ export async function deleteBudget(collegeId: string, id: string, who: string) {
 
 // ═══ Expenses ═════════════════════════════════════════════
 
-export async function listExpenses(collegeId: string, page = 1, limit = 20, status?: string) {
+export async function listExpenses(collegeId: string, page = 1, limit = 20, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(Expense, filter, page, limit, { createdAt: -1 }, ['budgetId']);
 }
 
@@ -516,8 +531,10 @@ export async function deleteExpense(collegeId: string, id: string, who: string) 
 
 // ═══ Financial Ledger ═════════════════════════════════════
 
-export async function listFinancialLedger(collegeId: string, page = 1, limit = 20) {
-  return paginate(FinancialLedger, { collegeId }, page, limit, { entryDate: -1 });
+export async function listFinancialLedger(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(FinancialLedger, filter, page, limit, { entryDate: -1 });
 }
 
 export async function createFinancialLedger(collegeId: string, data: any, who: string) {
@@ -542,8 +559,10 @@ export async function deleteFinancialLedger(collegeId: string, id: string, who: 
 
 // ═══ Payment Gateway Log ══════════════════════════════════
 
-export async function listPaymentGatewayLogs(collegeId: string, page = 1, limit = 20) {
-  return paginate(PaymentGatewayLog, { collegeId }, page, limit);
+export async function listPaymentGatewayLogs(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(PaymentGatewayLog, filter, page, limit);
 }
 
 export async function createPaymentGatewayLog(collegeId: string, data: any, who: string) {
@@ -568,11 +587,12 @@ export async function deletePaymentGatewayLog(collegeId: string, id: string, who
 
 // ═══ Fee Reminders ════════════════════════════════════════
 
-export async function listFeeReminders(collegeId: string, page = 1, limit = 20, studentId?: string, channel?: string, status?: string) {
+export async function listFeeReminders(collegeId: string, page = 1, limit = 20, studentId?: string, channel?: string, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (studentId) filter.studentId = studentId;
   if (channel) filter.channel = channel;
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
   return paginate(FeeReminder, filter, page, limit, { createdAt: -1 }, [STUDENT_POPULATE] as any);
 }
 
@@ -599,8 +619,10 @@ export async function deleteFeeReminder(collegeId: string, id: string, who: stri
 
 // ═══ Financial Reports ════════════════════════════════════
 
-export async function listFinancialReports(collegeId: string, page = 1, limit = 20) {
-  return paginate(FinancialReport, { collegeId }, page, limit, { generatedAt: -1 });
+export async function listFinancialReports(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(FinancialReport, filter, page, limit, { generatedAt: -1 });
 }
 
 export async function createFinancialReport(collegeId: string, data: any, who: string) {

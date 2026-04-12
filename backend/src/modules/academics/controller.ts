@@ -13,7 +13,7 @@ export async function dashboardStats(req: AuthRequest, res: Response, next: Next
 export async function listRegulations(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page = '1', limit = '20' } = req.query as any;
-    res.json(await svc.listRegulations(req.collegeId!, +page, +limit));
+    res.json(await svc.listRegulations(req.collegeId!, +page, +limit, req.authScope));
   } catch (e) { next(e); }
 }
 export async function getRegulation(req: AuthRequest, res: Response, next: NextFunction) {
@@ -33,7 +33,7 @@ export async function deleteRegulation(req: AuthRequest, res: Response, next: Ne
 export async function listProgrammes(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page = '1', limit = '20' } = req.query as any;
-    res.json(await svc.listProgrammes(req.collegeId!, +page, +limit));
+    res.json(await svc.listProgrammes(req.collegeId!, +page, +limit, req.authScope));
   } catch (e) { next(e); }
 }
 export async function getProgramme(req: AuthRequest, res: Response, next: NextFunction) {
@@ -53,7 +53,7 @@ export async function deleteProgramme(req: AuthRequest, res: Response, next: Nex
 export async function listDepartments(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page = '1', limit = '20' } = req.query as any;
-    res.json(await svc.listDepartments(req.collegeId!, +page, +limit));
+    res.json(await svc.listDepartments(req.collegeId!, +page, +limit, req.authScope));
   } catch (e) { next(e); }
 }
 export async function getDepartment(req: AuthRequest, res: Response, next: NextFunction) {
@@ -73,7 +73,7 @@ export async function deleteDepartment(req: AuthRequest, res: Response, next: Ne
 export async function listBranches(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page = '1', limit = '20' } = req.query as any;
-    res.json(await svc.listBranches(req.collegeId!, +page, +limit));
+    res.json(await svc.listBranches(req.collegeId!, +page, +limit, req.authScope));
   } catch (e) { next(e); }
 }
 export async function getBranch(req: AuthRequest, res: Response, next: NextFunction) {
@@ -93,7 +93,7 @@ export async function deleteBranch(req: AuthRequest, res: Response, next: NextFu
 export async function listBatches(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page = '1', limit = '20' } = req.query as any;
-    res.json(await svc.listBatches(req.collegeId!, +page, +limit));
+    res.json(await svc.listBatches(req.collegeId!, +page, +limit, req.authScope));
   } catch (e) { next(e); }
 }
 export async function getBatch(req: AuthRequest, res: Response, next: NextFunction) {
@@ -113,7 +113,7 @@ export async function deleteBatch(req: AuthRequest, res: Response, next: NextFun
 export async function listSections(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page = '1', limit = '20' } = req.query as any;
-    res.json(await svc.listSections(req.collegeId!, +page, +limit));
+    res.json(await svc.listSections(req.collegeId!, +page, +limit, req.authScope));
   } catch (e) { next(e); }
 }
 export async function getSection(req: AuthRequest, res: Response, next: NextFunction) {
@@ -133,7 +133,7 @@ export async function deleteSection(req: AuthRequest, res: Response, next: NextF
 export async function listAcademicYears(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page = '1', limit = '20' } = req.query as any;
-    res.json(await svc.listAcademicYears(req.collegeId!, +page, +limit));
+    res.json(await svc.listAcademicYears(req.collegeId!, +page, +limit, req.authScope));
   } catch (e) { next(e); }
 }
 export async function getAcademicYear(req: AuthRequest, res: Response, next: NextFunction) {
@@ -153,7 +153,7 @@ export async function deleteAcademicYear(req: AuthRequest, res: Response, next: 
 export async function listSemesters(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page = '1', limit = '20', academicYearId } = req.query as any;
-    res.json(await svc.listSemesters(req.collegeId!, +page, +limit, academicYearId));
+    res.json(await svc.listSemesters(req.collegeId!, +page, +limit, academicYearId, req.authScope));
   } catch (e) { next(e); }
 }
 export async function getSemester(req: AuthRequest, res: Response, next: NextFunction) {
@@ -173,7 +173,7 @@ export async function deleteSemester(req: AuthRequest, res: Response, next: Next
 export async function listCourses(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page = '1', limit = '20', regulationId } = req.query as any;
-    res.json(await svc.listCourses(req.collegeId!, +page, +limit, regulationId));
+    res.json(await svc.listCourses(req.collegeId!, +page, +limit, regulationId, req.authScope));
   } catch (e) { next(e); }
 }
 export async function getCourse(req: AuthRequest, res: Response, next: NextFunction) {
@@ -193,7 +193,7 @@ export async function deleteCourse(req: AuthRequest, res: Response, next: NextFu
 export async function listCurriculumMaps(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page = '1', limit = '20', branchId, semester } = req.query as any;
-    res.json(await svc.listCurriculumMaps(req.collegeId!, +page, +limit, branchId, semester ? +semester : undefined));
+    res.json(await svc.listCurriculumMaps(req.collegeId!, +page, +limit, branchId, semester ? +semester : undefined, req.authScope));
   } catch (e) { next(e); }
 }
 export async function createCurriculumMap(req: AuthRequest, res: Response, next: NextFunction) {
@@ -210,7 +210,7 @@ export async function deleteCurriculumMap(req: AuthRequest, res: Response, next:
 export async function listCourseOfferings(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page = '1', limit = '20', semesterId } = req.query as any;
-    res.json(await svc.listCourseOfferings(req.collegeId!, +page, +limit, semesterId));
+    res.json(await svc.listCourseOfferings(req.collegeId!, +page, +limit, semesterId, req.authScope));
   } catch (e) { next(e); }
 }
 export async function getCourseOffering(req: AuthRequest, res: Response, next: NextFunction) {
@@ -230,7 +230,7 @@ export async function deleteCourseOffering(req: AuthRequest, res: Response, next
 export async function listEnrollments(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page = '1', limit = '20', semesterId } = req.query as any;
-    res.json(await svc.listEnrollments(req.collegeId!, +page, +limit, semesterId));
+    res.json(await svc.listEnrollments(req.collegeId!, +page, +limit, semesterId, req.authScope));
   } catch (e) { next(e); }
 }
 export async function createEnrollment(req: AuthRequest, res: Response, next: NextFunction) {
@@ -245,7 +245,7 @@ export async function deleteEnrollment(req: AuthRequest, res: Response, next: Ne
 
 // ═══ Phase 3: Academic Calendar ═════════════════════════════
 export async function listCalendarEvents(req: AuthRequest, res: Response, next: NextFunction) {
-  try { const { page = '1', limit = '50', academicYearId } = req.query as any; res.json(await svc.listCalendarEvents(req.collegeId!, +page, +limit, academicYearId)); } catch (e) { next(e); }
+  try { const { page = '1', limit = '50', academicYearId } = req.query as any; res.json(await svc.listCalendarEvents(req.collegeId!, +page, +limit, academicYearId, req.authScope)); } catch (e) { next(e); }
 }
 export async function createCalendarEvent(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.status(201).json(await svc.createCalendarEvent(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
@@ -259,7 +259,7 @@ export async function deleteCalendarEvent(req: AuthRequest, res: Response, next:
 
 // ═══ Phase 3: Timetable ════════════════════════════════════
 export async function listTimetables(req: AuthRequest, res: Response, next: NextFunction) {
-  try { const { page = '1', limit = '20', semesterId } = req.query as any; res.json(await svc.listTimetables(req.collegeId!, +page, +limit, semesterId)); } catch (e) { next(e); }
+  try { const { page = '1', limit = '20', semesterId } = req.query as any; res.json(await svc.listTimetables(req.collegeId!, +page, +limit, semesterId, req.authScope)); } catch (e) { next(e); }
 }
 export async function getTimetable(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await svc.getTimetable(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }
@@ -290,7 +290,7 @@ export async function deleteTimetableSlot(req: AuthRequest, res: Response, next:
 
 // ═══ Phase 4: Attendance Sessions ══════════════════════════
 export async function listAttendanceSessions(req: AuthRequest, res: Response, next: NextFunction) {
-  try { const { page = '1', limit = '20', courseOfferingId } = req.query as any; res.json(await svc.listAttendanceSessions(req.collegeId!, +page, +limit, courseOfferingId)); } catch (e) { next(e); }
+  try { const { page = '1', limit = '20', courseOfferingId } = req.query as any; res.json(await svc.listAttendanceSessions(req.collegeId!, +page, +limit, courseOfferingId, req.authScope)); } catch (e) { next(e); }
 }
 export async function getAttendanceSession(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await svc.getAttendanceSession(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }
@@ -324,7 +324,7 @@ export async function bulkCreateAttendanceRecords(req: AuthRequest, res: Respons
 
 // ═══ Phase 5: Internal Assessments ═════════════════════════
 export async function listInternalAssessments(req: AuthRequest, res: Response, next: NextFunction) {
-  try { const { page = '1', limit = '20', courseOfferingId } = req.query as any; res.json(await svc.listInternalAssessments(req.collegeId!, +page, +limit, courseOfferingId)); } catch (e) { next(e); }
+  try { const { page = '1', limit = '20', courseOfferingId } = req.query as any; res.json(await svc.listInternalAssessments(req.collegeId!, +page, +limit, courseOfferingId, req.authScope)); } catch (e) { next(e); }
 }
 export async function getInternalAssessment(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await svc.getInternalAssessment(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }
@@ -358,7 +358,7 @@ export async function bulkCreateInternalMarks(req: AuthRequest, res: Response, n
 
 // ═══ Phase 6: Exam Registration ════════════════════════════
 export async function listExamRegistrations(req: AuthRequest, res: Response, next: NextFunction) {
-  try { const { page = '1', limit = '20', semesterId } = req.query as any; res.json(await svc.listExamRegistrations(req.collegeId!, +page, +limit, semesterId)); } catch (e) { next(e); }
+  try { const { page = '1', limit = '20', semesterId } = req.query as any; res.json(await svc.listExamRegistrations(req.collegeId!, +page, +limit, semesterId, req.authScope)); } catch (e) { next(e); }
 }
 export async function createExamRegistration(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.status(201).json(await svc.createExamRegistration(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
@@ -372,7 +372,7 @@ export async function deleteExamRegistration(req: AuthRequest, res: Response, ne
 
 // ═══ Phase 6: Exam Schedule ════════════════════════════════
 export async function listExamSchedules(req: AuthRequest, res: Response, next: NextFunction) {
-  try { const { page = '1', limit = '20', semesterId } = req.query as any; res.json(await svc.listExamSchedules(req.collegeId!, +page, +limit, semesterId)); } catch (e) { next(e); }
+  try { const { page = '1', limit = '20', semesterId } = req.query as any; res.json(await svc.listExamSchedules(req.collegeId!, +page, +limit, semesterId, req.authScope)); } catch (e) { next(e); }
 }
 export async function createExamSchedule(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.status(201).json(await svc.createExamSchedule(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
@@ -386,7 +386,7 @@ export async function deleteExamSchedule(req: AuthRequest, res: Response, next: 
 
 // ═══ Phase 6: External Marks ═══════════════════════════════
 export async function listExternalMarks(req: AuthRequest, res: Response, next: NextFunction) {
-  try { const { page = '1', limit = '20', semesterId } = req.query as any; res.json(await svc.listExternalMarks(req.collegeId!, +page, +limit, semesterId)); } catch (e) { next(e); }
+  try { const { page = '1', limit = '20', semesterId } = req.query as any; res.json(await svc.listExternalMarks(req.collegeId!, +page, +limit, semesterId, req.authScope)); } catch (e) { next(e); }
 }
 export async function createExternalMark(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.status(201).json(await svc.createExternalMark(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
@@ -400,7 +400,7 @@ export async function deleteExternalMark(req: AuthRequest, res: Response, next: 
 
 // ═══ Phase 7: Grade Cards ══════════════════════════════════
 export async function listGradeCards(req: AuthRequest, res: Response, next: NextFunction) {
-  try { const { page = '1', limit = '20', semesterId, studentId } = req.query as any; res.json(await svc.listGradeCards(req.collegeId!, +page, +limit, semesterId, studentId)); } catch (e) { next(e); }
+  try { const { page = '1', limit = '20', semesterId, studentId } = req.query as any; res.json(await svc.listGradeCards(req.collegeId!, +page, +limit, semesterId, studentId, req.authScope)); } catch (e) { next(e); }
 }
 export async function createGradeCard(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.status(201).json(await svc.createGradeCard(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
@@ -414,7 +414,7 @@ export async function deleteGradeCard(req: AuthRequest, res: Response, next: Nex
 
 // ═══ Phase 7: Semester Results ═════════════════════════════
 export async function listSemesterResults(req: AuthRequest, res: Response, next: NextFunction) {
-  try { const { page = '1', limit = '20', semesterId } = req.query as any; res.json(await svc.listSemesterResults(req.collegeId!, +page, +limit, semesterId)); } catch (e) { next(e); }
+  try { const { page = '1', limit = '20', semesterId } = req.query as any; res.json(await svc.listSemesterResults(req.collegeId!, +page, +limit, semesterId, req.authScope)); } catch (e) { next(e); }
 }
 export async function createSemesterResult(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.status(201).json(await svc.createSemesterResult(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
@@ -456,7 +456,7 @@ export async function deleteProgramOutcome(req: AuthRequest, res: Response, next
 
 // ═══ Phase 8: Elective Allocations ═════════════════════════
 export async function listElectiveAllocations(req: AuthRequest, res: Response, next: NextFunction) {
-  try { const { page = '1', limit = '20', semesterId } = req.query as any; res.json(await svc.listElectiveAllocations(req.collegeId!, +page, +limit, semesterId)); } catch (e) { next(e); }
+  try { const { page = '1', limit = '20', semesterId } = req.query as any; res.json(await svc.listElectiveAllocations(req.collegeId!, +page, +limit, semesterId, req.authScope)); } catch (e) { next(e); }
 }
 export async function createElectiveAllocation(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.status(201).json(await svc.createElectiveAllocation(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
@@ -470,7 +470,7 @@ export async function deleteElectiveAllocation(req: AuthRequest, res: Response, 
 
 // ═══ Phase 8: Lesson Plans ═════════════════════════════════
 export async function listLessonPlans(req: AuthRequest, res: Response, next: NextFunction) {
-  try { const { page = '1', limit = '50', courseOfferingId } = req.query as any; res.json(await svc.listLessonPlans(req.collegeId!, +page, +limit, courseOfferingId)); } catch (e) { next(e); }
+  try { const { page = '1', limit = '50', courseOfferingId } = req.query as any; res.json(await svc.listLessonPlans(req.collegeId!, +page, +limit, courseOfferingId, req.authScope)); } catch (e) { next(e); }
 }
 export async function createLessonPlan(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.status(201).json(await svc.createLessonPlan(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
@@ -484,7 +484,7 @@ export async function deleteLessonPlan(req: AuthRequest, res: Response, next: Ne
 
 // ═══ Phase 8: Course Feedback ══════════════════════════════
 export async function listCourseFeedback(req: AuthRequest, res: Response, next: NextFunction) {
-  try { const { page = '1', limit = '20', courseOfferingId } = req.query as any; res.json(await svc.listCourseFeedback(req.collegeId!, +page, +limit, courseOfferingId)); } catch (e) { next(e); }
+  try { const { page = '1', limit = '20', courseOfferingId } = req.query as any; res.json(await svc.listCourseFeedback(req.collegeId!, +page, +limit, courseOfferingId, req.authScope)); } catch (e) { next(e); }
 }
 export async function createCourseFeedback(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.status(201).json(await svc.createCourseFeedback(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }

@@ -30,6 +30,8 @@ import { CourseFeedback } from '../../models/academic-ops/CourseFeedback';
 import { paginate } from '../../shared/pagination';
 import { createAuditLog } from '../../shared/audit';
 import { AppError } from '../../middleware/errorHandler';
+import { AuthScope } from '../../shared/rbac/types';
+import { applyAuthScope } from '../../shared/rbac/apply-scope';
 
 const STUDENT_POPULATE = { path: 'studentId', populate: { path: 'personId' } };
 
@@ -56,8 +58,10 @@ export async function getStats(collegeId: string) {
 
 // ─── Regulations ────────────────────────────────────────────
 
-export async function listRegulations(collegeId: string, page: number, limit: number) {
-  return paginate(Regulation, { collegeId }, page, limit, { effectiveFromYear: -1 });
+export async function listRegulations(collegeId: string, page: number, limit: number, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(Regulation, filter, page, limit, { effectiveFromYear: -1 });
 }
 
 export async function getRegulation(collegeId: string, id: string) {
@@ -88,8 +92,10 @@ export async function deleteRegulation(collegeId: string, id: string, performedB
 
 // ─── Programmes ─────────────────────────────────────────────
 
-export async function listProgrammes(collegeId: string, page: number, limit: number) {
-  return paginate(Programme, { collegeId }, page, limit, { code: 1 }, ['regulationId']);
+export async function listProgrammes(collegeId: string, page: number, limit: number, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(Programme, filter, page, limit, { code: 1 }, ['regulationId']);
 }
 
 export async function getProgramme(collegeId: string, id: string) {
@@ -120,8 +126,12 @@ export async function deleteProgramme(collegeId: string, id: string, performedBy
 
 // ─── Departments ────────────────────────────────────────────
 
-export async function listDepartments(collegeId: string, page: number, limit: number) {
-  return paginate(Department, { collegeId }, page, limit, { code: 1 }, ['hodId']);
+export async function listDepartments(collegeId: string, page: number, limit: number, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope?.departmentOnly && authScope.departmentId) {
+    filter._id = authScope.departmentId;
+  }
+  return paginate(Department, filter, page, limit, { code: 1 }, ['hodId']);
 }
 
 export async function getDepartment(collegeId: string, id: string) {
@@ -152,8 +162,10 @@ export async function deleteDepartment(collegeId: string, id: string, performedB
 
 // ─── Branches ───────────────────────────────────────────────
 
-export async function listBranches(collegeId: string, page: number, limit: number) {
-  return paginate(Branch, { collegeId }, page, limit, { code: 1 }, ['programmeId', 'departmentId']);
+export async function listBranches(collegeId: string, page: number, limit: number, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(Branch, filter, page, limit, { code: 1 }, ['programmeId', 'departmentId']);
 }
 
 export async function getBranch(collegeId: string, id: string) {
@@ -184,8 +196,10 @@ export async function deleteBranch(collegeId: string, id: string, performedBy: s
 
 // ─── Batches ────────────────────────────────────────────────
 
-export async function listBatches(collegeId: string, page: number, limit: number) {
-  return paginate(Batch, { collegeId }, page, limit, { admissionYear: -1 }, ['programmeId', 'regulationId']);
+export async function listBatches(collegeId: string, page: number, limit: number, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(Batch, filter, page, limit, { admissionYear: -1 }, ['programmeId', 'regulationId']);
 }
 
 export async function getBatch(collegeId: string, id: string) {
@@ -216,8 +230,10 @@ export async function deleteBatch(collegeId: string, id: string, performedBy: st
 
 // ─── Sections ───────────────────────────────────────────────
 
-export async function listSections(collegeId: string, page: number, limit: number) {
-  return paginate(Section, { collegeId }, page, limit, { year: 1, semester: 1, name: 1 }, ['branchId', 'batchId', 'classAdvisorId']);
+export async function listSections(collegeId: string, page: number, limit: number, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(Section, filter, page, limit, { year: 1, semester: 1, name: 1 }, ['branchId', 'batchId', 'classAdvisorId']);
 }
 
 export async function getSection(collegeId: string, id: string) {
@@ -248,8 +264,10 @@ export async function deleteSection(collegeId: string, id: string, performedBy: 
 
 // ─── Academic Years ─────────────────────────────────────────
 
-export async function listAcademicYears(collegeId: string, page: number, limit: number) {
-  return paginate(AcademicYear, { collegeId }, page, limit, { startDate: -1 });
+export async function listAcademicYears(collegeId: string, page: number, limit: number, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(AcademicYear, filter, page, limit, { startDate: -1 });
 }
 
 export async function getAcademicYear(collegeId: string, id: string) {
@@ -287,9 +305,10 @@ export async function deleteAcademicYear(collegeId: string, id: string, performe
 
 // ─── Semesters ──────────────────────────────────────────────
 
-export async function listSemesters(collegeId: string, page: number, limit: number, academicYearId?: string) {
+export async function listSemesters(collegeId: string, page: number, limit: number, academicYearId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (academicYearId) filter.academicYearId = academicYearId;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(Semester, filter, page, limit, { year: 1, number: 1 }, ['academicYearId']);
 }
 
@@ -321,9 +340,10 @@ export async function deleteSemester(collegeId: string, id: string, performedBy:
 
 // ─── Courses ────────────────────────────────────────────────
 
-export async function listCourses(collegeId: string, page: number, limit: number, regulationId?: string) {
+export async function listCourses(collegeId: string, page: number, limit: number, regulationId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (regulationId) filter.regulationId = regulationId;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(Course, filter, page, limit, { code: 1 }, ['regulationId', 'departmentId']);
 }
 
@@ -355,10 +375,11 @@ export async function deleteCourse(collegeId: string, id: string, performedBy: s
 
 // ─── Curriculum Maps ────────────────────────────────────────
 
-export async function listCurriculumMaps(collegeId: string, page: number, limit: number, branchId?: string, semester?: number) {
+export async function listCurriculumMaps(collegeId: string, page: number, limit: number, branchId?: string, semester?: number, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (branchId) filter.branchId = branchId;
   if (semester) filter.semester = semester;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(CurriculumMap, filter, page, limit, { semester: 1 }, ['branchId']);
 }
 
@@ -384,9 +405,10 @@ export async function deleteCurriculumMap(collegeId: string, id: string, perform
 
 // ─── Course Offerings ───────────────────────────────────────
 
-export async function listCourseOfferings(collegeId: string, page: number, limit: number, semesterId?: string) {
+export async function listCourseOfferings(collegeId: string, page: number, limit: number, semesterId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (semesterId) filter.semesterId = semesterId;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(CourseOffering, filter, page, limit, { createdAt: -1 }, ['courseId', 'semesterId', 'sectionId', 'facultyId']);
 }
 
@@ -418,9 +440,10 @@ export async function deleteCourseOffering(collegeId: string, id: string, perfor
 
 // ─── Enrollments ────────────────────────────────────────────
 
-export async function listEnrollments(collegeId: string, page: number, limit: number, semesterId?: string) {
+export async function listEnrollments(collegeId: string, page: number, limit: number, semesterId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (semesterId) filter.semesterId = semesterId;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
   return paginate(Enrollment, filter, page, limit, { enrolledAt: -1 }, [STUDENT_POPULATE, 'courseOfferingId', 'semesterId'] as any);
 }
 
@@ -449,9 +472,10 @@ export async function deleteEnrollment(collegeId: string, id: string, performedB
 
 // ═══ Phase 3: Academic Calendar ═════════════════════════════
 
-export async function listCalendarEvents(collegeId: string, page: number, limit: number, academicYearId?: string) {
+export async function listCalendarEvents(collegeId: string, page: number, limit: number, academicYearId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (academicYearId) filter.academicYearId = academicYearId;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(AcademicCalendar, filter, page, limit, { startDate: 1 }, ['academicYearId']);
 }
 export async function createCalendarEvent(collegeId: string, data: any, performedBy: string) {
@@ -474,9 +498,10 @@ export async function deleteCalendarEvent(collegeId: string, id: string, perform
 
 // ═══ Phase 3: Timetable ════════════════════════════════════
 
-export async function listTimetables(collegeId: string, page: number, limit: number, semesterId?: string) {
+export async function listTimetables(collegeId: string, page: number, limit: number, semesterId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (semesterId) filter.semesterId = semesterId;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(Timetable, filter, page, limit, { createdAt: -1 }, ['semesterId', 'sectionId']);
 }
 export async function getTimetable(collegeId: string, id: string) {
@@ -526,9 +551,10 @@ export async function deleteTimetableSlot(collegeId: string, id: string, _perfor
 
 // ═══ Phase 4: Attendance Sessions ══════════════════════════
 
-export async function listAttendanceSessions(collegeId: string, page: number, limit: number, courseOfferingId?: string) {
+export async function listAttendanceSessions(collegeId: string, page: number, limit: number, courseOfferingId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (courseOfferingId) filter.courseOfferingId = courseOfferingId;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(AttendanceSession, filter, page, limit, { date: -1 }, ['courseOfferingId', 'facultyId']);
 }
 export async function getAttendanceSession(collegeId: string, id: string) {
@@ -579,9 +605,10 @@ export async function deleteAttendanceRecord(collegeId: string, id: string, _per
 
 // ═══ Phase 5: Internal Assessments ═════════════════════════
 
-export async function listInternalAssessments(collegeId: string, page: number, limit: number, courseOfferingId?: string) {
+export async function listInternalAssessments(collegeId: string, page: number, limit: number, courseOfferingId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (courseOfferingId) filter.courseOfferingId = courseOfferingId;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(InternalAssessment, filter, page, limit, { date: -1 }, ['courseOfferingId']);
 }
 export async function createInternalAssessment(collegeId: string, data: any, performedBy: string) {
@@ -632,9 +659,10 @@ export async function deleteInternalMark(collegeId: string, id: string, _perform
 
 // ═══ Phase 6: Exam Registration ════════════════════════════
 
-export async function listExamRegistrations(collegeId: string, page: number, limit: number, semesterId?: string) {
+export async function listExamRegistrations(collegeId: string, page: number, limit: number, semesterId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (semesterId) filter.semesterId = semesterId;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
   return paginate(ExamRegistration, filter, page, limit, { registeredAt: -1 }, [STUDENT_POPULATE, 'semesterId'] as any);
 }
 export async function createExamRegistration(collegeId: string, data: any, performedBy: string) {
@@ -655,9 +683,10 @@ export async function deleteExamRegistration(collegeId: string, id: string, _per
 
 // ═══ Phase 6: Exam Schedule ════════════════════════════════
 
-export async function listExamSchedules(collegeId: string, page: number, limit: number, semesterId?: string) {
+export async function listExamSchedules(collegeId: string, page: number, limit: number, semesterId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (semesterId) filter.semesterId = semesterId;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(ExamSchedule, filter, page, limit, { date: 1, startTime: 1 }, ['courseId', 'semesterId']);
 }
 export async function createExamSchedule(collegeId: string, data: any, performedBy: string) {
@@ -678,9 +707,10 @@ export async function deleteExamSchedule(collegeId: string, id: string, _perform
 
 // ═══ Phase 6: External Marks ═══════════════════════════════
 
-export async function listExternalMarks(collegeId: string, page: number, limit: number, semesterId?: string) {
+export async function listExternalMarks(collegeId: string, page: number, limit: number, semesterId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (semesterId) filter.semesterId = semesterId;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
   return paginate(ExternalMark, filter, page, limit, { createdAt: -1 }, [STUDENT_POPULATE, 'courseId', 'semesterId'] as any);
 }
 export async function createExternalMark(collegeId: string, data: any, _performedBy: string) {
@@ -700,10 +730,11 @@ export async function deleteExternalMark(collegeId: string, id: string, _perform
 
 // ═══ Phase 7: Grade Cards ══════════════════════════════════
 
-export async function listGradeCards(collegeId: string, page: number, limit: number, semesterId?: string, studentId?: string) {
+export async function listGradeCards(collegeId: string, page: number, limit: number, semesterId?: string, studentId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (semesterId) filter.semesterId = semesterId;
   if (studentId) filter.studentId = studentId;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
   return paginate(GradeCard, filter, page, limit, { createdAt: -1 }, [STUDENT_POPULATE, 'courseId', 'semesterId'] as any);
 }
 export async function createGradeCard(collegeId: string, data: any, _performedBy: string) {
@@ -723,9 +754,10 @@ export async function deleteGradeCard(collegeId: string, id: string, _performedB
 
 // ═══ Phase 7: Semester Results ═════════════════════════════
 
-export async function listSemesterResults(collegeId: string, page: number, limit: number, semesterId?: string) {
+export async function listSemesterResults(collegeId: string, page: number, limit: number, semesterId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (semesterId) filter.semesterId = semesterId;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
   return paginate(SemesterResult, filter, page, limit, { cgpa: -1 }, [STUDENT_POPULATE, 'semesterId'] as any);
 }
 export async function createSemesterResult(collegeId: string, data: any, _performedBy: string) {
@@ -785,9 +817,10 @@ export async function deleteProgramOutcome(collegeId: string, id: string, _perfo
 
 // ═══ Phase 8: Elective Allocation ══════════════════════════
 
-export async function listElectiveAllocations(collegeId: string, page: number, limit: number, semesterId?: string) {
+export async function listElectiveAllocations(collegeId: string, page: number, limit: number, semesterId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (semesterId) filter.semesterId = semesterId;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
   return paginate(ElectiveAllocation, filter, page, limit, { preference: 1 }, [STUDENT_POPULATE, 'courseOfferingId', 'semesterId'] as any);
 }
 export async function createElectiveAllocation(collegeId: string, data: any, _performedBy: string) {
@@ -807,9 +840,10 @@ export async function deleteElectiveAllocation(collegeId: string, id: string, _p
 
 // ═══ Phase 8: Lesson Plans ═════════════════════════════════
 
-export async function listLessonPlans(collegeId: string, page: number, limit: number, courseOfferingId?: string) {
+export async function listLessonPlans(collegeId: string, page: number, limit: number, courseOfferingId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (courseOfferingId) filter.courseOfferingId = courseOfferingId;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(LessonPlan, filter, page, limit, { weekNumber: 1 }, ['courseOfferingId']);
 }
 export async function createLessonPlan(collegeId: string, data: any, _performedBy: string) {
@@ -829,9 +863,10 @@ export async function deleteLessonPlan(collegeId: string, id: string, _performed
 
 // ═══ Phase 8: Course Feedback ══════════════════════════════
 
-export async function listCourseFeedback(collegeId: string, page: number, limit: number, courseOfferingId?: string) {
+export async function listCourseFeedback(collegeId: string, page: number, limit: number, courseOfferingId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (courseOfferingId) filter.courseOfferingId = courseOfferingId;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
   return paginate(CourseFeedback, filter, page, limit, { submittedAt: -1 }, ['courseOfferingId', STUDENT_POPULATE] as any);
 }
 export async function createCourseFeedback(collegeId: string, data: any, _performedBy: string) {
