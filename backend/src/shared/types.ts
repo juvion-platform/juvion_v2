@@ -1,8 +1,10 @@
 import { Request } from 'express';
+import { AuthScope } from './rbac/types';
 
 export interface AuthRequest extends Request {
   collegeId?: string;
   user?: { id: string; name: string; email: string; role: string; personaType: string };
+  authScope?: AuthScope;
 }
 
 export interface PaginatedResult<T> {
