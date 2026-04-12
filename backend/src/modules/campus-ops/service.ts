@@ -42,6 +42,8 @@ import { PeriodicalSubscription } from '../../models/library/PeriodicalSubscript
 import { paginate } from '../../shared/pagination';
 import { createAuditLog } from '../../shared/audit';
 import { AppError } from '../../middleware/errorHandler';
+import { AuthScope } from '../../shared/rbac/types';
+import { applyAuthScope } from '../../shared/rbac/apply-scope';
 
 // Populate helpers
 const FACULTY_POPULATE = { path: 'labInChargeId', populate: { path: 'personId' } };
@@ -91,8 +93,10 @@ export async function getStats(collegeId: string) {
 // ═══════════════════════════════════════════════════════════
 
 // ═══ Building ════════════════════════════════════════════
-export async function listBuildings(collegeId: string, page = 1, limit = 20) {
-  return paginate(Building, { collegeId }, page, limit, { createdAt: -1 });
+export async function listBuildings(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(Building, filter, page, limit, { createdAt: -1 });
 }
 export async function getBuilding(collegeId: string, id: string) {
   const doc = await Building.findOne({ _id: id, collegeId });
@@ -118,8 +122,10 @@ export async function deleteBuilding(collegeId: string, id: string, who: string)
 }
 
 // ═══ Room ════════════════════════════════════════════════
-export async function listRooms(collegeId: string, page = 1, limit = 20) {
-  return paginate(Room, { collegeId }, page, limit, { createdAt: -1 }, ['buildingId']);
+export async function listRooms(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(Room, filter, page, limit, { createdAt: -1 }, ['buildingId']);
 }
 export async function getRoom(collegeId: string, id: string) {
   const doc = await Room.findOne({ _id: id, collegeId }).populate('buildingId');
@@ -145,8 +151,10 @@ export async function deleteRoom(collegeId: string, id: string, who: string) {
 }
 
 // ═══ RoomBooking ═════════════════════════════════════════
-export async function listRoomBookings(collegeId: string, page = 1, limit = 20) {
-  return paginate(RoomBooking, { collegeId }, page, limit, { createdAt: -1 }, ['roomId', 'bookedBy']);
+export async function listRoomBookings(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(RoomBooking, filter, page, limit, { createdAt: -1 }, ['roomId', 'bookedBy']);
 }
 export async function getRoomBooking(collegeId: string, id: string) {
   const doc = await RoomBooking.findOne({ _id: id, collegeId }).populate('roomId bookedBy');
@@ -172,8 +180,10 @@ export async function deleteRoomBooking(collegeId: string, id: string, who: stri
 }
 
 // ═══ Vehicle ═════════════════════════════════════════════
-export async function listVehicles(collegeId: string, page = 1, limit = 20) {
-  return paginate(Vehicle, { collegeId }, page, limit, { createdAt: -1 }, [DRIVER_POPULATE] as any);
+export async function listVehicles(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(Vehicle, filter, page, limit, { createdAt: -1 }, [DRIVER_POPULATE] as any);
 }
 export async function getVehicle(collegeId: string, id: string) {
   const doc = await Vehicle.findOne({ _id: id, collegeId }).populate(DRIVER_POPULATE);
@@ -199,8 +209,10 @@ export async function deleteVehicle(collegeId: string, id: string, who: string) 
 }
 
 // ═══ GatePass ════════════════════════════════════════════
-export async function listGatePasses(collegeId: string, page = 1, limit = 20) {
-  return paginate(GatePass, { collegeId }, page, limit, { createdAt: -1 }, ['personId', 'approvedBy']);
+export async function listGatePasses(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(GatePass, filter, page, limit, { createdAt: -1 }, ['personId', 'approvedBy']);
 }
 export async function getGatePass(collegeId: string, id: string) {
   const doc = await GatePass.findOne({ _id: id, collegeId }).populate('personId approvedBy');
@@ -226,8 +238,10 @@ export async function deleteGatePass(collegeId: string, id: string, who: string)
 }
 
 // ═══ VisitorEntry ════════════════════════════════════════
-export async function listVisitorEntries(collegeId: string, page = 1, limit = 20) {
-  return paginate(VisitorEntry, { collegeId }, page, limit, { createdAt: -1 });
+export async function listVisitorEntries(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(VisitorEntry, filter, page, limit, { createdAt: -1 });
 }
 export async function getVisitorEntry(collegeId: string, id: string) {
   const doc = await VisitorEntry.findOne({ _id: id, collegeId });
@@ -253,8 +267,10 @@ export async function deleteVisitorEntry(collegeId: string, id: string, who: str
 }
 
 // ═══ SecurityIncident ════════════════════════════════════
-export async function listSecurityIncidents(collegeId: string, page = 1, limit = 20) {
-  return paginate(SecurityIncident, { collegeId }, page, limit, { createdAt: -1 }, ['reportedBy']);
+export async function listSecurityIncidents(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(SecurityIncident, filter, page, limit, { createdAt: -1 }, ['reportedBy']);
 }
 export async function getSecurityIncident(collegeId: string, id: string) {
   const doc = await SecurityIncident.findOne({ _id: id, collegeId }).populate('reportedBy');
@@ -280,8 +296,10 @@ export async function deleteSecurityIncident(collegeId: string, id: string, who:
 }
 
 // ═══ CCTV ════════════════════════════════════════════════
-export async function listCCTVs(collegeId: string, page = 1, limit = 20) {
-  return paginate(CCTV, { collegeId }, page, limit, { createdAt: -1 }, ['buildingId']);
+export async function listCCTVs(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(CCTV, filter, page, limit, { createdAt: -1 }, ['buildingId']);
 }
 export async function getCCTV(collegeId: string, id: string) {
   const doc = await CCTV.findOne({ _id: id, collegeId }).populate('buildingId');
@@ -307,8 +325,10 @@ export async function deleteCCTV(collegeId: string, id: string, who: string) {
 }
 
 // ═══ EmergencyContact ════════════════════════════════════
-export async function listEmergencyContacts(collegeId: string, page = 1, limit = 20) {
-  return paginate(EmergencyContact, { collegeId }, page, limit, { createdAt: -1 });
+export async function listEmergencyContacts(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(EmergencyContact, filter, page, limit, { createdAt: -1 });
 }
 export async function getEmergencyContact(collegeId: string, id: string) {
   const doc = await EmergencyContact.findOne({ _id: id, collegeId });
@@ -334,8 +354,10 @@ export async function deleteEmergencyContact(collegeId: string, id: string, who:
 }
 
 // ═══ Lab ═════════════════════════════════════════════════
-export async function listLabs(collegeId: string, page = 1, limit = 20) {
-  return paginate(Lab, { collegeId }, page, limit, { createdAt: -1 }, ['roomId', 'departmentId', FACULTY_POPULATE] as any);
+export async function listLabs(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(Lab, filter, page, limit, { createdAt: -1 }, ['roomId', 'departmentId', FACULTY_POPULATE] as any);
 }
 export async function getLab(collegeId: string, id: string) {
   const doc = await Lab.findOne({ _id: id, collegeId }).populate('roomId departmentId').populate(FACULTY_POPULATE);
@@ -361,8 +383,10 @@ export async function deleteLab(collegeId: string, id: string, who: string) {
 }
 
 // ═══ ParkingSlot ═════════════════════════════════════════
-export async function listParkingSlots(collegeId: string, page = 1, limit = 20) {
-  return paginate(ParkingSlot, { collegeId }, page, limit, { createdAt: -1 }, ['allocatedTo']);
+export async function listParkingSlots(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(ParkingSlot, filter, page, limit, { createdAt: -1 }, ['allocatedTo']);
 }
 export async function getParkingSlot(collegeId: string, id: string) {
   const doc = await ParkingSlot.findOne({ _id: id, collegeId }).populate('allocatedTo');
@@ -388,8 +412,10 @@ export async function deleteParkingSlot(collegeId: string, id: string, who: stri
 }
 
 // ═══ PowerBackup ═════════════════════════════════════════
-export async function listPowerBackups(collegeId: string, page = 1, limit = 20) {
-  return paginate(PowerBackup, { collegeId }, page, limit, { createdAt: -1 });
+export async function listPowerBackups(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(PowerBackup, filter, page, limit, { createdAt: -1 });
 }
 export async function getPowerBackup(collegeId: string, id: string) {
   const doc = await PowerBackup.findOne({ _id: id, collegeId });
@@ -415,8 +441,10 @@ export async function deletePowerBackup(collegeId: string, id: string, who: stri
 }
 
 // ═══ GreenInitiative ═════════════════════════════════════
-export async function listGreenInitiatives(collegeId: string, page = 1, limit = 20) {
-  return paginate(GreenInitiative, { collegeId }, page, limit, { createdAt: -1 }, ['coordinatorId']);
+export async function listGreenInitiatives(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(GreenInitiative, filter, page, limit, { createdAt: -1 }, ['coordinatorId']);
 }
 export async function getGreenInitiative(collegeId: string, id: string) {
   const doc = await GreenInitiative.findOne({ _id: id, collegeId }).populate('coordinatorId');
@@ -442,8 +470,10 @@ export async function deleteGreenInitiative(collegeId: string, id: string, who: 
 }
 
 // ═══ WaterSupply ═════════════════════════════════════════
-export async function listWaterSupplies(collegeId: string, page = 1, limit = 20) {
-  return paginate(WaterSupply, { collegeId }, page, limit, { createdAt: -1 });
+export async function listWaterSupplies(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(WaterSupply, filter, page, limit, { createdAt: -1 });
 }
 export async function getWaterSupply(collegeId: string, id: string) {
   const doc = await WaterSupply.findOne({ _id: id, collegeId });
@@ -473,8 +503,10 @@ export async function deleteWaterSupply(collegeId: string, id: string, who: stri
 // ═══════════════════════════════════════════════════════════
 
 // ═══ Asset ═══════════════════════════════════════════════
-export async function listAssets(collegeId: string, page = 1, limit = 20) {
-  return paginate(Asset, { collegeId }, page, limit, { createdAt: -1 }, ['departmentId']);
+export async function listAssets(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(Asset, filter, page, limit, { createdAt: -1 }, ['departmentId']);
 }
 export async function getAsset(collegeId: string, id: string) {
   const doc = await Asset.findOne({ _id: id, collegeId }).populate('departmentId');
@@ -500,8 +532,10 @@ export async function deleteAsset(collegeId: string, id: string, who: string) {
 }
 
 // ═══ AssetAllocation ═════════════════════════════════════
-export async function listAssetAllocations(collegeId: string, page = 1, limit = 20) {
-  return paginate(AssetAllocation, { collegeId }, page, limit, { createdAt: -1 }, ['assetId', 'allocatedTo']);
+export async function listAssetAllocations(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(AssetAllocation, filter, page, limit, { createdAt: -1 }, ['assetId', 'allocatedTo']);
 }
 export async function getAssetAllocation(collegeId: string, id: string) {
   const doc = await AssetAllocation.findOne({ _id: id, collegeId }).populate('assetId allocatedTo');
@@ -527,8 +561,10 @@ export async function deleteAssetAllocation(collegeId: string, id: string, who: 
 }
 
 // ═══ MaintenanceRequest ══════════════════════════════════
-export async function listMaintenanceRequests(collegeId: string, page = 1, limit = 20) {
-  return paginate(MaintenanceRequest, { collegeId }, page, limit, { createdAt: -1 }, ['requestedBy', STAFF_ASSIGNED_POPULATE] as any);
+export async function listMaintenanceRequests(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(MaintenanceRequest, filter, page, limit, { createdAt: -1 }, ['requestedBy', STAFF_ASSIGNED_POPULATE] as any);
 }
 export async function getMaintenanceRequest(collegeId: string, id: string) {
   const doc = await MaintenanceRequest.findOne({ _id: id, collegeId }).populate('requestedBy').populate(STAFF_ASSIGNED_POPULATE);
@@ -554,8 +590,10 @@ export async function deleteMaintenanceRequest(collegeId: string, id: string, wh
 }
 
 // ═══ MaintenanceSchedule ═════════════════════════════════
-export async function listMaintenanceSchedules(collegeId: string, page = 1, limit = 20) {
-  return paginate(MaintenanceSchedule, { collegeId }, page, limit, { createdAt: -1 }, ['assetId']);
+export async function listMaintenanceSchedules(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(MaintenanceSchedule, filter, page, limit, { createdAt: -1 }, ['assetId']);
 }
 export async function getMaintenanceSchedule(collegeId: string, id: string) {
   const doc = await MaintenanceSchedule.findOne({ _id: id, collegeId }).populate('assetId');
@@ -581,8 +619,10 @@ export async function deleteMaintenanceSchedule(collegeId: string, id: string, w
 }
 
 // ═══ ConstructionProject ═════════════════════════════════
-export async function listConstructionProjects(collegeId: string, page = 1, limit = 20) {
-  return paginate(ConstructionProject, { collegeId }, page, limit, { createdAt: -1 });
+export async function listConstructionProjects(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(ConstructionProject, filter, page, limit, { createdAt: -1 });
 }
 export async function getConstructionProject(collegeId: string, id: string) {
   const doc = await ConstructionProject.findOne({ _id: id, collegeId });
@@ -608,8 +648,10 @@ export async function deleteConstructionProject(collegeId: string, id: string, w
 }
 
 // ═══ Vendor ══════════════════════════════════════════════
-export async function listVendors(collegeId: string, page = 1, limit = 20) {
-  return paginate(Vendor, { collegeId }, page, limit, { createdAt: -1 });
+export async function listVendors(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(Vendor, filter, page, limit, { createdAt: -1 });
 }
 export async function getVendor(collegeId: string, id: string) {
   const doc = await Vendor.findOne({ _id: id, collegeId });
@@ -635,8 +677,10 @@ export async function deleteVendor(collegeId: string, id: string, who: string) {
 }
 
 // ═══ PurchaseOrder ═══════════════════════════════════════
-export async function listPurchaseOrders(collegeId: string, page = 1, limit = 20) {
-  return paginate(PurchaseOrder, { collegeId }, page, limit, { createdAt: -1 }, ['vendorId', 'requestedBy', 'approvedBy']);
+export async function listPurchaseOrders(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(PurchaseOrder, filter, page, limit, { createdAt: -1 }, ['vendorId', 'requestedBy', 'approvedBy']);
 }
 export async function getPurchaseOrder(collegeId: string, id: string) {
   const doc = await PurchaseOrder.findOne({ _id: id, collegeId }).populate('vendorId requestedBy approvedBy');
@@ -662,8 +706,10 @@ export async function deletePurchaseOrder(collegeId: string, id: string, who: st
 }
 
 // ═══ StockItem ═══════════════════════════════════════════
-export async function listStockItems(collegeId: string, page = 1, limit = 20) {
-  return paginate(StockItem, { collegeId }, page, limit, { createdAt: -1 });
+export async function listStockItems(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(StockItem, filter, page, limit, { createdAt: -1 });
 }
 export async function getStockItem(collegeId: string, id: string) {
   const doc = await StockItem.findOne({ _id: id, collegeId });
@@ -689,8 +735,10 @@ export async function deleteStockItem(collegeId: string, id: string, who: string
 }
 
 // ═══ StockTransaction ════════════════════════════════════
-export async function listStockTransactions(collegeId: string, page = 1, limit = 20) {
-  return paginate(StockTransaction, { collegeId }, page, limit, { createdAt: -1 }, ['stockItemId', 'doneBy']);
+export async function listStockTransactions(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(StockTransaction, filter, page, limit, { createdAt: -1 }, ['stockItemId', 'doneBy']);
 }
 export async function getStockTransaction(collegeId: string, id: string) {
   const doc = await StockTransaction.findOne({ _id: id, collegeId }).populate('stockItemId doneBy');
@@ -721,8 +769,10 @@ export async function deleteStockTransaction(collegeId: string, id: string, who:
 }
 
 // ═══ ITAsset ═════════════════════════════════════════════
-export async function listITAssets(collegeId: string, page = 1, limit = 20) {
-  return paginate(ITAsset, { collegeId }, page, limit, { createdAt: -1 }, ['assignedTo']);
+export async function listITAssets(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(ITAsset, filter, page, limit, { createdAt: -1 }, ['assignedTo']);
 }
 export async function getITAsset(collegeId: string, id: string) {
   const doc = await ITAsset.findOne({ _id: id, collegeId }).populate('assignedTo');
@@ -748,8 +798,10 @@ export async function deleteITAsset(collegeId: string, id: string, who: string) 
 }
 
 // ═══ NetworkInfra ════════════════════════════════════════
-export async function listNetworkInfra(collegeId: string, page = 1, limit = 20) {
-  return paginate(NetworkInfra, { collegeId }, page, limit, { createdAt: -1 });
+export async function listNetworkInfra(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(NetworkInfra, filter, page, limit, { createdAt: -1 });
 }
 export async function getNetworkInfra(collegeId: string, id: string) {
   const doc = await NetworkInfra.findOne({ _id: id, collegeId });
@@ -775,8 +827,10 @@ export async function deleteNetworkInfra(collegeId: string, id: string, who: str
 }
 
 // ═══ Insurance ═══════════════════════════════════════════
-export async function listInsurances(collegeId: string, page = 1, limit = 20) {
-  return paginate(Insurance, { collegeId }, page, limit, { createdAt: -1 });
+export async function listInsurances(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(Insurance, filter, page, limit, { createdAt: -1 });
 }
 export async function getInsurance(collegeId: string, id: string) {
   const doc = await Insurance.findOne({ _id: id, collegeId });
@@ -802,8 +856,10 @@ export async function deleteInsurance(collegeId: string, id: string, who: string
 }
 
 // ═══ EnergyConsumption ═══════════════════════════════════
-export async function listEnergyConsumptions(collegeId: string, page = 1, limit = 20) {
-  return paginate(EnergyConsumption, { collegeId }, page, limit, { year: -1, month: -1 }, ['buildingId']);
+export async function listEnergyConsumptions(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(EnergyConsumption, filter, page, limit, { year: -1, month: -1 }, ['buildingId']);
 }
 export async function getEnergyConsumption(collegeId: string, id: string) {
   const doc = await EnergyConsumption.findOne({ _id: id, collegeId }).populate('buildingId');
@@ -829,8 +885,10 @@ export async function deleteEnergyConsumption(collegeId: string, id: string, who
 }
 
 // ═══ WasteManagement ═════════════════════════════════════
-export async function listWasteManagements(collegeId: string, page = 1, limit = 20) {
-  return paginate(WasteManagement, { collegeId }, page, limit, { createdAt: -1 });
+export async function listWasteManagements(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(WasteManagement, filter, page, limit, { createdAt: -1 });
 }
 export async function getWasteManagement(collegeId: string, id: string) {
   const doc = await WasteManagement.findOne({ _id: id, collegeId });
@@ -860,8 +918,10 @@ export async function deleteWasteManagement(collegeId: string, id: string, who: 
 // ═══════════════════════════════════════════════════════════
 
 // ═══ Book ════════════════════════════════════════════════
-export async function listBooks(collegeId: string, page = 1, limit = 20) {
-  return paginate(Book, { collegeId }, page, limit, { createdAt: -1 }, ['departmentId']);
+export async function listBooks(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(Book, filter, page, limit, { createdAt: -1 }, ['departmentId']);
 }
 export async function getBook(collegeId: string, id: string) {
   const doc = await Book.findOne({ _id: id, collegeId }).populate('departmentId');
@@ -887,8 +947,10 @@ export async function deleteBook(collegeId: string, id: string, who: string) {
 }
 
 // ═══ BookIssue ═══════════════════════════════════════════
-export async function listBookIssues(collegeId: string, page = 1, limit = 20) {
-  return paginate(BookIssue, { collegeId }, page, limit, { createdAt: -1 }, ['bookId', 'issuedTo']);
+export async function listBookIssues(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'issuedTo' });
+  return paginate(BookIssue, filter, page, limit, { createdAt: -1 }, ['bookId', 'issuedTo']);
 }
 export async function getBookIssue(collegeId: string, id: string) {
   const doc = await BookIssue.findOne({ _id: id, collegeId }).populate('bookId issuedTo');
@@ -922,8 +984,10 @@ export async function deleteBookIssue(collegeId: string, id: string, who: string
 }
 
 // ═══ BookReservation ═════════════════════════════════════
-export async function listBookReservations(collegeId: string, page = 1, limit = 20) {
-  return paginate(BookReservation, { collegeId }, page, limit, { createdAt: -1 }, ['bookId', 'reservedBy']);
+export async function listBookReservations(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'reservedBy' });
+  return paginate(BookReservation, filter, page, limit, { createdAt: -1 }, ['bookId', 'reservedBy']);
 }
 export async function getBookReservation(collegeId: string, id: string) {
   const doc = await BookReservation.findOne({ _id: id, collegeId }).populate('bookId reservedBy');
@@ -949,8 +1013,10 @@ export async function deleteBookReservation(collegeId: string, id: string, who: 
 }
 
 // ═══ LibraryMember ═══════════════════════════════════════
-export async function listLibraryMembers(collegeId: string, page = 1, limit = 20) {
-  return paginate(LibraryMember, { collegeId }, page, limit, { createdAt: -1 }, ['personId']);
+export async function listLibraryMembers(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'personId' });
+  return paginate(LibraryMember, filter, page, limit, { createdAt: -1 }, ['personId']);
 }
 export async function getLibraryMember(collegeId: string, id: string) {
   const doc = await LibraryMember.findOne({ _id: id, collegeId }).populate('personId');
@@ -976,8 +1042,10 @@ export async function deleteLibraryMember(collegeId: string, id: string, who: st
 }
 
 // ═══ LibraryFine ═════════════════════════════════════════
-export async function listLibraryFines(collegeId: string, page = 1, limit = 20) {
-  return paginate(LibraryFine, { collegeId }, page, limit, { createdAt: -1 }, ['memberId', 'bookIssueId']);
+export async function listLibraryFines(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'memberId' });
+  return paginate(LibraryFine, filter, page, limit, { createdAt: -1 }, ['memberId', 'bookIssueId']);
 }
 export async function getLibraryFine(collegeId: string, id: string) {
   const doc = await LibraryFine.findOne({ _id: id, collegeId }).populate('memberId bookIssueId');
@@ -1003,8 +1071,10 @@ export async function deleteLibraryFine(collegeId: string, id: string, who: stri
 }
 
 // ═══ LibraryGateEntry ════════════════════════════════════
-export async function listLibraryGateEntries(collegeId: string, page = 1, limit = 20) {
-  return paginate(LibraryGateEntry, { collegeId }, page, limit, { createdAt: -1 }, ['personId']);
+export async function listLibraryGateEntries(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'personId' });
+  return paginate(LibraryGateEntry, filter, page, limit, { createdAt: -1 }, ['personId']);
 }
 export async function getLibraryGateEntry(collegeId: string, id: string) {
   const doc = await LibraryGateEntry.findOne({ _id: id, collegeId }).populate('personId');
@@ -1030,8 +1100,10 @@ export async function deleteLibraryGateEntry(collegeId: string, id: string, who:
 }
 
 // ═══ EResource ═══════════════════════════════════════════
-export async function listEResources(collegeId: string, page = 1, limit = 20) {
-  return paginate(EResource, { collegeId }, page, limit, { createdAt: -1 });
+export async function listEResources(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(EResource, filter, page, limit, { createdAt: -1 });
 }
 export async function getEResource(collegeId: string, id: string) {
   const doc = await EResource.findOne({ _id: id, collegeId });
@@ -1057,8 +1129,10 @@ export async function deleteEResource(collegeId: string, id: string, who: string
 }
 
 // ═══ EResourceAccess ═════════════════════════════════════
-export async function listEResourceAccesses(collegeId: string, page = 1, limit = 20) {
-  return paginate(EResourceAccess, { collegeId }, page, limit, { createdAt: -1 }, ['eResourceId', 'personId']);
+export async function listEResourceAccesses(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'personId' });
+  return paginate(EResourceAccess, filter, page, limit, { createdAt: -1 }, ['eResourceId', 'personId']);
 }
 export async function getEResourceAccess(collegeId: string, id: string) {
   const doc = await EResourceAccess.findOne({ _id: id, collegeId }).populate('eResourceId personId');
@@ -1084,8 +1158,10 @@ export async function deleteEResourceAccess(collegeId: string, id: string, who: 
 }
 
 // ═══ PeriodicalSubscription ══════════════════════════════
-export async function listPeriodicalSubscriptions(collegeId: string, page = 1, limit = 20) {
-  return paginate(PeriodicalSubscription, { collegeId }, page, limit, { createdAt: -1 });
+export async function listPeriodicalSubscriptions(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(PeriodicalSubscription, filter, page, limit, { createdAt: -1 });
 }
 export async function getPeriodicalSubscription(collegeId: string, id: string) {
   const doc = await PeriodicalSubscription.findOne({ _id: id, collegeId });

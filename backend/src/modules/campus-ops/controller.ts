@@ -15,7 +15,7 @@ export async function dashboardStats(req: AuthRequest, res: Response, next: Next
 
 // ═══ Building ════════════════════════════════════════════
 export async function listBuildings(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listBuildings(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listBuildings(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getBuilding(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getBuilding(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -32,7 +32,7 @@ export async function deleteBuilding(req: AuthRequest, res: Response, next: Next
 
 // ═══ Room ════════════════════════════════════════════════
 export async function listRooms(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listRooms(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listRooms(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getRoom(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getRoom(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -49,7 +49,7 @@ export async function deleteRoom(req: AuthRequest, res: Response, next: NextFunc
 
 // ═══ RoomBooking ═════════════════════════════════════════
 export async function listRoomBookings(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listRoomBookings(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listRoomBookings(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getRoomBooking(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getRoomBooking(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -66,7 +66,7 @@ export async function deleteRoomBooking(req: AuthRequest, res: Response, next: N
 
 // ═══ Vehicle ═════════════════════════════════════════════
 export async function listVehicles(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listVehicles(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listVehicles(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getVehicle(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getVehicle(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -83,7 +83,7 @@ export async function deleteVehicle(req: AuthRequest, res: Response, next: NextF
 
 // ═══ GatePass ════════════════════════════════════════════
 export async function listGatePasses(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listGatePasses(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listGatePasses(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getGatePass(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getGatePass(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -100,7 +100,7 @@ export async function deleteGatePass(req: AuthRequest, res: Response, next: Next
 
 // ═══ VisitorEntry ════════════════════════════════════════
 export async function listVisitorEntries(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listVisitorEntries(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listVisitorEntries(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getVisitorEntry(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getVisitorEntry(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -117,7 +117,7 @@ export async function deleteVisitorEntry(req: AuthRequest, res: Response, next: 
 
 // ═══ SecurityIncident ════════════════════════════════════
 export async function listSecurityIncidents(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listSecurityIncidents(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listSecurityIncidents(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getSecurityIncident(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getSecurityIncident(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -134,7 +134,7 @@ export async function deleteSecurityIncident(req: AuthRequest, res: Response, ne
 
 // ═══ CCTV ════════════════════════════════════════════════
 export async function listCCTVs(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listCCTVs(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listCCTVs(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getCCTV(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getCCTV(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -151,7 +151,7 @@ export async function deleteCCTV(req: AuthRequest, res: Response, next: NextFunc
 
 // ═══ EmergencyContact ════════════════════════════════════
 export async function listEmergencyContacts(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listEmergencyContacts(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listEmergencyContacts(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getEmergencyContact(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getEmergencyContact(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -168,7 +168,7 @@ export async function deleteEmergencyContact(req: AuthRequest, res: Response, ne
 
 // ═══ Lab ═════════════════════════════════════════════════
 export async function listLabs(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listLabs(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listLabs(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getLab(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getLab(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -185,7 +185,7 @@ export async function deleteLab(req: AuthRequest, res: Response, next: NextFunct
 
 // ═══ ParkingSlot ═════════════════════════════════════════
 export async function listParkingSlots(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listParkingSlots(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listParkingSlots(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getParkingSlot(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getParkingSlot(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -202,7 +202,7 @@ export async function deleteParkingSlot(req: AuthRequest, res: Response, next: N
 
 // ═══ PowerBackup ═════════════════════════════════════════
 export async function listPowerBackups(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listPowerBackups(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listPowerBackups(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getPowerBackup(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getPowerBackup(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -219,7 +219,7 @@ export async function deletePowerBackup(req: AuthRequest, res: Response, next: N
 
 // ═══ GreenInitiative ═════════════════════════════════════
 export async function listGreenInitiatives(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listGreenInitiatives(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listGreenInitiatives(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getGreenInitiative(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getGreenInitiative(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -236,7 +236,7 @@ export async function deleteGreenInitiative(req: AuthRequest, res: Response, nex
 
 // ═══ WaterSupply ═════════════════════════════════════════
 export async function listWaterSupplies(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listWaterSupplies(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listWaterSupplies(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getWaterSupply(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getWaterSupply(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -257,7 +257,7 @@ export async function deleteWaterSupply(req: AuthRequest, res: Response, next: N
 
 // ═══ Asset ═══════════════════════════════════════════════
 export async function listAssets(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listAssets(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listAssets(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getAsset(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getAsset(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -274,7 +274,7 @@ export async function deleteAsset(req: AuthRequest, res: Response, next: NextFun
 
 // ═══ AssetAllocation ═════════════════════════════════════
 export async function listAssetAllocations(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listAssetAllocations(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listAssetAllocations(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getAssetAllocation(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getAssetAllocation(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -291,7 +291,7 @@ export async function deleteAssetAllocation(req: AuthRequest, res: Response, nex
 
 // ═══ MaintenanceRequest ══════════════════════════════════
 export async function listMaintenanceRequests(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listMaintenanceRequests(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listMaintenanceRequests(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getMaintenanceRequest(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getMaintenanceRequest(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -308,7 +308,7 @@ export async function deleteMaintenanceRequest(req: AuthRequest, res: Response, 
 
 // ═══ MaintenanceSchedule ═════════════════════════════════
 export async function listMaintenanceSchedules(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listMaintenanceSchedules(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listMaintenanceSchedules(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getMaintenanceSchedule(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getMaintenanceSchedule(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -325,7 +325,7 @@ export async function deleteMaintenanceSchedule(req: AuthRequest, res: Response,
 
 // ═══ ConstructionProject ═════════════════════════════════
 export async function listConstructionProjects(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listConstructionProjects(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listConstructionProjects(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getConstructionProject(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getConstructionProject(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -342,7 +342,7 @@ export async function deleteConstructionProject(req: AuthRequest, res: Response,
 
 // ═══ Vendor ══════════════════════════════════════════════
 export async function listVendors(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listVendors(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listVendors(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getVendor(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getVendor(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -359,7 +359,7 @@ export async function deleteVendor(req: AuthRequest, res: Response, next: NextFu
 
 // ═══ PurchaseOrder ═══════════════════════════════════════
 export async function listPurchaseOrders(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listPurchaseOrders(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listPurchaseOrders(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getPurchaseOrder(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getPurchaseOrder(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -376,7 +376,7 @@ export async function deletePurchaseOrder(req: AuthRequest, res: Response, next:
 
 // ═══ StockItem ═══════════════════════════════════════════
 export async function listStockItems(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listStockItems(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listStockItems(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getStockItem(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getStockItem(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -393,7 +393,7 @@ export async function deleteStockItem(req: AuthRequest, res: Response, next: Nex
 
 // ═══ StockTransaction ════════════════════════════════════
 export async function listStockTransactions(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listStockTransactions(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listStockTransactions(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getStockTransaction(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getStockTransaction(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -410,7 +410,7 @@ export async function deleteStockTransaction(req: AuthRequest, res: Response, ne
 
 // ═══ ITAsset ═════════════════════════════════════════════
 export async function listITAssets(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listITAssets(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listITAssets(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getITAsset(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getITAsset(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -427,7 +427,7 @@ export async function deleteITAsset(req: AuthRequest, res: Response, next: NextF
 
 // ═══ NetworkInfra ════════════════════════════════════════
 export async function listNetworkInfra(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listNetworkInfra(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listNetworkInfra(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getNetworkInfra(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getNetworkInfra(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -444,7 +444,7 @@ export async function deleteNetworkInfra(req: AuthRequest, res: Response, next: 
 
 // ═══ Insurance ═══════════════════════════════════════════
 export async function listInsurances(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listInsurances(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listInsurances(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getInsurance(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getInsurance(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -461,7 +461,7 @@ export async function deleteInsurance(req: AuthRequest, res: Response, next: Nex
 
 // ═══ EnergyConsumption ═══════════════════════════════════
 export async function listEnergyConsumptions(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listEnergyConsumptions(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listEnergyConsumptions(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getEnergyConsumption(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getEnergyConsumption(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -478,7 +478,7 @@ export async function deleteEnergyConsumption(req: AuthRequest, res: Response, n
 
 // ═══ WasteManagement ═════════════════════════════════════
 export async function listWasteManagements(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listWasteManagements(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listWasteManagements(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getWasteManagement(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getWasteManagement(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -499,7 +499,7 @@ export async function deleteWasteManagement(req: AuthRequest, res: Response, nex
 
 // ═══ Book ════════════════════════════════════════════════
 export async function listBooks(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listBooks(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listBooks(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getBook(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getBook(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -516,7 +516,7 @@ export async function deleteBook(req: AuthRequest, res: Response, next: NextFunc
 
 // ═══ BookIssue ═══════════════════════════════════════════
 export async function listBookIssues(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listBookIssues(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listBookIssues(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getBookIssue(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getBookIssue(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -533,7 +533,7 @@ export async function deleteBookIssue(req: AuthRequest, res: Response, next: Nex
 
 // ═══ BookReservation ═════════════════════════════════════
 export async function listBookReservations(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listBookReservations(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listBookReservations(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getBookReservation(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getBookReservation(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -550,7 +550,7 @@ export async function deleteBookReservation(req: AuthRequest, res: Response, nex
 
 // ═══ LibraryMember ═══════════════════════════════════════
 export async function listLibraryMembers(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listLibraryMembers(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listLibraryMembers(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getLibraryMember(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getLibraryMember(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -567,7 +567,7 @@ export async function deleteLibraryMember(req: AuthRequest, res: Response, next:
 
 // ═══ LibraryFine ═════════════════════════════════════════
 export async function listLibraryFines(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listLibraryFines(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listLibraryFines(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getLibraryFine(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getLibraryFine(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -584,7 +584,7 @@ export async function deleteLibraryFine(req: AuthRequest, res: Response, next: N
 
 // ═══ LibraryGateEntry ════════════════════════════════════
 export async function listLibraryGateEntries(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listLibraryGateEntries(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listLibraryGateEntries(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getLibraryGateEntry(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getLibraryGateEntry(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -601,7 +601,7 @@ export async function deleteLibraryGateEntry(req: AuthRequest, res: Response, ne
 
 // ═══ EResource ═══════════════════════════════════════════
 export async function listEResources(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listEResources(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listEResources(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getEResource(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getEResource(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -618,7 +618,7 @@ export async function deleteEResource(req: AuthRequest, res: Response, next: Nex
 
 // ═══ EResourceAccess ═════════════════════════════════════
 export async function listEResourceAccesses(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listEResourceAccesses(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listEResourceAccesses(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getEResourceAccess(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getEResourceAccess(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -635,7 +635,7 @@ export async function deleteEResourceAccess(req: AuthRequest, res: Response, nex
 
 // ═══ PeriodicalSubscription ══════════════════════════════
 export async function listPeriodicalSubscriptions(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listPeriodicalSubscriptions(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+  try { res.json(await service.listPeriodicalSubscriptions(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
 }
 export async function getPeriodicalSubscription(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getPeriodicalSubscription(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
