@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authenticate } from '../../middleware/authenticate';
+import { authorize } from '../../middleware/authorize';
 import { validate } from '../../middleware/validate';
 import * as ctrl from './controller';
 import {
@@ -14,41 +15,41 @@ const router = Router();
 router.use(authenticate);
 
 // Dashboard
-router.get('/stats', ctrl.dashboardStats);
+router.get('/stats', authorize('governance', 'read'), ctrl.dashboardStats);
 
 // Committees
-router.get('/committees', ctrl.listCommittees);
-router.get('/committees/:id', ctrl.getCommittee);
-router.post('/committees', validate(createCommitteeSchema), ctrl.createCommittee);
-router.put('/committees/:id', validate(updateCommitteeSchema), ctrl.updateCommittee);
-router.delete('/committees/:id', ctrl.deleteCommittee);
+router.get('/committees', authorize('governance', 'read'), ctrl.listCommittees);
+router.get('/committees/:id', authorize('governance', 'read'), ctrl.getCommittee);
+router.post('/committees', authorize('governance', 'create'), validate(createCommitteeSchema), ctrl.createCommittee);
+router.put('/committees/:id', authorize('governance', 'update'), validate(updateCommitteeSchema), ctrl.updateCommittee);
+router.delete('/committees/:id', authorize('governance', 'delete'), ctrl.deleteCommittee);
 
 // Committee Meetings
-router.get('/meetings', ctrl.listMeetings);
-router.get('/meetings/:id', ctrl.getMeeting);
-router.post('/meetings', validate(createMeetingSchema), ctrl.createMeeting);
-router.put('/meetings/:id', validate(updateMeetingSchema), ctrl.updateMeeting);
-router.delete('/meetings/:id', ctrl.deleteMeeting);
+router.get('/meetings', authorize('governance', 'read'), ctrl.listMeetings);
+router.get('/meetings/:id', authorize('governance', 'read'), ctrl.getMeeting);
+router.post('/meetings', authorize('governance', 'create'), validate(createMeetingSchema), ctrl.createMeeting);
+router.put('/meetings/:id', authorize('governance', 'update'), validate(updateMeetingSchema), ctrl.updateMeeting);
+router.delete('/meetings/:id', authorize('governance', 'delete'), ctrl.deleteMeeting);
 
 // Policies
-router.get('/policies', ctrl.listPolicies);
-router.get('/policies/:id', ctrl.getPolicy);
-router.post('/policies', validate(createPolicySchema), ctrl.createPolicy);
-router.put('/policies/:id', validate(updatePolicySchema), ctrl.updatePolicy);
-router.delete('/policies/:id', ctrl.deletePolicy);
+router.get('/policies', authorize('governance', 'read'), ctrl.listPolicies);
+router.get('/policies/:id', authorize('governance', 'read'), ctrl.getPolicy);
+router.post('/policies', authorize('governance', 'create'), validate(createPolicySchema), ctrl.createPolicy);
+router.put('/policies/:id', authorize('governance', 'update'), validate(updatePolicySchema), ctrl.updatePolicy);
+router.delete('/policies/:id', authorize('governance', 'delete'), ctrl.deletePolicy);
 
 // Governing Body Members
-router.get('/board-members', ctrl.listBoardMembers);
-router.get('/board-members/:id', ctrl.getBoardMember);
-router.post('/board-members', validate(createBoardMemberSchema), ctrl.createBoardMember);
-router.put('/board-members/:id', validate(updateBoardMemberSchema), ctrl.updateBoardMember);
-router.delete('/board-members/:id', ctrl.deleteBoardMember);
+router.get('/board-members', authorize('governance', 'read'), ctrl.listBoardMembers);
+router.get('/board-members/:id', authorize('governance', 'read'), ctrl.getBoardMember);
+router.post('/board-members', authorize('governance', 'create'), validate(createBoardMemberSchema), ctrl.createBoardMember);
+router.put('/board-members/:id', authorize('governance', 'update'), validate(updateBoardMemberSchema), ctrl.updateBoardMember);
+router.delete('/board-members/:id', authorize('governance', 'delete'), ctrl.deleteBoardMember);
 
 // Strategic Goals
-router.get('/goals', ctrl.listGoals);
-router.get('/goals/:id', ctrl.getGoal);
-router.post('/goals', validate(createGoalSchema), ctrl.createGoal);
-router.put('/goals/:id', validate(updateGoalSchema), ctrl.updateGoal);
-router.delete('/goals/:id', ctrl.deleteGoal);
+router.get('/goals', authorize('governance', 'read'), ctrl.listGoals);
+router.get('/goals/:id', authorize('governance', 'read'), ctrl.getGoal);
+router.post('/goals', authorize('governance', 'create'), validate(createGoalSchema), ctrl.createGoal);
+router.put('/goals/:id', authorize('governance', 'update'), validate(updateGoalSchema), ctrl.updateGoal);
+router.delete('/goals/:id', authorize('governance', 'delete'), ctrl.deleteGoal);
 
 export default router;

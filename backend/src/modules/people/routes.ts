@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authenticate } from '../../middleware/authenticate';
+import { authorize } from '../../middleware/authorize';
 import { validate } from '../../middleware/validate';
 import * as ctrl from './controller';
 import {
@@ -15,48 +16,48 @@ const router = Router();
 router.use(authenticate);
 
 // Dashboard
-router.get('/stats', ctrl.dashboardStats);
+router.get('/stats', authorize('people', 'read'), ctrl.dashboardStats);
 
 // Persons
-router.get('/persons', ctrl.listPersons);
-router.get('/persons/:id', ctrl.getPerson);
-router.post('/persons', validate(createPersonSchema), ctrl.createPerson);
-router.put('/persons/:id', validate(updatePersonSchema), ctrl.updatePerson);
-router.delete('/persons/:id', ctrl.deletePerson);
+router.get('/persons', authorize('people', 'read'), ctrl.listPersons);
+router.get('/persons/:id', authorize('people', 'read'), ctrl.getPerson);
+router.post('/persons', authorize('people', 'create'), validate(createPersonSchema), ctrl.createPerson);
+router.put('/persons/:id', authorize('people', 'update'), validate(updatePersonSchema), ctrl.updatePerson);
+router.delete('/persons/:id', authorize('people', 'delete'), ctrl.deletePerson);
 
 // Students
-router.get('/students', ctrl.listStudents);
-router.get('/students/:id', ctrl.getStudent);
-router.post('/students', validate(createStudentSchema), ctrl.createStudent);
-router.put('/students/:id', validate(updateStudentSchema), ctrl.updateStudent);
-router.delete('/students/:id', ctrl.deleteStudent);
+router.get('/students', authorize('people', 'read'), ctrl.listStudents);
+router.get('/students/:id', authorize('people', 'read'), ctrl.getStudent);
+router.post('/students', authorize('people', 'create'), validate(createStudentSchema), ctrl.createStudent);
+router.put('/students/:id', authorize('people', 'update'), validate(updateStudentSchema), ctrl.updateStudent);
+router.delete('/students/:id', authorize('people', 'delete'), ctrl.deleteStudent);
 
 // Faculty
-router.get('/faculty', ctrl.listFaculty);
-router.get('/faculty/:id', ctrl.getFaculty);
-router.post('/faculty', validate(createFacultySchema), ctrl.createFaculty);
-router.put('/faculty/:id', validate(updateFacultySchema), ctrl.updateFaculty);
-router.delete('/faculty/:id', ctrl.deleteFaculty);
+router.get('/faculty', authorize('people', 'read'), ctrl.listFaculty);
+router.get('/faculty/:id', authorize('people', 'read'), ctrl.getFaculty);
+router.post('/faculty', authorize('people', 'create'), validate(createFacultySchema), ctrl.createFaculty);
+router.put('/faculty/:id', authorize('people', 'update'), validate(updateFacultySchema), ctrl.updateFaculty);
+router.delete('/faculty/:id', authorize('people', 'delete'), ctrl.deleteFaculty);
 
 // Staff
-router.get('/staff', ctrl.listStaff);
-router.get('/staff/:id', ctrl.getStaff);
-router.post('/staff', validate(createStaffSchema), ctrl.createStaff);
-router.put('/staff/:id', validate(updateStaffSchema), ctrl.updateStaff);
-router.delete('/staff/:id', ctrl.deleteStaff);
+router.get('/staff', authorize('people', 'read'), ctrl.listStaff);
+router.get('/staff/:id', authorize('people', 'read'), ctrl.getStaff);
+router.post('/staff', authorize('people', 'create'), validate(createStaffSchema), ctrl.createStaff);
+router.put('/staff/:id', authorize('people', 'update'), validate(updateStaffSchema), ctrl.updateStaff);
+router.delete('/staff/:id', authorize('people', 'delete'), ctrl.deleteStaff);
 
 // Parents
-router.get('/parents', ctrl.listParents);
-router.get('/parents/:id', ctrl.getParent);
-router.post('/parents', validate(createParentSchema), ctrl.createParent);
-router.put('/parents/:id', validate(updateParentSchema), ctrl.updateParent);
-router.delete('/parents/:id', ctrl.deleteParent);
+router.get('/parents', authorize('people', 'read'), ctrl.listParents);
+router.get('/parents/:id', authorize('people', 'read'), ctrl.getParent);
+router.post('/parents', authorize('people', 'create'), validate(createParentSchema), ctrl.createParent);
+router.put('/parents/:id', authorize('people', 'update'), validate(updateParentSchema), ctrl.updateParent);
+router.delete('/parents/:id', authorize('people', 'delete'), ctrl.deleteParent);
 
 // Organizations
-router.get('/organizations', ctrl.listOrganizations);
-router.get('/organizations/:id', ctrl.getOrganization);
-router.post('/organizations', validate(createOrganizationSchema), ctrl.createOrganization);
-router.put('/organizations/:id', validate(updateOrganizationSchema), ctrl.updateOrganization);
-router.delete('/organizations/:id', ctrl.deleteOrganization);
+router.get('/organizations', authorize('people', 'read'), ctrl.listOrganizations);
+router.get('/organizations/:id', authorize('people', 'read'), ctrl.getOrganization);
+router.post('/organizations', authorize('people', 'create'), validate(createOrganizationSchema), ctrl.createOrganization);
+router.put('/organizations/:id', authorize('people', 'update'), validate(updateOrganizationSchema), ctrl.updateOrganization);
+router.delete('/organizations/:id', authorize('people', 'delete'), ctrl.deleteOrganization);
 
 export default router;
