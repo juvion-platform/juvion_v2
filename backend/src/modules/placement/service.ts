@@ -18,6 +18,8 @@ import { PlacementReport } from '../../models/placement/PlacementReport';
 import { paginate } from '../../shared/pagination';
 import { createAuditLog } from '../../shared/audit';
 import { AppError } from '../../middleware/errorHandler';
+import { AuthScope } from '../../shared/rbac/types';
+import { applyAuthScope } from '../../shared/rbac/apply-scope';
 
 const STUDENT_POPULATE = { path: 'studentId', populate: { path: 'personId' } };
 const FACULTY_POPULATE = { path: 'mentorId', populate: { path: 'personId' } };
@@ -67,8 +69,10 @@ export async function getStats(collegeId: string) {
 
 // ═══ Placement Season ════════════════════════════════════
 
-export async function listPlacementSeasons(collegeId: string, page = 1, limit = 20) {
-  return paginate(PlacementSeason, { collegeId }, page, limit, { createdAt: -1 }, ['academicYearId']);
+export async function listPlacementSeasons(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(PlacementSeason, filter, page, limit, { createdAt: -1 }, ['academicYearId']);
 }
 
 export async function getPlacementSeason(collegeId: string, id: string) {
@@ -99,8 +103,10 @@ export async function deletePlacementSeason(collegeId: string, id: string, who: 
 
 // ═══ Company ═════════════════════════════════════════════
 
-export async function listCompanies(collegeId: string, page = 1, limit = 20) {
-  return paginate(Company, { collegeId }, page, limit, { createdAt: -1 });
+export async function listCompanies(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(Company, filter, page, limit, { createdAt: -1 });
 }
 
 export async function getCompany(collegeId: string, id: string) {
@@ -131,9 +137,10 @@ export async function deleteCompany(collegeId: string, id: string, who: string) 
 
 // ═══ Job Posting ═════════════════════════════════════════
 
-export async function listJobPostings(collegeId: string, page = 1, limit = 20, placementSeasonId?: string) {
+export async function listJobPostings(collegeId: string, page = 1, limit = 20, placementSeasonId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (placementSeasonId) filter.placementSeasonId = placementSeasonId;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(JobPosting, filter, page, limit, { createdAt: -1 }, ['placementSeasonId', 'companyId']);
 }
 
@@ -165,9 +172,10 @@ export async function deleteJobPosting(collegeId: string, id: string, who: strin
 
 // ═══ Placement Registration ══════════════════════════════
 
-export async function listPlacementRegistrations(collegeId: string, page = 1, limit = 20, jobPostingId?: string) {
+export async function listPlacementRegistrations(collegeId: string, page = 1, limit = 20, jobPostingId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (jobPostingId) filter.jobPostingId = jobPostingId;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
   return paginate(PlacementRegistration, filter, page, limit, { appliedAt: -1 }, ['jobPostingId', STUDENT_POPULATE] as any);
 }
 
@@ -193,9 +201,10 @@ export async function deletePlacementRegistration(collegeId: string, id: string,
 
 // ═══ Placement Round ═════════════════════════════════════
 
-export async function listPlacementRounds(collegeId: string, page = 1, limit = 20, jobPostingId?: string) {
+export async function listPlacementRounds(collegeId: string, page = 1, limit = 20, jobPostingId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (jobPostingId) filter.jobPostingId = jobPostingId;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(PlacementRound, filter, page, limit, { createdAt: -1 }, ['jobPostingId']);
 }
 
@@ -221,9 +230,10 @@ export async function deletePlacementRound(collegeId: string, id: string, who: s
 
 // ═══ Round Result ════════════════════════════════════════
 
-export async function listRoundResults(collegeId: string, page = 1, limit = 20, roundId?: string) {
+export async function listRoundResults(collegeId: string, page = 1, limit = 20, roundId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (roundId) filter.roundId = roundId;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(RoundResult, filter, page, limit, { createdAt: -1 }, ['roundId', STUDENT_POPULATE] as any);
 }
 
@@ -249,9 +259,10 @@ export async function deleteRoundResult(collegeId: string, id: string, who: stri
 
 // ═══ Placement Offer ═════════════════════════════════════
 
-export async function listPlacementOffers(collegeId: string, page = 1, limit = 20, studentId?: string) {
+export async function listPlacementOffers(collegeId: string, page = 1, limit = 20, studentId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (studentId) filter.studentId = studentId;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(PlacementOffer, filter, page, limit, { offerDate: -1 }, ['jobPostingId', 'companyId', STUDENT_POPULATE] as any);
 }
 
@@ -277,8 +288,10 @@ export async function deletePlacementOffer(collegeId: string, id: string, who: s
 
 // ═══ Internship Posting ══════════════════════════════════
 
-export async function listInternshipPostings(collegeId: string, page = 1, limit = 20) {
-  return paginate(InternshipPosting, { collegeId }, page, limit, { createdAt: -1 }, ['companyId']);
+export async function listInternshipPostings(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(InternshipPosting, filter, page, limit, { createdAt: -1 }, ['companyId']);
 }
 
 export async function createInternshipPosting(collegeId: string, data: any, who: string) {
@@ -303,9 +316,10 @@ export async function deleteInternshipPosting(collegeId: string, id: string, who
 
 // ═══ Internship Application ══════════════════════════════
 
-export async function listInternshipApplications(collegeId: string, page = 1, limit = 20, internshipId?: string) {
+export async function listInternshipApplications(collegeId: string, page = 1, limit = 20, internshipId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (internshipId) filter.internshipId = internshipId;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
   return paginate(InternshipApplication, filter, page, limit, { appliedAt: -1 }, ['internshipId', STUDENT_POPULATE] as any);
 }
 
@@ -331,8 +345,10 @@ export async function deleteInternshipApplication(collegeId: string, id: string,
 
 // ═══ Placement Training ══════════════════════════════════
 
-export async function listPlacementTrainings(collegeId: string, page = 1, limit = 20) {
-  return paginate(PlacementTraining, { collegeId }, page, limit, { startDate: -1 });
+export async function listPlacementTrainings(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(PlacementTraining, filter, page, limit, { startDate: -1 });
 }
 
 export async function createPlacementTraining(collegeId: string, data: any, who: string) {
@@ -357,9 +373,10 @@ export async function deletePlacementTraining(collegeId: string, id: string, who
 
 // ═══ Training Attendance ═════════════════════════════════
 
-export async function listTrainingAttendance(collegeId: string, page = 1, limit = 20, trainingId?: string) {
+export async function listTrainingAttendance(collegeId: string, page = 1, limit = 20, trainingId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (trainingId) filter.trainingId = trainingId;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(TrainingAttendance, filter, page, limit, { createdAt: -1 }, ['trainingId', STUDENT_POPULATE] as any);
 }
 
@@ -385,9 +402,10 @@ export async function deleteTrainingAttendance(collegeId: string, id: string, wh
 
 // ═══ Mock Interview ══════════════════════════════════════
 
-export async function listMockInterviews(collegeId: string, page = 1, limit = 20, studentId?: string) {
+export async function listMockInterviews(collegeId: string, page = 1, limit = 20, studentId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (studentId) filter.studentId = studentId;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(MockInterview, filter, page, limit, { date: -1 }, [STUDENT_POPULATE, 'interviewerId'] as any);
 }
 
@@ -413,9 +431,10 @@ export async function deleteMockInterview(collegeId: string, id: string, who: st
 
 // ═══ Higher Studies Application ══════════════════════════
 
-export async function listHigherStudiesApplications(collegeId: string, page = 1, limit = 20, studentId?: string) {
+export async function listHigherStudiesApplications(collegeId: string, page = 1, limit = 20, studentId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (studentId) filter.studentId = studentId;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
   return paginate(HigherStudiesApplication, filter, page, limit, { createdAt: -1 }, [STUDENT_POPULATE] as any);
 }
 
@@ -441,8 +460,10 @@ export async function deleteHigherStudiesApplication(collegeId: string, id: stri
 
 // ═══ Entrepreneur Profile ════════════════════════════════
 
-export async function listEntrepreneurProfiles(collegeId: string, page = 1, limit = 20) {
-  return paginate(EntrepreneurProfile, { collegeId }, page, limit, { createdAt: -1 }, [STUDENT_POPULATE, FACULTY_POPULATE] as any);
+export async function listEntrepreneurProfiles(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(EntrepreneurProfile, filter, page, limit, { createdAt: -1 }, [STUDENT_POPULATE, FACULTY_POPULATE] as any);
 }
 
 export async function createEntrepreneurProfile(collegeId: string, data: any, who: string) {
@@ -467,8 +488,10 @@ export async function deleteEntrepreneurProfile(collegeId: string, id: string, w
 
 // ═══ Alumni Profile ══════════════════════════════════════
 
-export async function listAlumniProfiles(collegeId: string, page = 1, limit = 20) {
-  return paginate(AlumniProfile, { collegeId }, page, limit, { graduationYear: -1 }, ['personId']);
+export async function listAlumniProfiles(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(AlumniProfile, filter, page, limit, { graduationYear: -1 }, ['personId']);
 }
 
 export async function createAlumniProfile(collegeId: string, data: any, who: string) {
@@ -493,8 +516,10 @@ export async function deleteAlumniProfile(collegeId: string, id: string, who: st
 
 // ═══ Alumni Event ════════════════════════════════════════
 
-export async function listAlumniEvents(collegeId: string, page = 1, limit = 20) {
-  return paginate(AlumniEvent, { collegeId }, page, limit, { date: -1 }, ['organizerId']);
+export async function listAlumniEvents(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(AlumniEvent, filter, page, limit, { date: -1 }, ['organizerId']);
 }
 
 export async function createAlumniEvent(collegeId: string, data: any, who: string) {
@@ -519,9 +544,10 @@ export async function deleteAlumniEvent(collegeId: string, id: string, who: stri
 
 // ═══ Placement Report ════════════════════════════════════
 
-export async function listPlacementReports(collegeId: string, page = 1, limit = 20, placementSeasonId?: string) {
+export async function listPlacementReports(collegeId: string, page = 1, limit = 20, placementSeasonId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (placementSeasonId) filter.placementSeasonId = placementSeasonId;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(PlacementReport, filter, page, limit, { generatedAt: -1 }, ['placementSeasonId']);
 }
 
