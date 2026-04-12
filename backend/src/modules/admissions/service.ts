@@ -9,6 +9,8 @@ import { Admission } from '../../models/admissions/Admission';
 import { paginate } from '../../shared/pagination';
 import { createAuditLog } from '../../shared/audit';
 import { AppError } from '../../middleware/errorHandler';
+import { AuthScope } from '../../shared/rbac/types';
+import { applyAuthScope } from '../../shared/rbac/apply-scope';
 
 // ─── Dashboard Stats ─────────────────────────────────
 export async function getDashboardStats(collegeId: string) {
@@ -43,9 +45,10 @@ export async function getDashboardStats(collegeId: string) {
 
 // ─── Inquiries ───────────────────────────────────────────────
 
-export async function listInquiries(collegeId: string, page: number, limit: number, status?: string) {
+export async function listInquiries(collegeId: string, page: number, limit: number, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(Inquiry, filter, page, limit, { createdAt: -1 });
 }
 
@@ -131,9 +134,10 @@ export async function convertInquiryToApplicant(collegeId: string, inquiryId: st
 
 // ─── Applicants ──────────────────────────────────────────────
 
-export async function listApplicants(collegeId: string, page: number, limit: number, status?: string) {
+export async function listApplicants(collegeId: string, page: number, limit: number, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(Applicant, filter, page, limit, { createdAt: -1 }, ['inquiryId']);
 }
 
@@ -164,9 +168,10 @@ export async function updateApplicant(collegeId: string, id: string, data: any, 
 
 // ─── Entrance Exam Scores ────────────────────────────────────
 
-export async function listExamScores(collegeId: string, page: number, limit: number, applicantId?: string) {
+export async function listExamScores(collegeId: string, page: number, limit: number, applicantId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (applicantId) filter.applicantId = applicantId;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(EntranceExamScore, filter, page, limit, { createdAt: -1 }, ['applicantId']);
 }
 
@@ -185,9 +190,10 @@ export async function updateExamScore(collegeId: string, id: string, data: any, 
 
 // ─── Counseling Allotments ───────────────────────────────────
 
-export async function listCounselingAllotments(collegeId: string, page: number, limit: number, applicantId?: string) {
+export async function listCounselingAllotments(collegeId: string, page: number, limit: number, applicantId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (applicantId) filter.applicantId = applicantId;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(CounselingAllotment, filter, page, limit, { createdAt: -1 }, ['applicantId']);
 }
 
@@ -206,9 +212,10 @@ export async function updateCounselingAllotment(collegeId: string, id: string, d
 
 // ─── Admission Offers ────────────────────────────────────────
 
-export async function listOffers(collegeId: string, page: number, limit: number, status?: string) {
+export async function listOffers(collegeId: string, page: number, limit: number, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(AdmissionOffer, filter, page, limit, { createdAt: -1 }, ['applicantId']);
 }
 
@@ -227,9 +234,10 @@ export async function updateOffer(collegeId: string, id: string, data: any, perf
 
 // ─── Document Checklists ─────────────────────────────────────
 
-export async function listDocumentChecklists(collegeId: string, page: number, limit: number, status?: string) {
+export async function listDocumentChecklists(collegeId: string, page: number, limit: number, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(DocumentChecklist, filter, page, limit, { createdAt: -1 }, ['applicantId']);
 }
 
@@ -251,8 +259,10 @@ export async function upsertDocumentChecklist(collegeId: string, applicantId: st
 
 // ─── Admissions (Final Enrollment) ───────────────────────────
 
-export async function listAdmissions(collegeId: string, page: number, limit: number) {
-  return paginate(Admission, { collegeId }, page, limit, { admissionDate: -1 }, ['applicantId', 'studentId']);
+export async function listAdmissions(collegeId: string, page: number, limit: number, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(Admission, filter, page, limit, { admissionDate: -1 }, ['applicantId', 'studentId']);
 }
 
 export async function getAdmission(collegeId: string, id: string) {

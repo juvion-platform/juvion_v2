@@ -8,7 +8,7 @@ const who = (req: AuthRequest) => req.user?.name || 'System';
 export async function listInquiries(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page = '1', limit = '20', status } = req.query as any;
-    res.json(await svc.listInquiries(req.collegeId!, +page, +limit, status));
+    res.json(await svc.listInquiries(req.collegeId!, +page, +limit, status, req.authScope));
   } catch (e) { next(e); }
 }
 
@@ -36,7 +36,7 @@ export async function convertInquiry(req: AuthRequest, res: Response, next: Next
 export async function listApplicants(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page = '1', limit = '20', status } = req.query as any;
-    res.json(await svc.listApplicants(req.collegeId!, +page, +limit, status));
+    res.json(await svc.listApplicants(req.collegeId!, +page, +limit, status, req.authScope));
   } catch (e) { next(e); }
 }
 
@@ -56,7 +56,7 @@ export async function updateApplicant(req: AuthRequest, res: Response, next: Nex
 export async function listExamScores(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page = '1', limit = '20', applicantId } = req.query as any;
-    res.json(await svc.listExamScores(req.collegeId!, +page, +limit, applicantId));
+    res.json(await svc.listExamScores(req.collegeId!, +page, +limit, applicantId, req.authScope));
   } catch (e) { next(e); }
 }
 
@@ -72,7 +72,7 @@ export async function updateExamScore(req: AuthRequest, res: Response, next: Nex
 export async function listCounselingAllotments(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page = '1', limit = '20', applicantId } = req.query as any;
-    res.json(await svc.listCounselingAllotments(req.collegeId!, +page, +limit, applicantId));
+    res.json(await svc.listCounselingAllotments(req.collegeId!, +page, +limit, applicantId, req.authScope));
   } catch (e) { next(e); }
 }
 
@@ -88,7 +88,7 @@ export async function updateCounselingAllotment(req: AuthRequest, res: Response,
 export async function listOffers(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page = '1', limit = '20', status } = req.query as any;
-    res.json(await svc.listOffers(req.collegeId!, +page, +limit, status));
+    res.json(await svc.listOffers(req.collegeId!, +page, +limit, status, req.authScope));
   } catch (e) { next(e); }
 }
 
@@ -104,7 +104,7 @@ export async function updateOffer(req: AuthRequest, res: Response, next: NextFun
 export async function listDocumentChecklists(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page = '1', limit = '20', status } = req.query as any;
-    res.json(await svc.listDocumentChecklists(req.collegeId!, +page, +limit, status));
+    res.json(await svc.listDocumentChecklists(req.collegeId!, +page, +limit, status, req.authScope));
   } catch (e) { next(e); }
 }
 
@@ -120,7 +120,7 @@ export async function upsertDocumentChecklist(req: AuthRequest, res: Response, n
 export async function listAdmissions(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page = '1', limit = '20' } = req.query as any;
-    res.json(await svc.listAdmissions(req.collegeId!, +page, +limit));
+    res.json(await svc.listAdmissions(req.collegeId!, +page, +limit, req.authScope));
   } catch (e) { next(e); }
 }
 
