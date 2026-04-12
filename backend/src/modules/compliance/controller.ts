@@ -14,7 +14,7 @@ export async function dashboardStats(req: AuthRequest, res: Response, next: Next
 export async function listAccreditationBodies(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit } = req.query as any;
-    res.json(await service.listAccreditationBodies(req.collegeId!, Number(page) || 1, Number(limit) || 20));
+    res.json(await service.listAccreditationBodies(req.collegeId!, Number(page) || 1, Number(limit) || 20, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getAccreditationBody(req: AuthRequest, res: Response, next: NextFunction) {
@@ -35,7 +35,7 @@ export async function deleteAccreditationBody(req: AuthRequest, res: Response, n
 export async function listAccreditationCycles(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, bodyId, status } = req.query as any;
-    res.json(await service.listAccreditationCycles(req.collegeId!, Number(page) || 1, Number(limit) || 20, bodyId, status));
+    res.json(await service.listAccreditationCycles(req.collegeId!, Number(page) || 1, Number(limit) || 20, bodyId, status, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getAccreditationCycle(req: AuthRequest, res: Response, next: NextFunction) {
@@ -56,7 +56,7 @@ export async function deleteAccreditationCycle(req: AuthRequest, res: Response, 
 export async function listComplianceCriteria(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, accreditationCycleId, status } = req.query as any;
-    res.json(await service.listComplianceCriteria(req.collegeId!, Number(page) || 1, Number(limit) || 20, accreditationCycleId, status));
+    res.json(await service.listComplianceCriteria(req.collegeId!, Number(page) || 1, Number(limit) || 20, accreditationCycleId, status, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getComplianceCriteria(req: AuthRequest, res: Response, next: NextFunction) {
@@ -77,7 +77,7 @@ export async function deleteComplianceCriteria(req: AuthRequest, res: Response, 
 export async function listRegulatoryFilings(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, body, status } = req.query as any;
-    res.json(await service.listRegulatoryFilings(req.collegeId!, Number(page) || 1, Number(limit) || 20, body, status));
+    res.json(await service.listRegulatoryFilings(req.collegeId!, Number(page) || 1, Number(limit) || 20, body, status, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getRegulatoryFiling(req: AuthRequest, res: Response, next: NextFunction) {
@@ -98,7 +98,7 @@ export async function deleteRegulatoryFiling(req: AuthRequest, res: Response, ne
 export async function listAICTEApprovals(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, status } = req.query as any;
-    res.json(await service.listAICTEApprovals(req.collegeId!, Number(page) || 1, Number(limit) || 20, status));
+    res.json(await service.listAICTEApprovals(req.collegeId!, Number(page) || 1, Number(limit) || 20, status, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getAICTEApproval(req: AuthRequest, res: Response, next: NextFunction) {
@@ -119,7 +119,7 @@ export async function deleteAICTEApproval(req: AuthRequest, res: Response, next:
 export async function listAffiliationStatuses(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, status } = req.query as any;
-    res.json(await service.listAffiliationStatuses(req.collegeId!, Number(page) || 1, Number(limit) || 20, status));
+    res.json(await service.listAffiliationStatuses(req.collegeId!, Number(page) || 1, Number(limit) || 20, status, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getAffiliationStatus(req: AuthRequest, res: Response, next: NextFunction) {
@@ -140,7 +140,7 @@ export async function deleteAffiliationStatus(req: AuthRequest, res: Response, n
 export async function listAuditFindings(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, auditType, status } = req.query as any;
-    res.json(await service.listAuditFindings(req.collegeId!, Number(page) || 1, Number(limit) || 20, auditType, status));
+    res.json(await service.listAuditFindings(req.collegeId!, Number(page) || 1, Number(limit) || 20, auditType, status, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getAuditFinding(req: AuthRequest, res: Response, next: NextFunction) {
@@ -161,7 +161,7 @@ export async function deleteAuditFinding(req: AuthRequest, res: Response, next: 
 export async function listIQACReports(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, reportType, status } = req.query as any;
-    res.json(await service.listIQACReports(req.collegeId!, Number(page) || 1, Number(limit) || 20, reportType, status));
+    res.json(await service.listIQACReports(req.collegeId!, Number(page) || 1, Number(limit) || 20, reportType, status, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getIQACReport(req: AuthRequest, res: Response, next: NextFunction) {
@@ -182,7 +182,7 @@ export async function deleteIQACReport(req: AuthRequest, res: Response, next: Ne
 export async function listRTIRequests(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, status } = req.query as any;
-    res.json(await service.listRTIRequests(req.collegeId!, Number(page) || 1, Number(limit) || 20, status));
+    res.json(await service.listRTIRequests(req.collegeId!, Number(page) || 1, Number(limit) || 20, status, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getRTIRequest(req: AuthRequest, res: Response, next: NextFunction) {
@@ -203,7 +203,7 @@ export async function deleteRTIRequest(req: AuthRequest, res: Response, next: Ne
 export async function listLegalCases(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, caseType, status } = req.query as any;
-    res.json(await service.listLegalCases(req.collegeId!, Number(page) || 1, Number(limit) || 20, caseType, status));
+    res.json(await service.listLegalCases(req.collegeId!, Number(page) || 1, Number(limit) || 20, caseType, status, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getLegalCase(req: AuthRequest, res: Response, next: NextFunction) {

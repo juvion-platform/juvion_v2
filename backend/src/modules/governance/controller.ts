@@ -14,7 +14,7 @@ export async function dashboardStats(req: AuthRequest, res: Response, next: Next
 export async function listCommittees(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, type } = req.query as any;
-    res.json(await service.listCommittees(req.collegeId!, Number(page) || 1, Number(limit) || 20, type));
+    res.json(await service.listCommittees(req.collegeId!, Number(page) || 1, Number(limit) || 20, type, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getCommittee(req: AuthRequest, res: Response, next: NextFunction) {
@@ -35,7 +35,7 @@ export async function deleteCommittee(req: AuthRequest, res: Response, next: Nex
 export async function listMeetings(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, committeeId, status } = req.query as any;
-    res.json(await service.listMeetings(req.collegeId!, Number(page) || 1, Number(limit) || 20, committeeId, status));
+    res.json(await service.listMeetings(req.collegeId!, Number(page) || 1, Number(limit) || 20, committeeId, status, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getMeeting(req: AuthRequest, res: Response, next: NextFunction) {
@@ -56,7 +56,7 @@ export async function deleteMeeting(req: AuthRequest, res: Response, next: NextF
 export async function listPolicies(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, category, status } = req.query as any;
-    res.json(await service.listPolicies(req.collegeId!, Number(page) || 1, Number(limit) || 20, category, status));
+    res.json(await service.listPolicies(req.collegeId!, Number(page) || 1, Number(limit) || 20, category, status, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getPolicy(req: AuthRequest, res: Response, next: NextFunction) {
@@ -77,7 +77,7 @@ export async function deletePolicy(req: AuthRequest, res: Response, next: NextFu
 export async function listBoardMembers(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, role } = req.query as any;
-    res.json(await service.listBoardMembers(req.collegeId!, Number(page) || 1, Number(limit) || 20, role));
+    res.json(await service.listBoardMembers(req.collegeId!, Number(page) || 1, Number(limit) || 20, role, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getBoardMember(req: AuthRequest, res: Response, next: NextFunction) {
@@ -98,7 +98,7 @@ export async function deleteBoardMember(req: AuthRequest, res: Response, next: N
 export async function listGoals(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, category, status } = req.query as any;
-    res.json(await service.listGoals(req.collegeId!, Number(page) || 1, Number(limit) || 20, category, status));
+    res.json(await service.listGoals(req.collegeId!, Number(page) || 1, Number(limit) || 20, category, status, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getGoal(req: AuthRequest, res: Response, next: NextFunction) {

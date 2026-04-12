@@ -6,6 +6,8 @@ import { StrategicGoal } from '../../models/governance/StrategicGoal';
 import { paginate } from '../../shared/pagination';
 import { createAuditLog } from '../../shared/audit';
 import { AppError } from '../../middleware/errorHandler';
+import { AuthScope } from '../../shared/rbac/types';
+import { applyAuthScope } from '../../shared/rbac/apply-scope';
 
 // ─── Dashboard Stats ──────────────────────────────────────
 export async function getStats(collegeId: string) {
@@ -35,9 +37,10 @@ export async function getStats(collegeId: string) {
 
 // ═══ Committee ══════════════════════════════════════════
 
-export async function listCommittees(collegeId: string, page = 1, limit = 20, type?: string) {
+export async function listCommittees(collegeId: string, page = 1, limit = 20, type?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (type) filter.type = type;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(Committee, filter, page, limit, { createdAt: -1 }, ['chairpersonId', 'members.personId']);
 }
 
@@ -69,10 +72,11 @@ export async function deleteCommittee(collegeId: string, id: string, who: string
 
 // ═══ Committee Meeting ══════════════════════════════════
 
-export async function listMeetings(collegeId: string, page = 1, limit = 20, committeeId?: string, status?: string) {
+export async function listMeetings(collegeId: string, page = 1, limit = 20, committeeId?: string, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (committeeId) filter.committeeId = committeeId;
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(CommitteeMeeting, filter, page, limit, { meetingDate: -1 }, ['committeeId', 'attendees']);
 }
 
@@ -104,10 +108,11 @@ export async function deleteMeeting(collegeId: string, id: string, who: string) 
 
 // ═══ Policy ═════════════════════════════════════════════
 
-export async function listPolicies(collegeId: string, page = 1, limit = 20, category?: string, status?: string) {
+export async function listPolicies(collegeId: string, page = 1, limit = 20, category?: string, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (category) filter.category = category;
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(Policy, filter, page, limit, { createdAt: -1 }, ['approvedBy']);
 }
 
@@ -139,9 +144,10 @@ export async function deletePolicy(collegeId: string, id: string, who: string) {
 
 // ═══ Governing Body Member ══════════════════════════════
 
-export async function listBoardMembers(collegeId: string, page = 1, limit = 20, role?: string) {
+export async function listBoardMembers(collegeId: string, page = 1, limit = 20, role?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (role) filter.role = role;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(GoverningBodyMember, filter, page, limit, { appointedDate: -1 }, ['personId']);
 }
 
@@ -173,10 +179,11 @@ export async function deleteBoardMember(collegeId: string, id: string, who: stri
 
 // ═══ Strategic Goal ═════════════════════════════════════
 
-export async function listGoals(collegeId: string, page = 1, limit = 20, category?: string, status?: string) {
+export async function listGoals(collegeId: string, page = 1, limit = 20, category?: string, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (category) filter.category = category;
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(StrategicGoal, filter, page, limit, { targetDate: 1 }, ['ownerId']);
 }
 
