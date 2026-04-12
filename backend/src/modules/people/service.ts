@@ -8,6 +8,8 @@ import { Organization } from '../../models/people/Organization';
 import { paginate } from '../../shared/pagination';
 import { createAuditLog } from '../../shared/audit';
 import { AppError } from '../../middleware/errorHandler';
+import { AuthScope } from '../../shared/rbac/types';
+import { applyAuthScope } from '../../shared/rbac/apply-scope';
 import {
   getFacultyProfileCompleteness,
   getOrganizationProfileCompleteness,
@@ -161,8 +163,9 @@ async function syncStudentParentLinks(collegeId: string, studentId: string, prev
 
 // ─── Persons (raw) ───────────────────────────────────
 
-export async function listPersons(collegeId: string, page: number, limit: number, search?: string) {
+export async function listPersons(collegeId: string, page: number, limit: number, search?: string, authScope?: AuthScope) {
   const match: any = { collegeId: toOid(collegeId) };
+  if (authScope) applyAuthScope(match, authScope, { selfField: '_id' });
   if (search) match.name = { $regex: search, $options: 'i' };
   const skip = (page - 1) * limit;
 
@@ -224,8 +227,9 @@ export async function deletePerson(collegeId: string, id: string, performedBy: s
 
 // ─── Students ────────────────────────────────────────
 
-export async function listStudents(collegeId: string, page: number, limit: number, status?: string, search?: string, onboardingStatus?: string, needsAttention = false) {
+export async function listStudents(collegeId: string, page: number, limit: number, status?: string, search?: string, onboardingStatus?: string, needsAttention = false, authScope?: AuthScope) {
   const filter: any = { collegeId: toOid(collegeId) };
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'personId', departmentField: 'branchId' });
   if (status) filter.status = status;
   if (onboardingStatus) filter.onboardingStatus = onboardingStatus;
   if (needsAttention) {
@@ -372,8 +376,9 @@ export async function deleteStudent(collegeId: string, id: string, performedBy: 
 
 // ─── Faculty ─────────────────────────────────────────
 
-export async function listFaculty(collegeId: string, page: number, limit: number, status?: string, search?: string) {
+export async function listFaculty(collegeId: string, page: number, limit: number, status?: string, search?: string, authScope?: AuthScope) {
   const filter: any = { collegeId: toOid(collegeId) };
+  if (authScope) applyAuthScope(filter, authScope);
   if (status) filter.status = status;
   const skip = (page - 1) * limit;
 
@@ -444,8 +449,9 @@ export async function deleteFaculty(collegeId: string, id: string, performedBy: 
 
 // ─── Staff ───────────────────────────────────────────
 
-export async function listStaff(collegeId: string, page: number, limit: number, status?: string, search?: string) {
+export async function listStaff(collegeId: string, page: number, limit: number, status?: string, search?: string, authScope?: AuthScope) {
   const filter: any = { collegeId: toOid(collegeId) };
+  if (authScope) applyAuthScope(filter, authScope);
   if (status) filter.status = status;
   const skip = (page - 1) * limit;
 
@@ -516,8 +522,9 @@ export async function deleteStaff(collegeId: string, id: string, performedBy: st
 
 // ─── Parents ─────────────────────────────────────────
 
-export async function listParents(collegeId: string, page: number, limit: number, search?: string) {
+export async function listParents(collegeId: string, page: number, limit: number, search?: string, authScope?: AuthScope) {
   const filter: any = { collegeId: toOid(collegeId) };
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'personId' });
   const skip = (page - 1) * limit;
 
   const pipeline: any[] = [
@@ -591,9 +598,10 @@ export async function deleteParent(collegeId: string, id: string, performedBy: s
 
 // ─── Organizations ───────────────────────────────────
 
-export async function listOrganizations(collegeId: string, page: number, limit: number, search?: string) {
+export async function listOrganizations(collegeId: string, page: number, limit: number, search?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (search) filter.name = { $regex: search, $options: 'i' };
+  if (authScope) applyAuthScope(filter, authScope);
   const result = await paginate(Organization, filter, page, limit, { createdAt: -1 });
   return {
     ...result,

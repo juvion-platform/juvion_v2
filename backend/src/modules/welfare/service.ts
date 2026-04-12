@@ -17,6 +17,8 @@ import { ParentMeeting } from '../../models/welfare/ParentMeeting';
 import { paginate } from '../../shared/pagination';
 import { createAuditLog } from '../../shared/audit';
 import { AppError } from '../../middleware/errorHandler';
+import { AuthScope } from '../../shared/rbac/types';
+import { applyAuthScope } from '../../shared/rbac/apply-scope';
 
 const STUDENT_POPULATE = { path: 'studentId', populate: { path: 'personId' } };
 const FACULTY_POPULATE = { path: 'facultyId', populate: { path: 'personId' } };
@@ -68,8 +70,10 @@ export async function getStats(collegeId: string) {
 
 // ═══ Hostel Block ════════════════════════════════════════
 
-export async function listHostelBlocks(collegeId: string, page = 1, limit = 20) {
-  return paginate(HostelBlock, { collegeId }, page, limit, { createdAt: -1 }, ['wardenId']);
+export async function listHostelBlocks(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(HostelBlock, filter, page, limit, { createdAt: -1 }, ['wardenId']);
 }
 
 export async function getHostelBlock(collegeId: string, id: string) {
@@ -100,9 +104,10 @@ export async function deleteHostelBlock(collegeId: string, id: string, who: stri
 
 // ═══ Hostel Room ═════════════════════════════════════════
 
-export async function listHostelRooms(collegeId: string, page = 1, limit = 20, blockId?: string) {
+export async function listHostelRooms(collegeId: string, page = 1, limit = 20, blockId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (blockId) filter.blockId = blockId;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(HostelRoom, filter, page, limit, { createdAt: -1 }, ['blockId']);
 }
 
@@ -134,10 +139,11 @@ export async function deleteHostelRoom(collegeId: string, id: string, who: strin
 
 // ═══ Hostel Allocation ═══════════════════════════════════
 
-export async function listHostelAllocations(collegeId: string, page = 1, limit = 20, studentId?: string, status?: string) {
+export async function listHostelAllocations(collegeId: string, page = 1, limit = 20, studentId?: string, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (studentId) filter.studentId = studentId;
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
   return paginate(HostelAllocation, filter, page, limit, { createdAt: -1 }, [STUDENT_POPULATE, 'roomId', 'academicYearId'] as any);
 }
 
@@ -169,9 +175,10 @@ export async function deleteHostelAllocation(collegeId: string, id: string, who:
 
 // ═══ Hostel Visitor Log ══════════════════════════════════
 
-export async function listHostelVisitorLogs(collegeId: string, page = 1, limit = 20, studentId?: string) {
+export async function listHostelVisitorLogs(collegeId: string, page = 1, limit = 20, studentId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (studentId) filter.studentId = studentId;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
   return paginate(HostelVisitorLog, filter, page, limit, { inTime: -1 }, [STUDENT_POPULATE] as any);
 }
 
@@ -203,9 +210,10 @@ export async function deleteHostelVisitorLog(collegeId: string, id: string, who:
 
 // ═══ Mess Menu ═══════════════════════════════════════════
 
-export async function listMessMenus(collegeId: string, page = 1, limit = 20, day?: string) {
+export async function listMessMenus(collegeId: string, page = 1, limit = 20, day?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (day) filter.day = day;
+  if (authScope) applyAuthScope(filter, authScope);
   return paginate(MessMenu, filter, page, limit, { effectiveFrom: -1 }, ['blockId']);
 }
 
@@ -237,9 +245,10 @@ export async function deleteMessMenu(collegeId: string, id: string, who: string)
 
 // ═══ Mess Feedback ═══════════════════════════════════════
 
-export async function listMessFeedbacks(collegeId: string, page = 1, limit = 20, mealType?: string) {
+export async function listMessFeedbacks(collegeId: string, page = 1, limit = 20, mealType?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (mealType) filter.mealType = mealType;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
   return paginate(MessFeedback, filter, page, limit, { date: -1 }, [STUDENT_POPULATE] as any);
 }
 
@@ -271,8 +280,10 @@ export async function deleteMessFeedback(collegeId: string, id: string, who: str
 
 // ═══ Transport Route ═════════════════════════════════════
 
-export async function listTransportRoutes(collegeId: string, page = 1, limit = 20) {
-  return paginate(TransportRoute, { collegeId }, page, limit, { createdAt: -1 });
+export async function listTransportRoutes(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(TransportRoute, filter, page, limit, { createdAt: -1 });
 }
 
 export async function getTransportRoute(collegeId: string, id: string) {
@@ -303,10 +314,11 @@ export async function deleteTransportRoute(collegeId: string, id: string, who: s
 
 // ═══ Transport Allocation ════════════════════════════════
 
-export async function listTransportAllocations(collegeId: string, page = 1, limit = 20, routeId?: string, status?: string) {
+export async function listTransportAllocations(collegeId: string, page = 1, limit = 20, routeId?: string, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (routeId) filter.routeId = routeId;
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
   return paginate(TransportAllocation, filter, page, limit, { createdAt: -1 }, [STUDENT_POPULATE, 'routeId', 'academicYearId'] as any);
 }
 
@@ -338,8 +350,10 @@ export async function deleteTransportAllocation(collegeId: string, id: string, w
 
 // ═══ Health Record ═══════════════════════════════════════
 
-export async function listHealthRecords(collegeId: string, page = 1, limit = 20) {
-  return paginate(HealthRecord, { collegeId }, page, limit, { createdAt: -1 }, ['personId']);
+export async function listHealthRecords(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'personId' });
+  return paginate(HealthRecord, filter, page, limit, { createdAt: -1 }, ['personId']);
 }
 
 export async function getHealthRecord(collegeId: string, id: string) {
@@ -370,8 +384,10 @@ export async function deleteHealthRecord(collegeId: string, id: string, who: str
 
 // ═══ Medical Visit ═══════════════════════════════════════
 
-export async function listMedicalVisits(collegeId: string, page = 1, limit = 20) {
-  return paginate(MedicalVisit, { collegeId }, page, limit, { visitDate: -1 }, ['personId']);
+export async function listMedicalVisits(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'personId' });
+  return paginate(MedicalVisit, filter, page, limit, { visitDate: -1 }, ['personId']);
 }
 
 export async function getMedicalVisit(collegeId: string, id: string) {
@@ -402,9 +418,10 @@ export async function deleteMedicalVisit(collegeId: string, id: string, who: str
 
 // ═══ Counseling Session ══════════════════════════════════
 
-export async function listCounselingSessions(collegeId: string, page = 1, limit = 20, type?: string) {
+export async function listCounselingSessions(collegeId: string, page = 1, limit = 20, type?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (type) filter.type = type;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
   return paginate(CounselingSession, filter, page, limit, { sessionDate: -1 }, [STUDENT_POPULATE, 'counselorId'] as any);
 }
 
@@ -436,9 +453,10 @@ export async function deleteCounselingSession(collegeId: string, id: string, who
 
 // ═══ Crisis Alert ════════════════════════════════════════
 
-export async function listCrisisAlerts(collegeId: string, page = 1, limit = 20, status?: string) {
+export async function listCrisisAlerts(collegeId: string, page = 1, limit = 20, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
   return paginate(CrisisAlert, filter, page, limit, { createdAt: -1 }, ['reportedBy', STUDENT_POPULATE, 'assignedTo'] as any);
 }
 
@@ -470,9 +488,10 @@ export async function deleteCrisisAlert(collegeId: string, id: string, who: stri
 
 // ═══ Anti-Ragging Complaint ══════════════════════════════
 
-export async function listAntiRaggingComplaints(collegeId: string, page = 1, limit = 20, status?: string) {
+export async function listAntiRaggingComplaints(collegeId: string, page = 1, limit = 20, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'complainantId' });
   return paginate(AntiRaggingComplaint, filter, page, limit, { createdAt: -1 }, ['complainantId', { path: 'accusedIds', populate: { path: 'personId' } }] as any);
 }
 
@@ -504,9 +523,10 @@ export async function deleteAntiRaggingComplaint(collegeId: string, id: string, 
 
 // ═══ Student Grievance ═══════════════════════════════════
 
-export async function listStudentGrievances(collegeId: string, page = 1, limit = 20, status?: string) {
+export async function listStudentGrievances(collegeId: string, page = 1, limit = 20, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
   return paginate(StudentGrievance, filter, page, limit, { createdAt: -1 }, [STUDENT_POPULATE, 'assignedTo'] as any);
 }
 
@@ -538,9 +558,10 @@ export async function deleteStudentGrievance(collegeId: string, id: string, who:
 
 // ═══ Insurance Claim ═════════════════════════════════════
 
-export async function listInsuranceClaims(collegeId: string, page = 1, limit = 20, status?: string) {
+export async function listInsuranceClaims(collegeId: string, page = 1, limit = 20, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'personId' });
   return paginate(InsuranceClaim, filter, page, limit, { claimDate: -1 }, ['personId']);
 }
 
@@ -572,9 +593,10 @@ export async function deleteInsuranceClaim(collegeId: string, id: string, who: s
 
 // ═══ Parent Meeting ══════════════════════════════════════
 
-export async function listParentMeetings(collegeId: string, page = 1, limit = 20, status?: string) {
+export async function listParentMeetings(collegeId: string, page = 1, limit = 20, status?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
   if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
   return paginate(ParentMeeting, filter, page, limit, { scheduledDate: -1 }, [STUDENT_POPULATE, { path: 'parentId', populate: { path: 'personId' } }, FACULTY_POPULATE] as any);
 }
 
