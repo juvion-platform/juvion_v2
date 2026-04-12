@@ -23,7 +23,7 @@ export const ALL_ACTIONS = ['read', 'create', 'update', 'delete'] as const;
  * Loads all policies once, then evaluates each module x action combination.
  */
 export async function resolvePermissions(
-  collegeId: string,
+  collegeId: string | undefined,
   role: string,
   personaType: string,
 ): Promise<string[]> {

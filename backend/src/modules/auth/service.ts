@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { User } from '../../models/User';
 import { AppError } from '../../middleware/errorHandler';
+import { resolvePermissions } from '../../shared/rbac/resolve-permissions';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
 const JWT_EXPIRES_IN = '7d';
@@ -69,6 +70,9 @@ export async function login(email: string, password: string, collegeId?: string)
     result.collegeId = String(user.collegeId);
   }
 
+  const targetCollegeId = isSuperAdmin ? undefined : String(user.collegeId);
+  result.permissions = await resolvePermissions(targetCollegeId, user.role, user.personaType);
+
   return result;
 }
 
@@ -102,7 +106,11 @@ export async function refreshToken(userId: string) {
   }
 
   const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
-  return { token };
+
+  const targetCollegeId = isSuperAdmin ? undefined : (user.collegeId ? String(user.collegeId) : undefined);
+  const permissions = await resolvePermissions(targetCollegeId, user.role, user.personaType);
+
+  return { token, permissions };
 }
 
 export async function createUser(collegeId: string, data: { email: string; password: string; name: string; role?: string; personaType?: string; personId?: string }) {

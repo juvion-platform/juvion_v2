@@ -40,11 +40,11 @@ export default function Login() {
       const { data } = await api.post('/auth/login', { email, password });
       if (data.isSuperAdmin) {
         // Superadmin: store token + colleges, redirect to college selector
-        setAuth(data.user, data.token, undefined, data.colleges);
+        setAuth(data.user, data.token, undefined, data.colleges, data.permissions);
         navigate('/select-college', { replace: true });
       } else {
         // Regular admin: store token + collegeId, redirect to dashboard
-        setAuth(data.user, data.token, data.collegeId);
+        setAuth(data.user, data.token, data.collegeId, undefined, data.permissions);
         navigate('/', { replace: true });
       }
     } catch (err: any) {
