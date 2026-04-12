@@ -9,20 +9,20 @@ import clsx from 'clsx';
 import { useAuthStore } from '../stores/authStore';
 
 const NAV_ITEMS = [
-  { to: '/', icon: LayoutDashboard, label: 'Dashboard', iconColor: 'text-sky-400' },
-  { to: '/admissions', icon: UserPlus, label: 'Admissions', iconColor: 'text-emerald-400' },
-  { to: '/people', icon: Users, label: 'People', iconColor: 'text-blue-400' },
-  { to: '/academics', icon: GraduationCap, label: 'Academics', iconColor: 'text-amber-400' },
-  { to: '/finance', icon: IndianRupee, label: 'Finance', iconColor: 'text-green-400' },
-  { to: '/hr', icon: Briefcase, label: 'HR', iconColor: 'text-violet-400' },
-  { to: '/welfare', icon: Heart, label: 'Welfare', iconColor: 'text-rose-400' },
-  { to: '/placement', icon: TrendingUp, label: 'Placement', iconColor: 'text-cyan-400' },
-  { to: '/campus', icon: Building2, label: 'Campus Ops', iconColor: 'text-orange-400' },
-  { to: '/student-dev', icon: BookOpen, label: 'Student Dev', iconColor: 'text-teal-400' },
-  { to: '/compliance', icon: Shield, label: 'Compliance', iconColor: 'text-red-400' },
-  { to: '/governance', icon: Landmark, label: 'Governance', iconColor: 'text-indigo-400' },
-  { to: '/platform', icon: Settings, label: 'Platform', iconColor: 'text-gray-400' },
-  { to: '/juvi', icon: Bot, label: 'Juvi AI', iconColor: 'text-purple-400' },
+  { to: '/', icon: LayoutDashboard, label: 'Dashboard', iconColor: 'text-sky-400', module: null },
+  { to: '/admissions', icon: UserPlus, label: 'Admissions', iconColor: 'text-emerald-400', module: 'admissions' },
+  { to: '/people', icon: Users, label: 'People', iconColor: 'text-blue-400', module: 'people' },
+  { to: '/academics', icon: GraduationCap, label: 'Academics', iconColor: 'text-amber-400', module: 'academics' },
+  { to: '/finance', icon: IndianRupee, label: 'Finance', iconColor: 'text-green-400', module: 'finance' },
+  { to: '/hr', icon: Briefcase, label: 'HR', iconColor: 'text-violet-400', module: 'hr' },
+  { to: '/welfare', icon: Heart, label: 'Welfare', iconColor: 'text-rose-400', module: 'welfare' },
+  { to: '/placement', icon: TrendingUp, label: 'Placement', iconColor: 'text-cyan-400', module: 'placement' },
+  { to: '/campus', icon: Building2, label: 'Campus Ops', iconColor: 'text-orange-400', module: 'campus' },
+  { to: '/student-dev', icon: BookOpen, label: 'Student Dev', iconColor: 'text-teal-400', module: 'student-dev' },
+  { to: '/compliance', icon: Shield, label: 'Compliance', iconColor: 'text-red-400', module: 'compliance' },
+  { to: '/governance', icon: Landmark, label: 'Governance', iconColor: 'text-indigo-400', module: 'governance' },
+  { to: '/platform', icon: Settings, label: 'Platform', iconColor: 'text-gray-400', module: 'platform' },
+  { to: '/juvi', icon: Bot, label: 'Juvi AI', iconColor: 'text-purple-400', module: 'juvi' },
 ];
 
 export default function DashboardLayout() {
@@ -34,6 +34,11 @@ export default function DashboardLayout() {
   const logout = useAuthStore((s) => s.logout);
   const isSuperAdmin = useAuthStore((s) => s.isSuperAdmin);
   const collegeName = useAuthStore((s) => s.collegeName);
+  const hasPermission = useAuthStore((s) => s.hasPermission);
+
+  const visibleItems = NAV_ITEMS.filter(
+    (item) => !item.module || hasPermission(item.module, 'read')
+  );
 
   // Decode user from token if user is null (page refresh)
   const displayName = user?.name || (() => {
@@ -101,7 +106,7 @@ export default function DashboardLayout() {
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto py-2 space-y-0.5">
-          {NAV_ITEMS.map(({ to, icon: Icon, label, iconColor }) => (
+          {visibleItems.map(({ to, icon: Icon, label, iconColor }) => (
             <NavLink
               key={to}
               to={to}
