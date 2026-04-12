@@ -1,12 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Mock the engine before importing authorize
+// Mock the engine and scope-resolver before importing authorize
 vi.mock('../../shared/rbac/engine', () => ({
   evaluateAccess: vi.fn(),
+}));
+vi.mock('../../shared/rbac/scope-resolver', () => ({
+  resolveUserScope: vi.fn().mockResolvedValue({}),
 }));
 
 import { authorize } from '../authorize';
 import { evaluateAccess } from '../../shared/rbac/engine';
+import { resolveUserScope } from '../../shared/rbac/scope-resolver';
 import { Response, NextFunction } from 'express';
 
 function mockReq(overrides: Record<string, unknown> = {}) {
@@ -87,10 +91,16 @@ describe('authorize middleware', () => {
       priority: 700,
       scope: { departmentOnly: true },
     });
+    (resolveUserScope as ReturnType<typeof vi.fn>).mockResolvedValue({
+      departmentId: 'dept1',
+      personId: 'person1',
+    });
     const mw = authorize('academics', 'read');
     await mw(req, res, next);
     expect(next).toHaveBeenCalled();
     expect(req.authScope).toBeDefined();
     expect(req.authScope.departmentOnly).toBe(true);
+    expect(req.authScope.departmentId).toBe('dept1');
+    expect(req.authScope.personId).toBe('person1');
   });
 });

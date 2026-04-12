@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from './authenticate';
 import { evaluateAccess } from '../shared/rbac/engine';
+import { resolveUserScope } from '../shared/rbac/scope-resolver';
 import { AuthScope, RbacOptions } from '../shared/rbac/types';
 
 /**
@@ -46,11 +47,16 @@ export function authorize(module: string, action: string, opts?: RbacOptions) {
         }
       }
 
+      // Resolve department and person IDs for scope enforcement
+      const userScope = await resolveUserScope(userId, collegeId || '', role);
+
       // Attach scope constraints for services to enforce
       const authScope: AuthScope = {
         departmentOnly: policy.scope?.departmentOnly ?? false,
+        departmentId: userScope.departmentId,
         selfOnly: policy.scope?.selfOnly ?? false,
         userId,
+        personId: userScope.personId,
         subDomain: policy.scope?.subDomain ? policy.scope.subDomain.split(',').map((s) => s.trim()) : undefined,
         resolvedPermissions: [],
       };
