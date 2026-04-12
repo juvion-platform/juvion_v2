@@ -118,3 +118,23 @@ export const createWhatsAppLogSchema = z.object({
   sentAt: z.string().optional(),
 });
 export const updateWhatsAppLogSchema = createWhatsAppLogSchema.partial();
+
+// ═══ RBAC Policy ═══════════════════════════════════════════
+
+export const createRbacPolicySchema = z.object({
+  role: z.enum(['super_admin', 'admin', 'principal', 'hod', 'faculty', 'staff', 'student', 'parent', '*']),
+  personaType: z.string().optional().nullable(),
+  module: z.string().min(1),
+  action: z.enum(['read', 'create', 'update', 'delete', 'approve', '*']),
+  effect: z.enum(['allow', 'deny']),
+  scope: z.object({
+    departmentOnly: z.boolean().optional(),
+    selfOnly: z.boolean().optional(),
+    subDomain: z.string().optional(),
+  }).optional(),
+  priority: z.number().int().min(1).max(999),
+  description: z.string().optional(),
+  isActive: z.boolean().optional(),
+});
+
+export const updateRbacPolicySchema = createRbacPolicySchema.partial();

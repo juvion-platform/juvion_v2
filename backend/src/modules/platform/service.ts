@@ -1,3 +1,5 @@
+import { Policy as RBACPolicy } from '../../models/platform/Policy';
+import { invalidatePolicies } from '../../shared/rbac/cache';
 import { Announcement } from '../../models/communication/Announcement';
 import { Circular } from '../../models/communication/Circular';
 import { Notification } from '../../models/communication/Notification';
@@ -309,4 +311,100 @@ export async function deleteWhatsAppLog(collegeId: string, id: string, who: stri
   if (!doc) throw new AppError(404, 'WhatsApp log not found');
   await createAuditLog({ collegeId, entityType: 'WhatsAppLog', entityId: id, entityName: doc.recipientPhone, action: 'delete', changes: [], performedBy: who });
   return doc;
+}
+
+// ═══ RBAC Policy Management ══════════════════════════════
+
+export async function listRbacPolicies(collegeId: string, page = 1, limit = 20, role?: string, module?: string) {
+  const filter: any = {
+    $or: [
+      { collegeId },
+      { collegeId: { $exists: false } },
+      { collegeId: null },
+    ],
+  };
+  if (role) filter.role = role;
+  if (module) filter.module = module;
+
+  const skip = (page - 1) * limit;
+  const [items, total] = await Promise.all([
+    RBACPolicy.find(filter).sort({ priority: -1, role: 1 }).skip(skip).limit(limit).lean(),
+    RBACPolicy.countDocuments(filter),
+  ]);
+  return { items, total, page, pages: Math.ceil(total / limit) };
+}
+
+export async function getRbacPolicy(collegeId: string, id: string) {
+  const doc = await RBACPolicy.findOne({
+    _id: id,
+    $or: [{ collegeId }, { collegeId: { $exists: false } }, { collegeId: null }],
+  });
+  if (!doc) throw new AppError(404, 'Policy not found');
+  return doc;
+}
+
+export async function createRbacPolicy(collegeId: string, data: any, performedBy: string) {
+  const doc = await RBACPolicy.create({
+    ...data,
+    collegeId,
+    createdBy: performedBy,
+  });
+  await invalidatePolicies(collegeId);
+  await createAuditLog({
+    collegeId,
+    entityType: 'RBACPolicy',
+    entityId: String(doc._id),
+    entityName: `${doc.role}:${doc.module}:${doc.action}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function updateRbacPolicy(collegeId: string, id: string, data: any, performedBy: string) {
+  const existing = await RBACPolicy.findById(id);
+  if (!existing) throw new AppError(404, 'Policy not found');
+  if (!existing.collegeId && existing.createdBy === 'seed') {
+    throw new AppError(403, 'Cannot edit system default policies. Create an override instead.');
+  }
+
+  const doc = await RBACPolicy.findOneAndUpdate(
+    { _id: id, collegeId },
+    { ...data, updatedBy: performedBy },
+    { new: true },
+  );
+  if (!doc) throw new AppError(404, 'Policy not found');
+  await invalidatePolicies(collegeId);
+  await createAuditLog({
+    collegeId,
+    entityType: 'RBACPolicy',
+    entityId: id,
+    entityName: `${doc.role}:${doc.module}:${doc.action}`,
+    action: 'update',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function deleteRbacPolicy(collegeId: string, id: string, performedBy: string) {
+  const existing = await RBACPolicy.findById(id);
+  if (!existing) throw new AppError(404, 'Policy not found');
+  if (!existing.collegeId && existing.createdBy === 'seed') {
+    throw new AppError(403, 'Cannot delete system default policies');
+  }
+
+  await RBACPolicy.findOneAndDelete({ _id: id, collegeId });
+  await invalidatePolicies(collegeId);
+  await createAuditLog({
+    collegeId,
+    entityType: 'RBACPolicy',
+    entityId: id,
+    entityName: `${existing.role}:${existing.module}:${existing.action}`,
+    action: 'delete',
+    changes: [],
+    performedBy,
+  });
+  return { message: 'Policy deleted' };
 }

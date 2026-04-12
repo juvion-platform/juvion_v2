@@ -12,6 +12,7 @@ import {
   createEmailLogSchema, updateEmailLogSchema,
   createSMSLogSchema, updateSMSLogSchema,
   createWhatsAppLogSchema, updateWhatsAppLogSchema,
+  createRbacPolicySchema, updateRbacPolicySchema,
 } from './validation';
 
 const router = Router();
@@ -75,5 +76,12 @@ router.get('/whatsapp-logs/:id', authorize('platform', 'read', { subDomain: 'com
 router.post('/whatsapp-logs', authorize('platform', 'create', { subDomain: 'communication' }), validate(createWhatsAppLogSchema), ctrl.createWhatsAppLog);
 router.put('/whatsapp-logs/:id', authorize('platform', 'update', { subDomain: 'communication' }), validate(updateWhatsAppLogSchema), ctrl.updateWhatsAppLog);
 router.delete('/whatsapp-logs/:id', authorize('platform', 'delete', { subDomain: 'communication' }), ctrl.deleteWhatsAppLog);
+
+// RBAC Policies (admin/principal only via authorize)
+router.get('/rbac-policies', authorize('platform', 'read'), ctrl.listRbacPolicies);
+router.get('/rbac-policies/:id', authorize('platform', 'read'), ctrl.getRbacPolicy);
+router.post('/rbac-policies', authorize('platform', 'create'), validate(createRbacPolicySchema), ctrl.createRbacPolicy);
+router.put('/rbac-policies/:id', authorize('platform', 'update'), validate(updateRbacPolicySchema), ctrl.updateRbacPolicy);
+router.delete('/rbac-policies/:id', authorize('platform', 'delete'), ctrl.deleteRbacPolicy);
 
 export default router;
