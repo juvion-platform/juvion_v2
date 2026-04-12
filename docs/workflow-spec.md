@@ -1,7 +1,9 @@
 # Juvion v2 — Workflow Specification
 
 > Derived from `Juvion_Architecture.xlsx` → "L1 Workflows" + "L1 Workflow × Module Matrix" + L2 sheets.
-> Status: DRAFT | April 2026
+> **Status**: DRAFT | Last updated: April 2026
+>
+> **Depth note**: W01 and W02 have full L2 sub-workflow breakdowns. W03–W10 are **L1 summaries only** — L2 sub-workflows are pending.
 
 ---
 
@@ -144,7 +146,7 @@ Juvion v2 defines **10 cross-module workflows** (W01–W10) that orchestrate the
 | **Personas** | Faculty, Student, Staff, Leadership, Parent |
 | **AI Role** | Timetable optimisation, attendance alerts, mark anomaly detection, grade auto-calc, CO-PO mapping |
 
-### Phases (54 L2 Sub-Workflows)
+### Phases (54 L2 Sub-Workflows planned — 14 detailed below, 40 pending)
 
 #### M03.1 CURR — Curriculum Instantiation (1)
 - **W02-L2-001** Instantiate Semester Curriculum — Activate courses for programme/regulation/semester, verify prerequisites
@@ -167,16 +169,25 @@ Juvion v2 defines **10 cross-module workflows** (W01–W10) that orchestrate the
 #### M03.4 TEACH — Teaching & Course Delivery (5)
 - **W02-L2-013** Instantiate Course for Semester — Course Instance + Roster + Juvi channel, CO mappings inherited
 - **W02-L2-014** Deliver Course Content — Materials uploaded, syllabus progress tracked, published to Juvi
-- *(W02-L2-015 through W02-L2-017 — Internal Assessments, Assignment Grading, Question Papers)*
+- **W02-L2-015** Conduct Internal Assessment — Faculty creates assessment, enters marks, anomaly detection flags outliers *(L2 detail pending)*
+- **W02-L2-016** Grade Assignments — Faculty grades, rubric-based scoring, Juvi publishes results *(L2 detail pending)*
+- **W02-L2-017** Prepare Question Papers — Faculty drafts, HOD reviews, print scheduling *(L2 detail pending)*
 
-#### M03.5 EXAM — Examination Management (8+)
-- Exam scheduling, hall ticket generation, seating arrangement
-- Mark entry, moderation, result computation
-- Grade card generation, backlog management
+#### M03.5 EXAM — Examination Management (8)
+- **W02-L2-018** Schedule Semester Exams — Exam controller creates schedule, room allocation, clash detection *(L2 detail pending)*
+- **W02-L2-019** Generate Hall Tickets — Attendance eligibility check, fee clearance, hall ticket PDF generation *(L2 detail pending)*
+- **W02-L2-020** Create Seating Arrangement — AI arranges seating (randomised, branch-mixed), room maps generated *(L2 detail pending)*
+- **W02-L2-021** Enter External Marks — Mark entry by faculty, double-entry verification, moderation rules *(L2 detail pending)*
+- **W02-L2-022** Moderate and Finalise Results — Statistical moderation, Dean review, result publication approval *(L2 detail pending)*
+- **W02-L2-023** Compute Grades and SGPA — Auto-calc from marks + credit weights, grade card generation *(L2 detail pending)*
+- **W02-L2-024** Manage Backlogs — Identify failed subjects, register for supplementary exams, track backlog clearance *(L2 detail pending)*
+- **W02-L2-025** Process Promotions and Detentions — Year-end rules applied, Student lifecycle state updated via M02 *(L2 detail pending)*
 
-#### M03.6 OBE — Outcome-Based Education (4+)
-- CO-PO mapping, attainment computation
-- Programme outcome analysis
+#### M03.6 OBE — Outcome-Based Education (4)
+- **W02-L2-026** Map Course Outcomes to Programme Outcomes — CO-PO matrix defined per course, inherited from regulation *(L2 detail pending)*
+- **W02-L2-027** Compute CO Attainment — Direct (marks) + indirect (feedback) attainment calculation *(L2 detail pending)*
+- **W02-L2-028** Compute PO Attainment — Aggregate CO attainment across programme, generate NBA report *(L2 detail pending)*
+- **W02-L2-029** Generate OBE Evidence Report — Auto-formatted for NAAC/NBA submission, fed to M10 *(L2 detail pending)*
 
 #### Cross-module interactions
 - **M02**: Student state updated (promoted/detained/graduated), academic history appended
@@ -187,7 +198,7 @@ Juvion v2 defines **10 cross-module workflows** (W01–W10) that orchestrate the
 
 ---
 
-## W03: Fee Lifecycle & Revenue Assurance
+## W03: Fee Lifecycle & Revenue Assurance *(L1 summary — L2 pending)*
 
 | Field | Value |
 |-------|-------|
@@ -208,7 +219,7 @@ Juvion v2 defines **10 cross-module workflows** (W01–W10) that orchestrate the
 
 ---
 
-## W04: Placement Season Execution
+## W04: Placement Season Execution *(L1 summary — L2 pending)*
 
 | Field | Value |
 |-------|-------|
@@ -229,7 +240,7 @@ Juvion v2 defines **10 cross-module workflows** (W01–W10) that orchestrate the
 
 ---
 
-## W05: Employee Lifecycle Management
+## W05: Employee Lifecycle Management *(L1 summary — L2 pending)*
 
 | Field | Value |
 |-------|-------|
@@ -249,7 +260,7 @@ Juvion v2 defines **10 cross-module workflows** (W01–W10) that orchestrate the
 
 ---
 
-## W06: Student Welfare & Crisis Response
+## W06: Student Welfare & Crisis Response *(L1 summary — L2 pending)*
 
 | Field | Value |
 |-------|-------|
@@ -271,7 +282,7 @@ Juvion v2 defines **10 cross-module workflows** (W01–W10) that orchestrate the
 
 ---
 
-## W07: Accreditation & Compliance Readiness
+## W07: Accreditation & Compliance Readiness *(L1 summary — L2 pending)*
 
 | Field | Value |
 |-------|-------|
@@ -297,7 +308,7 @@ Juvion v2 defines **10 cross-module workflows** (W01–W10) that orchestrate the
 
 ---
 
-## W08: Campus Life Operations
+## W08: Campus Life Operations *(L1 summary — L2 pending)*
 
 | Field | Value |
 |-------|-------|
@@ -318,7 +329,7 @@ Juvion v2 defines **10 cross-module workflows** (W01–W10) that orchestrate the
 
 ---
 
-## W09: Student Enrichment & Development
+## W09: Student Enrichment & Development *(L1 summary — L2 pending)*
 
 | Field | Value |
 |-------|-------|
@@ -339,7 +350,7 @@ Juvion v2 defines **10 cross-module workflows** (W01–W10) that orchestrate the
 
 ---
 
-## W10: Student Exit & Transition
+## W10: Student Exit & Transition *(L1 summary — L2 pending)*
 
 | Field | Value |
 |-------|-------|
@@ -390,6 +401,194 @@ Across all workflows, AI operates at these levels:
 2. **Flags for Review** — AI performs analysis and flags edge cases for human decision (e.g., dedup <80%, document OCR <90% confidence, eligibility borderline)
 3. **Assists** — AI prepares data/recommendations, human executes (e.g., merit list review, fee negotiation >₹50K, fraud investigation)
 4. **N/A** — Pure human judgment required (e.g., physical document verification, Leadership approval, disciplinary decisions)
+
+### AI Autonomy Configuration
+
+All AI thresholds are business-critical and must be configurable per college. The table below documents current defaults and ownership.
+
+| Threshold | Default | Workflow | Who Can Modify | Notes |
+|-----------|---------|----------|---------------|-------|
+| Lead dedup match confidence — auto-merge | ≥ 80% | W01 (L2-008) | ST1, Admin | Below 80% → manual review |
+| Document OCR confidence — auto-verify | ≥ 90% | W01 (L2-014) | ST1, Admin | Below 90% → flagged for ST1 |
+| Fee waiver — autonomous approval | ≤ ₹50,000 | W01 (L2-031) | Leadership only | Above ₹50K → escalates to Principal/Trust |
+| Attendance risk threshold — warning | < 75% | W02 (L2-009) | Dean, HOD | Triggers parent notification + welfare routing |
+| Attendance condonation — auto-approve | Medical with valid cert | W02 (L2-011) | Dean | Other types require HOD/Dean approval |
+| Leave — auto-approve | Casual ≤ 2 days, balance available | W05 | HR Manager | Other leave types require approval chain |
+| Crisis triage — auto-assign severity | Low severity | W06 | Welfare Officer | Medium/High → immediate human review |
+| Placement match — auto-shortlist | Semantic score ≥ 0.8 | W04 | TPO | Below 0.8 → manual review by TPO |
+
+> **Configuration location**: These thresholds should be stored in a college-level settings document (via M12 Platform) and exposed through the admin portal. Changes must be audit-logged.
+
+---
+
+## Entity State Machines
+
+Key entities have defined lifecycle states. The format below shows valid states and allowed transitions. Only the listed role(s) can trigger each transition.
+
+### Inquiry (Lead)
+
+```
+New → Contacted → Qualified → Converted → [end]
+ ↘ Dormant ↗         ↘ Disqualified → [end]
+```
+
+| From | To | Triggered By | Condition |
+|------|----|-------------|-----------|
+| New | Contacted | ST1, AG-01 | First interaction logged |
+| New | Dormant | AG-01 (auto) | No interaction for 14 days |
+| Contacted | Qualified | ST1, AG-01 | Lead score ≥ threshold |
+| Contacted | Dormant | AG-01 (auto) | No response after nurture sequence |
+| Qualified | Converted | ST1 | Application created (L2-009) |
+| Qualified | Disqualified | ST1 | Not eligible / duplicate |
+| Dormant | Contacted | ST1 | Re-engagement interaction |
+
+### Applicant
+
+```
+Draft → Submitted → Under Review → Eligible → Allotted → Offered
+   ↘ Incomplete       ↘ Ineligible     ↘ Waitlisted   ↘ Rejected
+                                                        ↘ Accepted → Enrolled
+```
+
+| From | To | Triggered By | Condition |
+|------|----|-------------|-----------|
+| Draft | Submitted | Student/ST1 | All required fields + app fee paid |
+| Submitted | Under Review | ST1, AG-01 | Document checklist initiated |
+| Under Review | Eligible | AG-01 (auto) | All rules pass |
+| Under Review | Ineligible | ST1 | Rules fail + manual review |
+| Under Review | Incomplete | ST1 | Missing documents, deadline set |
+| Incomplete | Under Review | Student | Documents re-uploaded |
+| Eligible | Allotted | System | Allotment round executed |
+| Eligible | Waitlisted | System | No seat in preferred branch |
+| Waitlisted | Allotted | System | Seat released, auto-promoted |
+| Allotted | Offered | System | Offer letter generated |
+| Offered | Accepted | Student | Payment confirmed |
+| Offered | Rejected | Student/System | Declined or expired |
+| Accepted | Enrolled | System | Enrolment transaction (L2-036) |
+
+### Student Lifecycle
+
+```
+Onboarding → Active → [per semester] → Graduated → Alumni
+                ↘ Year Back ↗    ↘ Detained
+                ↘ Suspended      ↘ Dropped Out → [exit]
+                ↘ Transferred Out → [exit]
+```
+
+| From | To | Triggered By | Condition |
+|------|----|-------------|-----------|
+| Onboarding | Active | System | All enrolment prerequisites met (L2-048) |
+| Active | Graduated | Registrar | All credits earned, no dues |
+| Active | Year Back | Exam Controller | Year repeat rules triggered |
+| Active | Detained | Dean | Attendance/academic criteria not met |
+| Active | Suspended | Principal | Disciplinary action |
+| Active | Dropped Out | Registrar/Student | Voluntary or involuntary exit |
+| Active | Transferred Out | Registrar | Transfer certificate issued |
+| Year Back | Active | Exam Controller | Year repeat cleared |
+| Graduated | Alumni | System | W10 alumni onboarding complete |
+
+### LeaveApplication
+
+```
+Draft → Submitted → Pending Approval → Approved → [end]
+                         ↘ Rejected → [end]
+                         ↘ Cancelled → [end]
+```
+
+| From | To | Triggered By | Condition |
+|------|----|-------------|-----------|
+| Draft | Submitted | Employee | Leave dates + type selected |
+| Submitted | Approved | AG-01 (auto) | Casual ≤ 2 days + balance available |
+| Submitted | Pending Approval | System | Does not meet auto-approve criteria |
+| Pending Approval | Approved | HOD/HR | Manual approval |
+| Pending Approval | Rejected | HOD/HR | Insufficient balance or conflict |
+| Submitted | Cancelled | Employee | Before approval |
+| Pending Approval | Cancelled | Employee | Before decision |
+
+### PlacementOffer
+
+```
+Extended → Accepted → Joined → [end]
+    ↘ Declined → [end]
+    ↘ Expired → [end]
+Accepted → Reneged → [end]
+```
+
+| From | To | Triggered By | Condition |
+|------|----|-------------|-----------|
+| Extended | Accepted | Student | Within acceptance deadline |
+| Extended | Declined | Student | Explicit decline |
+| Extended | Expired | System | Deadline passed |
+| Accepted | Joined | TPO | Joining date confirmed by company |
+| Accepted | Reneged | TPO | Student or company withdrew |
+
+---
+
+## SLA & Timeline Specifications
+
+| Workflow | Step | SLA | Escalation |
+|----------|------|-----|-----------|
+| W01 | Convener seat reporting | 72 hours from allotment | Reminders at 48h, 24h, 6h → auto-lapse + waitlist promotion |
+| W01 | Document upload (self-service) | 7 days from application | Reminders at Day 3, 5, 6 → status=Incomplete |
+| W01 | Document OCR verification | 4 hours from upload | If queue depth > 50, alert ST1 |
+| W01 | Offer acceptance | 5 days from offer | Reminders at Day 2, 4 → auto-expire + waitlist promotion |
+| W01 | Fee negotiation escalation | 48 hours for Leadership response | Auto-reminder to Principal at 24h |
+| W02 | Attendance marking | Same day by 8 PM | Alert HOD if faculty misses 2 consecutive days |
+| W02 | Internal marks entry | 3 days after assessment | Alert HOD at Day 2 |
+| W02 | External marks entry | 5 days after exam | Alert Exam Controller at Day 3 |
+| W03 | Fee payment reminder sequence | Day 1 (SMS) → Day 7 (WhatsApp) → Day 14 (call by ST2) → Day 30 (Leadership escalation) | Progressive escalation |
+| W05 | Leave approval | 2 business days | Auto-escalate to HR Manager if HOD doesn't act |
+| W06 | Crisis alert triage | 1 hour (High), 4 hours (Medium), 24 hours (Low) | High: immediate SMS to Dean + Warden + Counselor |
+| W06 | Grievance resolution | 7 days (standard), 48 hours (harassment/ragging) | Anti-ragging → statutory committee within 24h |
+| W10 | Financial clearance | 5 business days | Auto-reminder to Accounts at Day 3 |
+| W10 | Document issuance (TC, degree) | 10 business days | Auto-reminder to Registrar at Day 7 |
+
+---
+
+## Error & Compensation Flows
+
+Cross-module workflows involve distributed state changes. When a step fails mid-workflow, compensation (rollback) logic must undo completed steps.
+
+### W01-L2-036: Enrolment Transaction (most critical)
+
+This step provisions records across 6 modules in parallel. If any step fails:
+
+| Step | Creates | Compensation on Failure |
+|------|---------|------------------------|
+| M02: Create Person + Student | Person, Student records | Delete Student, soft-delete Person (if no other links) |
+| M04: Create Invoice | FeeLineItem, StudentFeeAccount | Delete line items, close account |
+| M08: Allocate Hostel | HostelAllocation, room occupancy update | Release room, delete allocation |
+| M08: Assign Transport | TransportAllocation | Release seat, delete allocation |
+| M03: Assign Section + Courses | Section assignment, Enrollment records | Remove enrollments, un-assign section |
+| M12: Provision Account | User record, RBAC role | Deactivate user, remove role |
+| Juvi: Onboard | JuviAccount, channel subscriptions | Delete account, unsubscribe channels |
+
+**Implementation**: The `WorkflowInstance` model tracks each step's status (`pending`, `completed`, `failed`). On failure:
+1. WorkflowInstance status → `compensation_in_progress`
+2. Compensation tasks created for each completed step (reverse order)
+3. Each compensation task executes the rollback action
+4. WorkflowInstance status → `compensated` (all rolled back) or `compensation_failed` (manual intervention needed)
+
+### W01-L2-041: Enrolment Cancellation
+
+Same compensation logic as L2-036 but initiated by user request rather than system failure. Additionally:
+- Refund calculation based on cancellation policy (days since enrolment)
+- Seat released back to inventory → triggers waitlist promotion (L2-029)
+
+### W03: Payment Failure
+
+If payment gateway returns failure after fee invoice was created:
+- Invoice status → `payment_failed`
+- StudentFeeAccount balance unchanged
+- Retry permitted (new payment attempt against same invoice)
+- No compensation needed — invoice persists until paid, cancelled, or waived
+
+### General Compensation Rules
+
+1. **Idempotency** — all compensation actions must be idempotent (safe to retry).
+2. **Audit trail** — every compensation action is logged in AuditLog with `action: 'compensate'`.
+3. **Manual fallback** — if automated compensation fails, WorkflowTask is created for ST7 (Admin) with full context.
+4. **No cascading deletes** — compensation uses soft-delete/status changes, never hard-deletes.
 
 ---
 
