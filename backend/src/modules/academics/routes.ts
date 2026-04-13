@@ -36,6 +36,7 @@ import {
   instantiateCurriculumSchema,
   formSectionsSchema,
   createLabBatchesSchema,
+  assignFacultySchema,
 } from './validation';
 
 const router = Router();
@@ -251,5 +252,9 @@ router.post('/academic-calendar/:id/publish', authorize('academics', 'update'), 
 // ═══ W02: Section Formation & Lab Batch Creation ═════════════
 router.post('/sections/form', authorize('academics', 'create'), validate(formSectionsSchema), ctrl.formSections);
 router.post('/sections/:id/lab-batches', authorize('academics', 'create'), validate(createLabBatchesSchema), ctrl.createLabBatches);
+
+// ═══ W02: Faculty Assignment & Timetable Conflict Detection ═════
+router.post('/offerings/:id/assign-faculty', authorize('academics', 'update'), validate(assignFacultySchema), ctrl.assignFacultyToOffering);
+router.get('/timetables/:id/conflicts', authorize('academics', 'read'), ctrl.detectTimetableConflicts);
 
 export default router;

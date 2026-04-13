@@ -343,3 +343,9 @@ export const formSectionsSchema = z.object({
 export const createLabBatchesSchema = z.object({
   labBatchSize: z.number().int().min(1).optional(),
 });
+
+// ═══ W02: Faculty Assignment & Timetable Conflict Detection ═════
+
+export const assignFacultySchema = z.object({
+  facultyId: z.string().min(1, 'Faculty ID is required'),
+});

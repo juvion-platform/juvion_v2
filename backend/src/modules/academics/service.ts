@@ -1134,3 +1134,260 @@ export async function createLabBatches(
 
   return { labBatchesCreated: createdBatches.length };
 }
+
+// ═══ W02: Faculty Assignment & Timetable Conflict Detection ═════
+
+export async function assignFacultyToOffering(
+  collegeId: string,
+  courseOfferingId: string,
+  facultyId: string,
+  performedBy: string,
+) {
+  const offering = await CourseOffering.findOne({ _id: courseOfferingId, collegeId });
+  if (!offering) throw new AppError(404, 'CourseOffering not found');
+
+  const oldFacultyId = offering.facultyId ? String(offering.facultyId) : '';
+  const oldStatus = offering.status || 'draft';
+
+  offering.facultyId = facultyId as unknown as typeof offering.facultyId;
+  if (offering.status === 'draft') {
+    offering.status = 'active';
+  }
+  await offering.save();
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'CourseOffering',
+    entityId: String(offering._id),
+    entityName: `Offering ${String(offering._id)}`,
+    action: 'update',
+    changes: [
+      { field: 'facultyId', displayName: 'Faculty', oldValue: oldFacultyId, newValue: facultyId },
+      ...(oldStatus === 'draft' && offering.status === 'active'
+        ? [{ field: 'status', displayName: 'Status', oldValue: oldStatus, newValue: 'active' }]
+        : []),
+    ],
+    performedBy,
+  });
+
+  return offering;
+}
+
+export interface ConflictResult {
+  type: 'faculty' | 'room' | 'section' | 'lab_consecutive' | 'load_balance';
+  severity: 'error' | 'warning';
+  slotA: { day: string; period: number; courseOfferingId: string };
+  slotB?: { day: string; period: number; courseOfferingId: string };
+  message: string;
+}
+
+export async function detectTimetableConflicts(
+  collegeId: string,
+  timetableId: string,
+) {
+  const timetable = await Timetable.findOne({ _id: timetableId, collegeId });
+  if (!timetable) throw new AppError(404, 'Timetable not found');
+
+  const semesterId = String(timetable.semesterId);
+
+  // Get all slots for this timetable
+  const thisSlots = await TimetableSlot.find({ timetableId, collegeId }).lean();
+
+  // Get all other timetables in the same semester
+  const otherTimetables = await Timetable.find({
+    collegeId,
+    semesterId: timetable.semesterId,
+    _id: { $ne: timetableId },
+  }).lean();
+
+  const otherTimetableIds = otherTimetables.map((t) => String(t._id));
+
+  // Get all slots from other timetables in the same semester
+  const otherSlots = otherTimetableIds.length > 0
+    ? await TimetableSlot.find({ timetableId: { $in: otherTimetableIds }, collegeId }).lean()
+    : [];
+
+  const allSlots = [...thisSlots, ...otherSlots];
+
+  // Build courseOfferingId -> facultyId map
+  const offeringIds = [...new Set(allSlots.map((s) => String(s.courseOfferingId)))];
+  const offerings = await CourseOffering.find({
+    _id: { $in: offeringIds },
+    collegeId,
+  }).lean();
+
+  const offeringFacultyMap = new Map<string, string>();
+  const offeringCourseMap = new Map<string, string>();
+  for (const o of offerings) {
+    offeringFacultyMap.set(String(o._id), String(o.facultyId));
+    offeringCourseMap.set(String(o._id), String(o.courseId));
+  }
+
+  // Build courseId -> Course map for lab checks
+  const courseIds = [...new Set([...offeringCourseMap.values()])];
+  const courses = await Course.find({ _id: { $in: courseIds }, collegeId }).lean();
+  const courseMap = new Map<string, typeof courses[number]>();
+  for (const c of courses) {
+    courseMap.set(String(c._id), c);
+  }
+
+  const conflicts: ConflictResult[] = [];
+
+  // Group all slots by (day, period) for cross-timetable checks
+  const dayPeriodMap = new Map<string, typeof allSlots>();
+  for (const slot of allSlots) {
+    const key = `${slot.day}:${slot.period}`;
+    const existing = dayPeriodMap.get(key);
+    if (existing) {
+      existing.push(slot);
+    } else {
+      dayPeriodMap.set(key, [slot]);
+    }
+  }
+
+  // a. Faculty conflicts: same faculty at same day+period in same semester
+  for (const [_key, slots] of dayPeriodMap) {
+    const facultySlots = new Map<string, typeof slots>();
+    for (const slot of slots) {
+      const facultyId = offeringFacultyMap.get(String(slot.courseOfferingId));
+      if (!facultyId) continue;
+      const existing = facultySlots.get(facultyId);
+      if (existing) {
+        existing.push(slot);
+      } else {
+        facultySlots.set(facultyId, [slot]);
+      }
+    }
+    for (const [_fId, fSlots] of facultySlots) {
+      if (fSlots.length > 1) {
+        const slotA = fSlots[0]!;
+        const slotB = fSlots[1]!;
+        conflicts.push({
+          type: 'faculty',
+          severity: 'error',
+          slotA: { day: slotA.day, period: slotA.period, courseOfferingId: String(slotA.courseOfferingId) },
+          slotB: { day: slotB.day, period: slotB.period, courseOfferingId: String(slotB.courseOfferingId) },
+          message: `Faculty conflict: same faculty assigned to two offerings at ${slotA.day} period ${slotA.period}`,
+        });
+      }
+    }
+  }
+
+  // b. Room conflicts: same roomId at same day+period across all semester timetables
+  for (const [_key, slots] of dayPeriodMap) {
+    const roomSlots = new Map<string, typeof slots>();
+    for (const slot of slots) {
+      if (!slot.roomId) continue;
+      const roomId = String(slot.roomId);
+      const existing = roomSlots.get(roomId);
+      if (existing) {
+        existing.push(slot);
+      } else {
+        roomSlots.set(roomId, [slot]);
+      }
+    }
+    for (const [_rId, rSlots] of roomSlots) {
+      if (rSlots.length > 1) {
+        const slotA = rSlots[0]!;
+        const slotB = rSlots[1]!;
+        conflicts.push({
+          type: 'room',
+          severity: 'error',
+          slotA: { day: slotA.day, period: slotA.period, courseOfferingId: String(slotA.courseOfferingId) },
+          slotB: { day: slotB.day, period: slotB.period, courseOfferingId: String(slotB.courseOfferingId) },
+          message: `Room conflict: same room assigned to two offerings at ${slotA.day} period ${slotA.period}`,
+        });
+      }
+    }
+  }
+
+  // c. Section conflict: same timetable has two slots at same day+period
+  const thisDayPeriodMap = new Map<string, typeof thisSlots>();
+  for (const slot of thisSlots) {
+    const key = `${slot.day}:${slot.period}`;
+    const existing = thisDayPeriodMap.get(key);
+    if (existing) {
+      existing.push(slot);
+    } else {
+      thisDayPeriodMap.set(key, [slot]);
+    }
+  }
+  for (const [_key, slots] of thisDayPeriodMap) {
+    if (slots.length > 1) {
+      const slotA = slots[0]!;
+      const slotB = slots[1]!;
+      conflicts.push({
+        type: 'section',
+        severity: 'error',
+        slotA: { day: slotA.day, period: slotA.period, courseOfferingId: String(slotA.courseOfferingId) },
+        slotB: { day: slotB.day, period: slotB.period, courseOfferingId: String(slotB.courseOfferingId) },
+        message: `Section conflict: two slots at ${slotA.day} period ${slotA.period} in same timetable`,
+      });
+    }
+  }
+
+  // d. Consecutive lab constraint: lab slots for same course should be consecutive periods on same day
+  // Group thisSlots by (courseOfferingId, day) where the course has practicalHrs > 0
+  const labCourseSlots = new Map<string, typeof thisSlots>();
+  for (const slot of thisSlots) {
+    if (slot.slotType !== 'lab') continue;
+    const courseId = offeringCourseMap.get(String(slot.courseOfferingId));
+    if (!courseId) continue;
+    const course = courseMap.get(courseId);
+    if (!course || course.practicalHrs <= 0) continue;
+
+    const key = `${String(slot.courseOfferingId)}:${slot.day}`;
+    const existing = labCourseSlots.get(key);
+    if (existing) {
+      existing.push(slot);
+    } else {
+      labCourseSlots.set(key, [slot]);
+    }
+  }
+
+  for (const [_key, slots] of labCourseSlots) {
+    if (slots.length < 2) continue;
+    const periods = slots.map((s) => s.period).sort((a, b) => a - b);
+    for (let i = 1; i < periods.length; i++) {
+      const prev = periods[i - 1]!;
+      const curr = periods[i]!;
+      if (curr - prev !== 1) {
+        const slotA = slots[0]!;
+        conflicts.push({
+          type: 'lab_consecutive',
+          severity: 'warning',
+          slotA: { day: slotA.day, period: prev, courseOfferingId: String(slotA.courseOfferingId) },
+          slotB: { day: slotA.day, period: curr, courseOfferingId: String(slotA.courseOfferingId) },
+          message: `Lab slots for offering ${String(slotA.courseOfferingId)} on ${slotA.day} are not consecutive (periods ${prev} and ${curr})`,
+        });
+        break;
+      }
+    }
+  }
+
+  // e. Daily load balance: faculty with > 6 periods on any single day
+  // Use allSlots so we catch across all timetables in the semester
+  const facultyDayLoad = new Map<string, number>();
+  for (const slot of allSlots) {
+    const facultyId = offeringFacultyMap.get(String(slot.courseOfferingId));
+    if (!facultyId) continue;
+    const key = `${facultyId}:${slot.day}`;
+    facultyDayLoad.set(key, (facultyDayLoad.get(key) || 0) + 1);
+  }
+
+  for (const [key, count] of facultyDayLoad) {
+    if (count > 6) {
+      const [_facultyId, day] = key.split(':') as [string, string];
+      conflicts.push({
+        type: 'load_balance',
+        severity: 'warning',
+        slotA: { day, period: 0, courseOfferingId: '' },
+        message: `Faculty has ${count} periods on ${day} (exceeds 6), semester ${semesterId}`,
+      });
+    }
+  }
+
+  const hasErrors = conflicts.some((c) => c.severity === 'error');
+
+  return { conflicts, hasErrors };
+}

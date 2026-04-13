@@ -531,3 +531,23 @@ export async function createLabBatches(req: AuthRequest, res: Response, next: Ne
     res.status(201).json(result);
   } catch (e) { next(e); }
 }
+
+// ═══ W02: Faculty Assignment & Timetable Conflict Detection ═════
+export async function assignFacultyToOffering(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { facultyId } = req.body;
+    const result = await svc.assignFacultyToOffering(
+      req.collegeId!, req.params.id as string, facultyId, who(req),
+    );
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+export async function detectTimetableConflicts(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const result = await svc.detectTimetableConflicts(
+      req.collegeId!, req.params.id as string,
+    );
+    res.json(result);
+  } catch (e) { next(e); }
+}
