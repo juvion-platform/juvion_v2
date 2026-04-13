@@ -536,3 +536,41 @@ export const computeGradesSchema = z.object({
 export const computeSemesterResultsSchema = z.object({
   semesterId: z.string().min(1, 'Semester ID is required'),
 });
+
+// ═══ W02: Result Publication ═════════════════════════════════
+
+export const transitionResultStatusSchema = z.object({
+  semesterId: z.string().min(1),
+  targetStatus: z.enum(['board_review', 'approved', 'published']),
+  boardDecision: z.string().optional(),
+});
+
+// ═══ W02: Revaluation Requests ═══════════════════════════════
+
+export const submitRevaluationRequestSchema = z.object({
+  studentId: z.string().min(1),
+  courseId: z.string().min(1),
+  semesterId: z.string().min(1),
+  examType: z.enum(['regular', 'supplementary']),
+  originalMarks: z.number().min(0),
+  reason: z.string().min(1),
+});
+
+export const processRevaluationRequestSchema = z.object({
+  action: z.enum(['forward', 'complete', 'reject']),
+  revaluedMarks: z.number().min(0).optional(),
+  outcome: z.enum(['marks_increased', 'marks_decreased', 'no_change']).optional(),
+});
+
+// ═══ W02: Backlogs ══════════════════════════════════════════
+
+export const updateBacklogSchema_w02 = z.object({
+  currentStatus: z.enum(['created', 'registered_for_supplementary', 'appeared', 'cleared', 'persists']).optional(),
+  clearedGrade: z.string().optional(),
+});
+
+// ═══ W02: Supplementary Exams ═══════════════════════════════
+
+export const scheduleSupplementaryExamsSchema = z.object({
+  semesterId: z.string().min(1),
+});

@@ -894,3 +894,71 @@ export async function computeSemesterResults(req: AuthRequest, res: Response, ne
     res.json(result);
   } catch (e) { next(e); }
 }
+
+// ═══ W02: Result Publication ═════════════════════════════════
+
+export async function transitionResultStatus(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { semesterId, targetStatus, boardDecision } = req.body;
+    const result = await svc.transitionResultStatus(req.collegeId!, semesterId, targetStatus, who(req), boardDecision);
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+// ═══ W02: Revaluation Requests ═══════════════════════════════
+
+export async function listRevaluationRequests(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page = '1', limit = '20', semesterId, studentId, status } = req.query as any;
+    res.json(await svc.listRevaluationRequests(req.collegeId!, +page, +limit, semesterId, studentId, status, req.authScope));
+  } catch (e) { next(e); }
+}
+
+export async function getRevaluationRequest(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await svc.getRevaluationRequest(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }
+}
+
+export async function submitRevaluationRequest(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const result = await svc.submitRevaluationRequest(req.collegeId!, req.body, who(req));
+    res.status(201).json(result);
+  } catch (e) { next(e); }
+}
+
+export async function processRevaluationRequest(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { action, revaluedMarks, outcome } = req.body;
+    const result = await svc.processRevaluationRequest(req.collegeId!, req.params.id as string, action, who(req), revaluedMarks, outcome);
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+// ═══ W02: Backlogs ══════════════════════════════════════════
+
+export async function listBacklogs(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page = '1', limit = '20', studentId, semesterId, status } = req.query as any;
+    res.json(await svc.listBacklogs(req.collegeId!, +page, +limit, studentId, semesterId, status, req.authScope));
+  } catch (e) { next(e); }
+}
+
+export async function getBacklog(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await svc.getBacklog(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }
+}
+
+export async function updateBacklog(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const result = await svc.updateBacklog(req.collegeId!, req.params.id as string, req.body, who(req));
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+// ═══ W02: Supplementary Exams ═══════════════════════════════
+
+export async function scheduleSupplementaryExams(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { semesterId } = req.body;
+    const result = await svc.scheduleSupplementaryExams(req.collegeId!, semesterId, who(req));
+    res.status(201).json(result);
+  } catch (e) { next(e); }
+}

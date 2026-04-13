@@ -59,6 +59,11 @@ import {
   validateExternalMarksSchema,
   computeGradesSchema,
   computeSemesterResultsSchema,
+  transitionResultStatusSchema,
+  submitRevaluationRequestSchema,
+  processRevaluationRequestSchema,
+  updateBacklogSchema_w02,
+  scheduleSupplementaryExamsSchema,
 } from './validation';
 
 const router = Router();
@@ -368,5 +373,22 @@ router.post('/grades/compute', authorize('academics', 'create'), validate(comput
 
 // ═══ W02: SGPA/CGPA Computation ═══════════════════════════════
 router.post('/semester-results/compute', authorize('academics', 'create'), validate(computeSemesterResultsSchema), ctrl.computeSemesterResults);
+
+// ═══ W02: Result Publication ═════════════════════════════════
+router.post('/semester-results/transition', authorize('academics', 'update'), validate(transitionResultStatusSchema), ctrl.transitionResultStatus);
+
+// ═══ W02: Revaluation Requests ═══════════════════════════════
+router.get('/revaluation-requests', authorize('academics', 'read'), ctrl.listRevaluationRequests);
+router.get('/revaluation-requests/:id', authorize('academics', 'read'), ctrl.getRevaluationRequest);
+router.post('/revaluation-requests', authorize('academics', 'create'), validate(submitRevaluationRequestSchema), ctrl.submitRevaluationRequest);
+router.put('/revaluation-requests/:id/process', authorize('academics', 'update'), validate(processRevaluationRequestSchema), ctrl.processRevaluationRequest);
+
+// ═══ W02: Backlogs ══════════════════════════════════════════
+router.get('/backlogs', authorize('academics', 'read'), ctrl.listBacklogs);
+router.get('/backlogs/:id', authorize('academics', 'read'), ctrl.getBacklog);
+router.put('/backlogs/:id', authorize('academics', 'update'), validate(updateBacklogSchema_w02), ctrl.updateBacklog);
+
+// ═══ W02: Supplementary Exams ═══════════════════════════════
+router.post('/supplementary-exams/schedule', authorize('academics', 'create'), validate(scheduleSupplementaryExamsSchema), ctrl.scheduleSupplementaryExams);
 
 export default router;

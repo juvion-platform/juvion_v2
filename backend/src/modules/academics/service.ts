@@ -43,6 +43,7 @@ import { SeatingPlan } from '../../models/academic-ops/SeatingPlan';
 import { InvigilationRoster } from '../../models/academic-ops/InvigilationRoster';
 import { HallTicket } from '../../models/academic-ops/HallTicket';
 import { Backlog } from '../../models/academic-ops/Backlog';
+import { RevaluationRequest } from '../../models/academic-ops/RevaluationRequest';
 import { paginate } from '../../shared/pagination';
 import { createAuditLog } from '../../shared/audit';
 import { AppError } from '../../middleware/errorHandler';
@@ -3486,4 +3487,331 @@ export async function computeSemesterResults(
   });
 
   return { processed: results.length, results };
+}
+
+// ═══ W02: Result Publication Workflow ═══════════════════════════
+
+const RESULT_TRANSITION_MAP: Record<string, string> = {
+  board_review: 'computed',
+  approved: 'board_review',
+  published: 'approved',
+};
+
+export async function transitionResultStatus(
+  collegeId: string,
+  semesterId: string,
+  targetStatus: 'board_review' | 'approved' | 'published',
+  performedBy: string,
+  boardDecision?: string,
+): Promise<{ updated: number }> {
+  const fromStatus = RESULT_TRANSITION_MAP[targetStatus];
+  if (!fromStatus) throw new AppError(400, `Invalid target status: ${targetStatus}`);
+
+  const updateFields: any = { status: targetStatus };
+  if (targetStatus === 'approved' && boardDecision) {
+    updateFields.boardDecision = boardDecision;
+  }
+  if (targetStatus === 'published') {
+    updateFields.publishedAt = new Date();
+  }
+
+  const result = await SemesterResult.updateMany(
+    { collegeId, semesterId, status: fromStatus },
+    { $set: updateFields },
+  );
+
+  const count = result.modifiedCount;
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'SemesterResult',
+    entityId: semesterId,
+    entityName: `Result Transition → ${targetStatus}`,
+    action: 'update',
+    changes: [{
+      field: 'status',
+      displayName: 'Result Status Transition',
+      oldValue: fromStatus,
+      newValue: `${targetStatus} (${count} records)`,
+    }],
+    performedBy,
+  });
+
+  return { updated: count };
+}
+
+// ═══ W02: Revaluation Requests ═══════════════════════════════
+
+export async function listRevaluationRequests(
+  collegeId: string,
+  page: number,
+  limit: number,
+  semesterId?: string,
+  studentId?: string,
+  status?: string,
+  authScope?: AuthScope,
+) {
+  const filter: any = { collegeId };
+  if (semesterId) filter.semesterId = semesterId;
+  if (studentId) filter.studentId = studentId;
+  if (status) filter.status = status;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
+  return paginate(RevaluationRequest, filter, page, limit, { submittedAt: -1 }, [STUDENT_POPULATE, 'courseId', 'semesterId'] as any);
+}
+
+export async function getRevaluationRequest(collegeId: string, id: string) {
+  const doc = await RevaluationRequest.findOne({ _id: id, collegeId })
+    .populate(STUDENT_POPULATE)
+    .populate('courseId')
+    .populate('semesterId');
+  if (!doc) throw new AppError(404, 'Revaluation request not found');
+  return doc;
+}
+
+export async function submitRevaluationRequest(
+  collegeId: string,
+  data: { studentId: string; courseId: string; semesterId: string; examType: string; originalMarks: number; reason: string },
+  performedBy: string,
+) {
+  const doc = await RevaluationRequest.create({
+    ...data,
+    collegeId,
+    status: 'submitted',
+    feePaid: false,
+    submittedAt: new Date(),
+  });
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'RevaluationRequest',
+    entityId: String(doc._id),
+    entityName: `Revaluation - ${data.studentId} / ${data.courseId}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return doc;
+}
+
+export async function processRevaluationRequest(
+  collegeId: string,
+  id: string,
+  action: 'forward' | 'complete' | 'reject',
+  performedBy: string,
+  revaluedMarks?: number,
+  outcome?: string,
+) {
+  const doc = await RevaluationRequest.findOne({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Revaluation request not found');
+
+  if (action === 'forward') {
+    if (doc.status !== 'submitted') throw new AppError(400, 'Can only forward a submitted request');
+    doc.status = 'forwarded_to_university';
+  } else if (action === 'complete') {
+    if (doc.status !== 'forwarded_to_university' && doc.status !== 'submitted') {
+      throw new AppError(400, 'Cannot complete a request in current status');
+    }
+    if (revaluedMarks === undefined || !outcome) {
+      throw new AppError(400, 'revaluedMarks and outcome are required for complete action');
+    }
+    doc.status = 'completed';
+    doc.revaluedMarks = revaluedMarks;
+    doc.outcome = outcome;
+    doc.completedAt = new Date();
+
+    // If marks increased, update the ExternalMark record
+    if (outcome === 'marks_increased') {
+      await ExternalMark.findOneAndUpdate(
+        {
+          collegeId,
+          studentId: doc.studentId,
+          courseId: doc.courseId,
+          semesterId: doc.semesterId,
+          examType: doc.examType,
+        },
+        { $set: { marksObtained: revaluedMarks, result: 'pass' } },
+      );
+    }
+  } else if (action === 'reject') {
+    if (doc.status === 'completed' || doc.status === 'rejected') {
+      throw new AppError(400, 'Cannot reject a completed or already rejected request');
+    }
+    doc.status = 'rejected';
+  }
+
+  await doc.save();
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'RevaluationRequest',
+    entityId: String(doc._id),
+    entityName: `Revaluation ${action}`,
+    action: 'update',
+    changes: [{
+      field: 'status',
+      displayName: 'Status',
+      oldValue: null,
+      newValue: doc.status,
+    }],
+    performedBy,
+  });
+
+  return doc;
+}
+
+// ═══ W02: Backlogs ══════════════════════════════════════════
+
+export async function listBacklogs(
+  collegeId: string,
+  page: number,
+  limit: number,
+  studentId?: string,
+  semesterId?: string,
+  status?: string,
+  authScope?: AuthScope,
+) {
+  const filter: any = { collegeId };
+  if (studentId) filter.studentId = studentId;
+  if (semesterId) filter.semesterId = semesterId;
+  if (status) filter.currentStatus = status;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
+  return paginate(Backlog, filter, page, limit, { createdAt: -1 }, [STUDENT_POPULATE, 'courseId', 'semesterId'] as any);
+}
+
+export async function getBacklog(collegeId: string, id: string) {
+  const doc = await Backlog.findOne({ _id: id, collegeId })
+    .populate(STUDENT_POPULATE)
+    .populate('courseId')
+    .populate('semesterId');
+  if (!doc) throw new AppError(404, 'Backlog not found');
+  return doc;
+}
+
+export async function updateBacklog(collegeId: string, id: string, data: any, performedBy: string) {
+  const doc = await Backlog.findOneAndUpdate({ _id: id, collegeId }, { $set: data }, { new: true });
+  if (!doc) throw new AppError(404, 'Backlog not found');
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'Backlog',
+    entityId: String(doc._id),
+    entityName: `Backlog - ${String(doc.studentId)} / ${String(doc.courseId)}`,
+    action: 'update',
+    changes: Object.keys(data).map(k => ({
+      field: k,
+      displayName: k,
+      oldValue: null,
+      newValue: data[k],
+    })),
+    performedBy,
+  });
+
+  return doc;
+}
+
+// ═══ W02: Supplementary Exam Scheduling ══════════════════════
+
+export async function scheduleSupplementaryExams(
+  collegeId: string,
+  semesterId: string,
+  performedBy: string,
+): Promise<{
+  scheduled: number;
+  registrations: number;
+  backlogs: Array<{ studentId: string; courseId: string }>;
+}> {
+  // 1. Find all Backlogs with currentStatus 'created' for this semester
+  const backlogs = await Backlog.find({ collegeId, semesterId, currentStatus: 'created' });
+  if (backlogs.length === 0) {
+    return { scheduled: 0, registrations: 0, backlogs: [] };
+  }
+
+  // 2. Group by courseId
+  const courseMap = new Map<string, typeof backlogs>();
+  for (const b of backlogs) {
+    const cid = String(b.courseId);
+    if (!courseMap.has(cid)) courseMap.set(cid, []);
+    courseMap.get(cid)!.push(b);
+  }
+
+  let scheduled = 0;
+  let registrations = 0;
+  const backlogSummary: Array<{ studentId: string; courseId: string }> = [];
+
+  // 3. For each course with backlogs
+  for (const [courseId, courseBacklogs] of courseMap) {
+    // 3a. Create or find an ExamSchedule with examType 'supplementary'
+    let examSchedule = await ExamSchedule.findOne({
+      collegeId,
+      semesterId,
+      courseId,
+      examType: 'supplementary',
+    });
+
+    if (!examSchedule) {
+      examSchedule = await ExamSchedule.create({
+        collegeId,
+        semesterId,
+        courseId,
+        examType: 'supplementary',
+        date: new Date(),
+        startTime: '09:00',
+        endTime: '12:00',
+        status: 'scheduled',
+      });
+      scheduled++;
+    }
+
+    // 3b. For each student with a backlog in this course
+    for (const backlog of courseBacklogs) {
+      // Find a course offering for this course/semester to use as courseOfferingId
+      const offering = await CourseOffering.findOne({
+        collegeId,
+        courseId,
+        semesterId,
+      });
+
+      if (offering) {
+        // Create ExamRegistration
+        await ExamRegistration.create({
+          collegeId,
+          studentId: backlog.studentId,
+          courseOfferingId: offering._id,
+          semesterId,
+          examType: 'supplementary',
+          status: 'registered',
+          isEligible: true,
+        });
+        registrations++;
+      }
+
+      // Update Backlog status
+      backlog.currentStatus = 'registered_for_supplementary';
+      await backlog.save();
+
+      backlogSummary.push({
+        studentId: String(backlog.studentId),
+        courseId: String(backlog.courseId),
+      });
+    }
+  }
+
+  // 4. Audit log
+  await createAuditLog({
+    collegeId,
+    entityType: 'ExamSchedule',
+    entityId: semesterId,
+    entityName: `Supplementary Exam Scheduling - ${semesterId}`,
+    action: 'create',
+    changes: [{
+      field: 'supplementaryScheduling',
+      displayName: 'Supplementary Exam Scheduling',
+      oldValue: null,
+      newValue: `Scheduled: ${scheduled}, Registrations: ${registrations}, Backlogs: ${backlogSummary.length}`,
+    }],
+    performedBy,
+  });
+
+  return { scheduled, registrations, backlogs: backlogSummary };
 }
