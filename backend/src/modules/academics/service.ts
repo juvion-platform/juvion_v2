@@ -37,6 +37,7 @@ import { Assignment } from '../../models/academic-ops/Assignment';
 import { Submission } from '../../models/academic-ops/Submission';
 import { Quiz } from '../../models/academic-ops/Quiz';
 import { QuizAttempt } from '../../models/academic-ops/QuizAttempt';
+import { FeeLineItem } from '../../models/finance/FeeLineItem';
 import { paginate } from '../../shared/pagination';
 import { createAuditLog } from '../../shared/audit';
 import { AppError } from '../../middleware/errorHandler';
@@ -2569,6 +2570,191 @@ export async function getCourseDeliveryOverview(
       averageProgress: result.length > 0
         ? Math.round(result.reduce((sum, r) => sum + r.syllabusProgress, 0) / result.length)
         : 0,
+    },
+  };
+}
+
+// ═══ W02: Hall Ticket Eligibility ═══════════════════════════
+
+export interface EligibilityResult {
+  studentId: string;
+  courseOfferingId: string;
+  courseId: string;
+  isEligible: boolean;
+  reasons: string[];
+  attendancePercent: number;
+  hasCondonation: boolean;
+  feeClearance: 'cleared' | 'outstanding' | 'unknown';
+}
+
+export async function checkHallTicketEligibility(
+  collegeId: string,
+  studentId: string,
+  semesterId: string,
+): Promise<EligibilityResult[]> {
+  // 1. Get all enrollments for this student in this semester (status: 'enrolled')
+  const enrollments = await Enrollment.find({
+    collegeId,
+    studentId,
+    semesterId,
+    status: 'enrolled',
+  });
+
+  if (enrollments.length === 0) {
+    throw new AppError(404, 'No active enrollments found for this student in the given semester');
+  }
+
+  const results: EligibilityResult[] = [];
+
+  for (const enrollment of enrollments) {
+    const courseOfferingId = String(enrollment.courseOfferingId);
+    const reasons: string[] = [];
+    let attendanceOk = true;
+    let hasCondonation = false;
+    let attendancePercent = 0;
+
+    // 2a. Attendance check
+    const summary = await AttendanceSummary.findOne({
+      collegeId,
+      studentId,
+      courseOfferingId,
+    });
+
+    if (summary) {
+      attendancePercent = summary.percentage;
+      if (summary.percentage < 75) {
+        // Check for approved condonation
+        const condonation = await CondonationRequest.findOne({
+          collegeId,
+          studentId,
+          courseOfferingId,
+          status: 'approved',
+        });
+        if (condonation) {
+          hasCondonation = true;
+          // Attendance OK due to condonation
+        } else {
+          attendanceOk = false;
+          reasons.push(`Attendance below 75% (${Math.round(attendancePercent)}%)`);
+        }
+      }
+    }
+    // If no summary found, attendance is treated as OK (no data to block)
+
+    // 2b. Fee clearance check
+    const outstandingFees = await FeeLineItem.find({
+      collegeId,
+      studentId,
+      status: { $nin: ['paid', 'waived'] },
+    });
+
+    const totalFeeItems = await FeeLineItem.countDocuments({
+      collegeId,
+      studentId,
+    });
+
+    let feeClearance: 'cleared' | 'outstanding' | 'unknown';
+    if (totalFeeItems === 0) {
+      feeClearance = 'unknown';
+    } else if (outstandingFees.length > 0) {
+      feeClearance = 'outstanding';
+      reasons.push('Outstanding fee dues');
+    } else {
+      feeClearance = 'cleared';
+    }
+
+    // 2c. Combine: isEligible = attendance OK AND (feeClearance === 'cleared' OR feeClearance === 'unknown')
+    const isEligible = attendanceOk && (feeClearance === 'cleared' || feeClearance === 'unknown');
+
+    // Get courseId from the course offering
+    const offering = await CourseOffering.findOne({ _id: courseOfferingId, collegeId });
+    const courseId = offering ? String(offering.courseId) : '';
+
+    results.push({
+      studentId,
+      courseOfferingId,
+      courseId,
+      isEligible,
+      reasons,
+      attendancePercent,
+      hasCondonation,
+      feeClearance,
+    });
+  }
+
+  return results;
+}
+
+export async function checkBulkEligibility(
+  collegeId: string,
+  semesterId: string,
+  performedBy: string,
+): Promise<{
+  semesterId: string;
+  results: EligibilityResult[];
+  summary: {
+    totalStudents: number;
+    eligible: number;
+    ineligible: number;
+    attendanceIssues: number;
+    feeIssues: number;
+  };
+}> {
+  // 1. Get all unique studentIds from enrolled enrollments in this semester
+  const enrollments = await Enrollment.find({
+    collegeId,
+    semesterId,
+    status: 'enrolled',
+  }).select('studentId');
+
+  const uniqueStudentIds = [...new Set(enrollments.map(e => String(e.studentId)))];
+
+  if (uniqueStudentIds.length === 0) {
+    throw new AppError(404, 'No enrolled students found for this semester');
+  }
+
+  // 2. For each student, call checkHallTicketEligibility
+  const allResults: EligibilityResult[] = [];
+  for (const sid of uniqueStudentIds) {
+    const studentResults = await checkHallTicketEligibility(collegeId, sid, semesterId);
+    allResults.push(...studentResults);
+  }
+
+  // 3. Compute summary
+  const eligibleResults = allResults.filter(r => r.isEligible);
+  const ineligibleResults = allResults.filter(r => !r.isEligible);
+  const attendanceIssues = allResults.filter(r =>
+    r.reasons.some(reason => reason.startsWith('Attendance below')),
+  ).length;
+  const feeIssues = allResults.filter(r =>
+    r.reasons.includes('Outstanding fee dues'),
+  ).length;
+
+  // 4. Audit log
+  await createAuditLog({
+    collegeId,
+    entityType: 'Semester',
+    entityId: semesterId,
+    entityName: `Bulk Eligibility Check - ${semesterId}`,
+    action: 'create',
+    changes: [{
+      field: 'bulkEligibilityCheck',
+      displayName: 'Bulk Eligibility Check',
+      oldValue: null,
+      newValue: `${uniqueStudentIds.length} students, ${eligibleResults.length} eligible, ${ineligibleResults.length} ineligible`,
+    }],
+    performedBy,
+  });
+
+  return {
+    semesterId,
+    results: allResults,
+    summary: {
+      totalStudents: uniqueStudentIds.length,
+      eligible: eligibleResults.length,
+      ineligible: ineligibleResults.length,
+      attendanceIssues,
+      feeIssues,
     },
   };
 }

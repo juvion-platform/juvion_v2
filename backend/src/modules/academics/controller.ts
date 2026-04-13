@@ -774,3 +774,22 @@ export async function getCourseDeliveryOverview(req: AuthRequest, res: Response,
     res.json(result);
   } catch (e) { next(e); }
 }
+
+// ═══ W02: Hall Ticket Eligibility ═══════════════════════════
+
+export async function checkHallTicketEligibility(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { studentId, semesterId } = req.query as { studentId: string; semesterId: string };
+    if (!studentId || !semesterId) throw new AppError(400, 'studentId and semesterId are required');
+    const result = await svc.checkHallTicketEligibility(req.collegeId!, studentId, semesterId);
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+export async function checkBulkEligibility(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { semesterId } = req.body;
+    const result = await svc.checkBulkEligibility(req.collegeId!, semesterId, who(req));
+    res.json(result);
+  } catch (e) { next(e); }
+}

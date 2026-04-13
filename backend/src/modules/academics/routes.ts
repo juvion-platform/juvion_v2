@@ -48,6 +48,7 @@ import {
   createSubmissionSchema, gradeSubmissionSchema,
   createQuizSchema, updateQuizSchema,
   submitQuizAttemptSchema,
+  checkBulkEligibilitySchema,
 } from './validation';
 
 const router = Router();
@@ -323,5 +324,9 @@ router.delete('/quiz-attempts/:id', authorize('academics', 'delete'), ctrl.delet
 
 // ═══ W02: Course Delivery Progress ══════════════════════════
 router.post('/offerings/:id/update-progress', authorize('academics', 'update'), ctrl.updateCourseDeliveryProgress);
+
+// ═══ W02: Hall Ticket Eligibility ═══════════════════════════
+router.get('/eligibility/check', authorize('academics', 'read'), ctrl.checkHallTicketEligibility);
+router.post('/eligibility/bulk-check', authorize('academics', 'create'), validate(checkBulkEligibilitySchema), ctrl.checkBulkEligibility);
 
 export default router;

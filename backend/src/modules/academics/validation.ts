@@ -460,3 +460,9 @@ export const submitQuizAttemptSchema = z.object({
     answer: z.string(),
   })),
 });
+
+// ═══ W02: Hall Ticket Eligibility ═══════════════════════════
+
+export const checkBulkEligibilitySchema = z.object({
+  semesterId: z.string().min(1, 'Semester ID is required'),
+});
