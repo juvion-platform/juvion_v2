@@ -1,0 +1,5 @@
+import { Schema, model, Document } from 'mongoose';
+export interface IEquipmentIssue extends Document { collegeId: Schema.Types.ObjectId; equipmentId: Schema.Types.ObjectId; issuedTo: Schema.Types.ObjectId; issuedBy: Schema.Types.ObjectId; issueDate: Date; dueDate: Date; returnDate?: Date; conditionOnIssue?: string; conditionOnReturn?: string; status: string; remarks?: string; }
+const schema = new Schema<IEquipmentIssue>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, equipmentId: { type: Schema.Types.ObjectId, ref: 'LabEquipment', required: true }, issuedTo: { type: Schema.Types.ObjectId, ref: 'Student', required: true }, issuedBy: { type: Schema.Types.ObjectId, ref: 'Staff', required: true }, issueDate: { type: Date, required: true }, dueDate: { type: Date, required: true }, returnDate: Date, conditionOnIssue: String, conditionOnReturn: String, status: { type: String, enum: ['issued', 'returned', 'overdue', 'lost'], default: 'issued' }, remarks: String }, { timestamps: true });
+schema.index({ collegeId: 1, equipmentId: 1, status: 1 });
+export const EquipmentIssue = model<IEquipmentIssue>('EquipmentIssue', schema);

@@ -1,0 +1,5 @@
+import { Schema, model, Document } from 'mongoose';
+export interface IEquipmentMaintenanceLog extends Document { collegeId: Schema.Types.ObjectId; equipmentId: Schema.Types.ObjectId; serviceDate: Date; serviceType: string; performedBy: string; description?: string; cost: number; nextServiceDue?: Date; remarks?: string; }
+const schema = new Schema<IEquipmentMaintenanceLog>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, equipmentId: { type: Schema.Types.ObjectId, ref: 'LabEquipment', required: true }, serviceDate: { type: Date, required: true }, serviceType: { type: String, enum: ['preventive', 'corrective', 'calibration', 'repair'], required: true }, performedBy: { type: String, required: true }, description: String, cost: { type: Number, default: 0 }, nextServiceDue: Date, remarks: String }, { timestamps: true });
+schema.index({ collegeId: 1, equipmentId: 1 });
+export const EquipmentMaintenanceLog = model<IEquipmentMaintenanceLog>('EquipmentMaintenanceLog', schema);

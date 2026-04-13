@@ -1,0 +1,5 @@
+import { Schema, model, Document } from 'mongoose';
+export interface IVendorPerformance extends Document { collegeId: Schema.Types.ObjectId; vendorId: Schema.Types.ObjectId; period: string; requestsAssigned: number; requestsCompleted: number; avgResponseTimeHours?: number; avgResolutionTimeHours?: number; slaComplianceRate?: number; customerSatisfactionScore?: number; remarks?: string; }
+const schema = new Schema<IVendorPerformance>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, vendorId: { type: Schema.Types.ObjectId, ref: 'Vendor', required: true }, period: { type: String, required: true }, requestsAssigned: { type: Number, default: 0 }, requestsCompleted: { type: Number, default: 0 }, avgResponseTimeHours: Number, avgResolutionTimeHours: Number, slaComplianceRate: Number, customerSatisfactionScore: Number, remarks: String }, { timestamps: true });
+schema.index({ collegeId: 1, vendorId: 1, period: 1 }, { unique: true });
+export const VendorPerformance = model<IVendorPerformance>('VendorPerformance', schema);

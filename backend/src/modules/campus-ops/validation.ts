@@ -489,3 +489,459 @@ export const createPeriodicalSubscriptionSchema = z.object({
   isActive: z.boolean().optional(),
 });
 export const updatePeriodicalSubscriptionSchema = createPeriodicalSubscriptionSchema.partial();
+
+// ═══════════════════════════════════════════════════════════
+// HOSTEL WORKFLOW SCHEMAS
+// ═══════════════════════════════════════════════════════════
+
+// ═══ Hostel Workflow Schemas ═══
+export const allocateHostelBulkSchema = z.object({
+  body: z.object({
+    studentIds: z.array(z.string()).min(1),
+    academicYearId: z.string(),
+  }),
+});
+
+export const allocateHostelSingleSchema = z.object({
+  body: z.object({
+    studentId: z.string(),
+    academicYearId: z.string(),
+    preferences: z.object({
+      blockPreference: z.string().optional(),
+      floorPreference: z.number().optional(),
+      roomTypePreference: z.string().optional(),
+      roommatePreference: z.string().optional(),
+    }).optional(),
+  }),
+});
+
+export const submitRoomChangeRequestSchema = z.object({
+  body: z.object({
+    studentId: z.string(),
+    currentRoomId: z.string(),
+    reason: z.string(),
+    reasonCategory: z.enum(['roommate_conflict', 'medical', 'preference', 'other']),
+    requestedRoomId: z.string().optional(),
+    preferredBlockId: z.string().optional(),
+  }),
+});
+
+export const approveRoomChangeSchema = z.object({
+  body: z.object({
+    newRoomId: z.string(),
+    newBedId: z.string(),
+  }),
+});
+
+export const verifyHostelClearanceSchema = z.object({
+  body: z.object({
+    roomVacated: z.boolean().optional(),
+    keysReturned: z.boolean().optional(),
+    damageAssessment: z.string().optional(),
+    damageAmount: z.number().optional(),
+    duesCleared: z.boolean().optional(),
+  }),
+});
+
+export const recordHostelAttendanceBulkSchema = z.object({
+  body: z.object({
+    date: z.string(),
+    records: z.array(z.object({
+      studentId: z.string(),
+      status: z.enum(['present', 'absent', 'on_leave']),
+    })).min(1),
+  }),
+});
+
+export const submitHostelLeaveSchema = z.object({
+  body: z.object({
+    studentId: z.string(),
+    leaveType: z.enum(['home', 'medical', 'emergency']),
+    startDate: z.string(),
+    endDate: z.string(),
+    destination: z.string(),
+    guardianContact: z.string(),
+    reason: z.string().optional(),
+  }),
+});
+
+export const rejectHostelLeaveSchema = z.object({
+  body: z.object({ reason: z.string() }),
+});
+
+export const reportViolationSchema = z.object({
+  body: z.object({
+    studentId: z.string(),
+    violationType: z.string(),
+    description: z.string(),
+    severity: z.enum(['low', 'medium', 'high', 'critical']),
+    evidence: z.array(z.string()).optional(),
+  }),
+});
+
+export const scheduleHearingSchema = z.object({
+  body: z.object({ hearingDate: z.string() }),
+});
+
+export const assignPenaltySchema = z.object({
+  body: z.object({
+    penaltyType: z.enum(['warning', 'fine', 'suspension', 'expulsion']),
+    fineAmount: z.number().optional(),
+    effectiveDate: z.string(),
+    expiryDate: z.string().optional(),
+  }),
+});
+
+export const fileAppealSchema = z.object({
+  body: z.object({
+    penaltyId: z.string(),
+    studentId: z.string(),
+    grounds: z.string(),
+  }),
+});
+
+export const resolveAppealSchema = z.object({
+  body: z.object({
+    outcome: z.enum(['upheld', 'modified', 'overturned']),
+    outcomeRemarks: z.string(),
+  }),
+});
+
+export const escalateWardenConcernSchema = z.object({
+  body: z.object({
+    studentId: z.string(),
+    concernType: z.string(),
+    severity: z.enum(['low', 'medium', 'high', 'critical']),
+    description: z.string(),
+    evidence: z.array(z.string()).optional(),
+  }),
+});
+
+// ═══════════════════════════════════════════════════════════
+// LIBRARY WORKFLOW SCHEMAS
+// ═══════════════════════════════════════════════════════════
+
+// ═══ Library Workflow Schemas ═══
+export const issueBookSchema = z.object({
+  body: z.object({
+    bookId: z.string(),
+    memberId: z.string(),
+  }),
+});
+
+export const returnBookSchema = z.object({
+  body: z.object({
+    bookIssueId: z.string(),
+    condition: z.string().optional(),
+  }),
+});
+
+export const renewBookSchema = z.object({
+  body: z.object({ bookIssueId: z.string() }),
+});
+
+export const reportBookLostSchema = z.object({
+  body: z.object({ bookIssueId: z.string() }),
+});
+
+export const reserveBookSchema = z.object({
+  body: z.object({
+    bookId: z.string(),
+    memberId: z.string(),
+  }),
+});
+
+export const initiateLibraryClearanceSchema = z.object({
+  body: z.object({
+    personType: z.enum(['student', 'staff', 'faculty']),
+  }),
+});
+
+export const recordLibraryEntrySchema = z.object({
+  body: z.object({ personId: z.string() }),
+});
+
+// ═══════════════════════════════════════════════════════════
+// MESS WORKFLOW SCHEMAS
+// ═══════════════════════════════════════════════════════════
+
+// ═══ Mess Workflow Schemas ═══
+export const recordMealTransactionSchema = z.object({
+  body: z.object({
+    studentId: z.string(),
+    messFacilityId: z.string(),
+    mealType: z.enum(['breakfast', 'lunch', 'snacks', 'dinner']),
+  }),
+});
+
+export const addCouponCreditSchema = z.object({
+  body: z.object({
+    studentId: z.string(),
+    messFacilityId: z.string(),
+    amount: z.number().positive(),
+  }),
+});
+
+export const qualityInspectionWorkflowSchema = z.object({
+  body: z.object({
+    messFacilityId: z.string(),
+    hygieneScore: z.number().min(0).max(10),
+    foodQualityScore: z.number().min(0).max(10),
+    complianceStatus: z.enum(['compliant', 'minor_issues', 'major_issues', 'non_compliant']),
+    issues: z.array(z.object({ area: z.string(), description: z.string(), severity: z.string() })).optional(),
+    vendorContractId: z.string().optional(),
+    remarks: z.string().optional(),
+  }),
+});
+
+export const terminateContractSchema = z.object({
+  body: z.object({ reason: z.string() }),
+});
+
+// ═══════════════════════════════════════════════════════════
+// TRANSPORT WORKFLOW SCHEMAS
+// ═══════════════════════════════════════════════════════════
+
+// ═══ Transport Workflow Schemas ═══
+export const allocateTransportBulkSchema = z.object({
+  body: z.object({
+    students: z.array(z.object({
+      studentId: z.string(),
+      address: z.string().optional(),
+    })).min(1),
+    academicYearId: z.string(),
+  }),
+});
+
+export const allocateTransportSingleSchema = z.object({
+  body: z.object({
+    studentId: z.string(),
+    routeId: z.string(),
+    stopId: z.string(),
+    academicYearId: z.string(),
+  }),
+});
+
+export const recordTransportAttendanceSchema = z.object({
+  body: z.object({
+    tripLogId: z.string(),
+    records: z.array(z.object({
+      studentId: z.string(),
+      stopId: z.string().optional(),
+    })).min(1),
+  }),
+});
+
+export const adjustRouteSchema = z.object({
+  body: z.object({
+    action: z.string(),
+    details: z.any(),
+  }),
+});
+
+// ═══════════════════════════════════════════════════════════
+// LABS WORKFLOW SCHEMAS
+// ═══════════════════════════════════════════════════════════
+
+// ═══ Labs Workflow Schemas ═══
+export const registerLabEquipmentSchema = z.object({
+  body: z.object({
+    labId: z.string(),
+    name: z.string(),
+    serialNumber: z.string(),
+    manufacturer: z.string().optional(),
+    purchaseDate: z.string().optional(),
+    purchaseCost: z.number().optional(),
+    condition: z.enum(['new', 'good', 'fair', 'poor']).optional(),
+    nextCalibration: z.string().optional(),
+  }),
+});
+
+export const updateEquipmentStatusSchema = z.object({
+  body: z.object({
+    status: z.enum(['active', 'maintenance', 'calibration_due', 'condemned']),
+    reason: z.string().optional(),
+  }),
+});
+
+export const recordEquipmentMaintenanceSchema = z.object({
+  body: z.object({
+    equipmentId: z.string(),
+    serviceType: z.enum(['preventive', 'corrective', 'calibration', 'repair']),
+    performedByName: z.string(),
+    description: z.string().optional(),
+    cost: z.number().optional(),
+    nextServiceDue: z.string().optional(),
+  }),
+});
+
+export const requestLabSlotBookingSchema = z.object({
+  body: z.object({
+    labId: z.string(),
+    date: z.string(),
+    startTime: z.string(),
+    endTime: z.string(),
+    purpose: z.string(),
+    attendeeCount: z.number().optional(),
+  }),
+});
+
+export const issueEquipmentSchema = z.object({
+  body: z.object({
+    equipmentId: z.string(),
+    issuedTo: z.string(),
+    dueDate: z.string(),
+    conditionOnIssue: z.string().optional(),
+  }),
+});
+
+export const returnEquipmentSchema = z.object({
+  body: z.object({ conditionOnReturn: z.string() }),
+});
+
+export const reportLabIncidentSchema = z.object({
+  body: z.object({
+    labId: z.string(),
+    incidentDate: z.string(),
+    type: z.enum(['safety', 'damage', 'chemical_spill', 'fire', 'injury', 'other']),
+    description: z.string(),
+    severity: z.enum(['low', 'medium', 'high', 'critical']),
+    equipmentDamaged: z.array(z.string()).optional(),
+  }),
+});
+
+export const resolveLabIncidentSchema = z.object({
+  body: z.object({ resolution: z.string() }),
+});
+
+// ═══════════════════════════════════════════════════════════
+// FACILITIES WORKFLOW SCHEMAS
+// ═══════════════════════════════════════════════════════════
+
+// ═══ Facilities Workflow Schemas ═══
+export const requestFacilityBookingSchema = z.object({
+  body: z.object({
+    roomId: z.string(),
+    date: z.string(),
+    startTime: z.string(),
+    endTime: z.string(),
+    purpose: z.string(),
+    requesterModule: z.string().optional(),
+    attendeeCount: z.number().optional(),
+  }),
+});
+
+export const rejectBookingSchema = z.object({
+  body: z.object({ reason: z.string() }),
+});
+
+export const recordFacilityUsageSchema = z.object({
+  body: z.object({
+    bookingId: z.string(),
+    actualStartTime: z.string(),
+    actualEndTime: z.string(),
+    attendeeCount: z.number(),
+    usageNotes: z.string().optional(),
+  }),
+});
+
+export const reportCampusIncidentSchema = z.object({
+  body: z.object({
+    incidentDate: z.string(),
+    type: z.string(),
+    severity: z.enum(['low', 'medium', 'high', 'critical']),
+    description: z.string(),
+    personsInvolved: z.array(z.object({ personId: z.string(), personType: z.string(), role: z.string() })).optional(),
+    visitorEntryId: z.string().optional(),
+  }),
+});
+
+export const resolveCampusIncidentSchema = z.object({
+  body: z.object({ resolution: z.string() }),
+});
+
+// ═══════════════════════════════════════════════════════════
+// MAINTENANCE WORKFLOW SCHEMAS
+// ═══════════════════════════════════════════════════════════
+
+// ═══ Maintenance Workflow Schemas ═══
+export const submitMaintenanceRequestSchema = z.object({
+  body: z.object({
+    facilityType: z.enum(['hostel', 'classroom', 'lab', 'transport', 'common_area', 'office', 'other']),
+    facilityId: z.string().optional(),
+    equipmentId: z.string().optional(),
+    description: z.string(),
+    category: z.string(),
+    location: z.string(),
+    priority: z.enum(['low', 'medium', 'high', 'critical']).optional(),
+  }),
+});
+
+export const triageMaintenanceRequestSchema = z.object({
+  body: z.object({
+    priority: z.enum(['low', 'medium', 'high', 'critical']),
+    assignmentRouting: z.enum(['in_house', 'amc_vendor', 'external']),
+    slaDeadlineHours: z.number().positive(),
+  }),
+});
+
+export const createMaintenanceAssignmentSchema_wf = z.object({
+  body: z.object({
+    requestId: z.string(),
+    assignedToType: z.enum(['in_house', 'amc_vendor', 'external']),
+    assignedToId: z.string(),
+    assignedToName: z.string(),
+    slaDeadline: z.string().optional(),
+  }),
+});
+
+export const addMaintenanceWorkLogSchema = z.object({
+  body: z.object({
+    assignmentId: z.string(),
+    workDate: z.string(),
+    hoursSpent: z.number().positive(),
+    description: z.string(),
+    materialsUsed: z.array(z.object({ name: z.string(), quantity: z.number(), cost: z.number() })).optional(),
+    cost: z.number().optional(),
+  }),
+});
+
+export const verifyMaintenanceWorkSchema = z.object({
+  body: z.object({
+    verificationStatus: z.enum(['passed', 'failed']),
+  }),
+});
+
+export const triggerPreventiveMaintenanceSchema = z.object({
+  body: z.object({
+    scheduleId: z.string().optional(),
+    equipmentId: z.string().optional(),
+    aiTriggered: z.boolean().optional(),
+    aiConfidence: z.number().optional(),
+  }),
+});
+
+export const createMaintenanceEscalationSchema_wf = z.object({
+  body: z.object({
+    requestId: z.string(),
+    assignmentId: z.string().optional(),
+    reason: z.string(),
+    triggerType: z.enum(['sla_warning', 'sla_breach', 'manual']),
+  }),
+});
+
+export const calculateVendorPerformanceSchema = z.object({
+  body: z.object({
+    vendorId: z.string(),
+    period: z.string(),
+  }),
+});
+
+export const provisionInfrastructureSchema = z.object({
+  body: z.object({
+    studentId: z.string(),
+    isHosteler: z.boolean(),
+    usesTransport: z.boolean(),
+    preferences: z.any().optional(),
+  }),
+});
