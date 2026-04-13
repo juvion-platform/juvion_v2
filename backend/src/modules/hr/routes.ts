@@ -23,6 +23,10 @@ import {
   createJobApplicationSchema, updateJobApplicationSchema,
   createPublicationSchema, updatePublicationSchema,
   createResearchProjectSchema, updateResearchProjectSchema,
+  submitLeaveSchema, compOffSchema, annualResetSchema, initBalanceSchema,
+  biometricSchema, odSchema, correctionSchema,
+  createAttendanceAnomalySchema, updateAttendanceAnomalySchema,
+  createAttendanceMonthlySummarySchema, updateAttendanceMonthlySummarySchema,
 } from './validation';
 
 const router = Router();
@@ -45,7 +49,20 @@ router.post('/leave-types', authorize('hr', 'create'), validate(createLeaveTypeS
 router.put('/leave-types/:id', authorize('hr', 'update'), validate(updateLeaveTypeSchema), ctrl.updateLeaveType);
 router.delete('/leave-types/:id', authorize('hr', 'delete'), ctrl.deleteLeaveType);
 
-// Leave Applications
+// Leave Workflow Routes (before CRUD :id routes)
+router.post('/leave-applications/submit', authorize('hr', 'create'), validate(submitLeaveSchema), ctrl.submitLeaveRequest);
+router.post('/leave-applications/:id/auto-approve', authorize('hr', 'update'), ctrl.autoApproveCasualLeave);
+router.post('/leave-applications/:id/approve', authorize('hr', 'update'), ctrl.approveLeaveRequest);
+router.post('/leave-applications/:id/reject', authorize('hr', 'update'), ctrl.rejectLeaveRequest);
+router.post('/leave-applications/:id/withdraw', authorize('hr', 'update'), ctrl.withdrawLeaveRequest);
+router.post('/leave-applications/:id/route', authorize('hr', 'update'), ctrl.routeLeaveForApproval);
+router.get('/leave-applications/:employeeId/exam-clash', authorize('hr', 'read'), ctrl.checkExamClash);
+router.post('/leave-applications/:id/trigger-substitution', authorize('hr', 'update'), ctrl.triggerFacultySubstitution);
+router.post('/leave/compensatory-off', authorize('hr', 'create'), validate(compOffSchema), ctrl.processCompensatoryOff);
+router.post('/leave/annual-reset', authorize('hr', 'update'), validate(annualResetSchema), ctrl.annualLeaveReset);
+router.post('/leave/initialize-balance', authorize('hr', 'create'), validate(initBalanceSchema), ctrl.initializeLeaveBalance);
+
+// Leave Applications CRUD
 router.get('/leave-applications', authorize('hr', 'read'), ctrl.listLeaveApplications);
 router.get('/leave-applications/:id', authorize('hr', 'read'), ctrl.getLeaveApplication);
 router.post('/leave-applications', authorize('hr', 'create'), validate(createLeaveApplicationSchema), ctrl.createLeaveApplication);
@@ -58,7 +75,19 @@ router.post('/leave-balances', authorize('hr', 'create'), validate(createLeaveBa
 router.put('/leave-balances/:id', authorize('hr', 'update'), validate(updateLeaveBalanceSchema), ctrl.updateLeaveBalance);
 router.delete('/leave-balances/:id', authorize('hr', 'delete'), ctrl.deleteLeaveBalance);
 
-// Employee Attendance
+// Attendance Workflow Routes (before CRUD :id routes)
+router.post('/attendance/biometric', authorize('hr', 'create'), validate(biometricSchema), ctrl.recordBiometricAttendance);
+router.post('/attendance/detect-anomalies', authorize('hr', 'update'), ctrl.detectAttendanceAnomalies);
+router.post('/attendance/reconcile', authorize('hr', 'update'), ctrl.reconcileAttendanceLeave);
+router.post('/attendance/lock-monthly', authorize('hr', 'update'), ctrl.lockMonthlyAttendance);
+router.post('/attendance/:id/correction', authorize('hr', 'update'), validate(correctionSchema), ctrl.submitAttendanceCorrection);
+router.post('/attendance/:id/correction/approve', authorize('hr', 'update'), ctrl.approveAttendanceCorrection);
+
+// OD Workflow Routes
+router.post('/on-duties/submit', authorize('hr', 'create'), validate(odSchema), ctrl.submitODRequest);
+router.post('/on-duties/:id/approve', authorize('hr', 'update'), ctrl.approveODRequest);
+
+// Employee Attendance CRUD
 router.get('/employee-attendance', authorize('hr', 'read'), ctrl.listEmployeeAttendance);
 router.post('/employee-attendance', authorize('hr', 'create'), validate(createEmployeeAttendanceSchema), ctrl.createEmployeeAttendance);
 router.put('/employee-attendance/:id', authorize('hr', 'update'), validate(updateEmployeeAttendanceSchema), ctrl.updateEmployeeAttendance);
@@ -157,5 +186,19 @@ router.get('/research-projects/:id', authorize('hr', 'read'), ctrl.getResearchPr
 router.post('/research-projects', authorize('hr', 'create'), validate(createResearchProjectSchema), ctrl.createResearchProject);
 router.put('/research-projects/:id', authorize('hr', 'update'), validate(updateResearchProjectSchema), ctrl.updateResearchProject);
 router.delete('/research-projects/:id', authorize('hr', 'delete'), ctrl.deleteResearchProject);
+
+// Attendance Anomalies
+router.get('/attendance-anomalies', authorize('hr', 'read'), ctrl.listAttendanceAnomalies);
+router.get('/attendance-anomalies/:id', authorize('hr', 'read'), ctrl.getAttendanceAnomaly);
+router.post('/attendance-anomalies', authorize('hr', 'create'), validate(createAttendanceAnomalySchema), ctrl.createAttendanceAnomaly);
+router.put('/attendance-anomalies/:id', authorize('hr', 'update'), validate(updateAttendanceAnomalySchema), ctrl.updateAttendanceAnomaly);
+router.delete('/attendance-anomalies/:id', authorize('hr', 'delete'), ctrl.deleteAttendanceAnomaly);
+
+// Attendance Monthly Summaries
+router.get('/attendance-monthly-summaries', authorize('hr', 'read'), ctrl.listAttendanceMonthlySummaries);
+router.get('/attendance-monthly-summaries/:id', authorize('hr', 'read'), ctrl.getAttendanceMonthlySummary);
+router.post('/attendance-monthly-summaries', authorize('hr', 'create'), validate(createAttendanceMonthlySummarySchema), ctrl.createAttendanceMonthlySummary);
+router.put('/attendance-monthly-summaries/:id', authorize('hr', 'update'), validate(updateAttendanceMonthlySummarySchema), ctrl.updateAttendanceMonthlySummary);
+router.delete('/attendance-monthly-summaries/:id', authorize('hr', 'delete'), ctrl.deleteAttendanceMonthlySummary);
 
 export default router;

@@ -389,3 +389,162 @@ export async function updateResearchProject(req: AuthRequest, res: Response, nex
 export async function deleteResearchProject(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.deleteResearchProject(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
 }
+
+// ═══════════════════════════════════════════════════════════
+// W05 Phase 1 — Leave & Attendance Workflow Controllers
+// ═══════════════════════════════════════════════════════════
+
+// ─── Leave Workflow ─────────────────────────────────────────
+
+export async function submitLeaveRequest(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await service.submitLeaveRequest(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function autoApproveCasualLeave(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.autoApproveCasualLeave(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+export async function checkExamClash(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { fromDate, toDate } = req.query as any;
+    res.json(await service.checkExamClash(req.collegeId!, req.params.employeeId as string, fromDate, toDate));
+  } catch (err) { next(err); }
+}
+
+export async function routeLeaveForApproval(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { level, approverId } = req.body;
+    res.json(await service.routeLeaveForApproval(req.collegeId!, req.params.id as string, level, approverId, who(req)));
+  } catch (err) { next(err); }
+}
+
+export async function approveLeaveRequest(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { approverId, remarks } = req.body;
+    res.json(await service.approveLeaveRequest(req.collegeId!, req.params.id as string, approverId, remarks || '', who(req)));
+  } catch (err) { next(err); }
+}
+
+export async function rejectLeaveRequest(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { approverId, remarks } = req.body;
+    res.json(await service.rejectLeaveRequest(req.collegeId!, req.params.id as string, approverId, remarks || '', who(req)));
+  } catch (err) { next(err); }
+}
+
+export async function withdrawLeaveRequest(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.withdrawLeaveRequest(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+export async function processCompensatoryOff(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await service.processCompensatoryOff(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function annualLeaveReset(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { academicYearId, newAcademicYearId } = req.body;
+    res.json(await service.annualLeaveReset(req.collegeId!, academicYearId, newAcademicYearId, who(req)));
+  } catch (err) { next(err); }
+}
+
+export async function triggerFacultySubstitution(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.triggerFacultySubstitution(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+export async function initializeLeaveBalance(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { employeeId, academicYearId, joiningDate } = req.body;
+    res.status(201).json(await service.initializeLeaveBalance(req.collegeId!, employeeId, academicYearId, new Date(joiningDate), who(req)));
+  } catch (err) { next(err); }
+}
+
+// ─── Attendance Workflow ────────────────────────────────────
+
+export async function recordBiometricAttendance(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await service.recordBiometricAttendance(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function detectAttendanceAnomalies(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { month, year } = req.body;
+    res.json(await service.detectAttendanceAnomalies(req.collegeId!, month, year, who(req)));
+  } catch (err) { next(err); }
+}
+
+export async function submitODRequest(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await service.submitODRequest(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function approveODRequest(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { approverId } = req.body;
+    res.json(await service.approveODRequest(req.collegeId!, req.params.id as string, approverId, who(req)));
+  } catch (err) { next(err); }
+}
+
+export async function reconcileAttendanceLeave(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { month, year } = req.body;
+    res.json(await service.reconcileAttendanceLeave(req.collegeId!, month, year, who(req)));
+  } catch (err) { next(err); }
+}
+
+export async function lockMonthlyAttendance(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { month, year } = req.body;
+    res.json(await service.lockMonthlyAttendance(req.collegeId!, month, year, who(req)));
+  } catch (err) { next(err); }
+}
+
+export async function submitAttendanceCorrection(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.submitAttendanceCorrection(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function approveAttendanceCorrection(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { approverId } = req.body;
+    res.json(await service.approveAttendanceCorrection(req.collegeId!, req.params.id as string, approverId, who(req)));
+  } catch (err) { next(err); }
+}
+
+// ═══ Attendance Anomaly CRUD ════════════════════════════════
+
+export async function listAttendanceAnomalies(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page, limit, employeeId, month, year } = req.query as any;
+    res.json(await service.listAttendanceAnomalies(req.collegeId!, Number(page) || 1, Number(limit) || 20, employeeId, Number(month) || undefined, Number(year) || undefined, req.authScope));
+  } catch (err) { next(err); }
+}
+export async function getAttendanceAnomaly(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.getAttendanceAnomaly(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+export async function createAttendanceAnomaly(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await service.createAttendanceAnomaly(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function updateAttendanceAnomaly(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.updateAttendanceAnomaly(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function deleteAttendanceAnomaly(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.deleteAttendanceAnomaly(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ═══ Attendance Monthly Summary CRUD ════════════════════════
+
+export async function listAttendanceMonthlySummaries(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page, limit, employeeId, month, year } = req.query as any;
+    res.json(await service.listAttendanceMonthlySummaries(req.collegeId!, Number(page) || 1, Number(limit) || 20, employeeId, Number(month) || undefined, Number(year) || undefined, req.authScope));
+  } catch (err) { next(err); }
+}
+export async function getAttendanceMonthlySummary(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.getAttendanceMonthlySummary(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+export async function createAttendanceMonthlySummary(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await service.createAttendanceMonthlySummary(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function updateAttendanceMonthlySummary(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.updateAttendanceMonthlySummary(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function deleteAttendanceMonthlySummary(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.deleteAttendanceMonthlySummary(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}

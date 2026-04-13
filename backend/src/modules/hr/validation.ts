@@ -264,3 +264,97 @@ export const createResearchProjectSchema = z.object({
   status: z.enum(['proposed', 'sanctioned', 'ongoing', 'completed', 'terminated']).optional(),
 });
 export const updateResearchProjectSchema = createResearchProjectSchema.partial();
+
+// ═══════════════════════════════════════════════════════════
+// W05 Phase 1 — Leave & Attendance Workflow Schemas
+// ═══════════════════════════════════════════════════════════
+
+// ─── Leave Workflow ─────────────────────────────────────────
+
+export const submitLeaveSchema = z.object({
+  employeeId: z.string().min(1),
+  leaveTypeId: z.string().min(1),
+  fromDate: z.string().min(1),
+  toDate: z.string().min(1),
+  days: z.number().min(0.5),
+  reason: z.string().min(1),
+  isHalfDay: z.boolean().optional(),
+  documentUrl: z.string().optional(),
+});
+
+export const compOffSchema = z.object({
+  employeeId: z.string().min(1),
+  workedDate: z.string().min(1),
+  reason: z.string().min(1),
+});
+
+export const annualResetSchema = z.object({
+  academicYearId: z.string().min(1),
+  newAcademicYearId: z.string().min(1),
+});
+
+export const initBalanceSchema = z.object({
+  employeeId: z.string().min(1),
+  academicYearId: z.string().min(1),
+  joiningDate: z.string().min(1),
+});
+
+// ─── Attendance Workflow ────────────────────────────────────
+
+export const biometricSchema = z.object({
+  employeeId: z.string().min(1),
+  date: z.string().min(1),
+  checkIn: z.string().optional(),
+  checkOut: z.string().optional(),
+  source: z.enum(['biometric', 'manual', 'app']).optional(),
+});
+
+export const odSchema = z.object({
+  employeeId: z.string().min(1),
+  fromDate: z.string().min(1),
+  toDate: z.string().min(1),
+  purpose: z.string().min(1),
+  venue: z.string().optional(),
+  documentUrl: z.string().optional(),
+});
+
+export const correctionSchema = z.object({
+  correctionReason: z.string().min(1),
+  requestedStatus: z.enum(['present', 'absent', 'half_day', 'on_duty', 'leave', 'holiday']),
+});
+
+// ─── Attendance Anomaly CRUD ────────────────────────────────
+
+export const createAttendanceAnomalySchema = z.object({
+  employeeId: z.string().min(1),
+  anomalyType: z.enum(['chronic_late', 'missing_swipe', 'irregular_pattern']),
+  month: z.number().int().min(1).max(12),
+  year: z.number().int(),
+  details: z.object({
+    lateCount: z.number().optional(),
+    missedCheckouts: z.number().optional(),
+    patternDescription: z.string().optional(),
+  }).optional(),
+  severity: z.enum(['info', 'warning', 'critical']),
+  referredToDisciplinary: z.boolean().optional(),
+  disciplinaryCaseId: z.string().optional(),
+});
+export const updateAttendanceAnomalySchema = createAttendanceAnomalySchema.partial();
+
+// ─── Attendance Monthly Summary CRUD ────────────────────────
+
+export const createAttendanceMonthlySummarySchema = z.object({
+  employeeId: z.string().min(1),
+  month: z.number().int().min(1).max(12),
+  year: z.number().int(),
+  totalPresent: z.number().min(0).optional(),
+  totalAbsent: z.number().min(0).optional(),
+  totalLate: z.number().min(0).optional(),
+  totalHalfDay: z.number().min(0).optional(),
+  totalOnDuty: z.number().min(0).optional(),
+  totalLeave: z.number().min(0).optional(),
+  totalHoliday: z.number().min(0).optional(),
+  lopDays: z.number().min(0).optional(),
+  isLocked: z.boolean().optional(),
+});
+export const updateAttendanceMonthlySummarySchema = createAttendanceMonthlySummarySchema.partial();
