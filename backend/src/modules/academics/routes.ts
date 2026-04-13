@@ -55,6 +55,9 @@ import {
   createInvigilationRosterSchema,
   updateInvigilationRosterSchema,
   generateHallTicketsSchema,
+  bulkEnterExternalMarksSchema,
+  validateExternalMarksSchema,
+  computeGradesSchema,
 } from './validation';
 
 const router = Router();
@@ -354,5 +357,12 @@ router.delete('/invigilation-rosters/:id', authorize('academics', 'delete'), ctr
 router.post('/hall-tickets/generate', authorize('academics', 'create'), validate(generateHallTicketsSchema), ctrl.generateHallTickets);
 router.get('/hall-tickets', authorize('academics', 'read'), ctrl.listHallTickets);
 router.get('/hall-tickets/:id', authorize('academics', 'read'), ctrl.getHallTicket);
+
+// ═══ W02: Bulk Mark Entry ═══════════════════════════════════
+router.post('/external-marks/bulk-enter', authorize('academics', 'create'), validate(bulkEnterExternalMarksSchema), ctrl.bulkEnterExternalMarks);
+router.post('/external-marks/validate', authorize('academics', 'update'), validate(validateExternalMarksSchema), ctrl.validateExternalMarks);
+
+// ═══ W02: Grade Computation ═════════════════════════════════
+router.post('/grades/compute', authorize('academics', 'create'), validate(computeGradesSchema), ctrl.computeGradesForSemester);
 
 export default router;

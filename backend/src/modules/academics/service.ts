@@ -42,6 +42,7 @@ import { Invoice } from '../../models/finance/Invoice';
 import { SeatingPlan } from '../../models/academic-ops/SeatingPlan';
 import { InvigilationRoster } from '../../models/academic-ops/InvigilationRoster';
 import { HallTicket } from '../../models/academic-ops/HallTicket';
+import { Backlog } from '../../models/academic-ops/Backlog';
 import { paginate } from '../../shared/pagination';
 import { createAuditLog } from '../../shared/audit';
 import { AppError } from '../../middleware/errorHandler';
@@ -2979,4 +2980,368 @@ export async function getHallTicket(collegeId: string, id: string) {
     .populate('courses.courseId');
   if (!doc) throw new AppError(404, 'Hall ticket not found');
   return doc;
+}
+
+// ═══ W02: Bulk Mark Entry with Anomaly Detection (Task 5) ═══════
+
+export async function bulkEnterExternalMarks(
+  collegeId: string,
+  semesterId: string,
+  courseId: string,
+  examType: string,
+  marks: Array<{
+    studentId: string;
+    marksObtained: number;
+    maxMarks: number;
+  }>,
+  performedBy: string,
+): Promise<{
+  entered: number;
+  anomaliesDetected: number;
+  results: Array<{
+    studentId: string;
+    marksObtained: number;
+    anomalyFlags: string[];
+    result: string;
+  }>;
+}> {
+  // Pre-compute stats for anomaly detection
+  const totalMarks = marks.reduce((sum, m) => sum + m.marksObtained, 0);
+  const avgMarks = marks.length > 0 ? totalMarks / marks.length : 0;
+
+  // Count occurrences of each mark value for suspicious pattern detection
+  const markCounts = new Map<number, number>();
+  for (const m of marks) {
+    markCounts.set(m.marksObtained, (markCounts.get(m.marksObtained) || 0) + 1);
+  }
+
+  const results: Array<{
+    studentId: string;
+    marksObtained: number;
+    anomalyFlags: string[];
+    result: string;
+  }> = [];
+  let anomaliesDetected = 0;
+
+  for (const entry of marks) {
+    // Anomaly detection
+    const anomalyFlags: string[] = [];
+
+    if (entry.marksObtained > entry.maxMarks) {
+      anomalyFlags.push('marks_above_max');
+    }
+    if (entry.marksObtained > avgMarks + 30) {
+      anomalyFlags.push('sudden_jump');
+    }
+    const sameMarkCount = markCounts.get(entry.marksObtained) || 0;
+    if (sameMarkCount >= 5) {
+      anomalyFlags.push('suspicious_pattern');
+    }
+    if (entry.marksObtained === 0) {
+      anomalyFlags.push('zero_marks');
+    }
+
+    if (anomalyFlags.length > 0) {
+      anomaliesDetected++;
+    }
+
+    // Determine result
+    let result: string;
+    if (entry.marksObtained === 0) {
+      result = 'absent';
+    } else if (entry.marksObtained >= 0.4 * entry.maxMarks) {
+      result = 'pass';
+    } else {
+      result = 'fail';
+    }
+
+    // Upsert ExternalMark
+    await ExternalMark.findOneAndUpdate(
+      { collegeId, studentId: entry.studentId, courseId, semesterId, examType },
+      {
+        collegeId,
+        studentId: entry.studentId,
+        courseId,
+        semesterId,
+        examType,
+        maxMarks: entry.maxMarks,
+        marksObtained: entry.marksObtained,
+        result,
+        enteredBy: performedBy,
+        anomalyFlags,
+      },
+      { upsert: true, new: true },
+    );
+
+    results.push({
+      studentId: entry.studentId,
+      marksObtained: entry.marksObtained,
+      anomalyFlags,
+      result,
+    });
+  }
+
+  // Audit log
+  await createAuditLog({
+    collegeId,
+    entityType: 'ExternalMark',
+    entityId: courseId,
+    entityName: `Bulk External Marks - ${courseId}`,
+    action: 'create',
+    changes: [{
+      field: 'bulkMarkEntry',
+      displayName: 'Bulk Mark Entry',
+      oldValue: null,
+      newValue: `Entered: ${results.length}, Anomalies: ${anomaliesDetected}`,
+    }],
+    performedBy,
+  });
+
+  return { entered: results.length, anomaliesDetected, results };
+}
+
+export async function validateExternalMarks(
+  collegeId: string,
+  semesterId: string,
+  courseId: string,
+  performedBy: string,
+): Promise<{ validated: number }> {
+  const result = await ExternalMark.updateMany(
+    { collegeId, semesterId, courseId, validatedBy: null },
+    { $set: { validatedBy: performedBy, validatedAt: new Date() } },
+  );
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'ExternalMark',
+    entityId: courseId,
+    entityName: `Validate External Marks - ${courseId}`,
+    action: 'update',
+    changes: [{
+      field: 'validation',
+      displayName: 'Mark Validation',
+      oldValue: null,
+      newValue: `Validated: ${result.modifiedCount}`,
+    }],
+    performedBy,
+  });
+
+  return { validated: result.modifiedCount };
+}
+
+// ═══ W02: Grade Computation Engine (Task 6) ═════════════════════
+
+const DEFAULT_GRADING_SCALE = [
+  { grade: 'O', minMarks: 90, maxMarks: 100, gradePoints: 10 },
+  { grade: 'A+', minMarks: 80, maxMarks: 89, gradePoints: 9 },
+  { grade: 'A', minMarks: 70, maxMarks: 79, gradePoints: 8 },
+  { grade: 'B+', minMarks: 60, maxMarks: 69, gradePoints: 7 },
+  { grade: 'B', minMarks: 50, maxMarks: 59, gradePoints: 6 },
+  { grade: 'C', minMarks: 40, maxMarks: 49, gradePoints: 5 },
+  { grade: 'F', minMarks: 0, maxMarks: 39, gradePoints: 0 },
+];
+
+const DEFAULT_PASSING_CRITERIA = { internalMin: 40, externalMin: 40, totalMin: 40 };
+
+export function computeGrade(
+  totalMarksPercent: number,
+  internalMarks: number,
+  internalMax: number,
+  externalMarks: number,
+  externalMax: number,
+  gradingScale: Array<{ grade: string; minMarks: number; maxMarks: number; gradePoints: number }>,
+  passingCriteria: { internalMin: number; externalMin: number; totalMin: number },
+): { grade: string; gradePoints: number; result: 'pass' | 'fail' } {
+  // Check passing criteria (values are percentages)
+  const internalPercent = internalMax > 0 ? (internalMarks / internalMax) * 100 : 0;
+  const externalPercent = externalMax > 0 ? (externalMarks / externalMax) * 100 : 0;
+
+  if (
+    internalPercent < passingCriteria.internalMin ||
+    externalPercent < passingCriteria.externalMin ||
+    totalMarksPercent < passingCriteria.totalMin
+  ) {
+    return { grade: 'F', gradePoints: 0, result: 'fail' };
+  }
+
+  // Look up grading scale
+  const entry = gradingScale.find(
+    (g) => totalMarksPercent >= g.minMarks && totalMarksPercent <= g.maxMarks,
+  );
+
+  if (entry) {
+    return { grade: entry.grade, gradePoints: entry.gradePoints, result: 'pass' };
+  }
+
+  // Fallback — should not happen with a well-configured scale
+  return { grade: 'F', gradePoints: 0, result: 'fail' };
+}
+
+export async function computeGradesForSemester(
+  collegeId: string,
+  semesterId: string,
+  performedBy: string,
+): Promise<{
+  processed: number;
+  passed: number;
+  failed: number;
+  backlogsCreated: number;
+  gradeCards: Array<{
+    studentId: string;
+    courseId: string;
+    grade: string;
+    gradePoints: number;
+    result: string;
+  }>;
+}> {
+  // 1. Get all CourseOfferings for this semester
+  const offerings = await CourseOffering.find({ collegeId, semesterId });
+
+  let processed = 0;
+  let passed = 0;
+  let failed = 0;
+  let backlogsCreated = 0;
+  const gradeCards: Array<{
+    studentId: string;
+    courseId: string;
+    grade: string;
+    gradePoints: number;
+    result: string;
+  }> = [];
+
+  for (const offering of offerings) {
+    // 2. Get course and regulation
+    const course = await Course.findOne({ _id: offering.courseId, collegeId });
+    if (!course) continue;
+
+    const regulation = await Regulation.findOne({ _id: course.regulationId, collegeId });
+    if (!regulation) continue;
+
+    const gradingScale = regulation.gradingScale && regulation.gradingScale.length > 0
+      ? regulation.gradingScale
+      : DEFAULT_GRADING_SCALE;
+
+    const passingCriteria = regulation.passingCriteria && regulation.passingCriteria.internalMin != null
+      ? regulation.passingCriteria
+      : DEFAULT_PASSING_CRITERIA;
+
+    // 3. Get all enrollments for this offering
+    const enrollments = await Enrollment.find({
+      collegeId,
+      courseOfferingId: offering._id,
+      status: { $in: ['enrolled', 'completed'] },
+    });
+
+    for (const enrollment of enrollments) {
+      const studentId = String(enrollment.studentId);
+      const courseId = String(offering.courseId);
+      const courseOfferingId = String(offering._id);
+
+      // 4a. Get CIE marks
+      let cieMarks = 0;
+      let totalCIEMarks = 0;
+      try {
+        const cieResult = await computeCIE(collegeId, courseOfferingId, studentId);
+        cieMarks = cieResult.cieMarks;
+        totalCIEMarks = cieResult.totalCIEMarks;
+      } catch (_e) {
+        // CIE not available — use 0
+      }
+
+      // 4b. Get external marks
+      const extMark = await ExternalMark.findOne({
+        collegeId,
+        studentId: enrollment.studentId,
+        courseId: offering.courseId,
+        semesterId,
+      });
+      const externalMarks = extMark ? extMark.marksObtained : 0;
+      const externalMax = extMark ? extMark.maxMarks : 100;
+
+      // 4c. Compute total
+      const internalMarks = cieMarks;
+      const internalMax = totalCIEMarks || 40; // default CIE max
+      const totalMarks = internalMarks + externalMarks;
+      const totalMax = internalMax + externalMax;
+      const totalMarksPercent = totalMax > 0 ? (totalMarks / totalMax) * 100 : 0;
+
+      // 4d. Compute grade
+      const gradeResult = computeGrade(
+        totalMarksPercent,
+        internalMarks,
+        internalMax,
+        externalMarks,
+        externalMax,
+        gradingScale,
+        passingCriteria,
+      );
+
+      // 4e. Upsert GradeCard
+      await GradeCard.findOneAndUpdate(
+        { collegeId, studentId: enrollment.studentId, semesterId, courseId: offering.courseId },
+        {
+          collegeId,
+          studentId: enrollment.studentId,
+          semesterId,
+          courseId: offering.courseId,
+          internalMarks,
+          externalMarks,
+          totalMarks,
+          grade: gradeResult.grade,
+          gradePoints: gradeResult.gradePoints,
+          credits: course.credits,
+          result: gradeResult.result,
+        },
+        { upsert: true, new: true },
+      );
+
+      // 4f. If fail, create Backlog
+      if (gradeResult.result === 'fail') {
+        await Backlog.findOneAndUpdate(
+          { collegeId, studentId: enrollment.studentId, courseId: offering.courseId },
+          {
+            collegeId,
+            studentId: enrollment.studentId,
+            courseId: offering.courseId,
+            semesterId,
+            originalExamType: 'regular',
+            attempts: 1,
+            currentStatus: 'created',
+          },
+          { upsert: true, new: true },
+        );
+        backlogsCreated++;
+        failed++;
+      } else {
+        passed++;
+      }
+
+      processed++;
+      gradeCards.push({
+        studentId,
+        courseId,
+        grade: gradeResult.grade,
+        gradePoints: gradeResult.gradePoints,
+        result: gradeResult.result,
+      });
+    }
+  }
+
+  // 5. Audit log
+  await createAuditLog({
+    collegeId,
+    entityType: 'GradeCard',
+    entityId: semesterId,
+    entityName: `Grade Computation - ${semesterId}`,
+    action: 'create',
+    changes: [{
+      field: 'gradeComputation',
+      displayName: 'Grade Computation',
+      oldValue: null,
+      newValue: `Processed: ${processed}, Passed: ${passed}, Failed: ${failed}, Backlogs: ${backlogsCreated}`,
+    }],
+    performedBy,
+  });
+
+  return { processed, passed, failed, backlogsCreated, gradeCards };
 }

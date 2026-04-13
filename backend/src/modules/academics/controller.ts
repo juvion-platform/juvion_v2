@@ -856,3 +856,31 @@ export async function listHallTickets(req: AuthRequest, res: Response, next: Nex
 export async function getHallTicket(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await svc.getHallTicket(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }
 }
+
+// ═══ W02: Bulk Mark Entry ═══════════════════════════════════
+
+export async function bulkEnterExternalMarks(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { semesterId, courseId, examType, marks } = req.body;
+    const result = await svc.bulkEnterExternalMarks(req.collegeId!, semesterId, courseId, examType, marks, who(req));
+    res.status(201).json(result);
+  } catch (e) { next(e); }
+}
+
+export async function validateExternalMarks(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { semesterId, courseId } = req.body;
+    const result = await svc.validateExternalMarks(req.collegeId!, semesterId, courseId, who(req));
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+// ═══ W02: Grade Computation ═════════════════════════════════
+
+export async function computeGradesForSemester(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { semesterId } = req.body;
+    const result = await svc.computeGradesForSemester(req.collegeId!, semesterId, who(req));
+    res.status(201).json(result);
+  } catch (e) { next(e); }
+}

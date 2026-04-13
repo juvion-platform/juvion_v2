@@ -506,3 +506,27 @@ export const generateHallTicketsSchema = z.object({
   semesterId: z.string().min(1),
   examType: z.enum(['regular', 'supplementary', 'improvement']),
 });
+
+// ═══ W02: Bulk Mark Entry ═══════════════════════════════════
+
+export const bulkEnterExternalMarksSchema = z.object({
+  semesterId: z.string().min(1),
+  courseId: z.string().min(1),
+  examType: z.enum(['regular', 'supplementary', 'improvement']),
+  marks: z.array(z.object({
+    studentId: z.string().min(1),
+    marksObtained: z.number().min(0),
+    maxMarks: z.number().positive(),
+  })).min(1),
+});
+
+export const validateExternalMarksSchema = z.object({
+  semesterId: z.string().min(1),
+  courseId: z.string().min(1),
+});
+
+// ═══ W02: Grade Computation ═════════════════════════════════
+
+export const computeGradesSchema = z.object({
+  semesterId: z.string().min(1),
+});
