@@ -33,6 +33,7 @@ import {
   createElectiveAllocationSchema, updateElectiveAllocationSchema,
   createLessonPlanSchema, updateLessonPlanSchema,
   createCourseFeedbackSchema,
+  instantiateCurriculumSchema,
 } from './validation';
 
 const router = Router();
@@ -240,5 +241,9 @@ router.delete('/lesson-plans/:id', authorize('academics', 'delete'), ctrl.delete
 router.get('/course-feedback', authorize('academics', 'read'), ctrl.listCourseFeedback);
 router.post('/course-feedback', authorize('academics', 'create'), validate(createCourseFeedbackSchema), ctrl.createCourseFeedback);
 router.delete('/course-feedback/:id', authorize('academics', 'delete'), ctrl.deleteCourseFeedback);
+
+// ═══ W02: Curriculum Instantiation & Calendar Publish ═════════
+router.post('/curriculum/instantiate', authorize('academics', 'create'), validate(instantiateCurriculumSchema), ctrl.instantiateSemesterCurriculum);
+router.post('/academic-calendar/:id/publish', authorize('academics', 'update'), ctrl.publishAcademicCalendar);
 
 export default router;

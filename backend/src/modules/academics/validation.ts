@@ -312,6 +312,15 @@ export const createLessonPlanSchema = z.object({
 });
 export const updateLessonPlanSchema = createLessonPlanSchema.partial();
 
+// ═══ W02: Curriculum Instantiation & Calendar Publish ═════════
+
+export const instantiateCurriculumSchema = z.object({
+  semesterId: z.string().min(1, 'Semester is required'),
+  regulationId: z.string().min(1, 'Regulation is required'),
+  programmeId: z.string().min(1, 'Programme is required'),
+  branchId: z.string().min(1, 'Branch is required'),
+});
+
 export const createCourseFeedbackSchema = z.object({
   courseOfferingId: z.string().min(1),
   studentId: z.string().min(1),

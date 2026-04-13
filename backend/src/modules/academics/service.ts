@@ -878,3 +878,107 @@ export async function deleteCourseFeedback(collegeId: string, id: string, _perfo
   if (!doc) throw new AppError(404, 'Feedback not found');
   return { deleted: true };
 }
+
+// ═══ W02: Curriculum Instantiation & Calendar Publish ═════════
+
+export async function instantiateSemesterCurriculum(
+  collegeId: string,
+  semesterId: string,
+  regulationId: string,
+  programmeId: string,
+  branchId: string,
+  performedBy: string,
+) {
+  // 1. Look up the semester to get its number and year
+  const semester = await Semester.findOne({ _id: semesterId, collegeId });
+  if (!semester) throw new AppError(404, 'Semester not found');
+
+  // 2. Query CurriculumMap for matching entries
+  const maps = await CurriculumMap.find({
+    collegeId,
+    regulationId,
+    programmeId,
+    branchId,
+    semester: semester.number,
+  });
+  if (maps.length === 0) {
+    throw new AppError(404, 'No curriculum map found for the given parameters');
+  }
+
+  // 3. For each map entry, look up the course and find sections, then create offerings
+  let courseOfferingsCreated = 0;
+  const courseNames: string[] = [];
+
+  for (const map of maps) {
+    // 3a. Look up the Course
+    const course = await Course.findOne({ _id: map.courseId, collegeId });
+    if (!course) continue;
+    courseNames.push(course.name);
+
+    // 3b. Find all Sections for this branch/semester
+    const sections = await Section.find({
+      collegeId,
+      branchId,
+      semester: semester.number,
+    });
+
+    // 3c. Create a CourseOffering for each section
+    for (const section of sections) {
+      await CourseOffering.create({
+        collegeId,
+        courseId: map.courseId,
+        semesterId,
+        sectionId: section._id,
+        facultyId: section.classAdvisorId || '000000000000000000000000',
+        status: 'draft',
+        maxEnrollment: section.capacity,
+      });
+      courseOfferingsCreated++;
+    }
+  }
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'CourseOffering',
+    entityId: semesterId,
+    entityName: `Curriculum instantiation for semester ${semester.number}`,
+    action: 'create',
+    changes: [{ field: 'courseOfferingsCreated', displayName: 'Course Offerings Created', oldValue: '0', newValue: String(courseOfferingsCreated) }],
+    performedBy,
+  });
+
+  return { courseOfferingsCreated, courses: courseNames };
+}
+
+export async function publishAcademicCalendar(
+  collegeId: string,
+  calendarId: string,
+  performedBy: string,
+) {
+  // 1. Find the calendar
+  const calendar = await AcademicCalendar.findOne({ _id: calendarId, collegeId });
+  if (!calendar) throw new AppError(404, 'Academic calendar not found');
+
+  // 2. Validate current status
+  if (calendar.status !== 'draft') {
+    throw new AppError(400, 'Calendar can only be published from draft status');
+  }
+
+  // 3. Update status and approvedBy
+  calendar.status = 'published';
+  calendar.approvedBy = performedBy as any;
+  await calendar.save();
+
+  // 4. Audit log
+  await createAuditLog({
+    collegeId,
+    entityType: 'AcademicCalendar',
+    entityId: String(calendar._id),
+    entityName: calendar.title,
+    action: 'update',
+    changes: [{ field: 'status', displayName: 'Status', oldValue: 'draft', newValue: 'published' }],
+    performedBy,
+  });
+
+  return calendar;
+}

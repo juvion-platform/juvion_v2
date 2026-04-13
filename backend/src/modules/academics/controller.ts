@@ -492,3 +492,21 @@ export async function createCourseFeedback(req: AuthRequest, res: Response, next
 export async function deleteCourseFeedback(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await svc.deleteCourseFeedback(req.collegeId!, req.params.id as string, who(req))); } catch (e) { next(e); }
 }
+
+// ═══ W02: Curriculum Instantiation & Calendar Publish ═════════
+export async function instantiateSemesterCurriculum(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { semesterId, regulationId, programmeId, branchId } = req.body;
+    const result = await svc.instantiateSemesterCurriculum(
+      req.collegeId!, semesterId, regulationId, programmeId, branchId, who(req),
+    );
+    res.status(201).json(result);
+  } catch (e) { next(e); }
+}
+
+export async function publishAcademicCalendar(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const result = await svc.publishAcademicCalendar(req.collegeId!, req.params.id as string, who(req));
+    res.json(result);
+  } catch (e) { next(e); }
+}
