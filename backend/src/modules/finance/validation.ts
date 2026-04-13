@@ -403,3 +403,119 @@ export const createInvoiceLineItemSchema = z.object({
   netAmount: z.number().min(0),
 });
 export const updateInvoiceLineItemSchema = createInvoiceLineItemSchema.partial();
+
+// ═══ W03: Payment Collection ═════════════════════════════════
+
+export const processGatewayWebhookSchema = z.object({
+  orderId: z.string().min(1),
+  amount: z.number().min(0),
+  transactionRef: z.string().min(1),
+  gatewayResponse: z.any().optional(),
+});
+
+export const recordCounterPaymentSchema = z.object({
+  invoiceId: z.string().min(1),
+  studentId: z.string().min(1),
+  amount: z.number().min(0),
+  paymentMode: z.enum(['cash', 'dd']),
+  ddNumber: z.string().optional(),
+  ddBank: z.string().optional(),
+  ddDate: z.string().optional(),
+  collectedBy: z.string().min(1),
+});
+
+export const importBankStatementSchema = z.object({
+  entries: z.array(z.object({
+    bankRef: z.string().min(1),
+    amount: z.number().min(0),
+    senderName: z.string().optional(),
+    creditDate: z.string().min(1),
+  })),
+});
+
+export const manualMatchPaymentSchema = z.object({
+  invoiceId: z.string().min(1),
+});
+
+// ═══ W03: Receipt Management ═════════════════════════════════
+
+export const reissueReceiptSchema = z.object({
+  channel: z.enum(['email', 'print', 'whatsapp']).optional(),
+});
+
+// ═══ W03: Bounce & Overpayment ═══════════════════════════════
+
+export const recordPaymentBounceSchema = z.object({
+  reason: z.string().min(1),
+  penaltyAmount: z.number().min(0).optional(),
+});
+
+export const resolveOverpaymentSchema = z.object({
+  resolution: z.enum(['refund', 'credit_forward']),
+});
+
+export const executeRefundSchema = z.object({
+  refundTransactionRef: z.string().min(1),
+});
+
+// ═══ W03: PaymentTransaction CRUD ════════════════════════════
+
+export const createPaymentTransactionSchema = z.object({
+  studentId: z.string().min(1),
+  invoiceId: z.string().min(1),
+  amount: z.number().min(0),
+  channel: z.enum(['gateway', 'cash', 'dd', 'neft', 'rtgs', 'upi', 'card']),
+  paymentMode: z.string().min(1),
+  transactionRef: z.string().optional(),
+  reconciliationStatus: z.enum(['initiated', 'received', 'matched', 'discrepancy', 'resolved', 'reversed', 'refunded']).optional(),
+  gatewayOrderId: z.string().optional(),
+  ddNumber: z.string().optional(),
+  ddBank: z.string().optional(),
+  ddDate: z.string().optional(),
+});
+export const updatePaymentTransactionSchema = createPaymentTransactionSchema.partial();
+
+// ═══ W03: Receipt CRUD ═══════════════════════════════════════
+
+export const createReceiptSchema = z.object({
+  receiptNumber: z.string().min(1),
+  paymentTransactionId: z.string().min(1),
+  studentId: z.string().min(1),
+  amount: z.number().min(0),
+  channel: z.enum(['email', 'print', 'whatsapp']).optional(),
+});
+export const updateReceiptSchema = createReceiptSchema.partial();
+
+// ═══ W03: ReconciliationEntry CRUD ═══════════════════════════
+
+export const createReconciliationEntrySchema = z.object({
+  paymentTransactionId: z.string().min(1),
+  bankStatementRef: z.string().optional(),
+  matchedAmount: z.number().min(0),
+  status: z.enum(['matched', 'discrepancy_flagged', 'resolved']).optional(),
+  discrepancyType: z.string().optional(),
+  discrepancyAmount: z.number().optional(),
+  notes: z.string().optional(),
+});
+export const updateReconciliationEntrySchema = createReconciliationEntrySchema.partial();
+
+// ═══ W03: BounceRecord CRUD ══════════════════════════════════
+
+export const createBounceRecordSchema = z.object({
+  paymentTransactionId: z.string().min(1),
+  invoiceId: z.string().min(1),
+  reason: z.string().min(1),
+  penaltyAmount: z.number().min(0).optional(),
+});
+export const updateBounceRecordSchema = createBounceRecordSchema.partial();
+
+// ═══ W03: OverpaymentRecord CRUD ═════════════════════════════
+
+export const createOverpaymentRecordSchema = z.object({
+  studentId: z.string().min(1),
+  paymentTransactionId: z.string().min(1),
+  invoiceId: z.string().min(1),
+  overpaymentAmount: z.number().min(0),
+  resolution: z.enum(['refund', 'credit_forward', 'pending']).optional(),
+});
+export const updateOverpaymentRecordSchema = createOverpaymentRecordSchema.partial();
