@@ -306,3 +306,100 @@ export const testFeeRulesSchema = z.object({
     batchId: z.string().optional(),
   })),
 });
+
+// ═══ W03: Billing — Invoice Batch Generation ═════════════════
+
+export const generateSemesterInvoiceBatchSchema = z.object({
+  semesterId: z.string().min(1),
+  academicYearId: z.string().min(1),
+});
+
+export const generateEnrolmentInvoiceSchema = z.object({
+  studentId: z.string().min(1),
+  feeStructureInstanceId: z.string().min(1),
+  firstPaymentAmount: z.number().min(0).optional(),
+});
+
+export const generateExamFeeInvoiceBatchSchema = z.object({
+  semesterId: z.string().min(1),
+  examType: z.string().min(1),
+  feeAmount: z.number().min(0),
+  studentIds: z.array(z.string().min(1)),
+});
+
+export const generateAdHocInvoiceSchema = z.object({
+  studentId: z.string().min(1),
+  items: z.array(z.object({
+    description: z.string().min(1),
+    amount: z.number().min(0),
+  })),
+  dueDate: z.string().min(1),
+  description: z.string().optional(),
+});
+
+// ═══ W03: Billing — Invoice Actions ══════════════════════════
+
+export const adjustInvoiceSchema = z.object({
+  adjustments: z.array(z.object({
+    lineItemId: z.string().min(1),
+    newAmount: z.number().min(0),
+    reason: z.string().min(1),
+  })),
+  reason: z.string().min(1),
+});
+
+export const disputeInvoiceSchema = z.object({
+  disputeReason: z.string().min(1),
+});
+
+export const writeOffInvoiceSchema = z.object({
+  approvedBy: z.string().min(1),
+  reason: z.string().min(1),
+});
+
+export const detectSiblingDiscountSchema = z.object({
+  academicYearId: z.string().min(1),
+});
+
+// ═══ W03: Fee Agreement ══════════════════════════════════════
+
+export const createFeeAgreementSchema = z.object({
+  studentId: z.string().min(1),
+  feeStructureInstanceId: z.string().min(1),
+  negotiatedTotal: z.number().min(0),
+  baseTotal: z.number().min(0),
+  waiverAmount: z.number().min(0).optional(),
+  approvalAuthority: z.string().min(1),
+  concessionDetails: z.string().optional(),
+  validityPeriodYears: z.number().int().min(1).optional(),
+});
+export const updateFeeAgreementSchema = createFeeAgreementSchema.partial();
+
+// ═══ W03: Payment Plan ═══════════════════════════════════════
+
+export const createPaymentPlanSchema = z.object({
+  studentId: z.string().min(1),
+  invoiceId: z.string().min(1),
+  feeAgreementId: z.string().optional(),
+  templateId: z.string().optional(),
+  totalAmount: z.number().min(0),
+  installments: z.array(z.object({
+    dueDate: z.string().min(1),
+    amount: z.number().min(0),
+    status: z.enum(['pending', 'paid', 'overdue']).optional(),
+  })),
+});
+export const updatePaymentPlanSchema = createPaymentPlanSchema.partial();
+
+// ═══ W03: Invoice Line Item ══════════════════════════════════
+
+export const createInvoiceLineItemSchema = z.object({
+  invoiceId: z.string().min(1),
+  feeComponentId: z.string().optional(),
+  description: z.string().min(1),
+  grossAmount: z.number().min(0),
+  scholarshipAllocated: z.number().min(0).optional(),
+  concessionApplied: z.number().min(0).optional(),
+  netAmount: z.number().min(0),
+});
+export const updateInvoiceLineItemSchema = createInvoiceLineItemSchema.partial();

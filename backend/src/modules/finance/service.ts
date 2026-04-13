@@ -17,7 +17,11 @@ import { FinancialLedger } from '../../models/finance/FinancialLedger';
 import { PaymentGatewayLog } from '../../models/finance/PaymentGatewayLog';
 import { FeeReminder } from '../../models/finance/FeeReminder';
 import { FinancialReport } from '../../models/finance/FinancialReport';
+import { FeeAgreement } from '../../models/finance/FeeAgreement';
+import { PaymentPlan } from '../../models/finance/PaymentPlan';
+import { InvoiceLineItem } from '../../models/finance/InvoiceLineItem';
 import { Student } from '../../models/people/Student';
+import { Enrollment } from '../../models/academic-ops/Enrollment';
 import { paginate } from '../../shared/pagination';
 import { createAuditLog } from '../../shared/audit';
 import { AppError } from '../../middleware/errorHandler';
@@ -1010,4 +1014,693 @@ export async function testFeeRulesWithProfiles(collegeId: string, feeStructureIn
     results.push({ profile, ...result });
   }
   return results;
+}
+
+// ═══ Batch Invoice Generation ═════════════════════════════
+
+export async function generateSemesterInvoiceBatch(
+  collegeId: string,
+  semesterId: string,
+  academicYearId: string,
+  performedBy: string,
+) {
+  const batchId = `BATCH-${Date.now()}`;
+  let generated = 0;
+  let totalRevenue = 0;
+
+  // Find distinct enrolled students for this semester
+  const enrollments = await Enrollment.find({ collegeId, semesterId, status: 'enrolled' }).lean();
+  const studentIds = [...new Set(enrollments.map(e => String(e.studentId)))];
+
+  for (const studentId of studentIds) {
+    const student = await Student.findOne({ _id: studentId, collegeId }).lean();
+    if (!student) continue;
+
+    const feeStructureInstance = await FeeStructureInstance.findOne({
+      collegeId,
+      programmeId: student.programmeId,
+      status: 'active',
+    }).lean();
+    if (!feeStructureInstance) continue;
+
+    const studentProfile: StudentProfile = {
+      programmeId: student.programmeId ? String(student.programmeId) : undefined,
+      branchId: student.branchId ? String(student.branchId) : undefined,
+      regulationId: student.regulationId ? String(student.regulationId) : undefined,
+      quota: student.quota,
+      category: student.category,
+      batchId: student.batchId ? String(student.batchId) : undefined,
+    };
+
+    const { applicableComponents } = await evaluateFeeRules(collegeId, String(feeStructureInstance._id), studentProfile);
+
+    // Check for active FeeAgreement
+    const feeAgreement = await FeeAgreement.findOne({ collegeId, studentId, status: 'active' }).lean();
+
+    // Check for active ScholarshipAllocation
+    const scholarshipAllocation = await ScholarshipAllocation.findOne({
+      collegeId, studentId, academicYearId, status: { $in: ['approved', 'disbursed'] },
+    }).lean();
+
+    // Check for active Concession
+    const concession = await Concession.findOne({
+      collegeId, studentId, academicYearId, status: 'approved',
+    }).lean();
+
+    const grossTotal = applicableComponents.reduce((sum, c) => sum + c.amount, 0);
+    const scholarshipTotal = scholarshipAllocation ? scholarshipAllocation.amount : 0;
+    let concessionTotal = 0;
+    if (concession) {
+      if (concession.flatAmount) {
+        concessionTotal = concession.flatAmount;
+      } else if (concession.percentage) {
+        concessionTotal = Math.round((grossTotal * concession.percentage) / 100);
+      }
+    }
+
+    // Apply FeeAgreement override
+    const effectiveGross = feeAgreement ? feeAgreement.negotiatedTotal : grossTotal;
+    const netPayable = Math.max(0, effectiveGross - scholarshipTotal - concessionTotal);
+
+    const invoiceNumber = `INV-${new Date().getFullYear()}-${Date.now()}`;
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + 30);
+
+    const invoice = await Invoice.create({
+      collegeId,
+      invoiceNumber,
+      studentId,
+      type: 'fee',
+      items: applicableComponents.map(c => ({ description: c.name, amount: c.amount })),
+      totalAmount: effectiveGross,
+      scholarshipAllocated: scholarshipTotal,
+      concessionApplied: concessionTotal,
+      netPayable,
+      dueDate,
+      status: 'generated',
+      semesterId,
+      feeAgreementId: feeAgreement ? feeAgreement._id : undefined,
+      batchId,
+    });
+
+    // Create InvoiceLineItems
+    const componentCount = applicableComponents.length;
+    for (const comp of applicableComponents) {
+      const scholarshipProportion = componentCount > 0 ? scholarshipTotal / componentCount : 0;
+      const concessionProportion = componentCount > 0 ? concessionTotal / componentCount : 0;
+      const netAmount = Math.max(0, comp.amount - scholarshipProportion - concessionProportion);
+
+      await InvoiceLineItem.create({
+        collegeId,
+        invoiceId: invoice._id,
+        feeComponentId: comp.componentId,
+        description: comp.name,
+        grossAmount: comp.amount,
+        scholarshipAllocated: Math.round(scholarshipProportion),
+        concessionApplied: Math.round(concessionProportion),
+        netAmount: Math.round(netAmount),
+        status: 'active',
+      });
+    }
+
+    generated++;
+    totalRevenue += netPayable;
+  }
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'Invoice',
+    entityId: batchId,
+    entityName: `Batch ${batchId}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return { batchId, generated, totalRevenue };
+}
+
+export async function generateEnrolmentInvoice(
+  collegeId: string,
+  studentId: string,
+  feeStructureInstanceId: string,
+  firstPaymentAmount: number,
+  performedBy: string,
+) {
+  const student = await Student.findOne({ _id: studentId, collegeId }).lean();
+  if (!student) throw new AppError(404, 'Student not found');
+
+  const studentProfile: StudentProfile = {
+    programmeId: student.programmeId ? String(student.programmeId) : undefined,
+    branchId: student.branchId ? String(student.branchId) : undefined,
+    regulationId: student.regulationId ? String(student.regulationId) : undefined,
+    quota: student.quota,
+    category: student.category,
+    batchId: student.batchId ? String(student.batchId) : undefined,
+  };
+
+  const { applicableComponents } = await evaluateFeeRules(collegeId, feeStructureInstanceId, studentProfile);
+
+  // Check for active FeeAgreement
+  const feeAgreement = await FeeAgreement.findOne({ collegeId, studentId, status: 'active' }).lean();
+
+  const grossTotal = applicableComponents.reduce((sum, c) => sum + c.amount, 0);
+  const effectiveGross = feeAgreement ? feeAgreement.negotiatedTotal : grossTotal;
+  const netPayable = Math.max(0, effectiveGross - firstPaymentAmount);
+
+  const invoiceNumber = `INV-${new Date().getFullYear()}-${Date.now()}`;
+  const dueDate = new Date();
+  dueDate.setDate(dueDate.getDate() + 30);
+
+  const invoice = await Invoice.create({
+    collegeId,
+    invoiceNumber,
+    studentId,
+    type: 'fee',
+    items: applicableComponents.map(c => ({ description: c.name, amount: c.amount })),
+    totalAmount: effectiveGross,
+    scholarshipAllocated: 0,
+    concessionApplied: firstPaymentAmount > 0 ? firstPaymentAmount : 0,
+    netPayable,
+    dueDate,
+    status: 'generated',
+    feeAgreementId: feeAgreement ? feeAgreement._id : undefined,
+  });
+
+  for (const comp of applicableComponents) {
+    await InvoiceLineItem.create({
+      collegeId,
+      invoiceId: invoice._id,
+      feeComponentId: comp.componentId,
+      description: comp.name,
+      grossAmount: comp.amount,
+      scholarshipAllocated: 0,
+      concessionApplied: 0,
+      netAmount: comp.amount,
+      status: 'active',
+    });
+  }
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'Invoice',
+    entityId: String(invoice._id),
+    entityName: invoice.invoiceNumber,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return invoice;
+}
+
+export async function generateExamFeeInvoiceBatch(
+  collegeId: string,
+  semesterId: string,
+  examType: string,
+  feeAmount: number,
+  studentIds: string[],
+  performedBy: string,
+) {
+  const batchId = `BATCH-${Date.now()}`;
+  let generated = 0;
+
+  const dueDate = new Date();
+  dueDate.setDate(dueDate.getDate() + 15);
+
+  for (const studentId of studentIds) {
+    const invoiceNumber = `INV-${new Date().getFullYear()}-${Date.now()}-${generated}`;
+    const invoice = await Invoice.create({
+      collegeId,
+      invoiceNumber,
+      studentId,
+      type: 'fee',
+      examType,
+      items: [{ description: `${examType} Exam Fee`, amount: feeAmount }],
+      totalAmount: feeAmount,
+      netPayable: feeAmount,
+      scholarshipAllocated: 0,
+      concessionApplied: 0,
+      dueDate,
+      status: 'generated',
+      semesterId,
+      batchId,
+    });
+
+    await InvoiceLineItem.create({
+      collegeId,
+      invoiceId: invoice._id,
+      description: `${examType} Exam Fee`,
+      grossAmount: feeAmount,
+      scholarshipAllocated: 0,
+      concessionApplied: 0,
+      netAmount: feeAmount,
+      status: 'active',
+    });
+
+    generated++;
+  }
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'Invoice',
+    entityId: batchId,
+    entityName: `Exam Batch ${batchId}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return { generated, batchId };
+}
+
+export async function generateAdHocInvoice(
+  collegeId: string,
+  studentId: string,
+  items: { description: string; amount: number }[],
+  dueDate: Date,
+  description: string,
+  performedBy: string,
+) {
+  const totalAmount = items.reduce((sum, item) => sum + item.amount, 0);
+  const invoiceNumber = `INV-${new Date().getFullYear()}-${Date.now()}`;
+
+  const invoice = await Invoice.create({
+    collegeId,
+    invoiceNumber,
+    studentId,
+    type: 'other',
+    items,
+    totalAmount,
+    netPayable: totalAmount,
+    scholarshipAllocated: 0,
+    concessionApplied: 0,
+    dueDate,
+    status: 'draft',
+  });
+
+  for (const item of items) {
+    await InvoiceLineItem.create({
+      collegeId,
+      invoiceId: invoice._id,
+      description: item.description,
+      grossAmount: item.amount,
+      scholarshipAllocated: 0,
+      concessionApplied: 0,
+      netAmount: item.amount,
+      status: 'active',
+    });
+  }
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'Invoice',
+    entityId: String(invoice._id),
+    entityName: description || invoiceNumber,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return invoice;
+}
+
+// ═══ Invoice Adjustment Workflows ════════════════════════
+
+export async function adjustInvoice(
+  collegeId: string,
+  invoiceId: string,
+  adjustments: { lineItemId: string; newAmount: number; reason: string }[],
+  _reason: string,
+  performedBy: string,
+) {
+  const invoice = await Invoice.findOne({ _id: invoiceId, collegeId });
+  if (!invoice) throw new AppError(404, 'Invoice not found');
+
+  const changes: { field: string; displayName: string; oldValue: unknown; newValue: unknown }[] = [];
+
+  for (const adj of adjustments) {
+    const lineItem = await InvoiceLineItem.findOne({ _id: adj.lineItemId, collegeId, invoiceId });
+    if (!lineItem) continue;
+
+    const oldNet = lineItem.netAmount;
+    const diff = adj.newAmount - lineItem.grossAmount;
+    lineItem.grossAmount = adj.newAmount;
+    lineItem.netAmount = Math.max(0, adj.newAmount - lineItem.scholarshipAllocated - lineItem.concessionApplied);
+
+    if (lineItem.netAmount !== oldNet) {
+      lineItem.status = 'adjusted';
+    }
+
+    await lineItem.save();
+    changes.push({ field: `lineItem.${adj.lineItemId}.grossAmount`, displayName: 'Gross Amount', oldValue: lineItem.grossAmount - diff, newValue: adj.newAmount });
+  }
+
+  // Recalculate invoice totals
+  const lineItems = await InvoiceLineItem.find({ collegeId, invoiceId }).lean();
+  const newTotalAmount = lineItems.reduce((sum, li) => sum + li.grossAmount, 0);
+  const newScholarshipAllocated = lineItems.reduce((sum, li) => sum + li.scholarshipAllocated, 0);
+  const newConcessionApplied = lineItems.reduce((sum, li) => sum + li.concessionApplied, 0);
+  const newNetPayable = lineItems.reduce((sum, li) => sum + li.netAmount, 0);
+
+  invoice.totalAmount = newTotalAmount;
+  invoice.scholarshipAllocated = newScholarshipAllocated;
+  invoice.concessionApplied = newConcessionApplied;
+  invoice.netPayable = newNetPayable;
+  await invoice.save();
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'Invoice',
+    entityId: invoiceId,
+    entityName: invoice.invoiceNumber,
+    action: 'update',
+    changes,
+    performedBy,
+  });
+
+  return invoice;
+}
+
+export async function disputeInvoice(collegeId: string, invoiceId: string, _disputeReason: string, performedBy: string) {
+  const invoice = await Invoice.findOne({ _id: invoiceId, collegeId });
+  if (!invoice) throw new AppError(404, 'Invoice not found');
+  if (!['sent', 'generated'].includes(invoice.status)) {
+    throw new AppError(400, 'Only sent or generated invoices can be disputed');
+  }
+
+  invoice.status = 'disputed';
+  await invoice.save();
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'Invoice',
+    entityId: invoiceId,
+    entityName: invoice.invoiceNumber,
+    action: 'update',
+    changes: [{ field: 'status', displayName: 'Status', oldValue: 'sent', newValue: 'disputed' }],
+    performedBy,
+  });
+
+  return invoice;
+}
+
+export async function confirmInvoice(collegeId: string, invoiceId: string, performedBy: string) {
+  const invoice = await Invoice.findOne({ _id: invoiceId, collegeId });
+  if (!invoice) throw new AppError(404, 'Invoice not found');
+  if (invoice.status !== 'disputed') {
+    throw new AppError(400, 'Only disputed invoices can be confirmed');
+  }
+
+  invoice.status = 'confirmed';
+  await invoice.save();
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'Invoice',
+    entityId: invoiceId,
+    entityName: invoice.invoiceNumber,
+    action: 'update',
+    changes: [{ field: 'status', displayName: 'Status', oldValue: 'disputed', newValue: 'confirmed' }],
+    performedBy,
+  });
+
+  return invoice;
+}
+
+export async function writeOffInvoice(
+  collegeId: string,
+  invoiceId: string,
+  _approvedBy: string,
+  _reason: string,
+  performedBy: string,
+) {
+  const invoice = await Invoice.findOne({ _id: invoiceId, collegeId });
+  if (!invoice) throw new AppError(404, 'Invoice not found');
+
+  const netPayable = invoice.netPayable ?? invoice.totalAmount;
+  if (netPayable <= 0) {
+    throw new AppError(400, 'Invoice has no unpaid balance to write off');
+  }
+
+  const prevStatus = invoice.status;
+  invoice.status = 'written_off';
+  await invoice.save();
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'Invoice',
+    entityId: invoiceId,
+    entityName: invoice.invoiceNumber,
+    action: 'update',
+    changes: [{ field: 'status', displayName: 'Status', oldValue: prevStatus, newValue: 'written_off' }],
+    performedBy,
+  });
+
+  return invoice;
+}
+
+export async function detectSiblingDiscount(
+  collegeId: string,
+  academicYearId: string,
+  performedBy: string,
+) {
+  // Find all students with a feeResponsibleParentId
+  const students = await Student.find({
+    collegeId,
+    feeResponsibleParentId: { $ne: null },
+    status: 'active',
+  }).lean();
+
+  // Group by feeResponsibleParentId
+  const parentMap = new Map<string, string[]>();
+  for (const s of students) {
+    if (!s.feeResponsibleParentId) continue;
+    const parentKey = String(s.feeResponsibleParentId);
+    const existing = parentMap.get(parentKey) ?? [];
+    existing.push(String(s._id));
+    parentMap.set(parentKey, existing);
+  }
+
+  let siblingGroups = 0;
+  let concessionsCreated = 0;
+
+  for (const [_parentId, siblingIds] of parentMap.entries()) {
+    if (siblingIds.length < 2) continue;
+    siblingGroups++;
+
+    // Apply sibling discount concession to all siblings beyond the first
+    for (let i = 1; i < siblingIds.length; i++) {
+      const studentId = siblingIds[i];
+      if (!studentId) continue;
+
+      // Avoid duplicate concessions
+      const existing = await Concession.findOne({
+        collegeId,
+        studentId,
+        academicYearId,
+        type: 'sibling',
+        source: 'm04',
+        status: { $in: ['requested', 'approved'] },
+      }).lean();
+
+      if (existing) continue;
+
+      await Concession.create({
+        collegeId,
+        studentId,
+        academicYearId,
+        type: 'sibling',
+        percentage: 10,
+        reason: 'Sibling discount auto-detected',
+        status: 'requested',
+        source: 'm04',
+      });
+      concessionsCreated++;
+    }
+  }
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'Concession',
+    entityId: `SIBLING-DETECT-${Date.now()}`,
+    entityName: `Sibling Discount Detection`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return { siblingGroups, concessionsCreated };
+}
+
+// ═══ Fee Agreement CRUD ═══════════════════════════════════
+
+export async function listFeeAgreements(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
+  return paginate(FeeAgreement, filter, page, limit, { createdAt: -1 }, [STUDENT_POPULATE, 'feeStructureInstanceId'] as any);
+}
+
+export async function getFeeAgreement(collegeId: string, id: string) {
+  const doc = await FeeAgreement.findOne({ _id: id, collegeId }).populate('studentId feeStructureInstanceId');
+  if (!doc) throw new AppError(404, 'Fee agreement not found');
+  return doc;
+}
+
+export async function createFeeAgreement(collegeId: string, data: any, performedBy: string) {
+  const doc = await FeeAgreement.create({ ...data, collegeId });
+  await createAuditLog({
+    collegeId,
+    entityType: 'FeeAgreement',
+    entityId: String(doc._id),
+    entityName: `Fee Agreement`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function updateFeeAgreement(collegeId: string, id: string, data: any, performedBy: string) {
+  const doc = await FeeAgreement.findOneAndUpdate({ _id: id, collegeId }, data, { new: true });
+  if (!doc) throw new AppError(404, 'Fee agreement not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'FeeAgreement',
+    entityId: id,
+    entityName: `Fee Agreement`,
+    action: 'update',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function deleteFeeAgreement(collegeId: string, id: string, performedBy: string) {
+  const doc = await FeeAgreement.findOneAndDelete({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Fee agreement not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'FeeAgreement',
+    entityId: id,
+    entityName: `Fee Agreement`,
+    action: 'delete',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+// ═══ Payment Plan CRUD ════════════════════════════════════
+
+export async function listPaymentPlans(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
+  return paginate(PaymentPlan, filter, page, limit, { createdAt: -1 }, [STUDENT_POPULATE, 'invoiceId', 'feeAgreementId'] as any);
+}
+
+export async function getPaymentPlan(collegeId: string, id: string) {
+  const doc = await PaymentPlan.findOne({ _id: id, collegeId }).populate('studentId invoiceId feeAgreementId');
+  if (!doc) throw new AppError(404, 'Payment plan not found');
+  return doc;
+}
+
+export async function createPaymentPlan(collegeId: string, data: any, performedBy: string) {
+  const doc = await PaymentPlan.create({ ...data, collegeId });
+  await createAuditLog({
+    collegeId,
+    entityType: 'PaymentPlan',
+    entityId: String(doc._id),
+    entityName: `Payment Plan`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function updatePaymentPlan(collegeId: string, id: string, data: any, performedBy: string) {
+  const doc = await PaymentPlan.findOneAndUpdate({ _id: id, collegeId }, data, { new: true });
+  if (!doc) throw new AppError(404, 'Payment plan not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'PaymentPlan',
+    entityId: id,
+    entityName: `Payment Plan`,
+    action: 'update',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function deletePaymentPlan(collegeId: string, id: string, performedBy: string) {
+  const doc = await PaymentPlan.findOneAndDelete({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Payment plan not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'PaymentPlan',
+    entityId: id,
+    entityName: `Payment Plan`,
+    action: 'delete',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+// ═══ Invoice Line Item CRUD ═══════════════════════════════
+
+export async function listInvoiceLineItems(collegeId: string, invoiceId: string, page = 1, limit = 20) {
+  return paginate(InvoiceLineItem, { collegeId, invoiceId }, page, limit, { createdAt: 1 }, ['feeComponentId']);
+}
+
+export async function getInvoiceLineItem(collegeId: string, id: string) {
+  const doc = await InvoiceLineItem.findOne({ _id: id, collegeId }).populate('feeComponentId invoiceId');
+  if (!doc) throw new AppError(404, 'Invoice line item not found');
+  return doc;
+}
+
+export async function createInvoiceLineItem(collegeId: string, data: any, performedBy: string) {
+  const doc = await InvoiceLineItem.create({ ...data, collegeId });
+  await createAuditLog({
+    collegeId,
+    entityType: 'InvoiceLineItem',
+    entityId: String(doc._id),
+    entityName: doc.description,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function updateInvoiceLineItem(collegeId: string, id: string, data: any, performedBy: string) {
+  const doc = await InvoiceLineItem.findOneAndUpdate({ _id: id, collegeId }, data, { new: true });
+  if (!doc) throw new AppError(404, 'Invoice line item not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'InvoiceLineItem',
+    entityId: id,
+    entityName: doc.description,
+    action: 'update',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function deleteInvoiceLineItem(collegeId: string, id: string, performedBy: string) {
+  const doc = await InvoiceLineItem.findOneAndDelete({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Invoice line item not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'InvoiceLineItem',
+    entityId: id,
+    entityName: doc.description,
+    action: 'delete',
+    changes: [],
+    performedBy,
+  });
+  return doc;
 }

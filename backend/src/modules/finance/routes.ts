@@ -29,6 +29,20 @@ import {
   updateFeeComponentRuleSchema,
   evaluateFeeRulesSchema,
   testFeeRulesSchema,
+  generateSemesterInvoiceBatchSchema,
+  generateEnrolmentInvoiceSchema,
+  generateExamFeeInvoiceBatchSchema,
+  generateAdHocInvoiceSchema,
+  adjustInvoiceSchema,
+  disputeInvoiceSchema,
+  writeOffInvoiceSchema,
+  detectSiblingDiscountSchema,
+  createFeeAgreementSchema,
+  updateFeeAgreementSchema,
+  createPaymentPlanSchema,
+  updatePaymentPlanSchema,
+  createInvoiceLineItemSchema,
+  updateInvoiceLineItemSchema,
 } from './validation';
 
 const router = Router();
@@ -95,6 +109,12 @@ router.get('/fines', authorize('finance', 'read'), ctrl.listFinePenalties);
 router.post('/fines', authorize('finance', 'create'), validate(createFinePenaltySchema), ctrl.createFinePenalty);
 router.put('/fines/:id', authorize('finance', 'update'), validate(updateFinePenaltySchema), ctrl.updateFinePenalty);
 router.delete('/fines/:id', authorize('finance', 'delete'), ctrl.deleteFinePenalty);
+
+// ═══ W03: Invoice Batch Generation ═══════════════════════════
+router.post('/invoices/batch/semester', authorize('finance', 'create'), validate(generateSemesterInvoiceBatchSchema), ctrl.generateSemesterInvoiceBatch);
+router.post('/invoices/enrolment', authorize('finance', 'create'), validate(generateEnrolmentInvoiceSchema), ctrl.generateEnrolmentInvoice);
+router.post('/invoices/batch/exam', authorize('finance', 'create'), validate(generateExamFeeInvoiceBatchSchema), ctrl.generateExamFeeInvoiceBatch);
+router.post('/invoices/ad-hoc', authorize('finance', 'create'), validate(generateAdHocInvoiceSchema), ctrl.generateAdHocInvoice);
 
 // Invoices
 router.get('/invoices', authorize('finance', 'read'), ctrl.listInvoices);
@@ -167,5 +187,33 @@ router.get('/fee-component-rules', authorize('finance', 'read'), ctrl.listFeeCom
 router.post('/fee-component-rules', authorize('finance', 'create'), validate(createFeeComponentRuleSchema), ctrl.createFeeComponentRule);
 router.put('/fee-component-rules/:id', authorize('finance', 'update'), validate(updateFeeComponentRuleSchema), ctrl.updateFeeComponentRule);
 router.delete('/fee-component-rules/:id', authorize('finance', 'delete'), ctrl.deleteFeeComponentRule);
+
+// ═══ W03: Invoice Actions ════════════════════════════════════
+router.post('/invoices/:id/adjust', authorize('finance', 'update'), validate(adjustInvoiceSchema), ctrl.adjustInvoice);
+router.post('/invoices/:id/dispute', authorize('finance', 'update'), validate(disputeInvoiceSchema), ctrl.disputeInvoice);
+router.post('/invoices/:id/confirm', authorize('finance', 'update'), ctrl.confirmInvoice);
+router.post('/invoices/:id/write-off', authorize('finance', 'update'), validate(writeOffInvoiceSchema), ctrl.writeOffInvoice);
+router.post('/concessions/sibling-detect', authorize('finance', 'create'), validate(detectSiblingDiscountSchema), ctrl.detectSiblingDiscount);
+
+// ═══ W03: Fee Agreements ═════════════════════════════════════
+router.get('/fee-agreements', authorize('finance', 'read'), ctrl.listFeeAgreements);
+router.get('/fee-agreements/:id', authorize('finance', 'read'), ctrl.getFeeAgreement);
+router.post('/fee-agreements', authorize('finance', 'create'), validate(createFeeAgreementSchema), ctrl.createFeeAgreement);
+router.put('/fee-agreements/:id', authorize('finance', 'update'), validate(updateFeeAgreementSchema), ctrl.updateFeeAgreement);
+router.delete('/fee-agreements/:id', authorize('finance', 'delete'), ctrl.deleteFeeAgreement);
+
+// ═══ W03: Payment Plans ══════════════════════════════════════
+router.get('/payment-plans', authorize('finance', 'read'), ctrl.listPaymentPlans);
+router.get('/payment-plans/:id', authorize('finance', 'read'), ctrl.getPaymentPlan);
+router.post('/payment-plans', authorize('finance', 'create'), validate(createPaymentPlanSchema), ctrl.createPaymentPlan);
+router.put('/payment-plans/:id', authorize('finance', 'update'), validate(updatePaymentPlanSchema), ctrl.updatePaymentPlan);
+router.delete('/payment-plans/:id', authorize('finance', 'delete'), ctrl.deletePaymentPlan);
+
+// ═══ W03: Invoice Line Items ═════════════════════════════════
+router.get('/invoice-line-items', authorize('finance', 'read'), ctrl.listInvoiceLineItems);
+router.get('/invoice-line-items/:id', authorize('finance', 'read'), ctrl.getInvoiceLineItem);
+router.post('/invoice-line-items', authorize('finance', 'create'), validate(createInvoiceLineItemSchema), ctrl.createInvoiceLineItem);
+router.put('/invoice-line-items/:id', authorize('finance', 'update'), validate(updateInvoiceLineItemSchema), ctrl.updateInvoiceLineItem);
+router.delete('/invoice-line-items/:id', authorize('finance', 'delete'), ctrl.deleteInvoiceLineItem);
 
 export default router;

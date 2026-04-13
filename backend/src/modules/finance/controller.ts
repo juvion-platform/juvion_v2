@@ -422,3 +422,142 @@ export async function testFeeRulesWithProfiles(req: AuthRequest, res: Response, 
     res.json(await service.testFeeRulesWithProfiles(req.collegeId!, feeStructureInstanceId, profiles));
   } catch (err) { next(err); }
 }
+
+// ═══ W03: Invoice Batch Generation ════════════════════════
+
+export async function generateSemesterInvoiceBatch(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { semesterId, academicYearId } = req.body;
+    res.status(201).json(await service.generateSemesterInvoiceBatch(req.collegeId!, semesterId, academicYearId, who(req)));
+  } catch (err) { next(err); }
+}
+
+export async function generateEnrolmentInvoice(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { studentId, feeStructureInstanceId, firstPaymentAmount = 0 } = req.body;
+    res.status(201).json(await service.generateEnrolmentInvoice(req.collegeId!, studentId, feeStructureInstanceId, firstPaymentAmount, who(req)));
+  } catch (err) { next(err); }
+}
+
+export async function generateExamFeeInvoiceBatch(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { semesterId, examType, feeAmount, studentIds } = req.body;
+    res.status(201).json(await service.generateExamFeeInvoiceBatch(req.collegeId!, semesterId, examType, feeAmount, studentIds, who(req)));
+  } catch (err) { next(err); }
+}
+
+export async function generateAdHocInvoice(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { studentId, items, dueDate, description } = req.body;
+    res.status(201).json(await service.generateAdHocInvoice(req.collegeId!, studentId, items, new Date(dueDate), description, who(req)));
+  } catch (err) { next(err); }
+}
+
+// ═══ W03: Invoice Actions ═════════════════════════════════
+
+export async function adjustInvoice(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { adjustments, reason } = req.body;
+    res.json(await service.adjustInvoice(req.collegeId!, req.params.id as string, adjustments, reason, who(req)));
+  } catch (err) { next(err); }
+}
+
+export async function disputeInvoice(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { disputeReason } = req.body;
+    res.json(await service.disputeInvoice(req.collegeId!, req.params.id as string, disputeReason, who(req)));
+  } catch (err) { next(err); }
+}
+
+export async function confirmInvoice(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    res.json(await service.confirmInvoice(req.collegeId!, req.params.id as string, who(req)));
+  } catch (err) { next(err); }
+}
+
+export async function writeOffInvoice(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { approvedBy, reason } = req.body;
+    res.json(await service.writeOffInvoice(req.collegeId!, req.params.id as string, approvedBy, reason, who(req)));
+  } catch (err) { next(err); }
+}
+
+export async function detectSiblingDiscount(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { academicYearId } = req.body;
+    res.status(201).json(await service.detectSiblingDiscount(req.collegeId!, academicYearId, who(req)));
+  } catch (err) { next(err); }
+}
+
+// ═══ W03: Fee Agreements ══════════════════════════════════
+
+export async function listFeeAgreements(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    res.json(await service.listFeeAgreements(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope));
+  } catch (err) { next(err); }
+}
+
+export async function getFeeAgreement(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.getFeeAgreement(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+
+export async function createFeeAgreement(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await service.createFeeAgreement(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function updateFeeAgreement(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.updateFeeAgreement(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function deleteFeeAgreement(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.deleteFeeAgreement(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ═══ W03: Payment Plans ═══════════════════════════════════
+
+export async function listPaymentPlans(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    res.json(await service.listPaymentPlans(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope));
+  } catch (err) { next(err); }
+}
+
+export async function getPaymentPlan(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.getPaymentPlan(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+
+export async function createPaymentPlan(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await service.createPaymentPlan(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function updatePaymentPlan(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.updatePaymentPlan(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function deletePaymentPlan(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.deletePaymentPlan(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ═══ W03: Invoice Line Items ══════════════════════════════
+
+export async function listInvoiceLineItems(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { invoiceId, page, limit } = req.query as any;
+    res.json(await service.listInvoiceLineItems(req.collegeId!, invoiceId, Number(page) || 1, Number(limit) || 20));
+  } catch (err) { next(err); }
+}
+
+export async function getInvoiceLineItem(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.getInvoiceLineItem(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+
+export async function createInvoiceLineItem(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await service.createInvoiceLineItem(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function updateInvoiceLineItem(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.updateInvoiceLineItem(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function deleteInvoiceLineItem(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.deleteInvoiceLineItem(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
