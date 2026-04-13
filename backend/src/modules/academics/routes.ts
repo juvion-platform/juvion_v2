@@ -37,6 +37,9 @@ import {
   formSectionsSchema,
   createLabBatchesSchema,
   assignFacultySchema,
+  applySubstitutionSchema,
+  optimizeElectiveAllocationsSchema,
+  finalizeElectiveAllocationsSchema,
 } from './validation';
 
 const router = Router();
@@ -256,5 +259,10 @@ router.post('/sections/:id/lab-batches', authorize('academics', 'create'), valid
 // ═══ W02: Faculty Assignment & Timetable Conflict Detection ═════
 router.post('/offerings/:id/assign-faculty', authorize('academics', 'update'), validate(assignFacultySchema), ctrl.assignFacultyToOffering);
 router.get('/timetables/:id/conflicts', authorize('academics', 'read'), ctrl.detectTimetableConflicts);
+
+// ═══ W02: Timetable Substitution & Elective Allocation ═════════
+router.put('/timetable-slots/:id/substitute', authorize('academics', 'update'), validate(applySubstitutionSchema), ctrl.applySubstitution);
+router.post('/elective-allocations/optimize', authorize('academics', 'create'), validate(optimizeElectiveAllocationsSchema), ctrl.optimizeElectiveAllocations);
+router.post('/elective-allocations/finalize', authorize('academics', 'create'), validate(finalizeElectiveAllocationsSchema), ctrl.finalizeElectiveAllocations);
 
 export default router;

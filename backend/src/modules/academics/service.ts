@@ -1391,3 +1391,272 @@ export async function detectTimetableConflicts(
 
   return { conflicts, hasErrors };
 }
+
+// ═══ W02: Timetable Substitution ═══════════════════════════════
+
+export async function applySubstitution(
+  collegeId: string,
+  slotId: string,
+  substituteFacultyId: string,
+  performedBy: string,
+) {
+  const slot = await TimetableSlot.findOne({ _id: slotId, collegeId });
+  if (!slot) throw new AppError(404, 'Timetable slot not found');
+
+  const offering = await CourseOffering.findOne({ _id: slot.courseOfferingId, collegeId });
+  if (!offering) throw new AppError(404, 'Course offering not found for this slot');
+
+  slot.isSubstitution = true;
+  slot.substituteFacultyId = substituteFacultyId as any;
+  slot.originalFacultyId = offering.facultyId;
+  await slot.save();
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'TimetableSlot',
+    entityId: String(slot._id),
+    entityName: `Slot ${slot.day} P${slot.period}`,
+    action: 'update',
+    changes: [{ field: 'substituteFacultyId', displayName: 'Substitute Faculty', oldValue: '', newValue: substituteFacultyId }],
+    performedBy,
+  });
+
+  return slot;
+}
+
+// ═══ W02: Elective Allocation Optimization ═════════════════════
+
+export async function optimizeElectiveAllocations(
+  collegeId: string,
+  semesterId: string,
+  electiveGroup: string,
+  performedBy: string,
+) {
+  // 1. Find all pending (requested) allocations for this semester + electiveGroup
+  const allocations = await ElectiveAllocation.find({
+    collegeId,
+    semesterId,
+    electiveGroup,
+    status: 'requested',
+  });
+
+  if (allocations.length === 0) {
+    throw new AppError(404, 'No pending elective allocation requests found');
+  }
+
+  // 2. Find elective courseIds from CurriculumMap where isElective=true and electiveGroup matches
+  const curriculumEntries = await CurriculumMap.find({
+    collegeId,
+    isElective: true,
+    electiveGroup,
+  }).lean();
+
+  const electiveCourseIds = curriculumEntries.map((c) => String(c.courseId));
+
+  // 3. Find CourseOfferings for these elective courses in this semester
+  const offerings = await CourseOffering.find({
+    collegeId,
+    semesterId,
+    courseId: { $in: electiveCourseIds },
+  });
+
+  if (offerings.length === 0) {
+    throw new AppError(404, 'No course offerings found for this elective group');
+  }
+
+  // Build a capacity map: courseId -> { offering, remaining capacity }
+  const capacityMap = new Map<string, { offeringId: string; remaining: number }>();
+  for (const off of offerings) {
+    const cId = String(off.courseId);
+    const existing = capacityMap.get(cId);
+    const remaining = off.maxEnrollment - off.enrolledCount;
+    // If multiple offerings exist per course, aggregate capacity
+    if (existing) {
+      existing.remaining += remaining;
+    } else {
+      capacityMap.set(cId, { offeringId: String(off._id), remaining });
+    }
+  }
+
+  // 4. Group allocations by studentId, sort by preference
+  const studentAllocations = new Map<string, typeof allocations>();
+  for (const alloc of allocations) {
+    const sId = String(alloc.studentId);
+    const existing = studentAllocations.get(sId);
+    if (existing) {
+      existing.push(alloc);
+    } else {
+      studentAllocations.set(sId, [alloc]);
+    }
+  }
+
+  // Sort each student's preferences by preference number (ascending = highest priority first)
+  for (const [, prefs] of studentAllocations) {
+    prefs.sort((a, b) => a.preference - b.preference);
+  }
+
+  // Sort students by their best (lowest) preference number -- first-preference students get priority
+  const sortedStudents = Array.from(studentAllocations.entries()).sort(
+    (a, b) => (a[1][0]?.preference ?? 999) - (b[1][0]?.preference ?? 999),
+  );
+
+  let allocated = 0;
+  let unallocated = 0;
+  const courseDistribution = new Map<string, number>();
+
+  for (const [, prefs] of sortedStudents) {
+    let assigned = false;
+
+    // Try to assign their highest preference that still has capacity
+    for (const alloc of prefs) {
+      const cId = String(alloc.courseId);
+      const cap = capacityMap.get(cId);
+      if (cap && cap.remaining > 0) {
+        alloc.status = 'allocated';
+        await alloc.save();
+        cap.remaining -= 1;
+        courseDistribution.set(cId, (courseDistribution.get(cId) || 0) + 1);
+        allocated += 1;
+        assigned = true;
+
+        // Reject the student's other preferences
+        for (const other of prefs) {
+          if (other !== alloc) {
+            other.status = 'rejected';
+            await other.save();
+          }
+        }
+        break;
+      }
+    }
+
+    // If all preferences full, assign to the one with most remaining capacity
+    if (!assigned) {
+      let bestCourseId: string | null = null;
+      let bestRemaining = -1;
+      for (const alloc of prefs) {
+        const cId = String(alloc.courseId);
+        const cap = capacityMap.get(cId);
+        if (cap && cap.remaining > bestRemaining) {
+          bestRemaining = cap.remaining;
+          bestCourseId = cId;
+        }
+      }
+
+      if (bestCourseId && bestRemaining > 0) {
+        const bestAlloc = prefs.find((a) => String(a.courseId) === bestCourseId);
+        if (bestAlloc) {
+          bestAlloc.status = 'allocated';
+          await bestAlloc.save();
+          const cap = capacityMap.get(bestCourseId)!;
+          cap.remaining -= 1;
+          courseDistribution.set(bestCourseId, (courseDistribution.get(bestCourseId) || 0) + 1);
+          allocated += 1;
+
+          for (const other of prefs) {
+            if (other !== bestAlloc) {
+              other.status = 'rejected';
+              await other.save();
+            }
+          }
+        } else {
+          unallocated += 1;
+        }
+      } else {
+        unallocated += 1;
+        // Reject all preferences for this student
+        for (const alloc of prefs) {
+          alloc.status = 'rejected';
+          await alloc.save();
+        }
+      }
+    }
+  }
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'ElectiveAllocation',
+    entityId: semesterId,
+    entityName: `Elective optimization: ${electiveGroup}`,
+    action: 'update',
+    changes: [{ field: 'status', displayName: 'Status', oldValue: 'requested', newValue: `allocated: ${allocated}, unallocated: ${unallocated}` }],
+    performedBy,
+  });
+
+  return {
+    allocated,
+    unallocated,
+    courseDistribution: Array.from(courseDistribution.entries()).map(([courseId, count]) => ({ courseId, count })),
+  };
+}
+
+// ═══ W02: Elective Allocation Finalization ═════════════════════
+
+export async function finalizeElectiveAllocations(
+  collegeId: string,
+  semesterId: string,
+  electiveGroup: string,
+  performedBy: string,
+) {
+  // 1. Find all allocated ElectiveAllocation entries for this semester + group
+  const allocations = await ElectiveAllocation.find({
+    collegeId,
+    semesterId,
+    electiveGroup,
+    status: 'allocated',
+  });
+
+  if (allocations.length === 0) {
+    throw new AppError(404, 'No allocated elective allocations found to finalize');
+  }
+
+  let enrollmentsCreated = 0;
+
+  for (const alloc of allocations) {
+    // 2a. Find the CourseOffering for the allocated course in this semester
+    const offering = await CourseOffering.findOne({
+      collegeId,
+      courseId: alloc.courseId,
+      semesterId,
+    });
+
+    if (!offering) {
+      // Skip if no offering found -- should not happen if optimization ran correctly
+      continue;
+    }
+
+    // 2b. Create an Enrollment record
+    await Enrollment.create({
+      collegeId,
+      studentId: alloc.studentId,
+      courseOfferingId: offering._id,
+      semesterId,
+      status: 'enrolled',
+    });
+
+    // 2c. Increment enrolledCount
+    await CourseOffering.updateOne(
+      { _id: offering._id },
+      { $inc: { enrolledCount: 1 } },
+    );
+
+    // 2d. Update ElectiveAllocation status to 'finalized'
+    alloc.status = 'finalized';
+    await alloc.save();
+
+    enrollmentsCreated += 1;
+  }
+
+  // 3. Create audit log
+  await createAuditLog({
+    collegeId,
+    entityType: 'ElectiveAllocation',
+    entityId: semesterId,
+    entityName: `Elective finalization: ${electiveGroup}`,
+    action: 'update',
+    changes: [{ field: 'status', displayName: 'Status', oldValue: 'allocated', newValue: `finalized (${enrollmentsCreated} enrollments)` }],
+    performedBy,
+  });
+
+  return { enrollmentsCreated };
+}

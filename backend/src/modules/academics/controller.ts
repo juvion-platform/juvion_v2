@@ -551,3 +551,34 @@ export async function detectTimetableConflicts(req: AuthRequest, res: Response, 
     res.json(result);
   } catch (e) { next(e); }
 }
+
+// ═══ W02: Timetable Substitution & Elective Allocation ═════════
+export async function applySubstitution(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { substituteFacultyId } = req.body;
+    const result = await svc.applySubstitution(
+      req.collegeId!, req.params.id as string, substituteFacultyId, who(req),
+    );
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+export async function optimizeElectiveAllocations(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { semesterId, electiveGroup } = req.body;
+    const result = await svc.optimizeElectiveAllocations(
+      req.collegeId!, semesterId, electiveGroup, who(req),
+    );
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+export async function finalizeElectiveAllocations(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { semesterId, electiveGroup } = req.body;
+    const result = await svc.finalizeElectiveAllocations(
+      req.collegeId!, semesterId, electiveGroup, who(req),
+    );
+    res.json(result);
+  } catch (e) { next(e); }
+}

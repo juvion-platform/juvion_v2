@@ -296,7 +296,7 @@ export const createElectiveAllocationSchema = z.object({
   electiveGroup: z.string().min(1),
   courseId: z.string().min(1),
   preference: z.number().int().min(1),
-  status: z.enum(['requested', 'allocated', 'rejected']).optional(),
+  status: z.enum(['requested', 'allocated', 'finalized', 'rejected']).optional(),
 });
 export const updateElectiveAllocationSchema = createElectiveAllocationSchema.partial();
 
@@ -348,4 +348,20 @@ export const createLabBatchesSchema = z.object({
 
 export const assignFacultySchema = z.object({
   facultyId: z.string().min(1, 'Faculty ID is required'),
+});
+
+// ═══ W02: Timetable Substitution & Elective Allocation ═════════
+
+export const applySubstitutionSchema = z.object({
+  substituteFacultyId: z.string().min(1, 'Substitute faculty ID is required'),
+});
+
+export const optimizeElectiveAllocationsSchema = z.object({
+  semesterId: z.string().min(1, 'Semester is required'),
+  electiveGroup: z.string().min(1, 'Elective group is required'),
+});
+
+export const finalizeElectiveAllocationsSchema = z.object({
+  semesterId: z.string().min(1, 'Semester is required'),
+  electiveGroup: z.string().min(1, 'Elective group is required'),
 });
