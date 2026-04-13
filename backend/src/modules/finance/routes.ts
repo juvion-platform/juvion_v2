@@ -94,6 +94,11 @@ import {
   updateFinancialHoldSchema,
   createWelfareReferralSchema,
   updateWelfareReferralSchema,
+  syncStudentStatusSchema,
+  independentHardshipSchema,
+  initiateGatewayPaymentSchema,
+  submitTSEPassClaimsSchema,
+  triggerReminderSequenceSchema,
 } from './validation';
 
 const router = Router();
@@ -409,5 +414,18 @@ router.get('/welfare-referrals/:id', authorize('finance', 'read'), ctrl.getWelfa
 router.post('/welfare-referrals', authorize('finance', 'create'), validate(createWelfareReferralSchema), ctrl.createWelfareReferral);
 router.put('/welfare-referrals/:id', authorize('finance', 'update'), validate(updateWelfareReferralSchema), ctrl.updateWelfareReferral);
 router.delete('/welfare-referrals/:id', authorize('finance', 'delete'), ctrl.deleteWelfareReferral);
+
+// ═══ W03 Phase 7: Cross-Module Integration & Events ═════════
+
+router.post('/sync/student-status', authenticate, validate(syncStudentStatusSchema), ctrl.syncStudentStatus);
+router.get('/clearance/:studentId', authenticate, ctrl.getFinancialClearance);
+router.get('/distress-signals/:defaulterRecordId', authenticate, ctrl.getDistressSignals);
+router.post('/independent-hardship', authenticate, validate(independentHardshipSchema), ctrl.submitIndependentHardship);
+router.get('/dashboards/revenue', authenticate, ctrl.revenueDashboard);
+router.get('/dashboards/defaulter-trends', authenticate, ctrl.defaulterTrendAnalysis);
+router.get('/policies/fee', authenticate, ctrl.feePolicy);
+router.post('/gateway/initiate', authenticate, validate(initiateGatewayPaymentSchema), ctrl.initiateGatewayPayment);
+router.post('/ts-epass/submit', authenticate, validate(submitTSEPassClaimsSchema), ctrl.submitTSEPassClaims);
+router.post('/reminders/trigger', authenticate, validate(triggerReminderSequenceSchema), ctrl.triggerReminderSequence);
 
 export default router;

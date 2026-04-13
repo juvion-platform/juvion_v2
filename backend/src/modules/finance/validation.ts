@@ -706,3 +706,31 @@ export const createWelfareReferralSchema = z.object({
   m06CaseId: z.string().optional(),
 });
 export const updateWelfareReferralSchema = createWelfareReferralSchema.partial();
+
+// ═══ W03 Phase 7: Cross-Module Integration & Events ═════════
+
+export const syncStudentStatusSchema = z.object({
+  studentId: z.string().min(1),
+});
+
+export const independentHardshipSchema = z.object({
+  studentId: z.string().min(1),
+  recommendedRelief: z.number().min(0),
+  documentation: z.string().optional(),
+  referredBy: z.string().min(1),
+});
+
+export const initiateGatewayPaymentSchema = z.object({
+  studentId: z.string().min(1),
+  invoiceIds: z.array(z.string().min(1)).min(1),
+  returnUrl: z.string().min(1),
+});
+
+export const submitTSEPassClaimsSchema = z.object({
+  schemeCode: z.string().min(1),
+  academicYearId: z.string().min(1),
+});
+
+export const triggerReminderSequenceSchema = z.object({
+  defaulterRecordId: z.string().min(1),
+});

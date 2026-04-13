@@ -23,6 +23,9 @@ export interface IStudent extends Document {
     portalAccessShared?: boolean;
     idCardIssued?: boolean;
   };
+  feeStatus?: 'paid' | 'partial' | 'overdue' | 'clear';
+  hasFinancialHold?: boolean;
+  scholarshipStatus?: 'active' | 'none' | 'pending';
 }
 
 const schema = new Schema<IStudent>({
@@ -48,6 +51,9 @@ const schema = new Schema<IStudent>({
     portalAccessShared: { type: Boolean, default: false },
     idCardIssued: { type: Boolean, default: false },
   },
+  feeStatus: { type: String, enum: ['paid', 'partial', 'overdue', 'clear'] },
+  hasFinancialHold: { type: Boolean, default: false },
+  scholarshipStatus: { type: String, enum: ['active', 'none', 'pending'] },
 }, { timestamps: true });
 
 schema.index({ collegeId: 1, rollNumber: 1 }, { unique: true, sparse: true });

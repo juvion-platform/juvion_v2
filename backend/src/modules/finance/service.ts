@@ -43,6 +43,7 @@ import { createAuditLog } from '../../shared/audit';
 import { AppError } from '../../middleware/errorHandler';
 import { AuthScope } from '../../shared/rbac/types';
 import { applyAuthScope } from '../../shared/rbac/apply-scope';
+import crypto from 'crypto';
 
 const STUDENT_POPULATE = { path: 'studentId', populate: { path: 'personId' } };
 
@@ -3976,4 +3977,533 @@ export async function deleteWelfareReferral(collegeId: string, id: string, perfo
     performedBy,
   });
   return doc;
+}
+
+// ═══ W03 Phase 7: Cross-Module Integration & Events ═════════
+
+// W03-L2-052: Sync student financial status
+export async function syncStudentFinancialStatus(collegeId: string, studentId: string, performedBy: string) {
+  const student = await Student.findOne({ _id: studentId, collegeId });
+  if (!student) throw new AppError(404, 'Student not found');
+
+  const overdueCount = await Invoice.countDocuments({ collegeId, studentId, status: 'overdue' });
+  const partialCount = await Invoice.countDocuments({ collegeId, studentId, status: 'partially_paid' });
+  const unpaidCount = await Invoice.countDocuments({
+    collegeId,
+    studentId,
+    status: { $nin: ['paid', 'cancelled', 'written_off'] },
+  });
+
+  let feeStatus: 'paid' | 'partial' | 'overdue' | 'clear';
+  if (overdueCount > 0) {
+    feeStatus = 'overdue';
+  } else if (partialCount > 0) {
+    feeStatus = 'partial';
+  } else if (unpaidCount === 0) {
+    feeStatus = 'clear';
+  } else {
+    feeStatus = 'paid';
+  }
+
+  const activeHolds = await FinancialHold.countDocuments({ collegeId, studentId, holdStatus: 'active' });
+  const hasFinancialHold = activeHolds > 0;
+
+  const activeScholarship = await ScholarshipEligibility.countDocuments({
+    collegeId,
+    studentId,
+    status: 'eligible',
+  });
+  const pendingScholarship = await ScholarshipEligibility.countDocuments({
+    collegeId,
+    studentId,
+    status: 'pending',
+  });
+
+  let scholarshipStatus: 'active' | 'none' | 'pending';
+  if (activeScholarship > 0) {
+    scholarshipStatus = 'active';
+  } else if (pendingScholarship > 0) {
+    scholarshipStatus = 'pending';
+  } else {
+    scholarshipStatus = 'none';
+  }
+
+  const changes: { field: string; displayName: string; oldValue: unknown; newValue: unknown }[] = [];
+  if (student.feeStatus !== feeStatus) {
+    changes.push({ field: 'feeStatus', displayName: 'Fee Status', oldValue: student.feeStatus, newValue: feeStatus });
+  }
+  if (student.hasFinancialHold !== hasFinancialHold) {
+    changes.push({ field: 'hasFinancialHold', displayName: 'Has Financial Hold', oldValue: student.hasFinancialHold, newValue: hasFinancialHold });
+  }
+  if (student.scholarshipStatus !== scholarshipStatus) {
+    changes.push({ field: 'scholarshipStatus', displayName: 'Scholarship Status', oldValue: student.scholarshipStatus, newValue: scholarshipStatus });
+  }
+
+  await Student.updateOne({ _id: studentId, collegeId }, { feeStatus, hasFinancialHold, scholarshipStatus });
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'Student',
+    entityId: studentId,
+    entityName: `Student financial status sync`,
+    action: 'update',
+    changes,
+    performedBy,
+  });
+
+  return { studentId, feeStatus, hasFinancialHold, scholarshipStatus, changesApplied: changes.length };
+}
+
+// W03-L2-053: Check financial clearance
+export async function checkFinancialClearance(collegeId: string, studentId: string) {
+  const unpaidCount = await Invoice.countDocuments({
+    collegeId,
+    studentId,
+    status: { $nin: ['paid', 'cancelled', 'written_off'] },
+  });
+
+  const activeDefaulters = await DefaulterRecord.countDocuments({
+    collegeId,
+    studentId,
+    escalationStage: { $nin: ['resolved', 'exited_hardship', 'exited_write_off'] },
+  });
+
+  const holdCount = await FinancialHold.countDocuments({ collegeId, studentId, holdStatus: 'active' });
+
+  const pendingRefundCount = await Refund.countDocuments({
+    collegeId,
+    studentId,
+    status: { $in: ['requested', 'approved', 'processing'] },
+  });
+
+  const reasons: string[] = [];
+  if (unpaidCount > 0) reasons.push(`${unpaidCount} unpaid invoice(s)`);
+  if (activeDefaulters > 0) reasons.push(`${activeDefaulters} active defaulter record(s)`);
+  if (holdCount > 0) reasons.push(`${holdCount} active financial hold(s)`);
+  if (pendingRefundCount > 0) reasons.push(`${pendingRefundCount} pending refund(s)`);
+
+  let clearanceStatus: 'CLEAR' | 'BLOCKED' | 'PENDING_REFUND';
+  if (unpaidCount > 0 || holdCount > 0 || activeDefaulters > 0) {
+    clearanceStatus = 'BLOCKED';
+  } else if (pendingRefundCount > 0) {
+    clearanceStatus = 'PENDING_REFUND';
+  } else {
+    clearanceStatus = 'CLEAR';
+  }
+
+  return { clearanceStatus, reasons, unpaidCount, holdCount, pendingRefundCount };
+}
+
+// W03-L2-054: Feed distress signals to welfare module
+export async function feedDistressSignals(collegeId: string, defaulterRecordId: string) {
+  const record = await DefaulterRecord.findOne({ _id: defaulterRecordId, collegeId }).lean();
+  if (!record) throw new AppError(404, 'Defaulter record not found');
+
+  return {
+    defaulterRecordId: String(record._id),
+    studentId: String(record.studentId),
+    distressScore: record.distressScore ?? 0,
+    distressSignals: record.distressSignals,
+    escalationStage: record.escalationStage,
+  };
+}
+
+// W03-L2-055: Receive independent hardship referral from welfare module
+export async function receiveIndependentHardship(
+  collegeId: string,
+  data: { studentId: string; recommendedRelief: number; documentation?: string; referredBy: string },
+  performedBy: string,
+) {
+  const currentYear = await AcademicYear.findOne({ collegeId }).sort({ createdAt: -1 }).lean();
+  if (!currentYear) throw new AppError(404, 'No academic year found');
+
+  const concession = await Concession.create({
+    collegeId,
+    studentId: data.studentId,
+    type: 'financial_hardship',
+    source: 'm06_referral',
+    flatAmount: data.recommendedRelief,
+    reason: data.documentation || 'Independent hardship referral from welfare module',
+    approvedBy: data.referredBy,
+    academicYearId: currentYear._id,
+    status: 'approved',
+  });
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'Concession',
+    entityId: String(concession._id),
+    entityName: `Independent hardship concession for student ${data.studentId}`,
+    action: 'create',
+    changes: [
+      { field: 'source', displayName: 'Source', oldValue: null, newValue: 'm06_referral' },
+      { field: 'recommendedRelief', displayName: 'Recommended Relief', oldValue: null, newValue: data.recommendedRelief },
+    ],
+    performedBy,
+  });
+
+  return concession;
+}
+
+// W03-L2-056: Revenue dashboard
+export async function getRevenueDashboard(collegeId: string, academicYearId?: string) {
+  const invoiceFilter: Record<string, unknown> = { collegeId };
+  if (academicYearId) {
+    const feeAgreements = await FeeAgreement.find({ collegeId, academicYearId }).select('_id').lean();
+    const feeAgreementIds = feeAgreements.map(fa => fa._id);
+    invoiceFilter.feeAgreementId = { $in: feeAgreementIds };
+  }
+
+  const invoiceAgg = await Invoice.aggregate([
+    { $match: invoiceFilter },
+    {
+      $group: {
+        _id: null,
+        totalInvoiced: { $sum: { $ifNull: ['$netPayable', '$totalAmount'] } },
+        totalCollected: {
+          $sum: { $cond: [{ $eq: ['$status', 'paid'] }, { $ifNull: ['$netPayable', '$totalAmount'] }, 0] },
+        },
+        totalOverdue: {
+          $sum: { $cond: [{ $eq: ['$status', 'overdue'] }, { $ifNull: ['$netPayable', '$totalAmount'] }, 0] },
+        },
+      },
+    },
+  ]);
+
+  const invoiceSummary = invoiceAgg[0] as { totalInvoiced: number; totalCollected: number; totalOverdue: number } | undefined;
+  const totalInvoiced = invoiceSummary?.totalInvoiced ?? 0;
+  const totalCollected = invoiceSummary?.totalCollected ?? 0;
+  const totalOverdue = invoiceSummary?.totalOverdue ?? 0;
+  const collectionRate = totalInvoiced > 0 ? Math.round((totalCollected / totalInvoiced) * 10000) / 100 : 0;
+  const overdueRate = totalInvoiced > 0 ? Math.round((totalOverdue / totalInvoiced) * 10000) / 100 : 0;
+
+  const channelAgg = await PaymentTransaction.aggregate([
+    { $match: { collegeId } },
+    { $group: { _id: '$channel', total: { $sum: '$amount' } } },
+  ]);
+  const receivedByChannel: Record<string, number> = {};
+  for (const row of channelAgg) {
+    const key = row._id as string;
+    receivedByChannel[key] = (row as { total: number }).total;
+  }
+
+  const defaulterAgg = await DefaulterRecord.aggregate([
+    { $match: { collegeId } },
+    { $group: { _id: '$escalationStage', count: { $sum: 1 } } },
+  ]);
+  const defaultersByStage: Record<string, number> = {};
+  for (const row of defaulterAgg) {
+    const key = row._id as string;
+    defaultersByStage[key] = (row as { count: number }).count;
+  }
+
+  const activeHolds = await FinancialHold.countDocuments({ collegeId, holdStatus: 'active' });
+
+  const receivableAgg = await ScholarshipReceivable.aggregate([
+    { $match: { collegeId } },
+    {
+      $group: {
+        _id: null,
+        totalPending: { $sum: { $cond: [{ $eq: ['$status', 'pending'] }, '$expectedAmount', 0] } },
+        totalDisbursed: { $sum: { $ifNull: ['$disbursedAmount', 0] } },
+      },
+    },
+  ]);
+  const receivableSummary = receivableAgg[0] as { totalPending: number; totalDisbursed: number } | undefined;
+  const scholarshipPending = receivableSummary?.totalPending ?? 0;
+  const scholarshipDisbursed = receivableSummary?.totalDisbursed ?? 0;
+
+  return {
+    totalInvoiced,
+    totalCollected,
+    collectionRate,
+    totalOverdue,
+    overdueRate,
+    receivedByChannel,
+    defaultersByStage,
+    activeHolds,
+    scholarshipPending,
+    scholarshipDisbursed,
+  };
+}
+
+// W03-L2-057: Defaulter trend analysis
+export async function getDefaulterTrendAnalysis(collegeId: string, months = 6) {
+  const now = new Date();
+  const startDate = new Date(now.getFullYear(), now.getMonth() - months + 1, 1);
+
+  const newDefaultersAgg = await DefaulterRecord.aggregate([
+    { $match: { collegeId, createdAt: { $gte: startDate } } },
+    {
+      $group: {
+        _id: {
+          year: { $year: '$createdAt' },
+          month: { $month: '$createdAt' },
+        },
+        count: { $sum: 1 },
+      },
+    },
+    { $sort: { '_id.year': 1, '_id.month': 1 } },
+  ]);
+
+  const resolvedAgg = await DefaulterRecord.aggregate([
+    {
+      $match: {
+        collegeId,
+        resolutionDate: { $gte: startDate },
+        escalationStage: { $in: ['resolved', 'exited_hardship', 'exited_write_off'] },
+      },
+    },
+    {
+      $group: {
+        _id: {
+          year: { $year: '$resolutionDate' },
+          month: { $month: '$resolutionDate' },
+        },
+        count: { $sum: 1 },
+      },
+    },
+    { $sort: { '_id.year': 1, '_id.month': 1 } },
+  ]);
+
+  const newMap = new Map<string, number>();
+  for (const row of newDefaultersAgg) {
+    const key = `${(row._id as { year: number; month: number }).year}-${String((row._id as { year: number; month: number }).month).padStart(2, '0')}`;
+    newMap.set(key, (row as { count: number }).count);
+  }
+
+  const resolvedMap = new Map<string, number>();
+  for (const row of resolvedAgg) {
+    const key = `${(row._id as { year: number; month: number }).year}-${String((row._id as { year: number; month: number }).month).padStart(2, '0')}`;
+    resolvedMap.set(key, (row as { count: number }).count);
+  }
+
+  const trends: { month: string; newDefaulters: number; resolved: number; netChange: number }[] = [];
+  for (let i = 0; i < months; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - months + 1 + i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const nd = newMap.get(key) ?? 0;
+    const res = resolvedMap.get(key) ?? 0;
+    trends.push({ month: key, newDefaulters: nd, resolved: res, netChange: nd - res });
+  }
+
+  const totalNew = trends.reduce((s, t) => s + t.newDefaulters, 0);
+  const averageMonthly = months > 0 ? Math.round(totalNew / months) : 0;
+  const currentMonth = trends[trends.length - 1];
+  const anomalyDetected = currentMonth ? currentMonth.newDefaulters > averageMonthly * 1.5 : false;
+
+  return {
+    trends,
+    anomalyDetected,
+    averageMonthly,
+    currentMonth: currentMonth ?? null,
+  };
+}
+
+// W03-L2-058: Consume fee policy from governance module
+export async function consumeFeePolicy(_collegeId: string) {
+  // Configurable defaults — would come from M11 governance module in production
+  return {
+    feeCeilings: [
+      { programmeType: 'B.Tech', maxTuition: 120000, maxHostel: 60000 },
+      { programmeType: 'M.Tech', maxTuition: 80000, maxHostel: 50000 },
+      { programmeType: 'MBA', maxTuition: 150000, maxHostel: 70000 },
+      { programmeType: 'Diploma', maxTuition: 35000, maxHostel: 30000 },
+    ],
+    mandatoryComponents: ['tuition', 'examination', 'library', 'development'],
+    deadlinePolicies: {
+      lateFeePercent: 2,
+      gracePeriodDays: 15,
+    },
+  };
+}
+
+// W03-L2-060: Orchestrate gateway payment
+export async function orchestrateGatewayPayment(
+  collegeId: string,
+  data: { studentId: string; invoiceIds: string[]; returnUrl: string },
+  performedBy: string,
+) {
+  if (data.invoiceIds.length === 0) throw new AppError(400, 'At least one invoice must be selected');
+
+  const invoices = await Invoice.find({
+    _id: { $in: data.invoiceIds },
+    collegeId,
+    studentId: data.studentId,
+    status: { $nin: ['paid', 'cancelled', 'written_off'] },
+  }).lean();
+
+  if (invoices.length === 0) throw new AppError(404, 'No payable invoices found');
+
+  const total = invoices.reduce((sum, inv) => sum + (inv.netPayable ?? inv.totalAmount), 0);
+  const idempotencyKey = crypto.randomUUID();
+
+  const log = await PaymentGatewayLog.create({
+    collegeId,
+    studentId: data.studentId,
+    orderId: `ORD-${Date.now()}-${idempotencyKey.slice(0, 8)}`,
+    gateway: 'razorpay',
+    amount: total,
+    currency: 'INR',
+    status: 'initiated',
+    idempotencyKey,
+    invoiceId: invoices[0]?._id,
+  });
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'PaymentGatewayLog',
+    entityId: String(log._id),
+    entityName: `Gateway payment initiated for student ${data.studentId}`,
+    action: 'create',
+    changes: [
+      { field: 'amount', displayName: 'Amount', oldValue: null, newValue: total },
+      { field: 'invoiceCount', displayName: 'Invoice Count', oldValue: null, newValue: invoices.length },
+    ],
+    performedBy,
+  });
+
+  return {
+    orderId: String(log._id),
+    amount: total,
+    idempotencyKey,
+    gatewaySessionUrl: `${data.returnUrl}?order=${String(log._id)}`,
+  };
+}
+
+// W03-L2-061: Orchestrate TS-ePass integration
+export async function orchestrateTSEPassIntegration(
+  collegeId: string,
+  data: { schemeCode: string; academicYearId: string },
+  performedBy: string,
+) {
+  const eligibleRecords = await ScholarshipEligibility.find({
+    collegeId,
+    schemeCode: data.schemeCode,
+    academicYearId: data.academicYearId,
+    status: 'eligible',
+  }).lean();
+
+  let claimsSubmitted = 0;
+  let claimsSkipped = 0;
+  const studentIds: string[] = [];
+
+  for (const record of eligibleRecords) {
+    const existingClaim = await ScholarshipClaim.findOne({
+      collegeId,
+      scholarshipEligibilityId: record._id,
+      studentId: record.studentId,
+      academicYearId: data.academicYearId,
+    }).lean();
+
+    if (existingClaim) {
+      claimsSkipped++;
+      continue;
+    }
+
+    const claim = await ScholarshipClaim.create({
+      collegeId,
+      scholarshipEligibilityId: record._id,
+      studentId: record.studentId,
+      schemeCode: data.schemeCode,
+      academicYearId: data.academicYearId,
+      claimAmount: 0,
+      status: 'submitted',
+      portalReference: `TSEPASS-${Date.now()}-${String(record.studentId).slice(-6)}`,
+    });
+
+    studentIds.push(String(record.studentId));
+    claimsSubmitted++;
+
+    await createAuditLog({
+      collegeId,
+      entityType: 'ScholarshipClaim',
+      entityId: String(claim._id),
+      entityName: `TS-ePass claim for student ${String(record.studentId)}`,
+      action: 'create',
+      changes: [],
+      performedBy,
+    });
+  }
+
+  return { claimsSubmitted, claimsSkipped, studentIds };
+}
+
+// W03-L2-062: Execute reminder sequence for defaulter
+export async function executeReminderSequence(
+  collegeId: string,
+  defaulterRecordId: string,
+  performedBy: string,
+) {
+  const record = await DefaulterRecord.findOne({ _id: defaulterRecordId, collegeId }).lean();
+  if (!record) throw new AppError(404, 'Defaulter record not found');
+
+  const stage = record.escalationStage;
+  const stageChannelMap: Record<string, string[]> = {
+    stage_1: ['sms'],
+    stage_2: ['whatsapp'],
+    stage_3: ['email', 'sms'],
+    stage_4: ['sms', 'email', 'whatsapp'],
+  };
+  const stageTemplateMap: Record<string, string> = {
+    stage_1: 'TPL_STAGE1_SMS',
+    stage_2: 'TPL_STAGE2_WHATSAPP',
+    stage_3: 'TPL_STAGE3_EMAIL_SMS',
+    stage_4: 'TPL_STAGE4_ALL',
+  };
+
+  const channels = stageChannelMap[stage] ?? ['sms'];
+  const templateId = stageTemplateMap[stage] ?? 'TPL_DEFAULT';
+
+  const reminders = [];
+  for (const channel of channels) {
+    const reminder = await FeeReminder.create({
+      collegeId,
+      studentId: record.studentId,
+      channel,
+      dueAmount: record.overdueAmount,
+      status: 'sent',
+      invoiceId: record.invoiceId,
+      escalationStage: stage,
+      defaulterRecordId: record._id,
+      templateId,
+      deliveryStatus: 'pending',
+    });
+    reminders.push(reminder);
+  }
+
+  const actionTypeMap: Record<string, 'sms_reminder' | 'whatsapp_parent' | 'phone_call_flag'> = {
+    stage_1: 'sms_reminder',
+    stage_2: 'whatsapp_parent',
+    stage_3: 'sms_reminder',
+    stage_4: 'sms_reminder',
+  };
+
+  await EscalationAction.create({
+    collegeId,
+    defaulterRecordId: record._id,
+    actionType: actionTypeMap[stage] ?? 'sms_reminder',
+    status: 'executed',
+    executedAt: new Date(),
+    outcome: `Sent ${channels.length} reminder(s) via ${channels.join(', ')}`,
+  });
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'FeeReminder',
+    entityId: defaulterRecordId,
+    entityName: `Reminder sequence for defaulter ${defaulterRecordId}`,
+    action: 'create',
+    changes: [
+      { field: 'channels', displayName: 'Channels', oldValue: null, newValue: channels.join(', ') },
+      { field: 'escalationStage', displayName: 'Escalation Stage', oldValue: null, newValue: stage },
+    ],
+    performedBy,
+  });
+
+  return {
+    remindersCreated: reminders.length,
+    channel: channels.join(', '),
+    escalationStage: stage,
+  };
 }

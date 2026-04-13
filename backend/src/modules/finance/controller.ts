@@ -1117,3 +1117,77 @@ export async function updateWelfareReferral(req: AuthRequest, res: Response, nex
 export async function deleteWelfareReferral(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.deleteWelfareReferral(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
 }
+
+// ═══ W03 Phase 7: Cross-Module Integration & Events ═════════
+
+export async function syncStudentStatus(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const result = await service.syncStudentFinancialStatus(req.collegeId!, req.body.studentId, who(req));
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+export async function getFinancialClearance(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const result = await service.checkFinancialClearance(req.collegeId!, req.params.studentId as string);
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+export async function getDistressSignals(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const result = await service.feedDistressSignals(req.collegeId!, req.params.defaulterRecordId as string);
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+export async function submitIndependentHardship(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const result = await service.receiveIndependentHardship(req.collegeId!, req.body, who(req));
+    res.status(201).json(result);
+  } catch (e) { next(e); }
+}
+
+export async function revenueDashboard(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { academicYearId } = req.query as { academicYearId?: string };
+    const result = await service.getRevenueDashboard(req.collegeId!, academicYearId);
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+export async function defaulterTrendAnalysis(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { months } = req.query as { months?: string };
+    const result = await service.getDefaulterTrendAnalysis(req.collegeId!, months ? Number(months) : undefined);
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+export async function feePolicy(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const result = await service.consumeFeePolicy(req.collegeId!);
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+export async function initiateGatewayPayment(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const result = await service.orchestrateGatewayPayment(req.collegeId!, req.body, who(req));
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+export async function submitTSEPassClaims(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const result = await service.orchestrateTSEPassIntegration(req.collegeId!, req.body, who(req));
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+export async function triggerReminderSequence(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const result = await service.executeReminderSequence(req.collegeId!, req.body.defaulterRecordId, who(req));
+    res.json(result);
+  } catch (e) { next(e); }
+}
