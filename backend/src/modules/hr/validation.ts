@@ -552,3 +552,102 @@ export const createFinalSettlementSchema = z.object({
   netSettlement: z.number(),
 });
 export const updateFinalSettlementSchema = createFinalSettlementSchema.partial();
+
+// ═══════════════════════════════════════════════════════════════════
+// W05 Phase 5 — Disciplinary Proceedings Schemas
+// ═══════════════════════════════════════════════════════════════════
+
+export const initiateCaseInternalSchema = z.object({
+  employeeId: z.string().min(1),
+  allegation: z.string().min(1),
+  evidence: z.array(z.string()).optional(),
+  investigatingAuthorityId: z.string().optional(),
+});
+
+export const receiveReferralSchema = z.object({
+  employeeId: z.string().min(1),
+  referralSource: z.enum(['m06_icc', 'm06_arc', 'other']),
+  referralDetails: z.string().optional(),
+  allegation: z.string().min(1),
+  evidence: z.array(z.string()).optional(),
+});
+
+export const updateInvestigationSchema = z.object({
+  investigationFindings: z.string().min(1),
+  investigatingAuthorityId: z.string().optional(),
+});
+
+export const issueShowCauseSchema = z.object({
+  showCauseNoticeUrl: z.string().min(1),
+  responseDeadlineDays: z.number().int().min(1).optional(),
+});
+
+export const recordResponseSchema = z.object({
+  responseText: z.string().min(1),
+});
+
+export const recordHearingSchema = z.object({
+  hearingDate: z.string().min(1),
+  hearingMinutesUrl: z.string().min(1),
+});
+
+export const decideOutcomeSchema = z.object({
+  outcome: z.enum(['warning', 'fine', 'suspension', 'demotion', 'termination', 'exonerated']),
+  outcomeDetails: z.string().optional(),
+});
+
+export const implementOutcomeSchema = z.object({
+  implementedActions: z.array(z.object({ action: z.string(), module: z.string().optional() })),
+  communicationLetterUrl: z.string().optional(),
+});
+
+export const submitAppealSchema = z.object({
+  appealText: z.string().min(1),
+});
+
+export const resolveAppealSchema = z.object({
+  resolution: z.enum(['upheld', 'modified', 'overturned']),
+  revisedOutcome: z.string().optional(),
+  revisedDetails: z.string().optional(),
+});
+
+export const closeInsufficientEvidenceSchema = z.object({
+  remarks: z.string().min(1),
+});
+
+// Disciplinary CRUD
+export const createDisciplinaryCaseSchema = z.object({
+  employeeId: z.string().min(1),
+  allegation: z.string().min(1),
+  origin: z.enum(['internal', 'external_referral']),
+  evidence: z.array(z.string()).optional(),
+});
+export const updateDisciplinaryCaseSchema = createDisciplinaryCaseSchema.partial();
+
+export const createDisciplinaryOutcomeSchema = z.object({
+  disciplinaryCaseId: z.string().min(1),
+  employeeId: z.string().min(1),
+  outcomeType: z.enum(['warning', 'fine', 'suspension', 'demotion', 'termination']),
+});
+export const updateDisciplinaryOutcomeSchema = createDisciplinaryOutcomeSchema.partial();
+
+// ═══════════════════════════════════════════════════════════════════
+// W05 Phase 6 — Compliance & Payroll Extract Schemas
+// ═══════════════════════════════════════════════════════════════════
+
+export const generatePayrollExtractSchema = z.object({
+  month: z.number().int().min(1).max(12),
+  year: z.number().int().min(2020),
+});
+
+export const attendanceComplianceSchema = z.object({
+  month: z.number().int().min(1).max(12),
+  year: z.number().int().min(2020),
+});
+
+export const createPayrollDataExtractSchema = z.object({
+  month: z.number().int().min(1).max(12),
+  year: z.number().int().min(2020),
+  status: z.enum(['draft', 'reviewed', 'released']).optional(),
+});
+export const updatePayrollDataExtractSchema = createPayrollDataExtractSchema.partial();

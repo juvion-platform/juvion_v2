@@ -3,6 +3,8 @@ import { AuthRequest } from '../../middleware/authenticate';
 import * as service from './service';
 import * as fdpAppraisalService from './fdp-appraisal-service';
 import * as exitService from './exit-service';
+import * as disciplinaryService from './disciplinary-service';
+import * as compliancePayrollService from './compliance-payroll-service';
 
 const who = (req: AuthRequest) => req.user?.name || 'System';
 
@@ -862,4 +864,138 @@ export async function updateFinalSettlement(req: AuthRequest, res: Response, nex
 }
 export async function deleteFinalSettlement(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await exitService.deleteFinalSettlement(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// W05 Phase 5 — Disciplinary Proceedings Controllers
+// ═══════════════════════════════════════════════════════════════════
+
+export async function initiateCaseInternal(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await disciplinaryService.initiateCaseInternal(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function receiveDisciplinaryReferral(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await disciplinaryService.receiveDisciplinaryReferral(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function updateInvestigation(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await disciplinaryService.updateInvestigation(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function closeInsufficientEvidence(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await disciplinaryService.closeInsufficientEvidence(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function issueShowCause(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await disciplinaryService.issueShowCause(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function recordResponse(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await disciplinaryService.recordResponse(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function recordHearing(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await disciplinaryService.recordHearing(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function decideOutcome(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await disciplinaryService.decideOutcome(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function implementOutcome(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await disciplinaryService.implementOutcome(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function closeCaseAfterImplementation(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await disciplinaryService.closeCaseAfterImplementation(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+export async function submitAppeal(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await disciplinaryService.submitAppeal(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function resolveAppeal(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await disciplinaryService.resolveAppeal(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function detectOverdueCases(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await disciplinaryService.detectOverdueCases(req.collegeId!)); } catch (err) { next(err); }
+}
+
+// Disciplinary CRUD
+export async function listDisciplinaryCases(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page, limit, status } = req.query as any;
+    res.json(await disciplinaryService.listDisciplinaryCases(req.collegeId!, Number(page) || 1, Number(limit) || 20, status));
+  } catch (err) { next(err); }
+}
+export async function getDisciplinaryCase(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await disciplinaryService.getDisciplinaryCase(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+export async function createDisciplinaryCaseCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await disciplinaryService.createDisciplinaryCase(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function updateDisciplinaryCase(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await disciplinaryService.updateDisciplinaryCase(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function deleteDisciplinaryCase(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await disciplinaryService.deleteDisciplinaryCase(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+export async function listDisciplinaryOutcomes(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page, limit } = req.query as any;
+    res.json(await disciplinaryService.listDisciplinaryOutcomes(req.collegeId!, Number(page) || 1, Number(limit) || 20));
+  } catch (err) { next(err); }
+}
+export async function getDisciplinaryOutcome(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await disciplinaryService.getDisciplinaryOutcome(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+export async function createDisciplinaryOutcomeCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await disciplinaryService.createDisciplinaryOutcome(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function updateDisciplinaryOutcome(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await disciplinaryService.updateDisciplinaryOutcome(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function deleteDisciplinaryOutcome(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await disciplinaryService.deleteDisciplinaryOutcome(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// W05 Phase 6 — Compliance Reporting & Payroll Extract Controllers
+// ═══════════════════════════════════════════════════════════════════
+
+export async function computeStudentFacultyRatio(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await compliancePayrollService.computeStudentFacultyRatio(req.collegeId!)); } catch (err) { next(err); }
+}
+export async function generateFDPComplianceReport(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { academicYearId } = req.body;
+    res.json(await compliancePayrollService.generateFDPComplianceReport(req.collegeId!, academicYearId));
+  } catch (err) { next(err); }
+}
+export async function generatePayrollExtract(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { month, year } = req.body;
+    res.status(201).json(await compliancePayrollService.generatePayrollExtract(req.collegeId!, month, year, who(req)));
+  } catch (err) { next(err); }
+}
+export async function reviewPayrollExtract(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await compliancePayrollService.reviewPayrollExtract(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+export async function releasePayrollExtract(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await compliancePayrollService.releasePayrollExtract(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+export async function generateAttendanceComplianceReport(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { month, year } = req.body;
+    res.json(await compliancePayrollService.generateAttendanceComplianceReport(req.collegeId!, month, year));
+  } catch (err) { next(err); }
+}
+
+// Payroll Data Extract CRUD
+export async function listPayrollDataExtracts(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page, limit, status } = req.query as any;
+    res.json(await compliancePayrollService.listPayrollDataExtracts(req.collegeId!, Number(page) || 1, Number(limit) || 20, status));
+  } catch (err) { next(err); }
+}
+export async function getPayrollDataExtract(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await compliancePayrollService.getPayrollDataExtract(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+export async function createPayrollDataExtractCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await compliancePayrollService.createPayrollDataExtract(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function updatePayrollDataExtract(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await compliancePayrollService.updatePayrollDataExtract(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function deletePayrollDataExtract(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await compliancePayrollService.deletePayrollDataExtract(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
 }

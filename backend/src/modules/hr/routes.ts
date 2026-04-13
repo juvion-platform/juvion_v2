@@ -40,6 +40,14 @@ import {
   createExitClearanceSchema, updateExitClearanceSchema,
   createHandoverRecordSchema, updateHandoverRecordSchema,
   createFinalSettlementSchema, updateFinalSettlementSchema,
+  initiateCaseInternalSchema, receiveReferralSchema, updateInvestigationSchema,
+  issueShowCauseSchema, recordResponseSchema, recordHearingSchema,
+  decideOutcomeSchema, implementOutcomeSchema, submitAppealSchema,
+  resolveAppealSchema, closeInsufficientEvidenceSchema,
+  createDisciplinaryCaseSchema, updateDisciplinaryCaseSchema,
+  createDisciplinaryOutcomeSchema, updateDisciplinaryOutcomeSchema,
+  generatePayrollExtractSchema, attendanceComplianceSchema,
+  createPayrollDataExtractSchema, updatePayrollDataExtractSchema,
 } from './validation';
 
 const router = Router();
@@ -325,5 +333,59 @@ router.get('/final-settlements/:id', authorize('hr', 'read'), ctrl.getFinalSettl
 router.post('/final-settlements', authorize('hr', 'create'), validate(createFinalSettlementSchema), ctrl.createFinalSettlementCtrl);
 router.put('/final-settlements/:id', authorize('hr', 'update'), validate(updateFinalSettlementSchema), ctrl.updateFinalSettlement);
 router.delete('/final-settlements/:id', authorize('hr', 'delete'), ctrl.deleteFinalSettlement);
+
+// ═══════════════════════════════════════════════════════════════════
+// W05 Phase 5 — Disciplinary Proceedings Routes
+// ═══════════════════════════════════════════════════════════════════
+
+// Disciplinary Workflow
+router.post('/disciplinary-cases', authorize('hr', 'create'), validate(initiateCaseInternalSchema), ctrl.initiateCaseInternal);
+router.post('/disciplinary-cases/from-referral', authorize('hr', 'create'), validate(receiveReferralSchema), ctrl.receiveDisciplinaryReferral);
+router.get('/disciplinary-cases/overdue', authorize('hr', 'read'), ctrl.detectOverdueCases);
+router.put('/disciplinary-cases/:id/investigation', authorize('hr', 'update'), validate(updateInvestigationSchema), ctrl.updateInvestigation);
+router.post('/disciplinary-cases/:id/close-insufficient', authorize('hr', 'update'), validate(closeInsufficientEvidenceSchema), ctrl.closeInsufficientEvidence);
+router.post('/disciplinary-cases/:id/show-cause', authorize('hr', 'update'), validate(issueShowCauseSchema), ctrl.issueShowCause);
+router.post('/disciplinary-cases/:id/record-response', authorize('hr', 'update'), validate(recordResponseSchema), ctrl.recordResponse);
+router.post('/disciplinary-cases/:id/hearing', authorize('hr', 'update'), validate(recordHearingSchema), ctrl.recordHearing);
+router.post('/disciplinary-cases/:id/decide', authorize('hr', 'update'), validate(decideOutcomeSchema), ctrl.decideOutcome);
+router.post('/disciplinary-cases/:id/implement', authorize('hr', 'update'), validate(implementOutcomeSchema), ctrl.implementOutcome);
+router.post('/disciplinary-cases/:id/close', authorize('hr', 'update'), ctrl.closeCaseAfterImplementation);
+router.post('/disciplinary-cases/:id/appeal', authorize('hr', 'update'), validate(submitAppealSchema), ctrl.submitAppeal);
+router.post('/disciplinary-cases/:id/resolve-appeal', authorize('hr', 'update'), validate(resolveAppealSchema), ctrl.resolveAppeal);
+
+// Disciplinary Cases CRUD
+router.get('/disciplinary-cases-list', authorize('hr', 'read'), ctrl.listDisciplinaryCases);
+router.get('/disciplinary-cases/:id', authorize('hr', 'read'), ctrl.getDisciplinaryCase);
+router.post('/disciplinary-cases-crud', authorize('hr', 'create'), validate(createDisciplinaryCaseSchema), ctrl.createDisciplinaryCaseCtrl);
+router.put('/disciplinary-cases/:id/crud', authorize('hr', 'update'), validate(updateDisciplinaryCaseSchema), ctrl.updateDisciplinaryCase);
+router.delete('/disciplinary-cases/:id', authorize('hr', 'delete'), ctrl.deleteDisciplinaryCase);
+
+// Disciplinary Outcomes CRUD
+router.get('/disciplinary-outcomes', authorize('hr', 'read'), ctrl.listDisciplinaryOutcomes);
+router.get('/disciplinary-outcomes/:id', authorize('hr', 'read'), ctrl.getDisciplinaryOutcome);
+router.post('/disciplinary-outcomes', authorize('hr', 'create'), validate(createDisciplinaryOutcomeSchema), ctrl.createDisciplinaryOutcomeCtrl);
+router.put('/disciplinary-outcomes/:id', authorize('hr', 'update'), validate(updateDisciplinaryOutcomeSchema), ctrl.updateDisciplinaryOutcome);
+router.delete('/disciplinary-outcomes/:id', authorize('hr', 'delete'), ctrl.deleteDisciplinaryOutcome);
+
+// ═══════════════════════════════════════════════════════════════════
+// W05 Phase 6 — Compliance Reporting & Payroll Extract Routes
+// ═══════════════════════════════════════════════════════════════════
+
+// Compliance
+router.post('/compliance/student-faculty-ratio', authorize('hr', 'read'), ctrl.computeStudentFacultyRatio);
+router.post('/compliance/fdp-report', authorize('hr', 'read'), ctrl.generateFDPComplianceReport);
+router.post('/compliance/attendance-report', authorize('hr', 'read'), validate(attendanceComplianceSchema), ctrl.generateAttendanceComplianceReport);
+
+// Payroll Extract
+router.post('/payroll-extracts/generate', authorize('hr', 'create'), validate(generatePayrollExtractSchema), ctrl.generatePayrollExtract);
+router.post('/payroll-extracts/:id/review', authorize('hr', 'update'), ctrl.reviewPayrollExtract);
+router.post('/payroll-extracts/:id/release', authorize('hr', 'update'), ctrl.releasePayrollExtract);
+
+// Payroll Data Extract CRUD
+router.get('/payroll-extracts', authorize('hr', 'read'), ctrl.listPayrollDataExtracts);
+router.get('/payroll-extracts/:id', authorize('hr', 'read'), ctrl.getPayrollDataExtract);
+router.post('/payroll-extracts', authorize('hr', 'create'), validate(createPayrollDataExtractSchema), ctrl.createPayrollDataExtractCtrl);
+router.put('/payroll-extracts/:id', authorize('hr', 'update'), validate(updatePayrollDataExtractSchema), ctrl.updatePayrollDataExtract);
+router.delete('/payroll-extracts/:id', authorize('hr', 'delete'), ctrl.deletePayrollDataExtract);
 
 export default router;
