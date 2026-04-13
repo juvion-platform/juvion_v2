@@ -105,6 +105,7 @@ describe('Workflow 02 — Student Admission Pipeline', () => {
     expect(res.body.examType).toBe('EAMCET');
     expect(res.body.score).toBe(78.45);
     examScoreId = res.body._id;
+    expect(examScoreId).toBeDefined();
   });
 
   // ── Step 4: Create Admission Offer ──────────────────

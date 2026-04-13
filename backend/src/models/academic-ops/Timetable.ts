@@ -3,6 +3,8 @@ import { Schema, model, Document } from 'mongoose';
 export interface ITimetable extends Document {
   collegeId: Schema.Types.ObjectId;
   semesterId: Schema.Types.ObjectId; sectionId: Schema.Types.ObjectId; version: number; status: string; effectiveFrom: Date;
+  approvedBy?: Schema.Types.ObjectId;
+  effectiveTo?: Date;
 }
 
 const schema = new Schema<ITimetable>({
@@ -12,6 +14,8 @@ const schema = new Schema<ITimetable>({
   version: { type: Number, default: 1 },
   status: { type: String, enum: ['draft', 'published', 'archived'], default: 'draft' },
   effectiveFrom: { type: Date, required: true },
+  approvedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+  effectiveTo: { type: Date },
 }, { timestamps: true });
 
 schema.index({ collegeId: 1, semesterId: 1, sectionId: 1 });

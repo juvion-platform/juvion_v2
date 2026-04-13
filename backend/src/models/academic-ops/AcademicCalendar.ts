@@ -3,6 +3,8 @@ import { Schema, model, Document } from 'mongoose';
 export interface IAcademicCalendar extends Document {
   collegeId: Schema.Types.ObjectId;
   academicYearId: Schema.Types.ObjectId; title: string; eventType: string; startDate: Date; endDate: Date; description?: string; isHoliday: boolean;
+  status?: string;
+  approvedBy?: Schema.Types.ObjectId;
 }
 
 const schema = new Schema<IAcademicCalendar>({
@@ -14,6 +16,8 @@ const schema = new Schema<IAcademicCalendar>({
   endDate: { type: Date, required: true },
   description: String,
   isHoliday: { type: Boolean, default: false },
+  status: { type: String, enum: ['draft', 'published', 'archived'], default: 'draft' },
+  approvedBy: { type: Schema.Types.ObjectId, ref: 'User' },
 }, { timestamps: true });
 
 schema.index({ collegeId: 1, academicYearId: 1, startDate: 1 });

@@ -1,4 +1,7 @@
 import { FeeStructure } from '../../models/finance/FeeStructure';
+import { FeeStructureInstance } from '../../models/finance/FeeStructureInstance';
+import { FeeComponent } from '../../models/finance/FeeComponent';
+import { FeeComponentRule } from '../../models/finance/FeeComponentRule';
 import { StudentFeeAccount } from '../../models/finance/StudentFeeAccount';
 import { FeeLineItem } from '../../models/finance/FeeLineItem';
 import { Payment } from '../../models/finance/Payment';
@@ -14,7 +17,22 @@ import { FinancialLedger } from '../../models/finance/FinancialLedger';
 import { PaymentGatewayLog } from '../../models/finance/PaymentGatewayLog';
 import { FeeReminder } from '../../models/finance/FeeReminder';
 import { FinancialReport } from '../../models/finance/FinancialReport';
+import { FeeAgreement } from '../../models/finance/FeeAgreement';
+import { PaymentPlan } from '../../models/finance/PaymentPlan';
+import { InvoiceLineItem } from '../../models/finance/InvoiceLineItem';
+import { PaymentTransaction } from '../../models/finance/PaymentTransaction';
+import { Receipt } from '../../models/finance/Receipt';
+import { ReconciliationEntry } from '../../models/finance/ReconciliationEntry';
+import { BounceRecord } from '../../models/finance/BounceRecord';
+import { OverpaymentRecord } from '../../models/finance/OverpaymentRecord';
+import { ScholarshipEligibility } from '../../models/finance/ScholarshipEligibility';
+import { ScholarshipClaim } from '../../models/finance/ScholarshipClaim';
+import { ScholarshipReceivable } from '../../models/finance/ScholarshipReceivable';
+import { ScholarshipCredit } from '../../models/finance/ScholarshipCredit';
+import { SemesterResult } from '../../models/academic-ops/SemesterResult';
+import { AcademicYear } from '../../models/academic-structure/AcademicYear';
 import { Student } from '../../models/people/Student';
+import { Enrollment } from '../../models/academic-ops/Enrollment';
 import { paginate } from '../../shared/pagination';
 import { createAuditLog } from '../../shared/audit';
 import { AppError } from '../../middleware/errorHandler';
@@ -635,5 +653,2629 @@ export async function deleteFinancialReport(collegeId: string, id: string, who: 
   const doc = await FinancialReport.findOneAndDelete({ _id: id, collegeId });
   if (!doc) throw new AppError(404, 'Report not found');
   await createAuditLog({ collegeId, entityType: 'FinancialReport', entityId: id, entityName: doc.reportType, action: 'delete', changes: [], performedBy: who });
+  return doc;
+}
+
+// ═══ Fee Structure Instance Lifecycle ════════════════════
+
+export async function listFeeStructureInstances(collegeId: string, page = 1, limit = 20, academicYearId?: string, status?: string) {
+  const filter: any = { collegeId };
+  if (academicYearId) filter.academicYearId = academicYearId;
+  if (status) filter.status = status;
+  return paginate(FeeStructureInstance, filter, page, limit, { createdAt: -1 }, ['academicYearId', 'programmeId', 'branchId']);
+}
+
+export async function getFeeStructureInstance(collegeId: string, id: string) {
+  const doc = await FeeStructureInstance.findOne({ _id: id, collegeId }).populate('academicYearId programmeId branchId priorVersionId');
+  if (!doc) throw new AppError(404, 'Fee structure instance not found');
+  return doc;
+}
+
+export async function createFeeStructureInstance(collegeId: string, data: any, who: string) {
+  const doc = await FeeStructureInstance.create({ ...data, collegeId });
+  await createAuditLog({ collegeId, entityType: 'FeeStructureInstance', entityId: String(doc._id), entityName: `Fee Structure Instance`, action: 'create', changes: [], performedBy: who });
+  return doc;
+}
+
+export async function cloneFeeStructure(collegeId: string, sourceInstanceId: string, newAcademicYearId: string, who: string) {
+  const source = await FeeStructureInstance.findOne({ _id: sourceInstanceId, collegeId });
+  if (!source) throw new AppError(404, 'Source fee structure instance not found');
+
+  const sourceComponents = await FeeComponent.find({ feeStructureInstanceId: sourceInstanceId, collegeId });
+  const sourceComponentIds = sourceComponents.map(c => String(c._id));
+  const sourceRules = await FeeComponentRule.find({ feeComponentId: { $in: sourceComponentIds }, collegeId });
+
+  const newInstance = await FeeStructureInstance.create({
+    collegeId,
+    academicYearId: newAcademicYearId,
+    programmeId: source.programmeId,
+    branchId: source.branchId,
+    category: source.category,
+    quota: source.quota,
+    status: 'draft',
+    priorVersionId: source._id,
+    totalAmount: 0,
+  });
+
+  const oldToNewComponentId: Record<string, string> = {};
+  const clonedComponents = [];
+  for (const comp of sourceComponents) {
+    const newComp = await FeeComponent.create({
+      collegeId,
+      feeStructureInstanceId: newInstance._id,
+      name: comp.name,
+      amount: comp.amount,
+      isRefundable: comp.isRefundable,
+      componentType: comp.componentType,
+      isConditional: comp.isConditional,
+      displayOrder: comp.displayOrder,
+    });
+    oldToNewComponentId[String(comp._id)] = String(newComp._id);
+    clonedComponents.push(newComp);
+  }
+
+  for (const rule of sourceRules) {
+    const newComponentId = oldToNewComponentId[String(rule.feeComponentId)];
+    if (newComponentId) {
+      await FeeComponentRule.create({
+        collegeId,
+        feeComponentId: newComponentId,
+        conditionType: rule.conditionType,
+        conditionValue: rule.conditionValue,
+        operator: rule.operator,
+        status: rule.status,
+      });
+    }
+  }
+
+  const totalAmount = clonedComponents.reduce((sum, c) => sum + c.amount, 0);
+  newInstance.totalAmount = totalAmount;
+  await newInstance.save();
+
+  await createAuditLog({ collegeId, entityType: 'FeeStructureInstance', entityId: String(newInstance._id), entityName: `Cloned Fee Structure Instance`, action: 'create', changes: [], performedBy: who });
+
+  return { instance: newInstance, components: clonedComponents };
+}
+
+export async function submitFeeStructure(collegeId: string, instanceId: string, who: string) {
+  const instance = await FeeStructureInstance.findOne({ _id: instanceId, collegeId });
+  if (!instance) throw new AppError(404, 'Fee structure instance not found');
+  if (instance.status !== 'draft') throw new AppError(400, 'Can only submit draft structures');
+
+  let comparisonData: Record<string, unknown> = {};
+  if (instance.priorVersionId) {
+    const priorComponents = await FeeComponent.find({ feeStructureInstanceId: String(instance.priorVersionId), collegeId }).lean();
+    const currentComponents = await FeeComponent.find({ feeStructureInstanceId: instanceId, collegeId }).lean();
+
+    const priorMap = new Map(priorComponents.map(c => [c.name, c.amount]));
+    const compRows = currentComponents.map(c => {
+      const priorAmount = priorMap.get(c.name) ?? 0;
+      const changePct = priorAmount > 0 ? ((c.amount - priorAmount) / priorAmount) * 100 : 0;
+      return { name: c.name, priorAmount, newAmount: c.amount, changePct: Math.round(changePct * 100) / 100 };
+    });
+    comparisonData = { rows: compRows };
+  }
+
+  const estimatedStudents = 100;
+  const revenueProjection = instance.totalAmount * estimatedStudents;
+
+  instance.status = 'submitted';
+  instance.comparisonData = comparisonData;
+  instance.revenueProjection = revenueProjection;
+  await instance.save();
+
+  await createAuditLog({ collegeId, entityType: 'FeeStructureInstance', entityId: instanceId, entityName: `Fee Structure Instance`, action: 'update', changes: [], performedBy: who });
+  return instance;
+}
+
+export async function approveFeeStructure(collegeId: string, instanceId: string, who: string) {
+  const instance = await FeeStructureInstance.findOne({ _id: instanceId, collegeId });
+  if (!instance) throw new AppError(404, 'Fee structure instance not found');
+  if (instance.status !== 'submitted') throw new AppError(400, 'Can only approve submitted structures');
+
+  instance.status = 'approved';
+  instance.approvedBy = who as any;
+  instance.approvedAt = new Date();
+  await instance.save();
+
+  await createAuditLog({ collegeId, entityType: 'FeeStructureInstance', entityId: instanceId, entityName: `Fee Structure Instance`, action: 'update', changes: [], performedBy: who });
+  return instance;
+}
+
+export async function activateFeeStructure(collegeId: string, instanceId: string, who: string) {
+  const instance = await FeeStructureInstance.findOne({ _id: instanceId, collegeId });
+  if (!instance) throw new AppError(404, 'Fee structure instance not found');
+  if (instance.status !== 'approved') throw new AppError(400, 'Can only activate approved structures');
+
+  await FeeStructureInstance.updateMany(
+    {
+      collegeId,
+      programmeId: instance.programmeId,
+      branchId: instance.branchId,
+      quota: instance.quota,
+      category: instance.category,
+      status: 'active',
+    },
+    { status: 'superseded' },
+  );
+
+  instance.status = 'active';
+  instance.effectiveDate = new Date();
+  await instance.save();
+
+  await createAuditLog({ collegeId, entityType: 'FeeStructureInstance', entityId: instanceId, entityName: `Fee Structure Instance`, action: 'update', changes: [], performedBy: who });
+  return instance;
+}
+
+export async function rejectFeeStructure(collegeId: string, instanceId: string, comments: string, who: string) {
+  const instance = await FeeStructureInstance.findOne({ _id: instanceId, collegeId });
+  if (!instance) throw new AppError(404, 'Fee structure instance not found');
+  if (instance.status !== 'submitted') throw new AppError(400, 'Can only reject submitted structures');
+
+  instance.status = 'revision_required';
+  instance.rejectionComments = comments;
+  await instance.save();
+
+  await createAuditLog({ collegeId, entityType: 'FeeStructureInstance', entityId: instanceId, entityName: `Fee Structure Instance`, action: 'update', changes: [], performedBy: who });
+  return instance;
+}
+
+export async function archiveFeeStructure(collegeId: string, instanceId: string, who: string) {
+  const instance = await FeeStructureInstance.findOne({ _id: instanceId, collegeId });
+  if (!instance) throw new AppError(404, 'Fee structure instance not found');
+  if (!['active', 'superseded'].includes(instance.status)) throw new AppError(400, 'Can only archive active or superseded structures');
+
+  instance.status = 'archived';
+  await instance.save();
+
+  await createAuditLog({ collegeId, entityType: 'FeeStructureInstance', entityId: instanceId, entityName: `Fee Structure Instance`, action: 'update', changes: [], performedBy: who });
+  return instance;
+}
+
+export async function getFeeStructureComparison(collegeId: string, instanceId: string) {
+  const instance = await FeeStructureInstance.findOne({ _id: instanceId, collegeId });
+  if (!instance) throw new AppError(404, 'Fee structure instance not found');
+
+  if (instance.comparisonData && Object.keys(instance.comparisonData).length > 0) {
+    return instance.comparisonData;
+  }
+
+  if (!instance.priorVersionId) {
+    return { rows: [] };
+  }
+
+  const priorComponents = await FeeComponent.find({ feeStructureInstanceId: String(instance.priorVersionId), collegeId }).lean();
+  const currentComponents = await FeeComponent.find({ feeStructureInstanceId: instanceId, collegeId }).lean();
+
+  const priorMap = new Map(priorComponents.map(c => [c.name, c.amount]));
+  const rows = currentComponents.map(c => {
+    const priorAmount = priorMap.get(c.name) ?? 0;
+    const changePct = priorAmount > 0 ? ((c.amount - priorAmount) / priorAmount) * 100 : 0;
+    return { name: c.name, priorAmount, newAmount: c.amount, changePct: Math.round(changePct * 100) / 100 };
+  });
+
+  return { rows };
+}
+
+export async function getFeeStructureRevenueProjection(collegeId: string, instanceId: string) {
+  const instance = await FeeStructureInstance.findOne({ _id: instanceId, collegeId });
+  if (!instance) throw new AppError(404, 'Fee structure instance not found');
+
+  const estimatedStudents = 100;
+  const revenueProjection = instance.revenueProjection ?? instance.totalAmount * estimatedStudents;
+
+  return { instanceId, totalAmount: instance.totalAmount, estimatedStudents, revenueProjection };
+}
+
+// ═══ Fee Components ═══════════════════════════════════════
+
+export async function listFeeComponents(collegeId: string, feeStructureInstanceId: string, page = 1, limit = 20) {
+  return paginate(FeeComponent, { collegeId, feeStructureInstanceId }, page, limit, { displayOrder: 1 });
+}
+
+export async function getFeeComponent(collegeId: string, id: string) {
+  const doc = await FeeComponent.findOne({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Fee component not found');
+  return doc;
+}
+
+async function recalcInstanceTotalAmount(collegeId: string, feeStructureInstanceId: string) {
+  const components = await FeeComponent.find({ feeStructureInstanceId, collegeId }).lean();
+  const totalAmount = components.reduce((sum, c) => sum + c.amount, 0);
+  await FeeStructureInstance.findOneAndUpdate({ _id: feeStructureInstanceId, collegeId }, { totalAmount });
+}
+
+export async function createFeeComponent(collegeId: string, data: any, who: string) {
+  const doc = await FeeComponent.create({ ...data, collegeId });
+  await recalcInstanceTotalAmount(collegeId, data.feeStructureInstanceId);
+  await createAuditLog({ collegeId, entityType: 'FeeComponent', entityId: String(doc._id), entityName: doc.name, action: 'create', changes: [], performedBy: who });
+  return doc;
+}
+
+export async function updateFeeComponent(collegeId: string, id: string, data: any, who: string) {
+  const doc = await FeeComponent.findOneAndUpdate({ _id: id, collegeId }, data, { new: true });
+  if (!doc) throw new AppError(404, 'Fee component not found');
+  await recalcInstanceTotalAmount(collegeId, String(doc.feeStructureInstanceId));
+  await createAuditLog({ collegeId, entityType: 'FeeComponent', entityId: id, entityName: doc.name, action: 'update', changes: [], performedBy: who });
+  return doc;
+}
+
+export async function deleteFeeComponent(collegeId: string, id: string, who: string) {
+  const doc = await FeeComponent.findOneAndDelete({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Fee component not found');
+  await recalcInstanceTotalAmount(collegeId, String(doc.feeStructureInstanceId));
+  await createAuditLog({ collegeId, entityType: 'FeeComponent', entityId: id, entityName: doc.name, action: 'delete', changes: [], performedBy: who });
+  return doc;
+}
+
+// ═══ Fee Component Rules ══════════════════════════════════
+
+export async function listFeeComponentRules(collegeId: string, feeComponentId: string, page = 1, limit = 20) {
+  return paginate(FeeComponentRule, { collegeId, feeComponentId }, page, limit);
+}
+
+export async function createFeeComponentRule(collegeId: string, data: any, who: string) {
+  const doc = await FeeComponentRule.create({ ...data, collegeId });
+  await createAuditLog({ collegeId, entityType: 'FeeComponentRule', entityId: String(doc._id), entityName: `Rule: ${doc.conditionType}`, action: 'create', changes: [], performedBy: who });
+  return doc;
+}
+
+export async function updateFeeComponentRule(collegeId: string, id: string, data: any, who: string) {
+  const doc = await FeeComponentRule.findOneAndUpdate({ _id: id, collegeId }, data, { new: true });
+  if (!doc) throw new AppError(404, 'Fee component rule not found');
+  await createAuditLog({ collegeId, entityType: 'FeeComponentRule', entityId: id, entityName: `Rule: ${doc.conditionType}`, action: 'update', changes: [], performedBy: who });
+  return doc;
+}
+
+export async function deleteFeeComponentRule(collegeId: string, id: string, who: string) {
+  const doc = await FeeComponentRule.findOneAndDelete({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Fee component rule not found');
+  await createAuditLog({ collegeId, entityType: 'FeeComponentRule', entityId: id, entityName: `Rule: ${doc.conditionType}`, action: 'delete', changes: [], performedBy: who });
+  return doc;
+}
+
+// ═══ Fee Rules Engine ═════════════════════════════════════
+
+interface StudentProfile {
+  programmeId?: string;
+  branchId?: string;
+  regulationId?: string;
+  quota?: string;
+  category?: string;
+  isHosteler?: boolean;
+  hasTransport?: boolean;
+  labProgramme?: boolean;
+  batchId?: string;
+}
+
+function resolveProfileValue(profile: StudentProfile, conditionType: string): unknown {
+  switch (conditionType) {
+    case 'hostel': return profile.isHosteler;
+    case 'transport': return profile.hasTransport;
+    case 'lab_programme': return profile.labProgramme;
+    case 'quota': return profile.quota;
+    case 'category': return profile.category;
+    case 'regulation': return profile.regulationId;
+    case 'batch': return profile.batchId;
+    default: return undefined;
+  }
+}
+
+function evaluateRule(conditionType: string, conditionValue: string, operator: string, profile: StudentProfile): boolean {
+  const fieldValue = resolveProfileValue(profile, conditionType);
+  const isBooleanField = conditionType === 'hostel' || conditionType === 'transport' || conditionType === 'lab_programme';
+
+  switch (operator) {
+    case 'equals': {
+      if (isBooleanField) {
+        return fieldValue === (conditionValue === 'true');
+      }
+      return String(fieldValue) === conditionValue;
+    }
+    case 'in': {
+      const values = conditionValue.split(',').map(v => v.trim());
+      return values.includes(String(fieldValue));
+    }
+    case 'not_in': {
+      const values = conditionValue.split(',').map(v => v.trim());
+      return !values.includes(String(fieldValue));
+    }
+    case 'exists': return fieldValue !== undefined && fieldValue !== null && fieldValue !== '';
+    case 'not_exists': return fieldValue === undefined || fieldValue === null || fieldValue === '';
+    default: return false;
+  }
+}
+
+export async function evaluateFeeRules(collegeId: string, feeStructureInstanceId: string, studentProfile: StudentProfile) {
+  const components = await FeeComponent.find({ feeStructureInstanceId, collegeId }).lean();
+
+  const applicableComponents = [];
+  for (const component of components) {
+    if (!component.isConditional) {
+      applicableComponents.push({
+        componentId: String(component._id),
+        name: component.name,
+        amount: component.amount,
+        componentType: component.componentType,
+      });
+    } else {
+      const rules = await FeeComponentRule.find({ feeComponentId: String(component._id), collegeId }).lean();
+      const allRulesPass = rules.every(rule =>
+        evaluateRule(rule.conditionType, rule.conditionValue, rule.operator, studentProfile),
+      );
+      if (allRulesPass) {
+        applicableComponents.push({
+          componentId: String(component._id),
+          name: component.name,
+          amount: component.amount,
+          componentType: component.componentType,
+        });
+      }
+    }
+  }
+
+  const totalAmount = applicableComponents.reduce((sum, c) => sum + c.amount, 0);
+  return { applicableComponents, totalAmount };
+}
+
+export async function testFeeRulesWithProfiles(collegeId: string, feeStructureInstanceId: string, profiles: StudentProfile[]) {
+  const results = [];
+  for (const profile of profiles) {
+    const result = await evaluateFeeRules(collegeId, feeStructureInstanceId, profile);
+    results.push({ profile, ...result });
+  }
+  return results;
+}
+
+// ═══ Batch Invoice Generation ═════════════════════════════
+
+export async function generateSemesterInvoiceBatch(
+  collegeId: string,
+  semesterId: string,
+  academicYearId: string,
+  performedBy: string,
+) {
+  const batchId = `BATCH-${Date.now()}`;
+  let generated = 0;
+  let totalRevenue = 0;
+
+  // Find distinct enrolled students for this semester
+  const enrollments = await Enrollment.find({ collegeId, semesterId, status: 'enrolled' }).lean();
+  const studentIds = [...new Set(enrollments.map(e => String(e.studentId)))];
+
+  for (const studentId of studentIds) {
+    const student = await Student.findOne({ _id: studentId, collegeId }).lean();
+    if (!student) continue;
+
+    const feeStructureInstance = await FeeStructureInstance.findOne({
+      collegeId,
+      programmeId: student.programmeId,
+      status: 'active',
+    }).lean();
+    if (!feeStructureInstance) continue;
+
+    const studentProfile: StudentProfile = {
+      programmeId: student.programmeId ? String(student.programmeId) : undefined,
+      branchId: student.branchId ? String(student.branchId) : undefined,
+      regulationId: student.regulationId ? String(student.regulationId) : undefined,
+      quota: student.quota,
+      category: student.category,
+      batchId: student.batchId ? String(student.batchId) : undefined,
+    };
+
+    const { applicableComponents } = await evaluateFeeRules(collegeId, String(feeStructureInstance._id), studentProfile);
+
+    // Check for active FeeAgreement
+    const feeAgreement = await FeeAgreement.findOne({ collegeId, studentId, status: 'active' }).lean();
+
+    // Check for active ScholarshipAllocation
+    const scholarshipAllocation = await ScholarshipAllocation.findOne({
+      collegeId, studentId, academicYearId, status: { $in: ['approved', 'disbursed'] },
+    }).lean();
+
+    // Check for active Concession
+    const concession = await Concession.findOne({
+      collegeId, studentId, academicYearId, status: 'approved',
+    }).lean();
+
+    const grossTotal = applicableComponents.reduce((sum, c) => sum + c.amount, 0);
+    const scholarshipTotal = scholarshipAllocation ? scholarshipAllocation.amount : 0;
+    let concessionTotal = 0;
+    if (concession) {
+      if (concession.flatAmount) {
+        concessionTotal = concession.flatAmount;
+      } else if (concession.percentage) {
+        concessionTotal = Math.round((grossTotal * concession.percentage) / 100);
+      }
+    }
+
+    // Apply FeeAgreement override
+    const effectiveGross = feeAgreement ? feeAgreement.negotiatedTotal : grossTotal;
+    const netPayable = Math.max(0, effectiveGross - scholarshipTotal - concessionTotal);
+
+    const invoiceNumber = `INV-${new Date().getFullYear()}-${Date.now()}`;
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + 30);
+
+    const invoice = await Invoice.create({
+      collegeId,
+      invoiceNumber,
+      studentId,
+      type: 'fee',
+      items: applicableComponents.map(c => ({ description: c.name, amount: c.amount })),
+      totalAmount: effectiveGross,
+      scholarshipAllocated: scholarshipTotal,
+      concessionApplied: concessionTotal,
+      netPayable,
+      dueDate,
+      status: 'generated',
+      semesterId,
+      feeAgreementId: feeAgreement ? feeAgreement._id : undefined,
+      batchId,
+    });
+
+    // Create InvoiceLineItems
+    const componentCount = applicableComponents.length;
+    for (const comp of applicableComponents) {
+      const scholarshipProportion = componentCount > 0 ? scholarshipTotal / componentCount : 0;
+      const concessionProportion = componentCount > 0 ? concessionTotal / componentCount : 0;
+      const netAmount = Math.max(0, comp.amount - scholarshipProportion - concessionProportion);
+
+      await InvoiceLineItem.create({
+        collegeId,
+        invoiceId: invoice._id,
+        feeComponentId: comp.componentId,
+        description: comp.name,
+        grossAmount: comp.amount,
+        scholarshipAllocated: Math.round(scholarshipProportion),
+        concessionApplied: Math.round(concessionProportion),
+        netAmount: Math.round(netAmount),
+        status: 'active',
+      });
+    }
+
+    generated++;
+    totalRevenue += netPayable;
+  }
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'Invoice',
+    entityId: batchId,
+    entityName: `Batch ${batchId}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return { batchId, generated, totalRevenue };
+}
+
+export async function generateEnrolmentInvoice(
+  collegeId: string,
+  studentId: string,
+  feeStructureInstanceId: string,
+  firstPaymentAmount: number,
+  performedBy: string,
+) {
+  const student = await Student.findOne({ _id: studentId, collegeId }).lean();
+  if (!student) throw new AppError(404, 'Student not found');
+
+  const studentProfile: StudentProfile = {
+    programmeId: student.programmeId ? String(student.programmeId) : undefined,
+    branchId: student.branchId ? String(student.branchId) : undefined,
+    regulationId: student.regulationId ? String(student.regulationId) : undefined,
+    quota: student.quota,
+    category: student.category,
+    batchId: student.batchId ? String(student.batchId) : undefined,
+  };
+
+  const { applicableComponents } = await evaluateFeeRules(collegeId, feeStructureInstanceId, studentProfile);
+
+  // Check for active FeeAgreement
+  const feeAgreement = await FeeAgreement.findOne({ collegeId, studentId, status: 'active' }).lean();
+
+  const grossTotal = applicableComponents.reduce((sum, c) => sum + c.amount, 0);
+  const effectiveGross = feeAgreement ? feeAgreement.negotiatedTotal : grossTotal;
+  const netPayable = Math.max(0, effectiveGross - firstPaymentAmount);
+
+  const invoiceNumber = `INV-${new Date().getFullYear()}-${Date.now()}`;
+  const dueDate = new Date();
+  dueDate.setDate(dueDate.getDate() + 30);
+
+  const invoice = await Invoice.create({
+    collegeId,
+    invoiceNumber,
+    studentId,
+    type: 'fee',
+    items: applicableComponents.map(c => ({ description: c.name, amount: c.amount })),
+    totalAmount: effectiveGross,
+    scholarshipAllocated: 0,
+    concessionApplied: firstPaymentAmount > 0 ? firstPaymentAmount : 0,
+    netPayable,
+    dueDate,
+    status: 'generated',
+    feeAgreementId: feeAgreement ? feeAgreement._id : undefined,
+  });
+
+  for (const comp of applicableComponents) {
+    await InvoiceLineItem.create({
+      collegeId,
+      invoiceId: invoice._id,
+      feeComponentId: comp.componentId,
+      description: comp.name,
+      grossAmount: comp.amount,
+      scholarshipAllocated: 0,
+      concessionApplied: 0,
+      netAmount: comp.amount,
+      status: 'active',
+    });
+  }
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'Invoice',
+    entityId: String(invoice._id),
+    entityName: invoice.invoiceNumber,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return invoice;
+}
+
+export async function generateExamFeeInvoiceBatch(
+  collegeId: string,
+  semesterId: string,
+  examType: string,
+  feeAmount: number,
+  studentIds: string[],
+  performedBy: string,
+) {
+  const batchId = `BATCH-${Date.now()}`;
+  let generated = 0;
+
+  const dueDate = new Date();
+  dueDate.setDate(dueDate.getDate() + 15);
+
+  for (const studentId of studentIds) {
+    const invoiceNumber = `INV-${new Date().getFullYear()}-${Date.now()}-${generated}`;
+    const invoice = await Invoice.create({
+      collegeId,
+      invoiceNumber,
+      studentId,
+      type: 'fee',
+      examType,
+      items: [{ description: `${examType} Exam Fee`, amount: feeAmount }],
+      totalAmount: feeAmount,
+      netPayable: feeAmount,
+      scholarshipAllocated: 0,
+      concessionApplied: 0,
+      dueDate,
+      status: 'generated',
+      semesterId,
+      batchId,
+    });
+
+    await InvoiceLineItem.create({
+      collegeId,
+      invoiceId: invoice._id,
+      description: `${examType} Exam Fee`,
+      grossAmount: feeAmount,
+      scholarshipAllocated: 0,
+      concessionApplied: 0,
+      netAmount: feeAmount,
+      status: 'active',
+    });
+
+    generated++;
+  }
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'Invoice',
+    entityId: batchId,
+    entityName: `Exam Batch ${batchId}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return { generated, batchId };
+}
+
+export async function generateAdHocInvoice(
+  collegeId: string,
+  studentId: string,
+  items: { description: string; amount: number }[],
+  dueDate: Date,
+  description: string,
+  performedBy: string,
+) {
+  const totalAmount = items.reduce((sum, item) => sum + item.amount, 0);
+  const invoiceNumber = `INV-${new Date().getFullYear()}-${Date.now()}`;
+
+  const invoice = await Invoice.create({
+    collegeId,
+    invoiceNumber,
+    studentId,
+    type: 'other',
+    items,
+    totalAmount,
+    netPayable: totalAmount,
+    scholarshipAllocated: 0,
+    concessionApplied: 0,
+    dueDate,
+    status: 'draft',
+  });
+
+  for (const item of items) {
+    await InvoiceLineItem.create({
+      collegeId,
+      invoiceId: invoice._id,
+      description: item.description,
+      grossAmount: item.amount,
+      scholarshipAllocated: 0,
+      concessionApplied: 0,
+      netAmount: item.amount,
+      status: 'active',
+    });
+  }
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'Invoice',
+    entityId: String(invoice._id),
+    entityName: description || invoiceNumber,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return invoice;
+}
+
+// ═══ Invoice Adjustment Workflows ════════════════════════
+
+export async function adjustInvoice(
+  collegeId: string,
+  invoiceId: string,
+  adjustments: { lineItemId: string; newAmount: number; reason: string }[],
+  _reason: string,
+  performedBy: string,
+) {
+  const invoice = await Invoice.findOne({ _id: invoiceId, collegeId });
+  if (!invoice) throw new AppError(404, 'Invoice not found');
+
+  const changes: { field: string; displayName: string; oldValue: unknown; newValue: unknown }[] = [];
+
+  for (const adj of adjustments) {
+    const lineItem = await InvoiceLineItem.findOne({ _id: adj.lineItemId, collegeId, invoiceId });
+    if (!lineItem) continue;
+
+    const oldNet = lineItem.netAmount;
+    const diff = adj.newAmount - lineItem.grossAmount;
+    lineItem.grossAmount = adj.newAmount;
+    lineItem.netAmount = Math.max(0, adj.newAmount - lineItem.scholarshipAllocated - lineItem.concessionApplied);
+
+    if (lineItem.netAmount !== oldNet) {
+      lineItem.status = 'adjusted';
+    }
+
+    await lineItem.save();
+    changes.push({ field: `lineItem.${adj.lineItemId}.grossAmount`, displayName: 'Gross Amount', oldValue: lineItem.grossAmount - diff, newValue: adj.newAmount });
+  }
+
+  // Recalculate invoice totals
+  const lineItems = await InvoiceLineItem.find({ collegeId, invoiceId }).lean();
+  const newTotalAmount = lineItems.reduce((sum, li) => sum + li.grossAmount, 0);
+  const newScholarshipAllocated = lineItems.reduce((sum, li) => sum + li.scholarshipAllocated, 0);
+  const newConcessionApplied = lineItems.reduce((sum, li) => sum + li.concessionApplied, 0);
+  const newNetPayable = lineItems.reduce((sum, li) => sum + li.netAmount, 0);
+
+  invoice.totalAmount = newTotalAmount;
+  invoice.scholarshipAllocated = newScholarshipAllocated;
+  invoice.concessionApplied = newConcessionApplied;
+  invoice.netPayable = newNetPayable;
+  await invoice.save();
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'Invoice',
+    entityId: invoiceId,
+    entityName: invoice.invoiceNumber,
+    action: 'update',
+    changes,
+    performedBy,
+  });
+
+  return invoice;
+}
+
+export async function disputeInvoice(collegeId: string, invoiceId: string, _disputeReason: string, performedBy: string) {
+  const invoice = await Invoice.findOne({ _id: invoiceId, collegeId });
+  if (!invoice) throw new AppError(404, 'Invoice not found');
+  if (!['sent', 'generated'].includes(invoice.status)) {
+    throw new AppError(400, 'Only sent or generated invoices can be disputed');
+  }
+
+  invoice.status = 'disputed';
+  await invoice.save();
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'Invoice',
+    entityId: invoiceId,
+    entityName: invoice.invoiceNumber,
+    action: 'update',
+    changes: [{ field: 'status', displayName: 'Status', oldValue: 'sent', newValue: 'disputed' }],
+    performedBy,
+  });
+
+  return invoice;
+}
+
+export async function confirmInvoice(collegeId: string, invoiceId: string, performedBy: string) {
+  const invoice = await Invoice.findOne({ _id: invoiceId, collegeId });
+  if (!invoice) throw new AppError(404, 'Invoice not found');
+  if (invoice.status !== 'disputed') {
+    throw new AppError(400, 'Only disputed invoices can be confirmed');
+  }
+
+  invoice.status = 'confirmed';
+  await invoice.save();
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'Invoice',
+    entityId: invoiceId,
+    entityName: invoice.invoiceNumber,
+    action: 'update',
+    changes: [{ field: 'status', displayName: 'Status', oldValue: 'disputed', newValue: 'confirmed' }],
+    performedBy,
+  });
+
+  return invoice;
+}
+
+export async function writeOffInvoice(
+  collegeId: string,
+  invoiceId: string,
+  _approvedBy: string,
+  _reason: string,
+  performedBy: string,
+) {
+  const invoice = await Invoice.findOne({ _id: invoiceId, collegeId });
+  if (!invoice) throw new AppError(404, 'Invoice not found');
+
+  const netPayable = invoice.netPayable ?? invoice.totalAmount;
+  if (netPayable <= 0) {
+    throw new AppError(400, 'Invoice has no unpaid balance to write off');
+  }
+
+  const prevStatus = invoice.status;
+  invoice.status = 'written_off';
+  await invoice.save();
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'Invoice',
+    entityId: invoiceId,
+    entityName: invoice.invoiceNumber,
+    action: 'update',
+    changes: [{ field: 'status', displayName: 'Status', oldValue: prevStatus, newValue: 'written_off' }],
+    performedBy,
+  });
+
+  return invoice;
+}
+
+export async function detectSiblingDiscount(
+  collegeId: string,
+  academicYearId: string,
+  performedBy: string,
+) {
+  // Find all students with a feeResponsibleParentId
+  const students = await Student.find({
+    collegeId,
+    feeResponsibleParentId: { $ne: null },
+    status: 'active',
+  }).lean();
+
+  // Group by feeResponsibleParentId
+  const parentMap = new Map<string, string[]>();
+  for (const s of students) {
+    if (!s.feeResponsibleParentId) continue;
+    const parentKey = String(s.feeResponsibleParentId);
+    const existing = parentMap.get(parentKey) ?? [];
+    existing.push(String(s._id));
+    parentMap.set(parentKey, existing);
+  }
+
+  let siblingGroups = 0;
+  let concessionsCreated = 0;
+
+  for (const [_parentId, siblingIds] of parentMap.entries()) {
+    if (siblingIds.length < 2) continue;
+    siblingGroups++;
+
+    // Apply sibling discount concession to all siblings beyond the first
+    for (let i = 1; i < siblingIds.length; i++) {
+      const studentId = siblingIds[i];
+      if (!studentId) continue;
+
+      // Avoid duplicate concessions
+      const existing = await Concession.findOne({
+        collegeId,
+        studentId,
+        academicYearId,
+        type: 'sibling',
+        source: 'm04',
+        status: { $in: ['requested', 'approved'] },
+      }).lean();
+
+      if (existing) continue;
+
+      await Concession.create({
+        collegeId,
+        studentId,
+        academicYearId,
+        type: 'sibling',
+        percentage: 10,
+        reason: 'Sibling discount auto-detected',
+        status: 'requested',
+        source: 'm04',
+      });
+      concessionsCreated++;
+    }
+  }
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'Concession',
+    entityId: `SIBLING-DETECT-${Date.now()}`,
+    entityName: `Sibling Discount Detection`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return { siblingGroups, concessionsCreated };
+}
+
+// ═══ Fee Agreement CRUD ═══════════════════════════════════
+
+export async function listFeeAgreements(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
+  return paginate(FeeAgreement, filter, page, limit, { createdAt: -1 }, [STUDENT_POPULATE, 'feeStructureInstanceId'] as any);
+}
+
+export async function getFeeAgreement(collegeId: string, id: string) {
+  const doc = await FeeAgreement.findOne({ _id: id, collegeId }).populate('studentId feeStructureInstanceId');
+  if (!doc) throw new AppError(404, 'Fee agreement not found');
+  return doc;
+}
+
+export async function createFeeAgreement(collegeId: string, data: any, performedBy: string) {
+  const doc = await FeeAgreement.create({ ...data, collegeId });
+  await createAuditLog({
+    collegeId,
+    entityType: 'FeeAgreement',
+    entityId: String(doc._id),
+    entityName: `Fee Agreement`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function updateFeeAgreement(collegeId: string, id: string, data: any, performedBy: string) {
+  const doc = await FeeAgreement.findOneAndUpdate({ _id: id, collegeId }, data, { new: true });
+  if (!doc) throw new AppError(404, 'Fee agreement not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'FeeAgreement',
+    entityId: id,
+    entityName: `Fee Agreement`,
+    action: 'update',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function deleteFeeAgreement(collegeId: string, id: string, performedBy: string) {
+  const doc = await FeeAgreement.findOneAndDelete({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Fee agreement not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'FeeAgreement',
+    entityId: id,
+    entityName: `Fee Agreement`,
+    action: 'delete',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+// ═══ Payment Plan CRUD ════════════════════════════════════
+
+export async function listPaymentPlans(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
+  return paginate(PaymentPlan, filter, page, limit, { createdAt: -1 }, [STUDENT_POPULATE, 'invoiceId', 'feeAgreementId'] as any);
+}
+
+export async function getPaymentPlan(collegeId: string, id: string) {
+  const doc = await PaymentPlan.findOne({ _id: id, collegeId }).populate('studentId invoiceId feeAgreementId');
+  if (!doc) throw new AppError(404, 'Payment plan not found');
+  return doc;
+}
+
+export async function createPaymentPlan(collegeId: string, data: any, performedBy: string) {
+  const doc = await PaymentPlan.create({ ...data, collegeId });
+  await createAuditLog({
+    collegeId,
+    entityType: 'PaymentPlan',
+    entityId: String(doc._id),
+    entityName: `Payment Plan`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function updatePaymentPlan(collegeId: string, id: string, data: any, performedBy: string) {
+  const doc = await PaymentPlan.findOneAndUpdate({ _id: id, collegeId }, data, { new: true });
+  if (!doc) throw new AppError(404, 'Payment plan not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'PaymentPlan',
+    entityId: id,
+    entityName: `Payment Plan`,
+    action: 'update',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function deletePaymentPlan(collegeId: string, id: string, performedBy: string) {
+  const doc = await PaymentPlan.findOneAndDelete({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Payment plan not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'PaymentPlan',
+    entityId: id,
+    entityName: `Payment Plan`,
+    action: 'delete',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+// ═══ Invoice Line Item CRUD ═══════════════════════════════
+
+export async function listInvoiceLineItems(collegeId: string, invoiceId: string, page = 1, limit = 20) {
+  return paginate(InvoiceLineItem, { collegeId, invoiceId }, page, limit, { createdAt: 1 }, ['feeComponentId']);
+}
+
+export async function getInvoiceLineItem(collegeId: string, id: string) {
+  const doc = await InvoiceLineItem.findOne({ _id: id, collegeId }).populate('feeComponentId invoiceId');
+  if (!doc) throw new AppError(404, 'Invoice line item not found');
+  return doc;
+}
+
+export async function createInvoiceLineItem(collegeId: string, data: any, performedBy: string) {
+  const doc = await InvoiceLineItem.create({ ...data, collegeId });
+  await createAuditLog({
+    collegeId,
+    entityType: 'InvoiceLineItem',
+    entityId: String(doc._id),
+    entityName: doc.description,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function updateInvoiceLineItem(collegeId: string, id: string, data: any, performedBy: string) {
+  const doc = await InvoiceLineItem.findOneAndUpdate({ _id: id, collegeId }, data, { new: true });
+  if (!doc) throw new AppError(404, 'Invoice line item not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'InvoiceLineItem',
+    entityId: id,
+    entityName: doc.description,
+    action: 'update',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function deleteInvoiceLineItem(collegeId: string, id: string, performedBy: string) {
+  const doc = await InvoiceLineItem.findOneAndDelete({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Invoice line item not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'InvoiceLineItem',
+    entityId: id,
+    entityName: doc.description,
+    action: 'delete',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+// ═══ Payment Collection ═══════════════════════════════════
+
+// W03-L2-017: Gateway Webhook Handler
+export async function processGatewayWebhook(
+  collegeId: string,
+  orderId: string,
+  amount: number,
+  transactionRef: string,
+  gatewayResponse: Record<string, unknown>,
+  performedBy: string,
+) {
+  // Idempotency check
+  const existing = await PaymentGatewayLog.findOne({ collegeId, orderId, status: 'success' }).lean();
+  if (existing) {
+    const existingTx = await PaymentTransaction.findOne({ collegeId, gatewayOrderId: orderId }).lean();
+    const existingReceipt = existingTx?.receiptId
+      ? await Receipt.findOne({ _id: existingTx.receiptId, collegeId }).lean()
+      : null;
+    return {
+      paymentTransactionId: existingTx ? String(existingTx._id) : null,
+      receiptNumber: existingReceipt?.receiptNumber ?? null,
+      invoiceStatus: null,
+    };
+  }
+
+  const gatewayLog = await PaymentGatewayLog.findOne({ collegeId, orderId });
+  if (!gatewayLog) throw new AppError(404, 'Payment gateway log not found');
+
+  gatewayLog.status = 'success';
+  gatewayLog.gatewayResponse = gatewayResponse;
+  gatewayLog.completedAt = new Date();
+  gatewayLog.signatureVerified = true;
+  gatewayLog.webhookReceivedAt = new Date();
+  await gatewayLog.save();
+
+  const invoice = await Invoice.findOne({ _id: gatewayLog.invoiceId, collegeId });
+  if (!invoice) throw new AppError(404, 'Invoice not found for this gateway order');
+
+  const tx = await PaymentTransaction.create({
+    collegeId,
+    studentId: gatewayLog.studentId,
+    invoiceId: gatewayLog.invoiceId,
+    channel: 'gateway',
+    paymentMode: 'online',
+    reconciliationStatus: 'received',
+    gatewayOrderId: orderId,
+    transactionRef,
+    amount,
+    paymentDate: new Date(),
+  });
+
+  const payable = invoice.netPayable ?? invoice.totalAmount;
+  const invoiceStatus = amount >= payable ? 'paid' : 'partially_paid';
+  invoice.status = invoiceStatus;
+  await invoice.save();
+
+  const receiptNumber = `REC-${Date.now()}`;
+  const receipt = await Receipt.create({
+    collegeId,
+    receiptNumber,
+    paymentTransactionId: tx._id,
+    studentId: gatewayLog.studentId,
+    amount,
+    channel: 'email',
+    status: 'issued',
+  });
+
+  tx.receiptId = receipt._id as unknown as typeof tx.receiptId;
+  await tx.save();
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'PaymentTransaction',
+    entityId: String(tx._id),
+    entityName: receiptNumber,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return { paymentTransactionId: String(tx._id), receiptNumber, invoiceStatus };
+}
+
+// W03-L2-018: Counter Payment (Cash/DD)
+export async function recordCounterPayment(
+  collegeId: string,
+  invoiceId: string,
+  studentId: string,
+  amount: number,
+  paymentMode: string,
+  ddNumber: string | undefined,
+  ddBank: string | undefined,
+  ddDate: Date | undefined,
+  _collectedBy: string,
+  performedBy: string,
+) {
+  const invoice = await Invoice.findOne({ _id: invoiceId, collegeId });
+  if (!invoice) throw new AppError(404, 'Invoice not found');
+
+  const channel = paymentMode === 'dd' ? 'dd' : 'cash';
+
+  const tx = await PaymentTransaction.create({
+    collegeId,
+    studentId,
+    invoiceId,
+    channel,
+    paymentMode,
+    reconciliationStatus: 'received',
+    amount,
+    paymentDate: new Date(),
+    ddNumber,
+    ddBank,
+    ddDate,
+  });
+
+  const payable = invoice.netPayable ?? invoice.totalAmount;
+  const invoiceStatus = amount >= payable ? 'paid' : 'partially_paid';
+  invoice.status = invoiceStatus;
+  await invoice.save();
+
+  const receiptNumber = `REC-${Date.now()}`;
+  const receipt = await Receipt.create({
+    collegeId,
+    receiptNumber,
+    paymentTransactionId: tx._id,
+    studentId,
+    amount,
+    channel: 'print',
+    status: 'issued',
+  });
+
+  tx.receiptId = receipt._id as unknown as typeof tx.receiptId;
+  await tx.save();
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'PaymentTransaction',
+    entityId: String(tx._id),
+    entityName: receiptNumber,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return { paymentTransactionId: String(tx._id), receiptNumber, invoiceStatus };
+}
+
+// W03-L2-019: Bank Statement Import (NEFT/RTGS matching)
+export async function importBankStatement(
+  collegeId: string,
+  entries: { bankRef: string; amount: number; senderName: string; creditDate: Date }[],
+  performedBy: string,
+) {
+  let processed = 0;
+  let matched = 0;
+  let discrepancies = 0;
+
+  for (const entry of entries) {
+    // Auto-match: find unpaid invoices with same amount
+    const matchingInvoices = await Invoice.find({
+      collegeId,
+      totalAmount: entry.amount,
+      status: { $in: ['sent', 'generated', 'partially_paid'] },
+    }).lean();
+
+    let reconciliationStatus: string;
+
+    if (matchingInvoices.length === 1) {
+      reconciliationStatus = 'matched';
+      matched++;
+    } else {
+      reconciliationStatus = 'discrepancy';
+      discrepancies++;
+    }
+
+    // We need studentId for PaymentTransaction — try to get from matched invoice
+    const invoice = matchingInvoices.length === 1 ? matchingInvoices[0] : null;
+
+    if (!invoice) {
+      // Create a stub transaction without studentId is not possible given schema requires it
+      // Instead, store a ReconciliationEntry with no transaction (not valid either)
+      // Best approach: skip creating PaymentTransaction without studentId; only flag discrepancy
+      discrepancies = discrepancies; // already incremented
+      processed++;
+      continue;
+    }
+
+    const tx = await PaymentTransaction.create({
+      collegeId,
+      studentId: invoice.studentId,
+      invoiceId: invoice._id,
+      channel: 'neft',
+      paymentMode: 'neft',
+      reconciliationStatus,
+      amount: entry.amount,
+      transactionRef: entry.bankRef,
+      paymentDate: entry.creditDate ?? new Date(),
+    });
+
+    await ReconciliationEntry.create({
+      collegeId,
+      paymentTransactionId: tx._id,
+      bankStatementRef: entry.bankRef,
+      matchedAmount: entry.amount,
+      status: reconciliationStatus === 'matched' ? 'matched' : 'discrepancy_flagged',
+    });
+
+    if (reconciliationStatus === 'matched' && invoice) {
+      const payable = (invoice as any).netPayable ?? invoice.totalAmount;
+      const newStatus = entry.amount >= payable ? 'paid' : 'partially_paid';
+      await Invoice.findByIdAndUpdate(invoice._id, { status: newStatus });
+    }
+
+    processed++;
+  }
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'ReconciliationEntry',
+    entityId: `BANK-IMPORT-${Date.now()}`,
+    entityName: `Bank Statement Import`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return { processed, matched, discrepancies };
+}
+
+// W03-L2-019: Manual Match for Unmatched Payments
+export async function manualMatchPayment(
+  collegeId: string,
+  paymentTransactionId: string,
+  invoiceId: string,
+  performedBy: string,
+) {
+  const tx = await PaymentTransaction.findOne({ _id: paymentTransactionId, collegeId });
+  if (!tx) throw new AppError(404, 'Payment transaction not found');
+  if (tx.reconciliationStatus !== 'discrepancy') {
+    throw new AppError(400, 'Only discrepancy transactions can be manually matched');
+  }
+
+  tx.reconciliationStatus = 'matched';
+  tx.invoiceId = invoiceId as unknown as typeof tx.invoiceId;
+  await tx.save();
+
+  let entry = await ReconciliationEntry.findOne({ collegeId, paymentTransactionId: tx._id });
+  if (!entry) {
+    entry = await ReconciliationEntry.create({
+      collegeId,
+      paymentTransactionId: tx._id,
+      matchedAmount: tx.amount,
+      status: 'resolved',
+      resolvedBy: performedBy as any,
+      resolvedAt: new Date(),
+    });
+  } else {
+    entry.status = 'resolved';
+    entry.resolvedBy = performedBy as any;
+    entry.resolvedAt = new Date();
+    await entry.save();
+  }
+
+  const invoice = await Invoice.findOne({ _id: invoiceId, collegeId });
+  if (invoice) {
+    const payable = invoice.netPayable ?? invoice.totalAmount;
+    invoice.status = tx.amount >= payable ? 'paid' : 'partially_paid';
+    await invoice.save();
+  }
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'PaymentTransaction',
+    entityId: paymentTransactionId,
+    entityName: `Manual Match`,
+    action: 'update',
+    changes: [],
+    performedBy,
+  });
+
+  return tx;
+}
+
+// W03-L2-020: Reconciliation Cycle
+export async function runReconciliation(collegeId: string, performedBy: string) {
+  const txs = await PaymentTransaction.find({ collegeId, reconciliationStatus: 'received' }).lean();
+
+  let total = txs.length;
+  let matched = 0;
+  let discrepancies = 0;
+
+  for (const tx of txs) {
+    const entry = await ReconciliationEntry.findOne({
+      collegeId,
+      paymentTransactionId: tx._id,
+      status: 'matched',
+    }).lean();
+
+    if (entry) {
+      matched++;
+    } else {
+      await PaymentTransaction.findByIdAndUpdate(tx._id, { reconciliationStatus: 'discrepancy' });
+      await ReconciliationEntry.create({
+        collegeId,
+        paymentTransactionId: tx._id,
+        matchedAmount: tx.amount,
+        status: 'discrepancy_flagged',
+      });
+      discrepancies++;
+    }
+  }
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'ReconciliationEntry',
+    entityId: `RECON-RUN-${Date.now()}`,
+    entityName: `Reconciliation Run`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return { total, matched, discrepancies };
+}
+
+export async function getReconciliationStatus(collegeId: string) {
+  const [txCounts, entryCounts] = await Promise.all([
+    PaymentTransaction.aggregate([
+      { $match: { collegeId } },
+      { $group: { _id: '$reconciliationStatus', count: { $sum: 1 } } },
+    ]),
+    ReconciliationEntry.aggregate([
+      { $match: { collegeId } },
+      { $group: { _id: '$status', count: { $sum: 1 } } },
+    ]),
+  ]);
+
+  const txSummary: Record<string, number> = {};
+  for (const item of txCounts) {
+    txSummary[item._id as string] = item.count as number;
+  }
+
+  const entrySummary: Record<string, number> = {};
+  for (const item of entryCounts) {
+    entrySummary[item._id as string] = item.count as number;
+  }
+
+  return { transactions: txSummary, entries: entrySummary };
+}
+
+// ═══ Receipt Management ════════════════════════════════════
+
+// W03-L2-021: Reissue Receipt
+export async function reissueReceipt(
+  collegeId: string,
+  receiptId: string,
+  channel: string,
+  performedBy: string,
+) {
+  const oldReceipt = await Receipt.findOne({ _id: receiptId, collegeId });
+  if (!oldReceipt) throw new AppError(404, 'Receipt not found');
+
+  oldReceipt.status = 'reissued';
+  await oldReceipt.save();
+
+  const receiptNumber = `REC-${Date.now()}`;
+  const newReceipt = await Receipt.create({
+    collegeId,
+    receiptNumber,
+    paymentTransactionId: oldReceipt.paymentTransactionId,
+    studentId: oldReceipt.studentId,
+    amount: oldReceipt.amount,
+    channel,
+    status: 'issued',
+  });
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'Receipt',
+    entityId: String(newReceipt._id),
+    entityName: receiptNumber,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return newReceipt;
+}
+
+export async function cancelReceipt(collegeId: string, receiptId: string, performedBy: string) {
+  const receipt = await Receipt.findOne({ _id: receiptId, collegeId });
+  if (!receipt) throw new AppError(404, 'Receipt not found');
+
+  receipt.status = 'cancelled';
+  await receipt.save();
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'Receipt',
+    entityId: receiptId,
+    entityName: receipt.receiptNumber,
+    action: 'update',
+    changes: [],
+    performedBy,
+  });
+
+  return receipt;
+}
+
+// W03-L2-022: Flag Duplicate Payment
+export async function flagDuplicatePayment(
+  collegeId: string,
+  paymentTransactionId: string,
+  performedBy: string,
+) {
+  const tx = await PaymentTransaction.findOne({ _id: paymentTransactionId, collegeId });
+  if (!tx) throw new AppError(404, 'Payment transaction not found');
+
+  const potentialDuplicates = await PaymentTransaction.find({
+    collegeId,
+    invoiceId: tx.invoiceId,
+    amount: tx.amount,
+    _id: { $ne: tx._id },
+  }).lean();
+
+  let isDuplicate = false;
+  let overpaymentRecordId: string | undefined;
+
+  if (potentialDuplicates.length > 0) {
+    isDuplicate = true;
+    const overpayment = await OverpaymentRecord.create({
+      collegeId,
+      studentId: tx.studentId,
+      paymentTransactionId: tx._id,
+      invoiceId: tx.invoiceId,
+      overpaymentAmount: tx.amount,
+      resolution: 'pending',
+    });
+    overpaymentRecordId = String(overpayment._id);
+  }
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'PaymentTransaction',
+    entityId: paymentTransactionId,
+    entityName: `Duplicate Flag`,
+    action: 'update',
+    changes: [],
+    performedBy,
+  });
+
+  return { isDuplicate, overpaymentRecordId };
+}
+
+// W03-L2-023: Record Payment Bounce
+export async function recordPaymentBounce(
+  collegeId: string,
+  paymentTransactionId: string,
+  reason: string,
+  penaltyAmount: number,
+  performedBy: string,
+) {
+  const tx = await PaymentTransaction.findOne({ _id: paymentTransactionId, collegeId });
+  if (!tx) throw new AppError(404, 'Payment transaction not found');
+
+  tx.reconciliationStatus = 'reversed';
+  await tx.save();
+
+  const invoice = await Invoice.findOne({ _id: tx.invoiceId, collegeId });
+  let invoiceStatus = invoice?.status ?? 'unknown';
+  if (invoice) {
+    if (invoice.status === 'paid') {
+      invoice.status = 'sent';
+    }
+    // For partially_paid: leave as is
+    await invoice.save();
+    invoiceStatus = invoice.status;
+  }
+
+  // Cancel receipt if exists
+  if (tx.receiptId) {
+    await Receipt.findOneAndUpdate(
+      { _id: tx.receiptId, collegeId },
+      { status: 'cancelled' },
+    );
+  }
+
+  const bounceRecord = await BounceRecord.create({
+    collegeId,
+    paymentTransactionId: tx._id,
+    invoiceId: tx.invoiceId,
+    reason,
+    penaltyAmount,
+    bouncedAt: new Date(),
+  });
+
+  let penaltyApplied = false;
+  if (penaltyAmount > 0 && invoice) {
+    const penaltyLineItem = await InvoiceLineItem.create({
+      collegeId,
+      invoiceId: invoice._id,
+      description: `Bounce Penalty - ${reason}`,
+      grossAmount: penaltyAmount,
+      scholarshipAllocated: 0,
+      concessionApplied: 0,
+      netAmount: penaltyAmount,
+      status: 'active',
+    });
+    await BounceRecord.findByIdAndUpdate(bounceRecord._id, { penaltyLineItemId: penaltyLineItem._id });
+    penaltyApplied = true;
+  }
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'BounceRecord',
+    entityId: String(bounceRecord._id),
+    entityName: `Bounce: ${reason}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return { bounceRecordId: String(bounceRecord._id), invoiceStatus, penaltyApplied };
+}
+
+// W03-L2-024: Resolve Overpayment
+export async function resolveOverpayment(
+  collegeId: string,
+  overpaymentRecordId: string,
+  resolution: 'refund' | 'credit_forward',
+  performedBy: string,
+) {
+  const overpayment = await OverpaymentRecord.findOne({ _id: overpaymentRecordId, collegeId });
+  if (!overpayment) throw new AppError(404, 'Overpayment record not found');
+
+  if (resolution === 'refund') {
+    const refund = await Refund.create({
+      collegeId,
+      studentId: overpayment.studentId,
+      amount: overpayment.overpaymentAmount,
+      reason: 'Overpayment refund',
+      refundMode: 'online',
+      status: 'requested',
+      sourceType: 'overpayment',
+      sourceId: overpayment._id,
+      invoiceId: overpayment.invoiceId,
+    });
+    overpayment.refundId = refund._id as unknown as typeof overpayment.refundId;
+  }
+
+  overpayment.resolution = resolution;
+  overpayment.resolvedAt = new Date();
+  await overpayment.save();
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'OverpaymentRecord',
+    entityId: overpaymentRecordId,
+    entityName: `Overpayment Resolution: ${resolution}`,
+    action: 'update',
+    changes: [],
+    performedBy,
+  });
+
+  return overpayment;
+}
+
+// W03-L2-025: Approve Refund
+export async function approveRefund(collegeId: string, refundId: string, performedBy: string) {
+  const refund = await Refund.findOne({ _id: refundId, collegeId });
+  if (!refund) throw new AppError(404, 'Refund not found');
+  if (refund.status !== 'requested') throw new AppError(400, 'Only requested refunds can be approved');
+
+  refund.status = 'approved';
+  await refund.save();
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'Refund',
+    entityId: refundId,
+    entityName: `Refund ₹${refund.amount}`,
+    action: 'update',
+    changes: [],
+    performedBy,
+  });
+
+  return refund;
+}
+
+// Execute Refund
+export async function executeRefund(
+  collegeId: string,
+  refundId: string,
+  refundTransactionRef: string,
+  performedBy: string,
+) {
+  const refund = await Refund.findOne({ _id: refundId, collegeId });
+  if (!refund) throw new AppError(404, 'Refund not found');
+  if (refund.status !== 'approved') throw new AppError(400, 'Only approved refunds can be executed');
+
+  refund.status = 'processed';
+  refund.refundTransactionRef = refundTransactionRef;
+  refund.processedDate = new Date();
+  await refund.save();
+
+  if (refund.sourceType === 'overpayment' && refund.sourceId) {
+    const overpayment = await OverpaymentRecord.findOne({ _id: refund.sourceId, collegeId }).lean();
+    if (overpayment) {
+      await PaymentTransaction.findOneAndUpdate(
+        { _id: overpayment.paymentTransactionId, collegeId },
+        { reconciliationStatus: 'refunded' },
+      );
+    }
+  }
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'Refund',
+    entityId: refundId,
+    entityName: `Refund ₹${refund.amount}`,
+    action: 'update',
+    changes: [],
+    performedBy,
+  });
+
+  return refund;
+}
+
+// ═══ PaymentTransaction CRUD ══════════════════════════════
+
+export async function listPaymentTransactions(
+  collegeId: string,
+  page = 1,
+  limit = 20,
+  invoiceId?: string,
+  reconciliationStatus?: string,
+) {
+  const filter: any = { collegeId };
+  if (invoiceId) filter.invoiceId = invoiceId;
+  if (reconciliationStatus) filter.reconciliationStatus = reconciliationStatus;
+  return paginate(PaymentTransaction, filter, page, limit, { createdAt: -1 });
+}
+
+export async function getPaymentTransaction(collegeId: string, id: string) {
+  const doc = await PaymentTransaction.findOne({ _id: id, collegeId }).populate('studentId invoiceId receiptId');
+  if (!doc) throw new AppError(404, 'Payment transaction not found');
+  return doc;
+}
+
+export async function createPaymentTransaction(collegeId: string, data: any, performedBy: string) {
+  const doc = await PaymentTransaction.create({ ...data, collegeId });
+  await createAuditLog({
+    collegeId,
+    entityType: 'PaymentTransaction',
+    entityId: String(doc._id),
+    entityName: `Transaction ${doc.channel}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function updatePaymentTransaction(collegeId: string, id: string, data: any, performedBy: string) {
+  const doc = await PaymentTransaction.findOneAndUpdate({ _id: id, collegeId }, data, { new: true });
+  if (!doc) throw new AppError(404, 'Payment transaction not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'PaymentTransaction',
+    entityId: id,
+    entityName: `Transaction ${doc.channel}`,
+    action: 'update',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function deletePaymentTransaction(collegeId: string, id: string, performedBy: string) {
+  const doc = await PaymentTransaction.findOneAndDelete({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Payment transaction not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'PaymentTransaction',
+    entityId: id,
+    entityName: `Transaction ${doc.channel}`,
+    action: 'delete',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+// ═══ Receipt CRUD ═════════════════════════════════════════
+
+export async function listReceipts(
+  collegeId: string,
+  page = 1,
+  limit = 20,
+  studentId?: string,
+  status?: string,
+) {
+  const filter: any = { collegeId };
+  if (studentId) filter.studentId = studentId;
+  if (status) filter.status = status;
+  return paginate(Receipt, filter, page, limit, { createdAt: -1 });
+}
+
+export async function getReceipt(collegeId: string, id: string) {
+  const doc = await Receipt.findOne({ _id: id, collegeId }).populate('paymentTransactionId studentId');
+  if (!doc) throw new AppError(404, 'Receipt not found');
+  return doc;
+}
+
+export async function createReceiptRecord(collegeId: string, data: any, performedBy: string) {
+  const doc = await Receipt.create({ ...data, collegeId });
+  await createAuditLog({
+    collegeId,
+    entityType: 'Receipt',
+    entityId: String(doc._id),
+    entityName: doc.receiptNumber,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function updateReceiptRecord(collegeId: string, id: string, data: any, performedBy: string) {
+  const doc = await Receipt.findOneAndUpdate({ _id: id, collegeId }, data, { new: true });
+  if (!doc) throw new AppError(404, 'Receipt not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'Receipt',
+    entityId: id,
+    entityName: doc.receiptNumber,
+    action: 'update',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function deleteReceiptRecord(collegeId: string, id: string, performedBy: string) {
+  const doc = await Receipt.findOneAndDelete({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Receipt not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'Receipt',
+    entityId: id,
+    entityName: doc.receiptNumber,
+    action: 'delete',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+// ═══ ReconciliationEntry CRUD ═════════════════════════════
+
+export async function listReconciliationEntries(
+  collegeId: string,
+  page = 1,
+  limit = 20,
+  status?: string,
+) {
+  const filter: any = { collegeId };
+  if (status) filter.status = status;
+  return paginate(ReconciliationEntry, filter, page, limit, { createdAt: -1 });
+}
+
+export async function getReconciliationEntry(collegeId: string, id: string) {
+  const doc = await ReconciliationEntry.findOne({ _id: id, collegeId }).populate('paymentTransactionId resolvedBy');
+  if (!doc) throw new AppError(404, 'Reconciliation entry not found');
+  return doc;
+}
+
+export async function createReconciliationEntry(collegeId: string, data: any, performedBy: string) {
+  const doc = await ReconciliationEntry.create({ ...data, collegeId });
+  await createAuditLog({
+    collegeId,
+    entityType: 'ReconciliationEntry',
+    entityId: String(doc._id),
+    entityName: `Recon Entry ${doc.status}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function updateReconciliationEntry(collegeId: string, id: string, data: any, performedBy: string) {
+  const doc = await ReconciliationEntry.findOneAndUpdate({ _id: id, collegeId }, data, { new: true });
+  if (!doc) throw new AppError(404, 'Reconciliation entry not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'ReconciliationEntry',
+    entityId: id,
+    entityName: `Recon Entry ${doc.status}`,
+    action: 'update',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function deleteReconciliationEntry(collegeId: string, id: string, performedBy: string) {
+  const doc = await ReconciliationEntry.findOneAndDelete({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Reconciliation entry not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'ReconciliationEntry',
+    entityId: id,
+    entityName: `Recon Entry`,
+    action: 'delete',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+// ═══ BounceRecord CRUD ════════════════════════════════════
+
+export async function listBounceRecords(
+  collegeId: string,
+  page = 1,
+  limit = 20,
+  invoiceId?: string,
+) {
+  const filter: any = { collegeId };
+  if (invoiceId) filter.invoiceId = invoiceId;
+  return paginate(BounceRecord, filter, page, limit, { bouncedAt: -1 });
+}
+
+export async function getBounceRecord(collegeId: string, id: string) {
+  const doc = await BounceRecord.findOne({ _id: id, collegeId }).populate('paymentTransactionId invoiceId penaltyLineItemId');
+  if (!doc) throw new AppError(404, 'Bounce record not found');
+  return doc;
+}
+
+export async function createBounceRecord(collegeId: string, data: any, performedBy: string) {
+  const doc = await BounceRecord.create({ ...data, collegeId });
+  await createAuditLog({
+    collegeId,
+    entityType: 'BounceRecord',
+    entityId: String(doc._id),
+    entityName: `Bounce: ${doc.reason}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function updateBounceRecord(collegeId: string, id: string, data: any, performedBy: string) {
+  const doc = await BounceRecord.findOneAndUpdate({ _id: id, collegeId }, data, { new: true });
+  if (!doc) throw new AppError(404, 'Bounce record not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'BounceRecord',
+    entityId: id,
+    entityName: `Bounce: ${doc.reason}`,
+    action: 'update',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function deleteBounceRecord(collegeId: string, id: string, performedBy: string) {
+  const doc = await BounceRecord.findOneAndDelete({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Bounce record not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'BounceRecord',
+    entityId: id,
+    entityName: `Bounce Record`,
+    action: 'delete',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+// ═══ OverpaymentRecord CRUD ═══════════════════════════════
+
+export async function listOverpaymentRecords(
+  collegeId: string,
+  page = 1,
+  limit = 20,
+  studentId?: string,
+  resolution?: string,
+) {
+  const filter: any = { collegeId };
+  if (studentId) filter.studentId = studentId;
+  if (resolution) filter.resolution = resolution;
+  return paginate(OverpaymentRecord, filter, page, limit, { createdAt: -1 });
+}
+
+export async function getOverpaymentRecord(collegeId: string, id: string) {
+  const doc = await OverpaymentRecord.findOne({ _id: id, collegeId }).populate('studentId paymentTransactionId invoiceId refundId');
+  if (!doc) throw new AppError(404, 'Overpayment record not found');
+  return doc;
+}
+
+export async function createOverpaymentRecord(collegeId: string, data: any, performedBy: string) {
+  const doc = await OverpaymentRecord.create({ ...data, collegeId });
+  await createAuditLog({
+    collegeId,
+    entityType: 'OverpaymentRecord',
+    entityId: String(doc._id),
+    entityName: `Overpayment ₹${doc.overpaymentAmount}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function updateOverpaymentRecord(collegeId: string, id: string, data: any, performedBy: string) {
+  const doc = await OverpaymentRecord.findOneAndUpdate({ _id: id, collegeId }, data, { new: true });
+  if (!doc) throw new AppError(404, 'Overpayment record not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'OverpaymentRecord',
+    entityId: id,
+    entityName: `Overpayment ₹${doc.overpaymentAmount}`,
+    action: 'update',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function deleteOverpaymentRecord(collegeId: string, id: string, performedBy: string) {
+  const doc = await OverpaymentRecord.findOneAndDelete({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Overpayment record not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'OverpaymentRecord',
+    entityId: id,
+    entityName: `Overpayment Record`,
+    action: 'delete',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+// ═══ W03 Phase 4: Scholarship & Concession Workflow Functions ════════════════
+
+// W03-L2-026: Verify scholarship eligibility in batch
+export async function verifyScholarshipEligibilityBatch(
+  collegeId: string,
+  academicYearId: string,
+  performedBy: string,
+) {
+  const allocations = await ScholarshipAllocation.find({ collegeId, academicYearId }).lean();
+  let eligible = 0;
+  let pending = 0;
+
+  for (const allocation of allocations) {
+    const scholarship = await Scholarship.findOne({ _id: allocation.scholarshipId, collegeId }).lean();
+    if (!scholarship) continue;
+    const schemeCode = scholarship.type;
+    const isEligible = allocation.status === 'approved';
+
+    await ScholarshipEligibility.create({
+      collegeId,
+      studentId: allocation.studentId,
+      schemeCode,
+      academicYearId,
+      status: isEligible ? 'eligible' : 'pending',
+      verificationMethod: isEligible ? 'auto' : 'manual',
+      verifiedAt: isEligible ? new Date() : undefined,
+      documentsStatus: isEligible ? 'complete' : undefined,
+    });
+
+    if (isEligible) eligible++;
+    else pending++;
+  }
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'ScholarshipEligibility',
+    entityId: academicYearId,
+    entityName: `Eligibility Batch AY:${academicYearId}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return { total: allocations.length, eligible, pending };
+}
+
+// W03-L2-027: Submit scholarship claims in batch
+export async function submitScholarshipClaimsBatch(
+  collegeId: string,
+  schemeCode: string,
+  academicYearId: string,
+  performedBy: string,
+) {
+  const eligibilities = await ScholarshipEligibility.find({
+    collegeId,
+    schemeCode,
+    academicYearId,
+    status: 'eligible',
+  }).lean();
+
+  let submitted = 0;
+  let totalClaimAmount = 0;
+
+  for (const eligibility of eligibilities) {
+    const allocation = await ScholarshipAllocation.findOne({
+      collegeId,
+      studentId: eligibility.studentId,
+      academicYearId,
+    }).lean();
+    if (!allocation) continue;
+
+    await ScholarshipClaim.create({
+      collegeId,
+      scholarshipEligibilityId: eligibility._id,
+      studentId: eligibility.studentId,
+      schemeCode,
+      academicYearId,
+      claimAmount: allocation.amount,
+    });
+
+    submitted++;
+    totalClaimAmount += allocation.amount;
+  }
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'ScholarshipClaim',
+    entityId: academicYearId,
+    entityName: `Claims Batch scheme:${schemeCode} AY:${academicYearId}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return { submitted, totalClaimAmount };
+}
+
+// W03-L2-028: Poll scholarship claim status (stub for TS-EPass integration)
+export async function pollScholarshipClaimStatus(
+  collegeId: string,
+  academicYearId: string,
+  _performedBy: string,
+) {
+  const claims = await ScholarshipClaim.find({
+    collegeId,
+    academicYearId,
+    status: 'submitted',
+  }).lean();
+
+  return { pending: claims.length, claims };
+}
+
+// W03-L2-029: Process scholarship disbursement
+export async function processScholarshipDisbursement(
+  collegeId: string,
+  scholarshipClaimId: string,
+  disbursedAmount: number,
+  performedBy: string,
+) {
+  const claim = await ScholarshipClaim.findOne({ _id: scholarshipClaimId, collegeId });
+  if (!claim) throw new AppError(404, 'Scholarship claim not found');
+  if (claim.status !== 'approved') throw new AppError(400, 'Claim must be approved before disbursement');
+
+  let receivable = await ScholarshipReceivable.findOne({ collegeId, scholarshipClaimId });
+  if (!receivable) {
+    receivable = await ScholarshipReceivable.create({
+      collegeId,
+      scholarshipClaimId,
+      studentId: claim.studentId,
+      expectedAmount: claim.claimAmount,
+    });
+  }
+
+  receivable.status = 'disbursed';
+  receivable.disbursedAmount = disbursedAmount;
+  receivable.disbursedAt = new Date();
+  await receivable.save();
+
+  const invoice = await Invoice.findOne({
+    collegeId,
+    studentId: claim.studentId,
+    status: { $in: ['generated', 'sent', 'partially_paid', 'overdue'] },
+  });
+
+  let creditApplied = false;
+  let invoiceUpdated = false;
+
+  if (invoice) {
+    await ScholarshipCredit.create({
+      collegeId,
+      scholarshipReceivableId: receivable._id,
+      studentId: claim.studentId,
+      invoiceId: invoice._id,
+      amount: disbursedAmount,
+    });
+
+    const currentAllocated = invoice.scholarshipAllocated ?? 0;
+    invoice.scholarshipAllocated = currentAllocated + disbursedAmount;
+    const netPayable = (invoice.netPayable ?? invoice.totalAmount) - disbursedAmount;
+    invoice.netPayable = Math.max(0, netPayable);
+    await invoice.save();
+
+    creditApplied = true;
+    invoiceUpdated = true;
+  }
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'ScholarshipReceivable',
+    entityId: String(receivable._id),
+    entityName: `Disbursement for claim ${scholarshipClaimId}`,
+    action: 'update',
+    changes: [],
+    performedBy,
+  });
+
+  return { creditApplied, invoiceUpdated };
+}
+
+// W03-L2-030: Convert receivable to liability
+export async function convertReceivableToLiability(
+  collegeId: string,
+  receivableId: string,
+  performedBy: string,
+) {
+  const receivable = await ScholarshipReceivable.findOne({ _id: receivableId, collegeId });
+  if (!receivable) throw new AppError(404, 'Scholarship receivable not found');
+  if (receivable.status !== 'pending' && receivable.status !== 'overdue') {
+    throw new AppError(400, 'Only pending or overdue receivables can be converted to liability');
+  }
+
+  receivable.status = 'converted_to_liability';
+  await receivable.save();
+
+  const claim = await ScholarshipClaim.findOne({ _id: receivable.scholarshipClaimId, collegeId }).lean();
+  if (claim) {
+    const invoice = await Invoice.findOne({
+      collegeId,
+      studentId: claim.studentId,
+      status: { $in: ['generated', 'sent', 'partially_paid', 'overdue'] },
+    });
+    if (invoice) {
+      invoice.netPayable = (invoice.netPayable ?? invoice.totalAmount) + receivable.expectedAmount;
+      await invoice.save();
+    }
+  }
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'ScholarshipReceivable',
+    entityId: receivableId,
+    entityName: `Receivable converted to liability`,
+    action: 'update',
+    changes: [],
+    performedBy,
+  });
+
+  return receivable;
+}
+
+// W03-L2-031: Process hardship concession from M06 welfare referral
+export async function processHardshipConcession(
+  collegeId: string,
+  studentId: string,
+  recommendedRelief: number,
+  welfareReferralId: string | undefined,
+  approvedBy: string,
+  performedBy: string,
+) {
+  const currentYear = await AcademicYear.findOne({ collegeId }).sort({ createdAt: -1 }).lean();
+  if (!currentYear) throw new AppError(404, 'No academic year found');
+
+  const concession = await Concession.create({
+    collegeId,
+    studentId,
+    type: 'financial_hardship',
+    source: 'm06_referral',
+    flatAmount: recommendedRelief,
+    reason: 'Welfare referral hardship concession',
+    approvedBy,
+    academicYearId: currentYear._id,
+    status: 'approved',
+    welfareReferralId: welfareReferralId || undefined,
+  });
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'Concession',
+    entityId: String(concession._id),
+    entityName: `Hardship concession for student ${studentId}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return concession;
+}
+
+// W03-L2-032: Apply merit scholarship in batch
+export async function applyMeritScholarshipBatch(
+  collegeId: string,
+  academicYearId: string,
+  minCGPA: number,
+  amount: number,
+  maxRecipients: number,
+  performedBy: string,
+) {
+  const results = await SemesterResult.find({
+    collegeId,
+    cgpa: { $gte: minCGPA },
+  }).sort({ cgpa: -1 }).limit(maxRecipients).lean();
+
+  let awarded = 0;
+
+  for (const result of results) {
+    await ScholarshipAllocation.create({
+      collegeId,
+      scholarshipId: result.studentId,
+      studentId: result.studentId,
+      academicYearId,
+      amount,
+      status: 'approved',
+    });
+    awarded++;
+  }
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'ScholarshipAllocation',
+    entityId: academicYearId,
+    entityName: `Merit scholarship batch AY:${academicYearId}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return { awarded };
+}
+
+// W03-L2-033: Detect staff ward concessions (stub — requires M05 HR integration)
+export async function detectStaffWardConcession(
+  collegeId: string,
+  academicYearId: string,
+  performedBy: string,
+) {
+  await createAuditLog({
+    collegeId,
+    entityType: 'Concession',
+    entityId: academicYearId,
+    entityName: `Staff ward detection AY:${academicYearId}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+  return { detected: 0, message: 'Staff-ward detection requires M05 HR integration' };
+}
+
+// W03-L2-034: Renew scholarships in batch for new academic year
+export async function renewScholarshipsBatch(
+  collegeId: string,
+  academicYearId: string,
+  performedBy: string,
+) {
+  const priorAllocations = await ScholarshipAllocation.find({
+    collegeId,
+    status: 'approved',
+  }).lean();
+
+  let renewed = 0;
+
+  for (const allocation of priorAllocations) {
+    const scholarship = await Scholarship.findOne({ _id: allocation.scholarshipId, collegeId }).lean();
+    if (!scholarship) continue;
+    const schemeCode = scholarship.type;
+
+    await ScholarshipEligibility.create({
+      collegeId,
+      studentId: allocation.studentId,
+      schemeCode,
+      academicYearId,
+      status: 'pending',
+      verificationMethod: 'manual',
+    });
+    renewed++;
+  }
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'ScholarshipEligibility',
+    entityId: academicYearId,
+    entityName: `Renewal batch AY:${academicYearId}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return { renewed };
+}
+
+// ═══ ScholarshipEligibility CRUD ═════════════════════════════
+
+export async function listScholarshipEligibilities(
+  collegeId: string,
+  page = 1,
+  limit = 20,
+  academicYearId?: string,
+  status?: string,
+) {
+  const filter: Record<string, unknown> = { collegeId };
+  if (academicYearId) filter.academicYearId = academicYearId;
+  if (status) filter.status = status;
+  return paginate(ScholarshipEligibility, filter, page, limit, { createdAt: -1 });
+}
+
+export async function getScholarshipEligibility(collegeId: string, id: string) {
+  const doc = await ScholarshipEligibility.findOne({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Scholarship eligibility not found');
+  return doc;
+}
+
+export async function createScholarshipEligibility(collegeId: string, data: Record<string, unknown>, performedBy: string) {
+  const doc = await ScholarshipEligibility.create({ ...data, collegeId });
+  await createAuditLog({
+    collegeId,
+    entityType: 'ScholarshipEligibility',
+    entityId: String(doc._id),
+    entityName: `Eligibility for scheme ${String(doc.schemeCode)}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function updateScholarshipEligibility(collegeId: string, id: string, data: Record<string, unknown>, performedBy: string) {
+  const doc = await ScholarshipEligibility.findOneAndUpdate({ _id: id, collegeId }, data, { new: true });
+  if (!doc) throw new AppError(404, 'Scholarship eligibility not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'ScholarshipEligibility',
+    entityId: id,
+    entityName: `Eligibility for scheme ${String(doc.schemeCode)}`,
+    action: 'update',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function deleteScholarshipEligibility(collegeId: string, id: string, performedBy: string) {
+  const doc = await ScholarshipEligibility.findOneAndDelete({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Scholarship eligibility not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'ScholarshipEligibility',
+    entityId: id,
+    entityName: `Scholarship Eligibility`,
+    action: 'delete',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+// ═══ ScholarshipClaim CRUD ════════════════════════════════════
+
+export async function listScholarshipClaims(
+  collegeId: string,
+  page = 1,
+  limit = 20,
+  academicYearId?: string,
+  status?: string,
+) {
+  const filter: Record<string, unknown> = { collegeId };
+  if (academicYearId) filter.academicYearId = academicYearId;
+  if (status) filter.status = status;
+  return paginate(ScholarshipClaim, filter, page, limit, { createdAt: -1 });
+}
+
+export async function getScholarshipClaim(collegeId: string, id: string) {
+  const doc = await ScholarshipClaim.findOne({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Scholarship claim not found');
+  return doc;
+}
+
+export async function createScholarshipClaim(collegeId: string, data: Record<string, unknown>, performedBy: string) {
+  const doc = await ScholarshipClaim.create({ ...data, collegeId });
+  await createAuditLog({
+    collegeId,
+    entityType: 'ScholarshipClaim',
+    entityId: String(doc._id),
+    entityName: `Claim for scheme ${String(doc.schemeCode)}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function updateScholarshipClaim(collegeId: string, id: string, data: Record<string, unknown>, performedBy: string) {
+  const doc = await ScholarshipClaim.findOneAndUpdate({ _id: id, collegeId }, data, { new: true });
+  if (!doc) throw new AppError(404, 'Scholarship claim not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'ScholarshipClaim',
+    entityId: id,
+    entityName: `Claim for scheme ${String(doc.schemeCode)}`,
+    action: 'update',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function deleteScholarshipClaim(collegeId: string, id: string, performedBy: string) {
+  const doc = await ScholarshipClaim.findOneAndDelete({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Scholarship claim not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'ScholarshipClaim',
+    entityId: id,
+    entityName: `Scholarship Claim`,
+    action: 'delete',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+// ═══ ScholarshipReceivable CRUD ═══════════════════════════════
+
+export async function listScholarshipReceivables(
+  collegeId: string,
+  page = 1,
+  limit = 20,
+  status?: string,
+) {
+  const filter: Record<string, unknown> = { collegeId };
+  if (status) filter.status = status;
+  return paginate(ScholarshipReceivable, filter, page, limit, { createdAt: -1 });
+}
+
+export async function getScholarshipReceivable(collegeId: string, id: string) {
+  const doc = await ScholarshipReceivable.findOne({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Scholarship receivable not found');
+  return doc;
+}
+
+export async function createScholarshipReceivable(collegeId: string, data: Record<string, unknown>, performedBy: string) {
+  const doc = await ScholarshipReceivable.create({ ...data, collegeId });
+  await createAuditLog({
+    collegeId,
+    entityType: 'ScholarshipReceivable',
+    entityId: String(doc._id),
+    entityName: `Receivable ₹${doc.expectedAmount}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function updateScholarshipReceivable(collegeId: string, id: string, data: Record<string, unknown>, performedBy: string) {
+  const doc = await ScholarshipReceivable.findOneAndUpdate({ _id: id, collegeId }, data, { new: true });
+  if (!doc) throw new AppError(404, 'Scholarship receivable not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'ScholarshipReceivable',
+    entityId: id,
+    entityName: `Receivable ₹${doc.expectedAmount}`,
+    action: 'update',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function deleteScholarshipReceivable(collegeId: string, id: string, performedBy: string) {
+  const doc = await ScholarshipReceivable.findOneAndDelete({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Scholarship receivable not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'ScholarshipReceivable',
+    entityId: id,
+    entityName: `Scholarship Receivable`,
+    action: 'delete',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+// ═══ ScholarshipCredit CRUD ═══════════════════════════════════
+
+export async function listScholarshipCredits(
+  collegeId: string,
+  page = 1,
+  limit = 20,
+  studentId?: string,
+) {
+  const filter: Record<string, unknown> = { collegeId };
+  if (studentId) filter.studentId = studentId;
+  return paginate(ScholarshipCredit, filter, page, limit, { appliedAt: -1 });
+}
+
+export async function getScholarshipCredit(collegeId: string, id: string) {
+  const doc = await ScholarshipCredit.findOne({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Scholarship credit not found');
+  return doc;
+}
+
+export async function createScholarshipCredit(collegeId: string, data: Record<string, unknown>, performedBy: string) {
+  const doc = await ScholarshipCredit.create({ ...data, collegeId });
+  await createAuditLog({
+    collegeId,
+    entityType: 'ScholarshipCredit',
+    entityId: String(doc._id),
+    entityName: `Credit ₹${doc.amount}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function updateScholarshipCredit(collegeId: string, id: string, data: Record<string, unknown>, performedBy: string) {
+  const doc = await ScholarshipCredit.findOneAndUpdate({ _id: id, collegeId }, data, { new: true });
+  if (!doc) throw new AppError(404, 'Scholarship credit not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'ScholarshipCredit',
+    entityId: id,
+    entityName: `Credit ₹${doc.amount}`,
+    action: 'update',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function deleteScholarshipCredit(collegeId: string, id: string, performedBy: string) {
+  const doc = await ScholarshipCredit.findOneAndDelete({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Scholarship credit not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'ScholarshipCredit',
+    entityId: id,
+    entityName: `Scholarship Credit`,
+    action: 'delete',
+    changes: [],
+    performedBy,
+  });
   return doc;
 }

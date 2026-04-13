@@ -305,3 +305,658 @@ export async function createFinancialReport(req: AuthRequest, res: Response, nex
 export async function deleteFinancialReport(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.deleteFinancialReport(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
 }
+
+// ═══ W03: Fee Structure Instance ══════════════════════════
+
+export async function listFeeStructureInstances(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page, limit, academicYearId, status } = req.query as any;
+    res.json(await service.listFeeStructureInstances(req.collegeId!, Number(page) || 1, Number(limit) || 20, academicYearId, status));
+  } catch (err) { next(err); }
+}
+
+export async function getFeeStructureInstance(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.getFeeStructureInstance(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+
+export async function createFeeStructureInstance(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await service.createFeeStructureInstance(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function cloneFeeStructure(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { sourceInstanceId, newAcademicYearId } = req.body;
+    res.status(201).json(await service.cloneFeeStructure(req.collegeId!, sourceInstanceId, newAcademicYearId, who(req)));
+  } catch (err) { next(err); }
+}
+
+export async function submitFeeStructure(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.submitFeeStructure(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+export async function approveFeeStructure(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.approveFeeStructure(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+export async function activateFeeStructure(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.activateFeeStructure(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+export async function rejectFeeStructure(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { comments } = req.body;
+    res.json(await service.rejectFeeStructure(req.collegeId!, req.params.id as string, comments, who(req)));
+  } catch (err) { next(err); }
+}
+
+export async function archiveFeeStructure(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.archiveFeeStructure(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+export async function getFeeStructureComparison(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.getFeeStructureComparison(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+
+export async function getFeeStructureRevenueProjection(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.getFeeStructureRevenueProjection(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+
+// ═══ W03: Fee Components ══════════════════════════════════
+
+export async function listFeeComponents(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { feeStructureInstanceId, page, limit } = req.query as any;
+    res.json(await service.listFeeComponents(req.collegeId!, feeStructureInstanceId, Number(page) || 1, Number(limit) || 20));
+  } catch (err) { next(err); }
+}
+
+export async function getFeeComponent(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.getFeeComponent(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+
+export async function createFeeComponent(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await service.createFeeComponent(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function updateFeeComponent(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.updateFeeComponent(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function deleteFeeComponent(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.deleteFeeComponent(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ═══ W03: Fee Component Rules ═════════════════════════════
+
+export async function listFeeComponentRules(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { feeComponentId, page, limit } = req.query as any;
+    res.json(await service.listFeeComponentRules(req.collegeId!, feeComponentId, Number(page) || 1, Number(limit) || 20));
+  } catch (err) { next(err); }
+}
+
+export async function createFeeComponentRule(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await service.createFeeComponentRule(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function updateFeeComponentRule(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.updateFeeComponentRule(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function deleteFeeComponentRule(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.deleteFeeComponentRule(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ═══ W03: Fee Rules Engine ════════════════════════════════
+
+export async function evaluateFeeRules(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { feeStructureInstanceId, studentProfile } = req.body;
+    res.json(await service.evaluateFeeRules(req.collegeId!, feeStructureInstanceId, studentProfile));
+  } catch (err) { next(err); }
+}
+
+export async function testFeeRulesWithProfiles(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { feeStructureInstanceId, profiles } = req.body;
+    res.json(await service.testFeeRulesWithProfiles(req.collegeId!, feeStructureInstanceId, profiles));
+  } catch (err) { next(err); }
+}
+
+// ═══ W03: Invoice Batch Generation ════════════════════════
+
+export async function generateSemesterInvoiceBatch(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { semesterId, academicYearId } = req.body;
+    res.status(201).json(await service.generateSemesterInvoiceBatch(req.collegeId!, semesterId, academicYearId, who(req)));
+  } catch (err) { next(err); }
+}
+
+export async function generateEnrolmentInvoice(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { studentId, feeStructureInstanceId, firstPaymentAmount = 0 } = req.body;
+    res.status(201).json(await service.generateEnrolmentInvoice(req.collegeId!, studentId, feeStructureInstanceId, firstPaymentAmount, who(req)));
+  } catch (err) { next(err); }
+}
+
+export async function generateExamFeeInvoiceBatch(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { semesterId, examType, feeAmount, studentIds } = req.body;
+    res.status(201).json(await service.generateExamFeeInvoiceBatch(req.collegeId!, semesterId, examType, feeAmount, studentIds, who(req)));
+  } catch (err) { next(err); }
+}
+
+export async function generateAdHocInvoice(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { studentId, items, dueDate, description } = req.body;
+    res.status(201).json(await service.generateAdHocInvoice(req.collegeId!, studentId, items, new Date(dueDate), description, who(req)));
+  } catch (err) { next(err); }
+}
+
+// ═══ W03: Invoice Actions ═════════════════════════════════
+
+export async function adjustInvoice(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { adjustments, reason } = req.body;
+    res.json(await service.adjustInvoice(req.collegeId!, req.params.id as string, adjustments, reason, who(req)));
+  } catch (err) { next(err); }
+}
+
+export async function disputeInvoice(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { disputeReason } = req.body;
+    res.json(await service.disputeInvoice(req.collegeId!, req.params.id as string, disputeReason, who(req)));
+  } catch (err) { next(err); }
+}
+
+export async function confirmInvoice(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    res.json(await service.confirmInvoice(req.collegeId!, req.params.id as string, who(req)));
+  } catch (err) { next(err); }
+}
+
+export async function writeOffInvoice(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { approvedBy, reason } = req.body;
+    res.json(await service.writeOffInvoice(req.collegeId!, req.params.id as string, approvedBy, reason, who(req)));
+  } catch (err) { next(err); }
+}
+
+export async function detectSiblingDiscount(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { academicYearId } = req.body;
+    res.status(201).json(await service.detectSiblingDiscount(req.collegeId!, academicYearId, who(req)));
+  } catch (err) { next(err); }
+}
+
+// ═══ W03: Fee Agreements ══════════════════════════════════
+
+export async function listFeeAgreements(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    res.json(await service.listFeeAgreements(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope));
+  } catch (err) { next(err); }
+}
+
+export async function getFeeAgreement(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.getFeeAgreement(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+
+export async function createFeeAgreement(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await service.createFeeAgreement(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function updateFeeAgreement(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.updateFeeAgreement(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function deleteFeeAgreement(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.deleteFeeAgreement(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ═══ W03: Payment Plans ═══════════════════════════════════
+
+export async function listPaymentPlans(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    res.json(await service.listPaymentPlans(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope));
+  } catch (err) { next(err); }
+}
+
+export async function getPaymentPlan(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.getPaymentPlan(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+
+export async function createPaymentPlan(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await service.createPaymentPlan(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function updatePaymentPlan(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.updatePaymentPlan(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function deletePaymentPlan(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.deletePaymentPlan(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ═══ W03: Invoice Line Items ══════════════════════════════
+
+export async function listInvoiceLineItems(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { invoiceId, page, limit } = req.query as any;
+    res.json(await service.listInvoiceLineItems(req.collegeId!, invoiceId, Number(page) || 1, Number(limit) || 20));
+  } catch (err) { next(err); }
+}
+
+export async function getInvoiceLineItem(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.getInvoiceLineItem(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+
+export async function createInvoiceLineItem(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await service.createInvoiceLineItem(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function updateInvoiceLineItem(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.updateInvoiceLineItem(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function deleteInvoiceLineItem(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.deleteInvoiceLineItem(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ═══ W03: Payment Collection ═════════════════════════════════
+
+export async function processGatewayWebhook(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { orderId, amount, transactionRef, gatewayResponse } = req.body;
+    res.json(await service.processGatewayWebhook(req.collegeId!, orderId, amount, transactionRef, gatewayResponse ?? {}, who(req)));
+  } catch (err) { next(err); }
+}
+
+export async function recordCounterPayment(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { invoiceId, studentId, amount, paymentMode, ddNumber, ddBank, ddDate, collectedBy } = req.body;
+    const ddDateParsed = ddDate ? new Date(ddDate as string) : undefined;
+    res.status(201).json(await service.recordCounterPayment(req.collegeId!, invoiceId, studentId, amount, paymentMode, ddNumber, ddBank, ddDateParsed, collectedBy, who(req)));
+  } catch (err) { next(err); }
+}
+
+export async function importBankStatement(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { entries } = req.body;
+    const parsed = (entries as Array<{ bankRef: string; amount: number; senderName?: string; creditDate: string }>).map(e => ({
+      bankRef: e.bankRef,
+      amount: e.amount,
+      senderName: e.senderName ?? '',
+      creditDate: new Date(e.creditDate),
+    }));
+    res.json(await service.importBankStatement(req.collegeId!, parsed, who(req)));
+  } catch (err) { next(err); }
+}
+
+export async function manualMatchPayment(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { invoiceId } = req.body;
+    res.json(await service.manualMatchPayment(req.collegeId!, req.params.id as string, invoiceId, who(req)));
+  } catch (err) { next(err); }
+}
+
+// ═══ W03: Reconciliation ═════════════════════════════════════
+
+export async function runReconciliation(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.runReconciliation(req.collegeId!, who(req))); } catch (err) { next(err); }
+}
+
+export async function getReconciliationStatus(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.getReconciliationStatus(req.collegeId!)); } catch (err) { next(err); }
+}
+
+// ═══ W03: Receipt Management ═════════════════════════════════
+
+export async function reissueReceipt(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { channel } = req.body;
+    res.status(201).json(await service.reissueReceipt(req.collegeId!, req.params.id as string, channel ?? 'email', who(req)));
+  } catch (err) { next(err); }
+}
+
+export async function cancelReceipt(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.cancelReceipt(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ═══ W03: Duplicate / Bounce / Overpayment / Refund ══════════
+
+export async function flagDuplicatePayment(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.flagDuplicatePayment(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+export async function recordPaymentBounce(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { reason, penaltyAmount } = req.body;
+    res.json(await service.recordPaymentBounce(req.collegeId!, req.params.id as string, reason, penaltyAmount ?? 0, who(req)));
+  } catch (err) { next(err); }
+}
+
+export async function resolveOverpayment(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { resolution } = req.body;
+    res.json(await service.resolveOverpayment(req.collegeId!, req.params.id as string, resolution, who(req)));
+  } catch (err) { next(err); }
+}
+
+export async function approveRefund(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.approveRefund(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+export async function executeRefund(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { refundTransactionRef } = req.body;
+    res.json(await service.executeRefund(req.collegeId!, req.params.id as string, refundTransactionRef, who(req)));
+  } catch (err) { next(err); }
+}
+
+// ═══ W03: PaymentTransaction CRUD ════════════════════════════
+
+export async function listPaymentTransactions(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page, limit, invoiceId, reconciliationStatus } = req.query as any;
+    res.json(await service.listPaymentTransactions(req.collegeId!, Number(page) || 1, Number(limit) || 20, invoiceId, reconciliationStatus));
+  } catch (err) { next(err); }
+}
+
+export async function getPaymentTransaction(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.getPaymentTransaction(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+
+export async function createPaymentTransaction(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await service.createPaymentTransaction(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function updatePaymentTransaction(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.updatePaymentTransaction(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function deletePaymentTransaction(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.deletePaymentTransaction(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ═══ W03: Receipt CRUD ═══════════════════════════════════════
+
+export async function listReceipts(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page, limit, studentId, status } = req.query as any;
+    res.json(await service.listReceipts(req.collegeId!, Number(page) || 1, Number(limit) || 20, studentId, status));
+  } catch (err) { next(err); }
+}
+
+export async function getReceipt(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.getReceipt(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+
+export async function createReceipt(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await service.createReceiptRecord(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function updateReceipt(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.updateReceiptRecord(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function deleteReceipt(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.deleteReceiptRecord(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ═══ W03: ReconciliationEntry CRUD ═══════════════════════════
+
+export async function listReconciliationEntries(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page, limit, status } = req.query as any;
+    res.json(await service.listReconciliationEntries(req.collegeId!, Number(page) || 1, Number(limit) || 20, status));
+  } catch (err) { next(err); }
+}
+
+export async function getReconciliationEntry(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.getReconciliationEntry(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+
+export async function createReconciliationEntry(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await service.createReconciliationEntry(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function updateReconciliationEntry(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.updateReconciliationEntry(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function deleteReconciliationEntry(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.deleteReconciliationEntry(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ═══ W03: BounceRecord CRUD ══════════════════════════════════
+
+export async function listBounceRecords(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page, limit, invoiceId } = req.query as any;
+    res.json(await service.listBounceRecords(req.collegeId!, Number(page) || 1, Number(limit) || 20, invoiceId));
+  } catch (err) { next(err); }
+}
+
+export async function getBounceRecord(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.getBounceRecord(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+
+export async function createBounceRecord(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await service.createBounceRecord(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function updateBounceRecord(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.updateBounceRecord(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function deleteBounceRecord(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.deleteBounceRecord(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ═══ W03: OverpaymentRecord CRUD ═════════════════════════════
+
+export async function listOverpaymentRecords(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page, limit, studentId, resolution } = req.query as any;
+    res.json(await service.listOverpaymentRecords(req.collegeId!, Number(page) || 1, Number(limit) || 20, studentId, resolution));
+  } catch (err) { next(err); }
+}
+
+export async function getOverpaymentRecord(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.getOverpaymentRecord(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+
+export async function createOverpaymentRecord(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await service.createOverpaymentRecord(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function updateOverpaymentRecord(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.updateOverpaymentRecord(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function deleteOverpaymentRecord(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.deleteOverpaymentRecord(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ═══ W03 Phase 4: Scholarship & Concession Workflow Controllers ═══════════════
+
+// W03-L2-026
+export async function verifyScholarshipEligibilityBatch(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { academicYearId } = req.body as { academicYearId: string };
+    res.json(await service.verifyScholarshipEligibilityBatch(req.collegeId!, academicYearId, who(req)));
+  } catch (err) { next(err); }
+}
+
+// W03-L2-027
+export async function submitScholarshipClaimsBatch(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { schemeCode, academicYearId } = req.body as { schemeCode: string; academicYearId: string };
+    res.json(await service.submitScholarshipClaimsBatch(req.collegeId!, schemeCode, academicYearId, who(req)));
+  } catch (err) { next(err); }
+}
+
+// W03-L2-028
+export async function pollScholarshipClaimStatus(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { academicYearId } = req.body as { academicYearId: string };
+    res.json(await service.pollScholarshipClaimStatus(req.collegeId!, academicYearId, who(req)));
+  } catch (err) { next(err); }
+}
+
+// W03-L2-029
+export async function processScholarshipDisbursement(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { scholarshipClaimId, disbursedAmount } = req.body as { scholarshipClaimId: string; disbursedAmount: number };
+    res.json(await service.processScholarshipDisbursement(req.collegeId!, scholarshipClaimId, disbursedAmount, who(req)));
+  } catch (err) { next(err); }
+}
+
+// W03-L2-030
+export async function convertReceivableToLiability(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    res.json(await service.convertReceivableToLiability(req.collegeId!, req.params.id as string, who(req)));
+  } catch (err) { next(err); }
+}
+
+// W03-L2-031
+export async function processHardshipConcession(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { studentId, recommendedRelief, welfareReferralId, approvedBy } = req.body as {
+      studentId: string;
+      recommendedRelief: number;
+      welfareReferralId?: string;
+      approvedBy: string;
+    };
+    res.status(201).json(await service.processHardshipConcession(req.collegeId!, studentId, recommendedRelief, welfareReferralId, approvedBy, who(req)));
+  } catch (err) { next(err); }
+}
+
+// W03-L2-032
+export async function applyMeritScholarshipBatch(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { academicYearId, minCGPA, amount, maxRecipients } = req.body as {
+      academicYearId: string;
+      minCGPA: number;
+      amount: number;
+      maxRecipients: number;
+    };
+    res.json(await service.applyMeritScholarshipBatch(req.collegeId!, academicYearId, minCGPA, amount, maxRecipients, who(req)));
+  } catch (err) { next(err); }
+}
+
+// W03-L2-033
+export async function detectStaffWardConcession(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { academicYearId } = req.body as { academicYearId: string };
+    res.json(await service.detectStaffWardConcession(req.collegeId!, academicYearId, who(req)));
+  } catch (err) { next(err); }
+}
+
+// W03-L2-034
+export async function renewScholarshipsBatch(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { academicYearId } = req.body as { academicYearId: string };
+    res.json(await service.renewScholarshipsBatch(req.collegeId!, academicYearId, who(req)));
+  } catch (err) { next(err); }
+}
+
+// ═══ ScholarshipEligibility CRUD ═════════════════════════════
+
+export async function listScholarshipEligibilities(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page, limit, academicYearId, status } = req.query as any;
+    res.json(await service.listScholarshipEligibilities(req.collegeId!, Number(page) || 1, Number(limit) || 20, academicYearId, status));
+  } catch (err) { next(err); }
+}
+
+export async function getScholarshipEligibility(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.getScholarshipEligibility(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+
+export async function createScholarshipEligibility(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await service.createScholarshipEligibility(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function updateScholarshipEligibility(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.updateScholarshipEligibility(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function deleteScholarshipEligibility(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.deleteScholarshipEligibility(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ═══ ScholarshipClaim CRUD ════════════════════════════════════
+
+export async function listScholarshipClaims(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page, limit, academicYearId, status } = req.query as any;
+    res.json(await service.listScholarshipClaims(req.collegeId!, Number(page) || 1, Number(limit) || 20, academicYearId, status));
+  } catch (err) { next(err); }
+}
+
+export async function getScholarshipClaim(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.getScholarshipClaim(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+
+export async function createScholarshipClaim(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await service.createScholarshipClaim(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function updateScholarshipClaim(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.updateScholarshipClaim(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function deleteScholarshipClaim(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.deleteScholarshipClaim(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ═══ ScholarshipReceivable CRUD ═══════════════════════════════
+
+export async function listScholarshipReceivables(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page, limit, status } = req.query as any;
+    res.json(await service.listScholarshipReceivables(req.collegeId!, Number(page) || 1, Number(limit) || 20, status));
+  } catch (err) { next(err); }
+}
+
+export async function getScholarshipReceivable(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.getScholarshipReceivable(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+
+export async function createScholarshipReceivable(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await service.createScholarshipReceivable(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function updateScholarshipReceivable(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.updateScholarshipReceivable(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function deleteScholarshipReceivable(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.deleteScholarshipReceivable(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ═══ ScholarshipCredit CRUD ═══════════════════════════════════
+
+export async function listScholarshipCredits(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page, limit, studentId } = req.query as any;
+    res.json(await service.listScholarshipCredits(req.collegeId!, Number(page) || 1, Number(limit) || 20, studentId));
+  } catch (err) { next(err); }
+}
+
+export async function getScholarshipCredit(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.getScholarshipCredit(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+
+export async function createScholarshipCredit(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await service.createScholarshipCredit(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function updateScholarshipCredit(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.updateScholarshipCredit(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function deleteScholarshipCredit(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.deleteScholarshipCredit(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}

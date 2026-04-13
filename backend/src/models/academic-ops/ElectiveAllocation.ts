@@ -12,7 +12,7 @@ const schema = new Schema<IElectiveAllocation>({
   electiveGroup: { type: String, required: true },
   courseId: { type: Schema.Types.ObjectId, ref: 'Course', required: true },
   preference: { type: Number, required: true },
-  status: { type: String, enum: ['requested', 'allocated', 'rejected'], default: 'requested' },
+  status: { type: String, enum: ['requested', 'allocated', 'finalized', 'rejected'], default: 'requested' },
 }, { timestamps: true });
 
 schema.index({ collegeId: 1, studentId: 1, semesterId: 1, electiveGroup: 1 });

@@ -2,7 +2,19 @@ import { Schema, model, Document } from 'mongoose';
 
 export interface IFeeStructure extends Document {
   collegeId: Schema.Types.ObjectId;
-  academicYearId: Schema.Types.ObjectId; programmeId: Schema.Types.ObjectId; branchId?: Schema.Types.ObjectId; category?: string; quota?: string; year: number; components: { name: string; amount: number; isRefundable: boolean }[]; totalAmount: number;
+  academicYearId: Schema.Types.ObjectId;
+  programmeId: Schema.Types.ObjectId;
+  branchId?: Schema.Types.ObjectId;
+  category?: string;
+  quota?: string;
+  year: number;
+  components: { name: string; amount: number; isRefundable: boolean }[];
+  totalAmount: number;
+  status: string;
+  effectiveDate?: Date;
+  priorVersionId?: Schema.Types.ObjectId;
+  approvedBy?: Schema.Types.ObjectId;
+  approvedAt?: Date;
 }
 
 const schema = new Schema<IFeeStructure>({
@@ -15,6 +27,11 @@ const schema = new Schema<IFeeStructure>({
   year: { type: Number, required: true },
   components: [{ name: String, amount: Number, isRefundable: { type: Boolean, default: false } }],
   totalAmount: { type: Number, required: true },
+  status: { type: String, enum: ['draft', 'submitted', 'approved', 'active', 'superseded', 'archived'], required: true, default: 'draft' },
+  effectiveDate: Date,
+  priorVersionId: { type: Schema.Types.ObjectId, ref: 'FeeStructure' },
+  approvedBy: { type: Schema.Types.ObjectId, ref: 'Person' },
+  approvedAt: Date,
 }, { timestamps: true });
 
 schema.index({ collegeId: 1, academicYearId: 1, programmeId: 1 });

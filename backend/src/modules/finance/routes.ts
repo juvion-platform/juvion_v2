@@ -20,6 +20,63 @@ import {
   createPaymentGatewayLogSchema, updatePaymentGatewayLogSchema,
   createFeeReminderSchema, updateFeeReminderSchema,
   createFinancialReportSchema,
+  createFeeStructureInstanceSchema,
+  cloneFeeStructureSchema,
+  rejectFeeStructureSchema,
+  createFeeComponentSchema,
+  updateFeeComponentSchema,
+  createFeeComponentRuleSchema,
+  updateFeeComponentRuleSchema,
+  evaluateFeeRulesSchema,
+  testFeeRulesSchema,
+  generateSemesterInvoiceBatchSchema,
+  generateEnrolmentInvoiceSchema,
+  generateExamFeeInvoiceBatchSchema,
+  generateAdHocInvoiceSchema,
+  adjustInvoiceSchema,
+  disputeInvoiceSchema,
+  writeOffInvoiceSchema,
+  detectSiblingDiscountSchema,
+  createFeeAgreementSchema,
+  updateFeeAgreementSchema,
+  createPaymentPlanSchema,
+  updatePaymentPlanSchema,
+  createInvoiceLineItemSchema,
+  updateInvoiceLineItemSchema,
+  processGatewayWebhookSchema,
+  recordCounterPaymentSchema,
+  importBankStatementSchema,
+  manualMatchPaymentSchema,
+  reissueReceiptSchema,
+  recordPaymentBounceSchema,
+  resolveOverpaymentSchema,
+  executeRefundSchema,
+  createPaymentTransactionSchema,
+  updatePaymentTransactionSchema,
+  createReceiptSchema,
+  updateReceiptSchema,
+  createReconciliationEntrySchema,
+  updateReconciliationEntrySchema,
+  createBounceRecordSchema,
+  updateBounceRecordSchema,
+  createOverpaymentRecordSchema,
+  updateOverpaymentRecordSchema,
+  verifyScholarshipEligibilityBatchSchema,
+  submitScholarshipClaimsBatchSchema,
+  pollScholarshipClaimStatusSchema,
+  processScholarshipDisbursementSchema,
+  processHardshipConcessionSchema,
+  applyMeritScholarshipBatchSchema,
+  detectStaffWardConcessionSchema,
+  renewScholarshipsBatchSchema,
+  createScholarshipEligibilitySchema,
+  updateScholarshipEligibilitySchema,
+  createScholarshipClaimSchema,
+  updateScholarshipClaimSchema,
+  createScholarshipReceivableSchema,
+  updateScholarshipReceivableSchema,
+  createScholarshipCreditSchema,
+  updateScholarshipCreditSchema,
 } from './validation';
 
 const router = Router();
@@ -49,6 +106,16 @@ router.post('/fee-line-items', authorize('finance', 'create'), validate(createFe
 router.put('/fee-line-items/:id', authorize('finance', 'update'), validate(updateFeeLineItemSchema), ctrl.updateFeeLineItem);
 router.delete('/fee-line-items/:id', authorize('finance', 'delete'), ctrl.deleteFeeLineItem);
 
+// ═══ W03: Payment Gateway Webhook ════════════════════════════
+router.post('/payments/gateway-webhook', validate(processGatewayWebhookSchema), ctrl.processGatewayWebhook);
+
+// ═══ W03: Payment Collection ═════════════════════════════════
+router.post('/payments/counter', authorize('finance', 'create'), validate(recordCounterPaymentSchema), ctrl.recordCounterPayment);
+router.post('/payments/bank-import', authorize('finance', 'create'), validate(importBankStatementSchema), ctrl.importBankStatement);
+router.post('/payments/:id/match', authorize('finance', 'update'), validate(manualMatchPaymentSchema), ctrl.manualMatchPayment);
+router.post('/payments/:id/flag-duplicate', authorize('finance', 'update'), ctrl.flagDuplicatePayment);
+router.post('/payments/:id/bounce', authorize('finance', 'update'), validate(recordPaymentBounceSchema), ctrl.recordPaymentBounce);
+
 // Payments
 router.get('/payments', authorize('finance', 'read'), ctrl.listPayments);
 router.get('/payments/:id', authorize('finance', 'read'), ctrl.getPayment);
@@ -75,6 +142,10 @@ router.post('/concessions', authorize('finance', 'create'), validate(createConce
 router.put('/concessions/:id', authorize('finance', 'update'), validate(updateConcessionSchema), ctrl.updateConcession);
 router.delete('/concessions/:id', authorize('finance', 'delete'), ctrl.deleteConcession);
 
+// ═══ W03: Refund Actions (before CRUD :id routes) ════════════
+router.post('/refunds/:id/approve', authorize('finance', 'update'), ctrl.approveRefund);
+router.post('/refunds/:id/execute', authorize('finance', 'update'), validate(executeRefundSchema), ctrl.executeRefund);
+
 // Refunds
 router.get('/refunds', authorize('finance', 'read'), ctrl.listRefunds);
 router.post('/refunds', authorize('finance', 'create'), validate(createRefundSchema), ctrl.createRefund);
@@ -86,6 +157,12 @@ router.get('/fines', authorize('finance', 'read'), ctrl.listFinePenalties);
 router.post('/fines', authorize('finance', 'create'), validate(createFinePenaltySchema), ctrl.createFinePenalty);
 router.put('/fines/:id', authorize('finance', 'update'), validate(updateFinePenaltySchema), ctrl.updateFinePenalty);
 router.delete('/fines/:id', authorize('finance', 'delete'), ctrl.deleteFinePenalty);
+
+// ═══ W03: Invoice Batch Generation ═══════════════════════════
+router.post('/invoices/batch/semester', authorize('finance', 'create'), validate(generateSemesterInvoiceBatchSchema), ctrl.generateSemesterInvoiceBatch);
+router.post('/invoices/enrolment', authorize('finance', 'create'), validate(generateEnrolmentInvoiceSchema), ctrl.generateEnrolmentInvoice);
+router.post('/invoices/batch/exam', authorize('finance', 'create'), validate(generateExamFeeInvoiceBatchSchema), ctrl.generateExamFeeInvoiceBatch);
+router.post('/invoices/ad-hoc', authorize('finance', 'create'), validate(generateAdHocInvoiceSchema), ctrl.generateAdHocInvoice);
 
 // Invoices
 router.get('/invoices', authorize('finance', 'read'), ctrl.listInvoices);
@@ -130,5 +207,148 @@ router.delete('/reminders/:id', authorize('finance', 'delete'), ctrl.deleteFeeRe
 router.get('/reports', authorize('finance', 'read'), ctrl.listFinancialReports);
 router.post('/reports', authorize('finance', 'create'), validate(createFinancialReportSchema), ctrl.createFinancialReport);
 router.delete('/reports/:id', authorize('finance', 'delete'), ctrl.deleteFinancialReport);
+
+// ═══ W03: Fee Structure Instance Lifecycle ═══════════════════
+router.get('/fee-structure-instances', authorize('finance', 'read'), ctrl.listFeeStructureInstances);
+router.get('/fee-structure-instances/:id', authorize('finance', 'read'), ctrl.getFeeStructureInstance);
+router.post('/fee-structure-instances', authorize('finance', 'create'), validate(createFeeStructureInstanceSchema), ctrl.createFeeStructureInstance);
+router.post('/fee-structures/clone', authorize('finance', 'create'), validate(cloneFeeStructureSchema), ctrl.cloneFeeStructure);
+router.post('/fee-structure-instances/:id/submit', authorize('finance', 'update'), ctrl.submitFeeStructure);
+router.post('/fee-structure-instances/:id/approve', authorize('finance', 'update'), ctrl.approveFeeStructure);
+router.post('/fee-structure-instances/:id/activate', authorize('finance', 'update'), ctrl.activateFeeStructure);
+router.post('/fee-structure-instances/:id/reject', authorize('finance', 'update'), validate(rejectFeeStructureSchema), ctrl.rejectFeeStructure);
+router.post('/fee-structure-instances/:id/archive', authorize('finance', 'update'), ctrl.archiveFeeStructure);
+router.get('/fee-structure-instances/:id/comparison', authorize('finance', 'read'), ctrl.getFeeStructureComparison);
+router.get('/fee-structure-instances/:id/revenue-projection', authorize('finance', 'read'), ctrl.getFeeStructureRevenueProjection);
+
+// ═══ W03: Fee Components ═════════════════════════════════════
+router.get('/fee-components', authorize('finance', 'read'), ctrl.listFeeComponents);
+router.get('/fee-components/:id', authorize('finance', 'read'), ctrl.getFeeComponent);
+router.post('/fee-components', authorize('finance', 'create'), validate(createFeeComponentSchema), ctrl.createFeeComponent);
+router.put('/fee-components/:id', authorize('finance', 'update'), validate(updateFeeComponentSchema), ctrl.updateFeeComponent);
+router.delete('/fee-components/:id', authorize('finance', 'delete'), ctrl.deleteFeeComponent);
+
+// ═══ W03: Fee Component Rules ════════════════════════════════
+router.post('/fee-component-rules/evaluate', authorize('finance', 'read'), validate(evaluateFeeRulesSchema), ctrl.evaluateFeeRules);
+router.post('/fee-component-rules/test', authorize('finance', 'read'), validate(testFeeRulesSchema), ctrl.testFeeRulesWithProfiles);
+router.get('/fee-component-rules', authorize('finance', 'read'), ctrl.listFeeComponentRules);
+router.post('/fee-component-rules', authorize('finance', 'create'), validate(createFeeComponentRuleSchema), ctrl.createFeeComponentRule);
+router.put('/fee-component-rules/:id', authorize('finance', 'update'), validate(updateFeeComponentRuleSchema), ctrl.updateFeeComponentRule);
+router.delete('/fee-component-rules/:id', authorize('finance', 'delete'), ctrl.deleteFeeComponentRule);
+
+// ═══ W03: Invoice Actions ════════════════════════════════════
+router.post('/invoices/:id/adjust', authorize('finance', 'update'), validate(adjustInvoiceSchema), ctrl.adjustInvoice);
+router.post('/invoices/:id/dispute', authorize('finance', 'update'), validate(disputeInvoiceSchema), ctrl.disputeInvoice);
+router.post('/invoices/:id/confirm', authorize('finance', 'update'), ctrl.confirmInvoice);
+router.post('/invoices/:id/write-off', authorize('finance', 'update'), validate(writeOffInvoiceSchema), ctrl.writeOffInvoice);
+router.post('/concessions/sibling-detect', authorize('finance', 'create'), validate(detectSiblingDiscountSchema), ctrl.detectSiblingDiscount);
+
+// ═══ W03: Fee Agreements ═════════════════════════════════════
+router.get('/fee-agreements', authorize('finance', 'read'), ctrl.listFeeAgreements);
+router.get('/fee-agreements/:id', authorize('finance', 'read'), ctrl.getFeeAgreement);
+router.post('/fee-agreements', authorize('finance', 'create'), validate(createFeeAgreementSchema), ctrl.createFeeAgreement);
+router.put('/fee-agreements/:id', authorize('finance', 'update'), validate(updateFeeAgreementSchema), ctrl.updateFeeAgreement);
+router.delete('/fee-agreements/:id', authorize('finance', 'delete'), ctrl.deleteFeeAgreement);
+
+// ═══ W03: Payment Plans ══════════════════════════════════════
+router.get('/payment-plans', authorize('finance', 'read'), ctrl.listPaymentPlans);
+router.get('/payment-plans/:id', authorize('finance', 'read'), ctrl.getPaymentPlan);
+router.post('/payment-plans', authorize('finance', 'create'), validate(createPaymentPlanSchema), ctrl.createPaymentPlan);
+router.put('/payment-plans/:id', authorize('finance', 'update'), validate(updatePaymentPlanSchema), ctrl.updatePaymentPlan);
+router.delete('/payment-plans/:id', authorize('finance', 'delete'), ctrl.deletePaymentPlan);
+
+// ═══ W03: Invoice Line Items ═════════════════════════════════
+router.get('/invoice-line-items', authorize('finance', 'read'), ctrl.listInvoiceLineItems);
+router.get('/invoice-line-items/:id', authorize('finance', 'read'), ctrl.getInvoiceLineItem);
+router.post('/invoice-line-items', authorize('finance', 'create'), validate(createInvoiceLineItemSchema), ctrl.createInvoiceLineItem);
+router.put('/invoice-line-items/:id', authorize('finance', 'update'), validate(updateInvoiceLineItemSchema), ctrl.updateInvoiceLineItem);
+router.delete('/invoice-line-items/:id', authorize('finance', 'delete'), ctrl.deleteInvoiceLineItem);
+
+// ═══ W03: Reconciliation ═════════════════════════════════════
+router.post('/reconciliation/run', authorize('finance', 'create'), ctrl.runReconciliation);
+router.get('/reconciliation/status', authorize('finance', 'read'), ctrl.getReconciliationStatus);
+
+// ═══ W03: Receipts (action routes before CRUD :id routes) ════
+router.post('/receipts/:id/reissue', authorize('finance', 'update'), validate(reissueReceiptSchema), ctrl.reissueReceipt);
+router.post('/receipts/:id/cancel', authorize('finance', 'update'), ctrl.cancelReceipt);
+
+// ═══ W03: Receipt CRUD ═══════════════════════════════════════
+router.get('/receipts', authorize('finance', 'read'), ctrl.listReceipts);
+router.get('/receipts/:id', authorize('finance', 'read'), ctrl.getReceipt);
+router.post('/receipts', authorize('finance', 'create'), validate(createReceiptSchema), ctrl.createReceipt);
+router.put('/receipts/:id', authorize('finance', 'update'), validate(updateReceiptSchema), ctrl.updateReceipt);
+router.delete('/receipts/:id', authorize('finance', 'delete'), ctrl.deleteReceipt);
+
+// ═══ W03: ReconciliationEntry CRUD ═══════════════════════════
+router.get('/reconciliation-entries', authorize('finance', 'read'), ctrl.listReconciliationEntries);
+router.get('/reconciliation-entries/:id', authorize('finance', 'read'), ctrl.getReconciliationEntry);
+router.post('/reconciliation-entries', authorize('finance', 'create'), validate(createReconciliationEntrySchema), ctrl.createReconciliationEntry);
+router.put('/reconciliation-entries/:id', authorize('finance', 'update'), validate(updateReconciliationEntrySchema), ctrl.updateReconciliationEntry);
+router.delete('/reconciliation-entries/:id', authorize('finance', 'delete'), ctrl.deleteReconciliationEntry);
+
+// ═══ W03: BounceRecord CRUD ══════════════════════════════════
+router.get('/bounce-records', authorize('finance', 'read'), ctrl.listBounceRecords);
+router.get('/bounce-records/:id', authorize('finance', 'read'), ctrl.getBounceRecord);
+router.post('/bounce-records', authorize('finance', 'create'), validate(createBounceRecordSchema), ctrl.createBounceRecord);
+router.put('/bounce-records/:id', authorize('finance', 'update'), validate(updateBounceRecordSchema), ctrl.updateBounceRecord);
+router.delete('/bounce-records/:id', authorize('finance', 'delete'), ctrl.deleteBounceRecord);
+
+// ═══ W03: OverpaymentRecord (action routes before CRUD :id routes) ═
+router.post('/overpayments/:id/resolve', authorize('finance', 'update'), validate(resolveOverpaymentSchema), ctrl.resolveOverpayment);
+
+// ═══ W03: OverpaymentRecord CRUD ═════════════════════════════
+router.get('/overpayments', authorize('finance', 'read'), ctrl.listOverpaymentRecords);
+router.get('/overpayments/:id', authorize('finance', 'read'), ctrl.getOverpaymentRecord);
+router.post('/overpayments', authorize('finance', 'create'), validate(createOverpaymentRecordSchema), ctrl.createOverpaymentRecord);
+router.put('/overpayments/:id', authorize('finance', 'update'), validate(updateOverpaymentRecordSchema), ctrl.updateOverpaymentRecord);
+router.delete('/overpayments/:id', authorize('finance', 'delete'), ctrl.deleteOverpaymentRecord);
+
+// ═══ W03: PaymentTransaction CRUD ════════════════════════════
+router.get('/payment-transactions', authorize('finance', 'read'), ctrl.listPaymentTransactions);
+router.get('/payment-transactions/:id', authorize('finance', 'read'), ctrl.getPaymentTransaction);
+router.post('/payment-transactions', authorize('finance', 'create'), validate(createPaymentTransactionSchema), ctrl.createPaymentTransaction);
+router.put('/payment-transactions/:id', authorize('finance', 'update'), validate(updatePaymentTransactionSchema), ctrl.updatePaymentTransaction);
+router.delete('/payment-transactions/:id', authorize('finance', 'delete'), ctrl.deletePaymentTransaction);
+
+// ═══ W03 Phase 4: Scholarship & Concession Workflow Routes ═══════════════════
+
+// Scholarship workflow actions
+router.post('/scholarships/eligibility/batch', authorize('finance', 'create'), validate(verifyScholarshipEligibilityBatchSchema), ctrl.verifyScholarshipEligibilityBatch);
+router.post('/scholarships/claims/submit-batch', authorize('finance', 'create'), validate(submitScholarshipClaimsBatchSchema), ctrl.submitScholarshipClaimsBatch);
+router.post('/scholarships/claims/poll-status', authorize('finance', 'read'), validate(pollScholarshipClaimStatusSchema), ctrl.pollScholarshipClaimStatus);
+router.post('/scholarships/disbursement/process', authorize('finance', 'update'), validate(processScholarshipDisbursementSchema), ctrl.processScholarshipDisbursement);
+router.post('/scholarship-receivables/:id/convert', authorize('finance', 'update'), ctrl.convertReceivableToLiability);
+router.post('/concessions/hardship', authorize('finance', 'create'), validate(processHardshipConcessionSchema), ctrl.processHardshipConcession);
+router.post('/concessions/merit/batch', authorize('finance', 'create'), validate(applyMeritScholarshipBatchSchema), ctrl.applyMeritScholarshipBatch);
+router.post('/concessions/staff-ward/detect', authorize('finance', 'create'), validate(detectStaffWardConcessionSchema), ctrl.detectStaffWardConcession);
+router.post('/scholarships/renewal/batch', authorize('finance', 'create'), validate(renewScholarshipsBatchSchema), ctrl.renewScholarshipsBatch);
+
+// ScholarshipEligibility CRUD
+router.get('/scholarship-eligibility', authorize('finance', 'read'), ctrl.listScholarshipEligibilities);
+router.get('/scholarship-eligibility/:id', authorize('finance', 'read'), ctrl.getScholarshipEligibility);
+router.post('/scholarship-eligibility', authorize('finance', 'create'), validate(createScholarshipEligibilitySchema), ctrl.createScholarshipEligibility);
+router.put('/scholarship-eligibility/:id', authorize('finance', 'update'), validate(updateScholarshipEligibilitySchema), ctrl.updateScholarshipEligibility);
+router.delete('/scholarship-eligibility/:id', authorize('finance', 'delete'), ctrl.deleteScholarshipEligibility);
+
+// ScholarshipClaim CRUD
+router.get('/scholarship-claims', authorize('finance', 'read'), ctrl.listScholarshipClaims);
+router.get('/scholarship-claims/:id', authorize('finance', 'read'), ctrl.getScholarshipClaim);
+router.post('/scholarship-claims', authorize('finance', 'create'), validate(createScholarshipClaimSchema), ctrl.createScholarshipClaim);
+router.put('/scholarship-claims/:id', authorize('finance', 'update'), validate(updateScholarshipClaimSchema), ctrl.updateScholarshipClaim);
+router.delete('/scholarship-claims/:id', authorize('finance', 'delete'), ctrl.deleteScholarshipClaim);
+
+// ScholarshipReceivable CRUD (action route before :id CRUD routes)
+router.get('/scholarship-receivables', authorize('finance', 'read'), ctrl.listScholarshipReceivables);
+router.get('/scholarship-receivables/:id', authorize('finance', 'read'), ctrl.getScholarshipReceivable);
+router.post('/scholarship-receivables', authorize('finance', 'create'), validate(createScholarshipReceivableSchema), ctrl.createScholarshipReceivable);
+router.put('/scholarship-receivables/:id', authorize('finance', 'update'), validate(updateScholarshipReceivableSchema), ctrl.updateScholarshipReceivable);
+router.delete('/scholarship-receivables/:id', authorize('finance', 'delete'), ctrl.deleteScholarshipReceivable);
+
+// ScholarshipCredit CRUD
+router.get('/scholarship-credits', authorize('finance', 'read'), ctrl.listScholarshipCredits);
+router.get('/scholarship-credits/:id', authorize('finance', 'read'), ctrl.getScholarshipCredit);
+router.post('/scholarship-credits', authorize('finance', 'create'), validate(createScholarshipCreditSchema), ctrl.createScholarshipCredit);
+router.put('/scholarship-credits/:id', authorize('finance', 'update'), validate(updateScholarshipCreditSchema), ctrl.updateScholarshipCredit);
+router.delete('/scholarship-credits/:id', authorize('finance', 'delete'), ctrl.deleteScholarshipCredit);
 
 export default router;
