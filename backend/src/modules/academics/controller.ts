@@ -962,3 +962,41 @@ export async function scheduleSupplementaryExams(req: AuthRequest, res: Response
     res.status(201).json(result);
   } catch (e) { next(e); }
 }
+
+// ═══ W02: Backlog Clearance ══════════════════════════════════
+
+export async function clearBacklog(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { clearedGrade, clearedInSemesterId } = req.body;
+    const result = await svc.clearBacklog(req.collegeId!, req.params.id as string, clearedGrade, clearedInSemesterId, who(req));
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+// ═══ W02: Promotion/Detention ════════════════════════════════
+
+export async function determinePromotions(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { academicYearId, year } = req.body;
+    const result = await svc.determinePromotions(req.collegeId!, academicYearId, year, who(req));
+    res.status(201).json(result);
+  } catch (e) { next(e); }
+}
+
+export async function listPromotionDecisions(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page = '1', limit = '20', academicYearId, studentId, decision } = req.query as any;
+    res.json(await svc.listPromotionDecisions(req.collegeId!, +page, +limit, academicYearId, studentId, decision, req.authScope));
+  } catch (e) { next(e); }
+}
+
+export async function getPromotionDecision(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await svc.getPromotionDecision(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }
+}
+
+export async function updatePromotionDecision(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const result = await svc.updatePromotionDecision(req.collegeId!, req.params.id as string, req.body, who(req));
+    res.json(result);
+  } catch (e) { next(e); }
+}

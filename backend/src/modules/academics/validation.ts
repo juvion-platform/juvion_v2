@@ -574,3 +574,24 @@ export const updateBacklogSchema_w02 = z.object({
 export const scheduleSupplementaryExamsSchema = z.object({
   semesterId: z.string().min(1),
 });
+
+// ═══ W02: Backlog Clearance ══════════════════════════════════
+
+export const clearBacklogSchema = z.object({
+  clearedGrade: z.string().min(1),
+  clearedInSemesterId: z.string().min(1),
+});
+
+// ═══ W02: Promotion/Detention ════════════════════════════════
+
+export const determinePromotionsSchema = z.object({
+  academicYearId: z.string().min(1),
+  year: z.number().int().min(1).max(6),
+});
+
+export const updatePromotionDecisionSchema_w02 = z.object({
+  decision: z.enum(['promoted', 'detained', 'year_back', 'graduated', 'rusticated']).optional(),
+  reason: z.string().optional(),
+  boardMeetingDate: z.string().optional(),
+  effectiveDate: z.string().optional(),
+});

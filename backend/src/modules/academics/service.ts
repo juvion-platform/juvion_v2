@@ -43,6 +43,7 @@ import { SeatingPlan } from '../../models/academic-ops/SeatingPlan';
 import { InvigilationRoster } from '../../models/academic-ops/InvigilationRoster';
 import { HallTicket } from '../../models/academic-ops/HallTicket';
 import { Backlog } from '../../models/academic-ops/Backlog';
+import { PromotionDecision } from '../../models/academic-ops/PromotionDecision';
 import { RevaluationRequest } from '../../models/academic-ops/RevaluationRequest';
 import { paginate } from '../../shared/pagination';
 import { createAuditLog } from '../../shared/audit';
@@ -3814,4 +3815,231 @@ export async function scheduleSupplementaryExams(
   });
 
   return { scheduled, registrations, backlogs: backlogSummary };
+}
+
+// ═══ W02: Backlog Clearance ══════════════════════════════════
+
+export async function clearBacklog(
+  collegeId: string,
+  backlogId: string,
+  clearedGrade: string,
+  clearedInSemesterId: string,
+  performedBy: string,
+): Promise<any> {
+  const backlog = await Backlog.findOne({ _id: backlogId, collegeId });
+  if (!backlog) throw new AppError(404, 'Backlog not found');
+  if (backlog.currentStatus === 'cleared') throw new AppError(400, 'Backlog is already cleared');
+
+  backlog.currentStatus = 'cleared';
+  backlog.clearedGrade = clearedGrade;
+  backlog.clearedInSemesterId = clearedInSemesterId as any;
+  backlog.clearedAt = new Date();
+  await backlog.save();
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'Backlog',
+    entityId: String(backlog._id),
+    entityName: `Backlog ${String(backlog._id)}`,
+    action: 'update',
+    changes: [
+      { field: 'currentStatus', displayName: 'Status', oldValue: 'active', newValue: 'cleared' },
+      { field: 'clearedGrade', displayName: 'Cleared Grade', oldValue: null, newValue: clearedGrade },
+    ],
+    performedBy,
+  });
+
+  return backlog;
+}
+
+// ═══ W02: Promotion/Detention ════════════════════════════════
+
+export async function determinePromotions(
+  collegeId: string,
+  academicYearId: string,
+  year: number,
+  performedBy: string,
+): Promise<{
+  processed: number;
+  promoted: number;
+  detained: number;
+  decisions: Array<{
+    studentId: string;
+    decision: string;
+    totalBacklogs: number;
+    reason: string;
+  }>;
+}> {
+  // 1. Get semesters for this academic year
+  const semesters = await Semester.find({ collegeId, academicYearId }).lean();
+  const semesterIds = semesters.map((s) => s._id);
+
+  if (semesterIds.length === 0) {
+    return { processed: 0, promoted: 0, detained: 0, decisions: [] };
+  }
+
+  // 2. Get distinct students who have SemesterResults for these semesters
+  const semesterResults = await SemesterResult.find({
+    collegeId,
+    semesterId: { $in: semesterIds },
+  }).lean();
+
+  const studentIdSet = new Set(semesterResults.map((r) => String(r.studentId)));
+  const studentIds = Array.from(studentIdSet);
+
+  const MAX_YEAR = 4; // BTech standard
+  const decisions: Array<{ studentId: string; decision: string; totalBacklogs: number; reason: string }> = [];
+  let promoted = 0;
+  let detained = 0;
+
+  for (const studentId of studentIds) {
+    // 2a. Count active backlogs
+    const totalBacklogs = await Backlog.countDocuments({
+      collegeId,
+      studentId,
+      currentStatus: { $ne: 'cleared' },
+    });
+
+    // 2b. Apply promotion rules
+    let decision: string;
+    let toYear: number | null = null;
+    let reason: string;
+
+    if (year >= MAX_YEAR && totalBacklogs === 0) {
+      decision = 'graduated';
+      reason = 'All criteria met for graduation';
+    } else if (totalBacklogs === 0) {
+      decision = 'promoted';
+      toYear = year + 1;
+      reason = 'No active backlogs';
+    } else if (totalBacklogs >= 1 && totalBacklogs <= 4) {
+      decision = 'promoted';
+      toYear = year + 1;
+      reason = `Promoted with ${totalBacklogs} backlog${totalBacklogs > 1 ? 's' : ''}`;
+    } else {
+      decision = 'detained';
+      reason = `Detained: ${totalBacklogs} active backlogs (exceeds limit of 4)`;
+    }
+
+    if (decision === 'detained') {
+      detained++;
+    } else {
+      promoted++;
+    }
+
+    // 2c. Upsert PromotionDecision
+    await PromotionDecision.findOneAndUpdate(
+      { collegeId, studentId, academicYearId },
+      {
+        collegeId,
+        studentId,
+        academicYearId,
+        fromYear: year,
+        toYear: toYear ?? undefined,
+        decision,
+        reason,
+        totalBacklogs,
+      },
+      { upsert: true, new: true },
+    );
+
+    // 2d. Update SemesterResults for this student's semesters in this academic year
+    const promotionStatus = decision === 'graduated' ? 'graduated' : decision;
+    await SemesterResult.updateMany(
+      { collegeId, studentId, semesterId: { $in: semesterIds } },
+      { promotionStatus },
+    );
+
+    decisions.push({ studentId, decision, totalBacklogs, reason });
+  }
+
+  // 3. Audit log
+  await createAuditLog({
+    collegeId,
+    entityType: 'PromotionDecision',
+    entityId: academicYearId,
+    entityName: `Promotion Determination - Year ${year}`,
+    action: 'create',
+    changes: [
+      {
+        field: 'promotionDetermination',
+        displayName: 'Promotion Determination',
+        oldValue: null,
+        newValue: `Processed: ${studentIds.length}, Promoted: ${promoted}, Detained: ${detained}`,
+      },
+    ],
+    performedBy,
+  });
+
+  return { processed: studentIds.length, promoted, detained, decisions };
+}
+
+export async function listPromotionDecisions(
+  collegeId: string,
+  page: number,
+  limit: number,
+  academicYearId?: string,
+  studentId?: string,
+  decision?: string,
+  authScope?: any,
+) {
+  const filter: FilterQuery<any> = { collegeId };
+  if (academicYearId) filter['academicYearId'] = academicYearId;
+  if (studentId) filter['studentId'] = studentId;
+  if (decision) filter['decision'] = decision;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
+  return paginate(PromotionDecision, filter, page, limit, { createdAt: -1 }, [STUDENT_POPULATE, 'academicYearId'] as any);
+}
+
+export async function getPromotionDecision(collegeId: string, id: string) {
+  const doc = await PromotionDecision.findOne({ _id: id, collegeId })
+    .populate(STUDENT_POPULATE)
+    .populate('academicYearId');
+  if (!doc) throw new AppError(404, 'Promotion decision not found');
+  return doc;
+}
+
+export async function updatePromotionDecision(
+  collegeId: string,
+  id: string,
+  data: {
+    decision?: string;
+    reason?: string;
+    boardMeetingDate?: string;
+    effectiveDate?: string;
+  },
+  performedBy: string,
+) {
+  const doc = await PromotionDecision.findOne({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Promotion decision not found');
+
+  const changes: Array<{ field: string; displayName: string; oldValue: any; newValue: any }> = [];
+
+  if (data.decision !== undefined && data.decision !== doc.decision) {
+    changes.push({ field: 'decision', displayName: 'Decision', oldValue: doc.decision, newValue: data.decision });
+    doc.decision = data.decision;
+  }
+  if (data.reason !== undefined) {
+    doc.reason = data.reason;
+  }
+  if (data.boardMeetingDate !== undefined) {
+    doc.boardMeetingDate = new Date(data.boardMeetingDate);
+  }
+  if (data.effectiveDate !== undefined) {
+    doc.effectiveDate = new Date(data.effectiveDate);
+  }
+
+  await doc.save();
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'PromotionDecision',
+    entityId: String(doc._id),
+    entityName: `Promotion Decision ${String(doc._id)}`,
+    action: 'update',
+    changes,
+    performedBy,
+  });
+
+  return doc;
 }

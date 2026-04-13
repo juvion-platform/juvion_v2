@@ -64,6 +64,9 @@ import {
   processRevaluationRequestSchema,
   updateBacklogSchema_w02,
   scheduleSupplementaryExamsSchema,
+  clearBacklogSchema,
+  determinePromotionsSchema,
+  updatePromotionDecisionSchema_w02,
 } from './validation';
 
 const router = Router();
@@ -390,5 +393,14 @@ router.put('/backlogs/:id', authorize('academics', 'update'), validate(updateBac
 
 // ═══ W02: Supplementary Exams ═══════════════════════════════
 router.post('/supplementary-exams/schedule', authorize('academics', 'create'), validate(scheduleSupplementaryExamsSchema), ctrl.scheduleSupplementaryExams);
+
+// ═══ W02: Backlog Clearance ══════════════════════════════════
+router.put('/backlogs/:id/clear', authorize('academics', 'update'), validate(clearBacklogSchema), ctrl.clearBacklog);
+
+// ═══ W02: Promotion/Detention ════════════════════════════════
+router.post('/promotions/determine', authorize('academics', 'create'), validate(determinePromotionsSchema), ctrl.determinePromotions);
+router.get('/promotions', authorize('academics', 'read'), ctrl.listPromotionDecisions);
+router.get('/promotions/:id', authorize('academics', 'read'), ctrl.getPromotionDecision);
+router.put('/promotions/:id', authorize('academics', 'update'), validate(updatePromotionDecisionSchema_w02), ctrl.updatePromotionDecision);
 
 export default router;
