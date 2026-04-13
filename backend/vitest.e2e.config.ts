@@ -9,6 +9,6 @@ export default defineConfig({
     hookTimeout: 30_000,
     globalSetup: ['src/__e2e__/setup/global-setup.ts'],
     pool: 'forks',
-    poolOptions: { forks: { singleFork: true } },
+    fileParallelism: false,
   },
 });

@@ -41,7 +41,7 @@ export async function createTestStudent(collegeId: string, opts?: CreateStudentO
     batchId: opts?.batchId,
     rollNumber: `24JIT${String(studentCounter).padStart(4, '0')}`,
     status: 'active',
-    onboardingStatus: 'completed',
+    onboardingStatus: 'not_started',
   });
 
   const { user, token } = await createTestUser({
