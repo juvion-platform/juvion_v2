@@ -2154,8 +2154,12 @@ export async function computeCIE(
         break;
       }
       case 'latest': {
-        // Take the most recent mark (last in date-sorted list)
-        const latest = studentMarks[studentMarks.length - 1];
+        // Take the most recent mark by date; handle optional dates
+        const withDates = studentMarks.filter((sm) => sm.date != null);
+        const sorted = withDates.length > 0
+          ? [...withDates].sort((a, b) => a.date!.getTime() - b.date!.getTime())
+          : studentMarks;
+        const latest = sorted[sorted.length - 1];
         rawMarks = latest?.marksObtained ?? 0;
         rawMaxMarks = latest?.maxMarks ?? comp.maxMarks;
         break;
@@ -2185,8 +2189,11 @@ export async function computeCIE(
   // 8. Sum all weightedMarks to get cieMarks
   const rawCIE = componentResults.reduce((sum, c) => sum + c.weightedMarks, 0);
 
-  // 9. Cap at totalCIEMarks
-  const cieMarks = Math.min(Math.round(rawCIE * 100) / 100, totalCIEMarks);
+  // 9. If incomplete, do NOT compute partial CIE — return 0
+  // Cap at totalCIEMarks for complete results
+  const cieMarks = isComplete
+    ? Math.min(Math.round(rawCIE * 100) / 100, totalCIEMarks)
+    : 0;
 
   // 10. Return breakdown
   return {
