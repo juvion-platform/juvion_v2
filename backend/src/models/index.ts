@@ -100,10 +100,14 @@ export { WelfareReferral } from './finance/WelfareReferral';
 
 // === Hr ===
 export { Appraisal } from './hr/Appraisal';
+export { AppointmentOrder } from './hr/AppointmentOrder';
+export { AttendanceAnomaly } from './hr/AttendanceAnomaly';
+export { AttendanceMonthlySummary } from './hr/AttendanceMonthlySummary';
 export { Employee } from './hr/Employee';
 export { EmployeeAttendance } from './hr/EmployeeAttendance';
 export { ExitProcess } from './hr/ExitProcess';
 export { Grievance } from './hr/Grievance';
+export { HiringRequisition } from './hr/HiringRequisition';
 export { JobApplication } from './hr/JobApplication';
 export { LeaveApplication } from './hr/LeaveApplication';
 export { LeaveBalance } from './hr/LeaveBalance';
@@ -116,6 +120,7 @@ export { Publication } from './hr/Publication';
 export { Qualification } from './hr/Qualification';
 export { Recruitment } from './hr/Recruitment';
 export { ResearchProject } from './hr/ResearchProject';
+export { SelectionCommittee } from './hr/SelectionCommittee';
 export { Training } from './hr/Training';
 export { TrainingParticipant } from './hr/TrainingParticipant';
 

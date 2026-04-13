@@ -3,6 +3,10 @@ import { Schema, model, Document } from 'mongoose';
 export interface IRecruitment extends Document {
   collegeId: Schema.Types.ObjectId;
   position: string; departmentId: Schema.Types.ObjectId; vacancies: number; qualifications: string; experience?: string; salary?: string; postedDate: Date; lastDate: Date; status: string;
+  positionType?: string;
+  requisitionId?: Schema.Types.ObjectId;
+  selectionCommitteeId?: Schema.Types.ObjectId;
+  aicteCompliant?: boolean;
 }
 
 const schema = new Schema<IRecruitment>({
@@ -16,6 +20,10 @@ const schema = new Schema<IRecruitment>({
   postedDate: { type: Date, default: Date.now },
   lastDate: { type: Date, required: true },
   status: { type: String, enum: ['open', 'closed', 'on_hold', 'filled'], default: 'open' },
+  positionType: { type: String, enum: ['faculty', 'staff'] },
+  requisitionId: { type: Schema.Types.ObjectId, ref: 'HiringRequisition' },
+  selectionCommitteeId: { type: Schema.Types.ObjectId, ref: 'SelectionCommittee' },
+  aicteCompliant: { type: Boolean, default: false },
 }, { timestamps: true });
 
 schema.index({ collegeId: 1, status: 1 });
