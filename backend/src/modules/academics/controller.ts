@@ -1,5 +1,6 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../../middleware/authenticate';
+import { AppError } from '../../middleware/errorHandler';
 import * as svc from './service';
 
 const who = (req: AuthRequest) => req.user?.name || 'System';
@@ -752,4 +753,24 @@ export async function submitQuizAttempt(req: AuthRequest, res: Response, next: N
 }
 export async function deleteQuizAttempt(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await svc.deleteQuizAttempt(req.collegeId!, req.params.id as string, who(req))); } catch (e) { next(e); }
+}
+
+// ═══ W02: Course Delivery Progress ══════════════════════════
+
+export async function updateCourseDeliveryProgress(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const result = await svc.updateCourseDeliveryProgress(
+      req.collegeId!, req.params.id as string, who(req),
+    );
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+export async function getCourseDeliveryOverview(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { semesterId } = req.query as { semesterId: string };
+    if (!semesterId) throw new AppError(400, 'semesterId query parameter is required');
+    const result = await svc.getCourseDeliveryOverview(req.collegeId!, semesterId);
+    res.json(result);
+  } catch (e) { next(e); }
 }

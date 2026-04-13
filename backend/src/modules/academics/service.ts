@@ -2492,3 +2492,83 @@ export async function deleteQuizAttempt(collegeId: string, id: string, performed
   });
   return { deleted: true };
 }
+
+// ═══ W02: Course Delivery Progress ══════════════════════════
+
+export async function updateCourseDeliveryProgress(
+  collegeId: string,
+  courseOfferingId: string,
+  _performedBy: string,
+) {
+  // 1. Verify CourseOffering exists
+  const offering = await CourseOffering.findOne({ _id: courseOfferingId, collegeId });
+  if (!offering) throw new AppError(404, 'Course offering not found');
+
+  // 2. Count lesson plans by status
+  const lessonPlans = await LessonPlan.find({ collegeId, courseOfferingId });
+  const total = lessonPlans.length;
+  if (total === 0) {
+    return { courseOfferingId, syllabusProgress: 0, totalTopics: 0, completed: 0, skipped: 0, planned: 0 };
+  }
+
+  const completed = lessonPlans.filter(lp => lp.status === 'completed').length;
+  const skipped = lessonPlans.filter(lp => lp.status === 'skipped').length;
+  const planned = lessonPlans.filter(lp => lp.status === 'planned').length;
+
+  // 3. Calculate progress = (completed / total) * 100, rounded to integer
+  const syllabusProgress = Math.round((completed / total) * 100);
+
+  // 4. Update CourseOffering
+  offering.syllabusProgress = syllabusProgress;
+  await offering.save();
+
+  return {
+    courseOfferingId,
+    syllabusProgress,
+    totalTopics: total,
+    completed,
+    skipped,
+    planned,
+  };
+}
+
+export async function getCourseDeliveryOverview(
+  collegeId: string,
+  semesterId: string,
+) {
+  // 1. Get all course offerings for this semester
+  const offerings = await CourseOffering.find({ collegeId, semesterId }).populate('courseId').lean();
+
+  // 2. For each offering, get lesson plan counts
+  const result = [];
+  for (const offering of offerings) {
+    const total = await LessonPlan.countDocuments({ collegeId, courseOfferingId: offering._id });
+    const completed = await LessonPlan.countDocuments({ collegeId, courseOfferingId: offering._id, status: 'completed' });
+
+    const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+    // 3. Compute expected progress: compare completed vs total with a flag if below 50%
+    const belowExpected = progress < 50 && total > 0;
+
+    result.push({
+      courseOfferingId: String(offering._id),
+      courseId: String(offering.courseId),
+      syllabusProgress: progress,
+      totalTopics: total,
+      completed,
+      belowExpected,
+    });
+  }
+
+  return {
+    semesterId,
+    offerings: result,
+    summary: {
+      totalOfferings: result.length,
+      belowExpectedCount: result.filter(r => r.belowExpected).length,
+      averageProgress: result.length > 0
+        ? Math.round(result.reduce((sum, r) => sum + r.syllabusProgress, 0) / result.length)
+        : 0,
+    },
+  };
+}

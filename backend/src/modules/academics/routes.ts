@@ -127,6 +127,7 @@ router.delete('/curriculum/:id', authorize('academics', 'delete'), ctrl.deleteCu
 
 // Course Offerings
 router.get('/offerings', authorize('academics', 'read'), ctrl.listCourseOfferings);
+router.get('/offerings/delivery-overview', authorize('academics', 'read'), ctrl.getCourseDeliveryOverview);
 router.get('/offerings/:id', authorize('academics', 'read'), ctrl.getCourseOffering);
 router.post('/offerings', authorize('academics', 'create'), validate(createCourseOfferingSchema), ctrl.createCourseOffering);
 router.put('/offerings/:id', authorize('academics', 'update'), validate(updateCourseOfferingSchema), ctrl.updateCourseOffering);
@@ -319,5 +320,8 @@ router.get('/quiz-attempts', authorize('academics', 'read'), ctrl.listQuizAttemp
 router.get('/quiz-attempts/:id', authorize('academics', 'read'), ctrl.getQuizAttempt);
 router.post('/quiz-attempts', authorize('academics', 'create'), validate(submitQuizAttemptSchema), ctrl.submitQuizAttempt);
 router.delete('/quiz-attempts/:id', authorize('academics', 'delete'), ctrl.deleteQuizAttempt);
+
+// ═══ W02: Course Delivery Progress ══════════════════════════
+router.post('/offerings/:id/update-progress', authorize('academics', 'update'), ctrl.updateCourseDeliveryProgress);
 
 export default router;
