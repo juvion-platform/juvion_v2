@@ -83,6 +83,7 @@ export { ReconciliationEntry } from './finance/ReconciliationEntry';
 export { BounceRecord } from './finance/BounceRecord';
 export { OverpaymentRecord } from './finance/OverpaymentRecord';
 export { Refund } from './finance/Refund';
+export { RevenueReconciliationReport } from './finance/RevenueReconciliationReport';
 export { Scholarship } from './finance/Scholarship';
 export { ScholarshipAllocation } from './finance/ScholarshipAllocation';
 export { ScholarshipClaim } from './finance/ScholarshipClaim';
