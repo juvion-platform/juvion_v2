@@ -3,6 +3,9 @@ import { Schema, model, Document } from 'mongoose';
 export interface IExamRegistration extends Document {
   collegeId: Schema.Types.ObjectId;
   studentId: Schema.Types.ObjectId; courseOfferingId: Schema.Types.ObjectId; semesterId: Schema.Types.ObjectId; examType: string; isEligible: boolean; registeredAt: Date; status: string;
+  hallTicketNumber?: string;
+  feeClearanceStatus?: string;
+  attendanceClearance?: boolean;
 }
 
 const schema = new Schema<IExamRegistration>({
@@ -14,6 +17,9 @@ const schema = new Schema<IExamRegistration>({
   isEligible: { type: Boolean, default: true },
   registeredAt: { type: Date, default: Date.now },
   status: { type: String, enum: ['registered', 'approved', 'rejected', 'appeared', 'absent'], default: 'registered' },
+  hallTicketNumber: { type: String },
+  feeClearanceStatus: { type: String, enum: ['pending', 'cleared', 'outstanding'], default: 'pending' },
+  attendanceClearance: { type: Boolean, default: false },
 }, { timestamps: true });
 
 schema.index({ collegeId: 1, studentId: 1, semesterId: 1 });
