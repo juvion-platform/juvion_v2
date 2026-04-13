@@ -1,0 +1,5 @@
+import { Schema, model, Document } from 'mongoose';
+export interface IMaintenanceAssignment extends Document { collegeId: Schema.Types.ObjectId; requestId: Schema.Types.ObjectId; assignedToType: string; assignedToId: Schema.Types.ObjectId; assignedToName?: string; slaDeadline: Date; startedAt?: Date; completedAt?: Date; status: string; remarks?: string; }
+const schema = new Schema<IMaintenanceAssignment>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, requestId: { type: Schema.Types.ObjectId, ref: 'MaintenanceRequest', required: true }, assignedToType: { type: String, enum: ['in_house', 'amc_vendor', 'external'], required: true }, assignedToId: { type: Schema.Types.ObjectId, required: true }, assignedToName: String, slaDeadline: { type: Date, required: true }, startedAt: Date, completedAt: Date, status: { type: String, enum: ['assigned', 'in_progress', 'completed', 'rework'], default: 'assigned' }, remarks: String }, { timestamps: true });
+schema.index({ collegeId: 1, requestId: 1 });
+export const MaintenanceAssignment = model<IMaintenanceAssignment>('MaintenanceAssignment', schema);

@@ -1,0 +1,5 @@
+import { Schema, model, Document } from 'mongoose';
+export interface IMaintenanceWorkLog extends Document { collegeId: Schema.Types.ObjectId; assignmentId: Schema.Types.ObjectId; workDate: Date; hoursSpent: number; description: string; materialsUsed: { name?: string; quantity?: number; cost?: number }[]; cost: number; loggedBy: string; }
+const schema = new Schema<IMaintenanceWorkLog>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, assignmentId: { type: Schema.Types.ObjectId, ref: 'MaintenanceAssignment', required: true }, workDate: { type: Date, required: true }, hoursSpent: { type: Number, required: true }, description: { type: String, required: true }, materialsUsed: [new Schema({ name: String, quantity: Number, cost: Number }, { _id: false })], cost: { type: Number, default: 0 }, loggedBy: { type: String, required: true } }, { timestamps: true });
+schema.index({ collegeId: 1, assignmentId: 1 });
+export const MaintenanceWorkLog = model<IMaintenanceWorkLog>('MaintenanceWorkLog', schema);

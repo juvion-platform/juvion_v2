@@ -1,0 +1,5 @@
+import { Schema, model, Document } from 'mongoose';
+export interface ILabEquipment extends Document { collegeId: Schema.Types.ObjectId; labId: Schema.Types.ObjectId; name: string; serialNumber: string; manufacturer?: string; equipmentModel?: string; purchaseDate?: Date; purchaseCost?: number; condition: string; lastMaintenance?: Date; nextCalibration?: Date; status: string; }
+const schema = new Schema<ILabEquipment>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, labId: { type: Schema.Types.ObjectId, ref: 'Lab', required: true }, name: { type: String, required: true }, serialNumber: { type: String, required: true }, manufacturer: String, equipmentModel: String, purchaseDate: Date, purchaseCost: Number, condition: { type: String, enum: ['new', 'good', 'fair', 'poor'], default: 'good' }, lastMaintenance: Date, nextCalibration: Date, status: { type: String, enum: ['active', 'maintenance', 'calibration_due', 'condemned'], default: 'active' } }, { timestamps: true });
+schema.index({ collegeId: 1, serialNumber: 1 }, { unique: true });
+export const LabEquipment = model<ILabEquipment>('LabEquipment', schema);

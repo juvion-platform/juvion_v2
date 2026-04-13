@@ -41,6 +41,34 @@ import {
   createEResourceSchema, updateEResourceSchema,
   createEResourceAccessSchema, updateEResourceAccessSchema,
   createPeriodicalSubscriptionSchema, updatePeriodicalSubscriptionSchema,
+  // Hostel workflow schemas
+  allocateHostelBulkSchema, allocateHostelSingleSchema, submitRoomChangeRequestSchema,
+  approveRoomChangeSchema, verifyHostelClearanceSchema, recordHostelAttendanceBulkSchema,
+  submitHostelLeaveSchema, rejectHostelLeaveSchema, reportViolationSchema,
+  scheduleHearingSchema, assignPenaltySchema, fileAppealSchema, resolveAppealSchema,
+  escalateWardenConcernSchema,
+  // Library workflow schemas
+  issueBookSchema, returnBookSchema, renewBookSchema, reportBookLostSchema,
+  reserveBookSchema, initiateLibraryClearanceSchema, recordLibraryEntrySchema,
+  // Mess workflow schemas
+  recordMealTransactionSchema, addCouponCreditSchema, qualityInspectionWorkflowSchema,
+  terminateContractSchema,
+  // Transport workflow schemas
+  allocateTransportBulkSchema, allocateTransportSingleSchema,
+  recordTransportAttendanceSchema, adjustRouteSchema,
+  // Labs workflow schemas
+  registerLabEquipmentSchema, updateEquipmentStatusSchema, recordEquipmentMaintenanceSchema,
+  requestLabSlotBookingSchema, issueEquipmentSchema, returnEquipmentSchema,
+  reportLabIncidentSchema, resolveLabIncidentSchema,
+  // Facilities workflow schemas
+  requestFacilityBookingSchema, rejectBookingSchema, recordFacilityUsageSchema,
+  reportCampusIncidentSchema, resolveCampusIncidentSchema,
+  // Maintenance workflow schemas
+  submitMaintenanceRequestSchema, triageMaintenanceRequestSchema,
+  createMaintenanceAssignmentSchema_wf, addMaintenanceWorkLogSchema,
+  verifyMaintenanceWorkSchema, triggerPreventiveMaintenanceSchema,
+  createMaintenanceEscalationSchema_wf, calculateVendorPerformanceSchema,
+  provisionInfrastructureSchema,
 } from './validation';
 
 const router = Router();
@@ -319,5 +347,313 @@ router.get('/periodical-subscriptions/:id', authorize('campus', 'read', { subDom
 router.post('/periodical-subscriptions', authorize('campus', 'create', { subDomain: 'library' }), validate(createPeriodicalSubscriptionSchema), ctrl.createPeriodicalSubscription);
 router.put('/periodical-subscriptions/:id', authorize('campus', 'update', { subDomain: 'library' }), validate(updatePeriodicalSubscriptionSchema), ctrl.updatePeriodicalSubscription);
 router.delete('/periodical-subscriptions/:id', authorize('campus', 'delete', { subDomain: 'library' }), ctrl.deletePeriodicalSubscription);
+
+// ═══════════════════════════════════════════════════════════
+// HOSTEL WORKFLOW ROUTES
+// ═══════════════════════════════════════════════════════════
+router.post('/hostel/allocate-bulk', authorize('campus', 'create', { subDomain: 'hostel' }), validate(allocateHostelBulkSchema), ctrl.allocateHostelBulkCtrl);
+router.post('/hostel/allocate', authorize('campus', 'create', { subDomain: 'hostel' }), validate(allocateHostelSingleSchema), ctrl.allocateHostelSingleCtrl);
+router.post('/hostel/room-change-requests', authorize('campus', 'create', { subDomain: 'hostel' }), validate(submitRoomChangeRequestSchema), ctrl.submitRoomChangeRequestCtrl);
+router.put('/hostel/room-change-requests/:id/approve', authorize('campus', 'update', { subDomain: 'hostel' }), validate(approveRoomChangeSchema), ctrl.approveRoomChangeCtrl);
+router.put('/hostel/room-change-requests/:id/reject', authorize('campus', 'update', { subDomain: 'hostel' }), ctrl.rejectRoomChangeCtrl);
+router.post('/hostel/clearance/:studentId', authorize('campus', 'create', { subDomain: 'hostel' }), ctrl.initiateHostelClearanceCtrl);
+router.put('/hostel/clearance/:id/verify', authorize('campus', 'update', { subDomain: 'hostel' }), validate(verifyHostelClearanceSchema), ctrl.verifyHostelClearanceCtrl);
+router.get('/hostel/clearance/:studentId', authorize('campus', 'read', { subDomain: 'hostel' }), ctrl.getHostelClearanceStatusCtrl);
+router.post('/hostel/attendance/record', authorize('campus', 'create', { subDomain: 'hostel' }), validate(recordHostelAttendanceBulkSchema), ctrl.recordHostelAttendanceBulkCtrl);
+router.get('/hostel/attendance/anomalies', authorize('campus', 'read', { subDomain: 'hostel' }), ctrl.getAttendanceAnomaliesCtrl);
+router.post('/hostel/leave-requests', authorize('campus', 'create', { subDomain: 'hostel' }), validate(submitHostelLeaveSchema), ctrl.submitHostelLeaveCtrl);
+router.put('/hostel/leave-requests/:id/approve', authorize('campus', 'update', { subDomain: 'hostel' }), ctrl.approveHostelLeaveCtrl);
+router.put('/hostel/leave-requests/:id/reject', authorize('campus', 'update', { subDomain: 'hostel' }), validate(rejectHostelLeaveSchema), ctrl.rejectHostelLeaveCtrl);
+router.put('/hostel/leave-requests/:id/return', authorize('campus', 'update', { subDomain: 'hostel' }), ctrl.recordHostelLeaveReturnCtrl);
+router.post('/hostel/violations', authorize('campus', 'create', { subDomain: 'hostel' }), validate(reportViolationSchema), ctrl.reportViolationCtrl);
+router.put('/hostel/violations/:id/investigate', authorize('campus', 'update', { subDomain: 'hostel' }), ctrl.investigateViolationCtrl);
+router.put('/hostel/violations/:id/hearing', authorize('campus', 'update', { subDomain: 'hostel' }), validate(scheduleHearingSchema), ctrl.scheduleHearingCtrl);
+router.put('/hostel/violations/:id/penalize', authorize('campus', 'update', { subDomain: 'hostel' }), validate(assignPenaltySchema), ctrl.assignPenaltyCtrl);
+router.put('/hostel/violations/:id/dismiss', authorize('campus', 'update', { subDomain: 'hostel' }), ctrl.dismissViolationCtrl);
+router.post('/hostel/appeals', authorize('campus', 'create', { subDomain: 'hostel' }), validate(fileAppealSchema), ctrl.fileAppealCtrl);
+router.put('/hostel/appeals/:id/resolve', authorize('campus', 'update', { subDomain: 'hostel' }), validate(resolveAppealSchema), ctrl.resolveAppealCtrl);
+router.post('/hostel/welfare-signals', authorize('campus', 'create', { subDomain: 'hostel' }), validate(escalateWardenConcernSchema), ctrl.escalateWardenConcernCtrl);
+
+// Hostel CRUD
+router.get('/beds', authorize('campus', 'read', { subDomain: 'hostel' }), ctrl.listBedsCtrl);
+router.get('/beds/:id', authorize('campus', 'read', { subDomain: 'hostel' }), ctrl.getBedCtrl);
+router.post('/beds', authorize('campus', 'create', { subDomain: 'hostel' }), ctrl.createBedCtrl);
+router.put('/beds/:id', authorize('campus', 'update', { subDomain: 'hostel' }), ctrl.updateBedCtrl);
+router.delete('/beds/:id', authorize('campus', 'delete', { subDomain: 'hostel' }), ctrl.deleteBedCtrl);
+
+// ═══════════════════════════════════════════════════════════
+// LIBRARY WORKFLOW ROUTES
+// ═══════════════════════════════════════════════════════════
+router.post('/library/issue', authorize('campus', 'create', { subDomain: 'library' }), validate(issueBookSchema), ctrl.issueBookCtrl);
+router.post('/library/return', authorize('campus', 'create', { subDomain: 'library' }), validate(returnBookSchema), ctrl.returnBookCtrl);
+router.post('/library/renew', authorize('campus', 'create', { subDomain: 'library' }), validate(renewBookSchema), ctrl.renewBookCtrl);
+router.post('/library/lost', authorize('campus', 'create', { subDomain: 'library' }), validate(reportBookLostSchema), ctrl.reportBookLostCtrl);
+router.post('/library/reserve', authorize('campus', 'create', { subDomain: 'library' }), validate(reserveBookSchema), ctrl.reserveBookCtrl);
+router.put('/library/reservations/:id/pickup', authorize('campus', 'update', { subDomain: 'library' }), ctrl.pickupReservationCtrl);
+router.put('/library/reservations/:id/cancel', authorize('campus', 'update', { subDomain: 'library' }), ctrl.cancelReservationCtrl);
+router.post('/library/clearance/:personId', authorize('campus', 'create', { subDomain: 'library' }), validate(initiateLibraryClearanceSchema), ctrl.initiateLibraryClearanceCtrl);
+router.get('/library/clearance/:personId', authorize('campus', 'read', { subDomain: 'library' }), ctrl.getLibraryClearanceStatusCtrl);
+router.post('/library/visits/entry', authorize('campus', 'create', { subDomain: 'library' }), validate(recordLibraryEntrySchema), ctrl.recordLibraryEntryCtrl);
+router.put('/library/visits/:id/exit', authorize('campus', 'update', { subDomain: 'library' }), ctrl.recordLibraryExitCtrl);
+router.get('/library/visits/stats', authorize('campus', 'read', { subDomain: 'library' }), ctrl.getLibraryVisitStatsCtrl);
+
+// Library Clearances CRUD
+router.get('/library-clearances', authorize('campus', 'read', { subDomain: 'library' }), ctrl.listLibraryClearancesCtrl);
+router.get('/library-clearances/:id', authorize('campus', 'read', { subDomain: 'library' }), ctrl.getLibraryClearanceCtrl);
+router.post('/library-clearances', authorize('campus', 'create', { subDomain: 'library' }), ctrl.createLibraryClearanceCtrl);
+router.put('/library-clearances/:id', authorize('campus', 'update', { subDomain: 'library' }), ctrl.updateLibraryClearanceCtrl);
+router.delete('/library-clearances/:id', authorize('campus', 'delete', { subDomain: 'library' }), ctrl.deleteLibraryClearanceCtrl);
+
+// ═══════════════════════════════════════════════════════════
+// MESS WORKFLOW ROUTES
+// ═══════════════════════════════════════════════════════════
+router.post('/mess/meal-transactions', authorize('campus', 'create', { subDomain: 'mess' }), validate(recordMealTransactionSchema), ctrl.recordMealTransactionCtrl);
+router.post('/mess/meal-attendance', authorize('campus', 'create', { subDomain: 'mess' }), ctrl.recordMealAttendanceCtrl);
+router.get('/mess/daily-summary', authorize('campus', 'read', { subDomain: 'mess' }), ctrl.getMessDailySummaryCtrl);
+router.post('/mess/coupon-credit', authorize('campus', 'create', { subDomain: 'mess' }), validate(addCouponCreditSchema), ctrl.addCouponCreditCtrl);
+router.post('/mess/menus', authorize('campus', 'create', { subDomain: 'mess' }), ctrl.createMenuCtrl);
+router.put('/mess/menus/:id/approve', authorize('campus', 'update', { subDomain: 'mess' }), ctrl.approveMenuCtrl);
+router.put('/mess/menus/:id/publish', authorize('campus', 'update', { subDomain: 'mess' }), ctrl.publishMenuCtrl);
+router.post('/mess/quality-inspections', authorize('campus', 'create', { subDomain: 'mess' }), validate(qualityInspectionWorkflowSchema), ctrl.recordQualityInspectionCtrl);
+router.get('/mess/quality-trend', authorize('campus', 'read', { subDomain: 'mess' }), ctrl.getQualityTrendCtrl);
+router.post('/mess/vendor-contracts', authorize('campus', 'create', { subDomain: 'mess' }), ctrl.createMessVendorContractCtrl);
+router.put('/mess/vendor-contracts/:id/activate', authorize('campus', 'update', { subDomain: 'mess' }), ctrl.activateMessVendorContractCtrl);
+router.put('/mess/vendor-contracts/:id/terminate', authorize('campus', 'update', { subDomain: 'mess' }), validate(terminateContractSchema), ctrl.terminateMessVendorContractCtrl);
+
+// Mess Facilities CRUD
+router.get('/mess-facilities', authorize('campus', 'read', { subDomain: 'mess' }), ctrl.listMessFacilitiesCtrl);
+router.get('/mess-facilities/:id', authorize('campus', 'read', { subDomain: 'mess' }), ctrl.getMessFacilityCtrl);
+router.post('/mess-facilities', authorize('campus', 'create', { subDomain: 'mess' }), ctrl.createMessFacilityCtrl);
+router.put('/mess-facilities/:id', authorize('campus', 'update', { subDomain: 'mess' }), ctrl.updateMessFacilityCtrl);
+router.delete('/mess-facilities/:id', authorize('campus', 'delete', { subDomain: 'mess' }), ctrl.deleteMessFacilityCtrl);
+
+// Meal Transactions CRUD (immutable — list/get only)
+router.get('/meal-transactions', authorize('campus', 'read', { subDomain: 'mess' }), ctrl.listMealTransactionsCtrl);
+router.get('/meal-transactions/:id', authorize('campus', 'read', { subDomain: 'mess' }), ctrl.getMealTransactionCtrl);
+
+// Mess Subscriptions CRUD
+router.get('/mess-subscriptions', authorize('campus', 'read', { subDomain: 'mess' }), ctrl.listMessSubscriptionsCtrl);
+router.get('/mess-subscriptions/:id', authorize('campus', 'read', { subDomain: 'mess' }), ctrl.getMessSubscriptionCtrl);
+router.post('/mess-subscriptions', authorize('campus', 'create', { subDomain: 'mess' }), ctrl.createMessSubscriptionCtrl);
+router.put('/mess-subscriptions/:id', authorize('campus', 'update', { subDomain: 'mess' }), ctrl.updateMessSubscriptionCtrl);
+router.delete('/mess-subscriptions/:id', authorize('campus', 'delete', { subDomain: 'mess' }), ctrl.deleteMessSubscriptionCtrl);
+
+// Dietary Preferences CRUD
+router.get('/dietary-preferences', authorize('campus', 'read', { subDomain: 'mess' }), ctrl.listDietaryPreferencesCtrl);
+router.get('/dietary-preferences/:id', authorize('campus', 'read', { subDomain: 'mess' }), ctrl.getDietaryPreferenceCtrl);
+router.post('/dietary-preferences', authorize('campus', 'create', { subDomain: 'mess' }), ctrl.createDietaryPreferenceCtrl);
+router.put('/dietary-preferences/:id', authorize('campus', 'update', { subDomain: 'mess' }), ctrl.updateDietaryPreferenceCtrl);
+router.delete('/dietary-preferences/:id', authorize('campus', 'delete', { subDomain: 'mess' }), ctrl.deleteDietaryPreferenceCtrl);
+
+// Quality Inspections CRUD
+router.get('/quality-inspections', authorize('campus', 'read', { subDomain: 'mess' }), ctrl.listQualityInspectionsCtrl);
+router.get('/quality-inspections/:id', authorize('campus', 'read', { subDomain: 'mess' }), ctrl.getQualityInspectionCtrl);
+router.post('/quality-inspections', authorize('campus', 'create', { subDomain: 'mess' }), ctrl.createQualityInspectionRecordCtrl);
+router.put('/quality-inspections/:id', authorize('campus', 'update', { subDomain: 'mess' }), ctrl.updateQualityInspectionCtrl);
+router.delete('/quality-inspections/:id', authorize('campus', 'delete', { subDomain: 'mess' }), ctrl.deleteQualityInspectionCtrl);
+
+// Mess Vendor Contracts CRUD
+router.get('/mess-vendor-contracts', authorize('campus', 'read', { subDomain: 'mess' }), ctrl.listMessVendorContractsCtrl);
+router.get('/mess-vendor-contracts/:id', authorize('campus', 'read', { subDomain: 'mess' }), ctrl.getMessVendorContractByIdCtrl);
+router.put('/mess-vendor-contracts/:id', authorize('campus', 'update', { subDomain: 'mess' }), ctrl.updateMessVendorContractRecordCtrl);
+router.delete('/mess-vendor-contracts/:id', authorize('campus', 'delete', { subDomain: 'mess' }), ctrl.deleteMessVendorContractCtrl);
+
+// ═══════════════════════════════════════════════════════════
+// TRANSPORT WORKFLOW ROUTES
+// ═══════════════════════════════════════════════════════════
+router.post('/transport/allocate-bulk', authorize('campus', 'create', { subDomain: 'transport' }), validate(allocateTransportBulkSchema), ctrl.allocateTransportBulkCtrl);
+router.post('/transport/allocate', authorize('campus', 'create', { subDomain: 'transport' }), validate(allocateTransportSingleSchema), ctrl.allocateTransportSingleCtrl);
+router.post('/transport/clearance/:studentId', authorize('campus', 'create', { subDomain: 'transport' }), ctrl.initiateTransportClearanceCtrl);
+router.get('/transport/clearance/:studentId', authorize('campus', 'read', { subDomain: 'transport' }), ctrl.getTransportClearanceStatusCtrl);
+router.post('/transport/trip-logs', authorize('campus', 'create', { subDomain: 'transport' }), ctrl.createTripLogCtrl);
+router.put('/transport/trip-logs/:id/start', authorize('campus', 'update', { subDomain: 'transport' }), ctrl.startTripCtrl);
+router.put('/transport/trip-logs/:id/complete', authorize('campus', 'update', { subDomain: 'transport' }), ctrl.completeTripCtrl);
+router.post('/transport/attendance', authorize('campus', 'create', { subDomain: 'transport' }), validate(recordTransportAttendanceSchema), ctrl.recordTransportAttendanceCtrl);
+router.put('/transport/routes/:id/adjust', authorize('campus', 'update', { subDomain: 'transport' }), validate(adjustRouteSchema), ctrl.adjustRouteCtrl);
+router.get('/transport/route-utilization', authorize('campus', 'read', { subDomain: 'transport' }), ctrl.getRouteUtilizationCtrl);
+router.post('/transport/contractor-contracts', authorize('campus', 'create', { subDomain: 'transport' }), ctrl.createTransportContractorContractCtrl);
+router.put('/transport/contractor-contracts/:id/activate', authorize('campus', 'update', { subDomain: 'transport' }), ctrl.activateTransportContractCtrl);
+router.put('/transport/contractor-contracts/:id/terminate', authorize('campus', 'update', { subDomain: 'transport' }), validate(terminateContractSchema), ctrl.terminateTransportContractCtrl);
+
+// Route Stops CRUD
+router.get('/route-stops', authorize('campus', 'read', { subDomain: 'transport' }), ctrl.listRouteStopsCtrl);
+router.get('/route-stops/:id', authorize('campus', 'read', { subDomain: 'transport' }), ctrl.getRouteStopCtrl);
+router.post('/route-stops', authorize('campus', 'create', { subDomain: 'transport' }), ctrl.createRouteStopCtrl);
+router.put('/route-stops/:id', authorize('campus', 'update', { subDomain: 'transport' }), ctrl.updateRouteStopCtrl);
+router.delete('/route-stops/:id', authorize('campus', 'delete', { subDomain: 'transport' }), ctrl.deleteRouteStopCtrl);
+
+// Drivers CRUD
+router.get('/drivers', authorize('campus', 'read', { subDomain: 'transport' }), ctrl.listDriversCtrl);
+router.get('/drivers/:id', authorize('campus', 'read', { subDomain: 'transport' }), ctrl.getDriverCtrl);
+router.post('/drivers', authorize('campus', 'create', { subDomain: 'transport' }), ctrl.createDriverCtrl);
+router.put('/drivers/:id', authorize('campus', 'update', { subDomain: 'transport' }), ctrl.updateDriverCtrl);
+router.delete('/drivers/:id', authorize('campus', 'delete', { subDomain: 'transport' }), ctrl.deleteDriverCtrl);
+
+// Trip Logs CRUD
+router.get('/trip-logs', authorize('campus', 'read', { subDomain: 'transport' }), ctrl.listTripLogsCtrl);
+router.get('/trip-logs/:id', authorize('campus', 'read', { subDomain: 'transport' }), ctrl.getTripLogCtrl);
+router.post('/trip-logs', authorize('campus', 'create', { subDomain: 'transport' }), ctrl.createTripLogCtrl);
+router.put('/trip-logs/:id', authorize('campus', 'update', { subDomain: 'transport' }), ctrl.updateTripLogCtrl);
+router.delete('/trip-logs/:id', authorize('campus', 'delete', { subDomain: 'transport' }), ctrl.deleteTripLogCtrl);
+
+// Transport Attendance CRUD (immutable — list/get only)
+router.get('/transport-attendance', authorize('campus', 'read', { subDomain: 'transport' }), ctrl.listTransportAttendancesCtrl);
+router.get('/transport-attendance/:id', authorize('campus', 'read', { subDomain: 'transport' }), ctrl.getTransportAttendanceCtrl);
+
+// Transport Contractors CRUD
+router.get('/transport-contractors', authorize('campus', 'read', { subDomain: 'transport' }), ctrl.listTransportContractorsCtrl);
+router.get('/transport-contractors/:id', authorize('campus', 'read', { subDomain: 'transport' }), ctrl.getTransportContractorCtrl);
+// TransportContractor CRUD create handled via workflow (createTransportContractorContractCtrl)
+router.put('/transport-contractors/:id', authorize('campus', 'update', { subDomain: 'transport' }), ctrl.updateTransportContractorCtrl);
+router.delete('/transport-contractors/:id', authorize('campus', 'delete', { subDomain: 'transport' }), ctrl.deleteTransportContractorCtrl);
+
+// Transport Clearances CRUD
+router.get('/transport-clearances', authorize('campus', 'read', { subDomain: 'transport' }), ctrl.listTransportClearancesCtrl);
+router.get('/transport-clearances/:id', authorize('campus', 'read', { subDomain: 'transport' }), ctrl.getTransportClearanceCtrl);
+// TransportClearance create handled via workflow (initiateTransportClearanceCtrl)
+router.put('/transport-clearances/:id', authorize('campus', 'update', { subDomain: 'transport' }), ctrl.updateTransportClearanceCtrl);
+router.delete('/transport-clearances/:id', authorize('campus', 'delete', { subDomain: 'transport' }), ctrl.deleteTransportClearanceCtrl);
+
+// ═══════════════════════════════════════════════════════════
+// LABS WORKFLOW ROUTES
+// ═══════════════════════════════════════════════════════════
+router.post('/labs/register-equipment', authorize('campus', 'create', { subDomain: 'labs' }), validate(registerLabEquipmentSchema), ctrl.registerLabEquipmentCtrl);
+router.put('/labs/equipment/:id/status', authorize('campus', 'update', { subDomain: 'labs' }), validate(updateEquipmentStatusSchema), ctrl.updateEquipmentStatusCtrl);
+router.post('/labs/equipment-maintenance', authorize('campus', 'create', { subDomain: 'labs' }), validate(recordEquipmentMaintenanceSchema), ctrl.recordEquipmentMaintenanceCtrl);
+router.get('/labs/equipment-due-calibration', authorize('campus', 'read', { subDomain: 'labs' }), ctrl.getEquipmentDueForCalibrationCtrl);
+router.post('/labs/slot-bookings', authorize('campus', 'create', { subDomain: 'labs' }), validate(requestLabSlotBookingSchema), ctrl.requestLabSlotBookingCtrl);
+router.put('/labs/slot-bookings/:id/approve', authorize('campus', 'update', { subDomain: 'labs' }), ctrl.approveLabSlotBookingCtrl);
+router.put('/labs/slot-bookings/:id/reject', authorize('campus', 'update', { subDomain: 'labs' }), ctrl.rejectLabSlotBookingCtrl);
+router.put('/labs/slot-bookings/:id/complete', authorize('campus', 'update', { subDomain: 'labs' }), ctrl.completeLabSlotBookingCtrl);
+router.put('/labs/slot-bookings/:id/cancel', authorize('campus', 'update', { subDomain: 'labs' }), ctrl.cancelLabSlotBookingCtrl);
+router.post('/labs/equipment-issues', authorize('campus', 'create', { subDomain: 'labs' }), validate(issueEquipmentSchema), ctrl.issueEquipmentCtrl);
+router.put('/labs/equipment-issues/:id/return', authorize('campus', 'update', { subDomain: 'labs' }), validate(returnEquipmentSchema), ctrl.returnEquipmentCtrl);
+router.get('/labs/overdue-equipment', authorize('campus', 'read', { subDomain: 'labs' }), ctrl.getOverdueEquipmentCtrl);
+router.post('/labs/incidents', authorize('campus', 'create', { subDomain: 'labs' }), validate(reportLabIncidentSchema), ctrl.reportLabIncidentCtrl);
+router.put('/labs/incidents/:id/investigate', authorize('campus', 'update', { subDomain: 'labs' }), ctrl.investigateLabIncidentCtrl);
+router.put('/labs/incidents/:id/resolve', authorize('campus', 'update', { subDomain: 'labs' }), validate(resolveLabIncidentSchema), ctrl.resolveLabIncidentCtrl);
+router.put('/labs/incidents/:id/close', authorize('campus', 'update', { subDomain: 'labs' }), ctrl.closeLabIncidentCtrl);
+router.post('/labs/clearance/:studentId', authorize('campus', 'create', { subDomain: 'labs' }), ctrl.initiateLabClearanceCtrl);
+router.get('/labs/clearance/:studentId', authorize('campus', 'read', { subDomain: 'labs' }), ctrl.getLabClearanceStatusCtrl);
+
+// Lab Equipment CRUD
+router.get('/lab-equipment', authorize('campus', 'read', { subDomain: 'labs' }), ctrl.listLabEquipmentCtrl);
+router.get('/lab-equipment/:id', authorize('campus', 'read', { subDomain: 'labs' }), ctrl.getLabEquipmentCtrl);
+router.post('/lab-equipment', authorize('campus', 'create', { subDomain: 'labs' }), ctrl.createLabEquipmentCtrl);
+router.put('/lab-equipment/:id', authorize('campus', 'update', { subDomain: 'labs' }), ctrl.updateLabEquipmentCtrl);
+router.delete('/lab-equipment/:id', authorize('campus', 'delete', { subDomain: 'labs' }), ctrl.deleteLabEquipmentCtrl);
+
+// Lab Slot Bookings CRUD
+router.get('/lab-slot-bookings', authorize('campus', 'read', { subDomain: 'labs' }), ctrl.listLabSlotBookingsCtrl);
+router.get('/lab-slot-bookings/:id', authorize('campus', 'read', { subDomain: 'labs' }), ctrl.getLabSlotBookingCtrl);
+router.post('/lab-slot-bookings', authorize('campus', 'create', { subDomain: 'labs' }), ctrl.createLabSlotBookingCrudCtrl);
+router.put('/lab-slot-bookings/:id', authorize('campus', 'update', { subDomain: 'labs' }), ctrl.updateLabSlotBookingCtrl);
+router.delete('/lab-slot-bookings/:id', authorize('campus', 'delete', { subDomain: 'labs' }), ctrl.deleteLabSlotBookingCtrl);
+
+// Equipment Issues CRUD
+router.get('/equipment-issues', authorize('campus', 'read', { subDomain: 'labs' }), ctrl.listEquipmentIssuesCtrl);
+router.get('/equipment-issues/:id', authorize('campus', 'read', { subDomain: 'labs' }), ctrl.getEquipmentIssueCtrl);
+router.post('/equipment-issues', authorize('campus', 'create', { subDomain: 'labs' }), ctrl.createEquipmentIssueCrudCtrl);
+router.put('/equipment-issues/:id', authorize('campus', 'update', { subDomain: 'labs' }), ctrl.updateEquipmentIssueCtrl);
+router.delete('/equipment-issues/:id', authorize('campus', 'delete', { subDomain: 'labs' }), ctrl.deleteEquipmentIssueCtrl);
+
+// Lab Incidents CRUD
+router.get('/lab-incidents', authorize('campus', 'read', { subDomain: 'labs' }), ctrl.listLabIncidentsCtrl);
+router.get('/lab-incidents/:id', authorize('campus', 'read', { subDomain: 'labs' }), ctrl.getLabIncidentCtrl);
+router.post('/lab-incidents', authorize('campus', 'create', { subDomain: 'labs' }), ctrl.createLabIncidentCrudCtrl);
+router.put('/lab-incidents/:id', authorize('campus', 'update', { subDomain: 'labs' }), ctrl.updateLabIncidentCtrl);
+router.delete('/lab-incidents/:id', authorize('campus', 'delete', { subDomain: 'labs' }), ctrl.deleteLabIncidentCtrl);
+
+// Lab Clearances CRUD
+router.get('/lab-clearances', authorize('campus', 'read', { subDomain: 'labs' }), ctrl.listLabClearancesCtrl);
+router.get('/lab-clearances/:id', authorize('campus', 'read', { subDomain: 'labs' }), ctrl.getLabClearanceCtrl);
+router.post('/lab-clearances', authorize('campus', 'create', { subDomain: 'labs' }), ctrl.createLabClearanceCrudCtrl);
+router.put('/lab-clearances/:id', authorize('campus', 'update', { subDomain: 'labs' }), ctrl.updateLabClearanceCtrl);
+router.delete('/lab-clearances/:id', authorize('campus', 'delete', { subDomain: 'labs' }), ctrl.deleteLabClearanceCtrl);
+
+// Facility Usage Logs (list/get)
+router.get('/facility-usage-logs', authorize('campus', 'read', { subDomain: 'labs' }), ctrl.listFacilityUsageLogsCtrl);
+router.get('/facility-usage-logs/:id', authorize('campus', 'read', { subDomain: 'labs' }), ctrl.getFacilityUsageLogCtrl);
+
+// Equipment Maintenance Logs (list/get)
+router.get('/equipment-maintenance-logs', authorize('campus', 'read', { subDomain: 'labs' }), ctrl.listEquipmentMaintenanceLogsCtrl);
+router.get('/equipment-maintenance-logs/:id', authorize('campus', 'read', { subDomain: 'labs' }), ctrl.getEquipmentMaintenanceLogCtrl);
+
+// ═══════════════════════════════════════════════════════════
+// FACILITIES WORKFLOW ROUTES
+// ═══════════════════════════════════════════════════════════
+router.post('/facilities/book', authorize('campus', 'create', { subDomain: 'facilities' }), validate(requestFacilityBookingSchema), ctrl.requestFacilityBookingCtrl);
+router.put('/facilities/bookings/:id/approve', authorize('campus', 'update', { subDomain: 'facilities' }), ctrl.approveFacilityBookingCtrl);
+router.put('/facilities/bookings/:id/reject', authorize('campus', 'update', { subDomain: 'facilities' }), validate(rejectBookingSchema), ctrl.rejectFacilityBookingCtrl);
+router.put('/facilities/bookings/:id/cancel', authorize('campus', 'update', { subDomain: 'facilities' }), ctrl.cancelFacilityBookingCtrl);
+router.post('/facilities/bookings/:id/usage-log', authorize('campus', 'create', { subDomain: 'facilities' }), validate(recordFacilityUsageSchema), ctrl.recordFacilityUsageCtrl);
+router.put('/facilities/bookings/:id/no-show', authorize('campus', 'update', { subDomain: 'facilities' }), ctrl.recordNoShowCtrl);
+router.get('/facilities/sports-equipment-availability', authorize('campus', 'read', { subDomain: 'facilities' }), ctrl.getSportsEquipmentAvailabilityCtrl);
+router.post('/facilities/campus-incidents', authorize('campus', 'create', { subDomain: 'facilities' }), validate(reportCampusIncidentSchema), ctrl.reportCampusIncidentCtrl);
+router.put('/facilities/campus-incidents/:id/investigate', authorize('campus', 'update', { subDomain: 'facilities' }), ctrl.investigateCampusIncidentCtrl);
+router.put('/facilities/campus-incidents/:id/resolve', authorize('campus', 'update', { subDomain: 'facilities' }), validate(resolveCampusIncidentSchema), ctrl.resolveCampusIncidentCtrl);
+router.get('/facilities/utilization', authorize('campus', 'read', { subDomain: 'facilities' }), ctrl.getFacilityUtilizationCtrl);
+router.get('/facilities/utilization/:facilityId', authorize('campus', 'read', { subDomain: 'facilities' }), ctrl.getFacilityUtilizationByRoomCtrl);
+router.put('/facilities/visitor-checkout/:id', authorize('campus', 'update', { subDomain: 'facilities' }), ctrl.recordVisitorCheckoutCtrl);
+
+// ═══════════════════════════════════════════════════════════
+// MAINTENANCE WORKFLOW ROUTES
+// ═══════════════════════════════════════════════════════════
+router.post('/maintenance/submit', authorize('campus', 'create', { subDomain: 'maintenance' }), validate(submitMaintenanceRequestSchema), ctrl.submitMaintenanceRequestCtrl);
+router.put('/maintenance/requests/:id/triage', authorize('campus', 'update', { subDomain: 'maintenance' }), validate(triageMaintenanceRequestSchema), ctrl.triageMaintenanceRequestCtrl);
+router.post('/maintenance/assignments', authorize('campus', 'create', { subDomain: 'maintenance' }), validate(createMaintenanceAssignmentSchema_wf), ctrl.createMaintenanceAssignmentCtrl);
+router.put('/maintenance/assignments/:id/start', authorize('campus', 'update', { subDomain: 'maintenance' }), ctrl.startMaintenanceWorkCtrl);
+router.put('/maintenance/assignments/:id/complete', authorize('campus', 'update', { subDomain: 'maintenance' }), ctrl.completeMaintenanceAssignmentCtrl);
+router.put('/maintenance/requests/:id/verify', authorize('campus', 'update', { subDomain: 'maintenance' }), validate(verifyMaintenanceWorkSchema), ctrl.verifyMaintenanceWorkCtrl);
+router.post('/maintenance/work-logs', authorize('campus', 'create', { subDomain: 'maintenance' }), validate(addMaintenanceWorkLogSchema), ctrl.addMaintenanceWorkLogCtrl);
+router.post('/maintenance/pm-trigger', authorize('campus', 'create', { subDomain: 'maintenance' }), validate(triggerPreventiveMaintenanceSchema), ctrl.triggerPreventiveMaintenanceCtrl);
+router.get('/maintenance/pm-due', authorize('campus', 'read', { subDomain: 'maintenance' }), ctrl.checkDuePreventiveMaintenanceCtrl);
+router.put('/maintenance/pm/:id/complete', authorize('campus', 'update', { subDomain: 'maintenance' }), ctrl.completePreventiveMaintenanceCtrl);
+router.get('/maintenance/sla-breaches', authorize('campus', 'read', { subDomain: 'maintenance' }), ctrl.checkSLABreachesCtrl);
+router.post('/maintenance/escalations', authorize('campus', 'create', { subDomain: 'maintenance' }), validate(createMaintenanceEscalationSchema_wf), ctrl.createMaintenanceEscalationCtrl);
+router.put('/maintenance/escalations/:id/acknowledge', authorize('campus', 'update', { subDomain: 'maintenance' }), ctrl.acknowledgeEscalationCtrl);
+router.put('/maintenance/escalations/:id/resolve', authorize('campus', 'update', { subDomain: 'maintenance' }), ctrl.resolveEscalationCtrl);
+router.post('/maintenance/vendor-performance', authorize('campus', 'create', { subDomain: 'maintenance' }), validate(calculateVendorPerformanceSchema), ctrl.calculateVendorPerformanceCtrl);
+router.get('/maintenance/vendor-performance-summary', authorize('campus', 'read', { subDomain: 'maintenance' }), ctrl.getVendorPerformanceSummaryCtrl);
+
+// Maintenance Assignments CRUD
+router.get('/maintenance-assignments', authorize('campus', 'read', { subDomain: 'maintenance' }), ctrl.listMaintenanceAssignmentsCtrl);
+router.get('/maintenance-assignments/:id', authorize('campus', 'read', { subDomain: 'maintenance' }), ctrl.getMaintenanceAssignmentCtrl);
+// MaintenanceAssignment create handled via workflow (createMaintenanceAssignmentCtrl)
+router.put('/maintenance-assignments/:id', authorize('campus', 'update', { subDomain: 'maintenance' }), ctrl.updateMaintenanceAssignmentCtrl);
+router.delete('/maintenance-assignments/:id', authorize('campus', 'delete', { subDomain: 'maintenance' }), ctrl.deleteMaintenanceAssignmentCtrl);
+
+// Maintenance Work Logs (list/get)
+router.get('/maintenance-work-logs', authorize('campus', 'read', { subDomain: 'maintenance' }), ctrl.listMaintenanceWorkLogsCtrl);
+router.get('/maintenance-work-logs/:id', authorize('campus', 'read', { subDomain: 'maintenance' }), ctrl.getMaintenanceWorkLogCtrl);
+
+// Maintenance Escalations CRUD
+router.get('/maintenance-escalations', authorize('campus', 'read', { subDomain: 'maintenance' }), ctrl.listMaintenanceEscalationsCtrl);
+router.get('/maintenance-escalations/:id', authorize('campus', 'read', { subDomain: 'maintenance' }), ctrl.getMaintenanceEscalationCtrl);
+// MaintenanceEscalation create handled via workflow (createMaintenanceEscalationCtrl)
+router.put('/maintenance-escalations/:id', authorize('campus', 'update', { subDomain: 'maintenance' }), ctrl.updateMaintenanceEscalationCtrl);
+router.delete('/maintenance-escalations/:id', authorize('campus', 'delete', { subDomain: 'maintenance' }), ctrl.deleteMaintenanceEscalationCtrl);
+
+// AMC Contracts CRUD
+router.get('/amc-contracts', authorize('campus', 'read', { subDomain: 'maintenance' }), ctrl.listAMCContractsCtrl);
+router.get('/amc-contracts/:id', authorize('campus', 'read', { subDomain: 'maintenance' }), ctrl.getAMCContractCtrl);
+router.post('/amc-contracts', authorize('campus', 'create', { subDomain: 'maintenance' }), ctrl.createAMCContractRecordCtrl);
+router.put('/amc-contracts/:id', authorize('campus', 'update', { subDomain: 'maintenance' }), ctrl.updateAMCContractCtrl);
+router.delete('/amc-contracts/:id', authorize('campus', 'delete', { subDomain: 'maintenance' }), ctrl.deleteAMCContractCtrl);
+
+// Vendor Performances CRUD
+router.get('/vendor-performances', authorize('campus', 'read', { subDomain: 'maintenance' }), ctrl.listVendorPerformancesCtrl);
+router.get('/vendor-performances/:id', authorize('campus', 'read', { subDomain: 'maintenance' }), ctrl.getVendorPerformanceCtrl);
+router.post('/vendor-performances', authorize('campus', 'create', { subDomain: 'maintenance' }), ctrl.createVendorPerformanceRecordCtrl);
+router.put('/vendor-performances/:id', authorize('campus', 'update', { subDomain: 'maintenance' }), ctrl.updateVendorPerformanceRecordCtrl);
+router.delete('/vendor-performances/:id', authorize('campus', 'delete', { subDomain: 'maintenance' }), ctrl.deleteVendorPerformanceRecordCtrl);
+
+// ═══════════════════════════════════════════════════════════
+// CROSS-MODULE ROUTES
+// ═══════════════════════════════════════════════════════════
+router.get('/clearance/:studentId', authorize('campus', 'read'), ctrl.aggregateClearanceStatusCtrl);
+router.post('/provision/:studentId', authorize('campus', 'create'), validate(provisionInfrastructureSchema), ctrl.provisionInfrastructureCtrl);
+router.get('/compliance/evidence', authorize('campus', 'read'), ctrl.getComplianceEvidenceCtrl);
+router.get('/governance/metrics', authorize('campus', 'read'), ctrl.getGovernanceMetricsCtrl);
 
 export default router;
