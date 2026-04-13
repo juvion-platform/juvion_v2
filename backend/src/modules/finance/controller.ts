@@ -777,3 +777,186 @@ export async function updateOverpaymentRecord(req: AuthRequest, res: Response, n
 export async function deleteOverpaymentRecord(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.deleteOverpaymentRecord(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
 }
+
+// ═══ W03 Phase 4: Scholarship & Concession Workflow Controllers ═══════════════
+
+// W03-L2-026
+export async function verifyScholarshipEligibilityBatch(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { academicYearId } = req.body as { academicYearId: string };
+    res.json(await service.verifyScholarshipEligibilityBatch(req.collegeId!, academicYearId, who(req)));
+  } catch (err) { next(err); }
+}
+
+// W03-L2-027
+export async function submitScholarshipClaimsBatch(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { schemeCode, academicYearId } = req.body as { schemeCode: string; academicYearId: string };
+    res.json(await service.submitScholarshipClaimsBatch(req.collegeId!, schemeCode, academicYearId, who(req)));
+  } catch (err) { next(err); }
+}
+
+// W03-L2-028
+export async function pollScholarshipClaimStatus(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { academicYearId } = req.body as { academicYearId: string };
+    res.json(await service.pollScholarshipClaimStatus(req.collegeId!, academicYearId, who(req)));
+  } catch (err) { next(err); }
+}
+
+// W03-L2-029
+export async function processScholarshipDisbursement(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { scholarshipClaimId, disbursedAmount } = req.body as { scholarshipClaimId: string; disbursedAmount: number };
+    res.json(await service.processScholarshipDisbursement(req.collegeId!, scholarshipClaimId, disbursedAmount, who(req)));
+  } catch (err) { next(err); }
+}
+
+// W03-L2-030
+export async function convertReceivableToLiability(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    res.json(await service.convertReceivableToLiability(req.collegeId!, req.params.id as string, who(req)));
+  } catch (err) { next(err); }
+}
+
+// W03-L2-031
+export async function processHardshipConcession(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { studentId, recommendedRelief, welfareReferralId, approvedBy } = req.body as {
+      studentId: string;
+      recommendedRelief: number;
+      welfareReferralId?: string;
+      approvedBy: string;
+    };
+    res.status(201).json(await service.processHardshipConcession(req.collegeId!, studentId, recommendedRelief, welfareReferralId, approvedBy, who(req)));
+  } catch (err) { next(err); }
+}
+
+// W03-L2-032
+export async function applyMeritScholarshipBatch(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { academicYearId, minCGPA, amount, maxRecipients } = req.body as {
+      academicYearId: string;
+      minCGPA: number;
+      amount: number;
+      maxRecipients: number;
+    };
+    res.json(await service.applyMeritScholarshipBatch(req.collegeId!, academicYearId, minCGPA, amount, maxRecipients, who(req)));
+  } catch (err) { next(err); }
+}
+
+// W03-L2-033
+export async function detectStaffWardConcession(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { academicYearId } = req.body as { academicYearId: string };
+    res.json(await service.detectStaffWardConcession(req.collegeId!, academicYearId, who(req)));
+  } catch (err) { next(err); }
+}
+
+// W03-L2-034
+export async function renewScholarshipsBatch(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { academicYearId } = req.body as { academicYearId: string };
+    res.json(await service.renewScholarshipsBatch(req.collegeId!, academicYearId, who(req)));
+  } catch (err) { next(err); }
+}
+
+// ═══ ScholarshipEligibility CRUD ═════════════════════════════
+
+export async function listScholarshipEligibilities(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page, limit, academicYearId, status } = req.query as any;
+    res.json(await service.listScholarshipEligibilities(req.collegeId!, Number(page) || 1, Number(limit) || 20, academicYearId, status));
+  } catch (err) { next(err); }
+}
+
+export async function getScholarshipEligibility(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.getScholarshipEligibility(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+
+export async function createScholarshipEligibility(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await service.createScholarshipEligibility(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function updateScholarshipEligibility(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.updateScholarshipEligibility(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function deleteScholarshipEligibility(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.deleteScholarshipEligibility(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ═══ ScholarshipClaim CRUD ════════════════════════════════════
+
+export async function listScholarshipClaims(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page, limit, academicYearId, status } = req.query as any;
+    res.json(await service.listScholarshipClaims(req.collegeId!, Number(page) || 1, Number(limit) || 20, academicYearId, status));
+  } catch (err) { next(err); }
+}
+
+export async function getScholarshipClaim(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.getScholarshipClaim(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+
+export async function createScholarshipClaim(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await service.createScholarshipClaim(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function updateScholarshipClaim(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.updateScholarshipClaim(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function deleteScholarshipClaim(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.deleteScholarshipClaim(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ═══ ScholarshipReceivable CRUD ═══════════════════════════════
+
+export async function listScholarshipReceivables(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page, limit, status } = req.query as any;
+    res.json(await service.listScholarshipReceivables(req.collegeId!, Number(page) || 1, Number(limit) || 20, status));
+  } catch (err) { next(err); }
+}
+
+export async function getScholarshipReceivable(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.getScholarshipReceivable(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+
+export async function createScholarshipReceivable(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await service.createScholarshipReceivable(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function updateScholarshipReceivable(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.updateScholarshipReceivable(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function deleteScholarshipReceivable(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.deleteScholarshipReceivable(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ═══ ScholarshipCredit CRUD ═══════════════════════════════════
+
+export async function listScholarshipCredits(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page, limit, studentId } = req.query as any;
+    res.json(await service.listScholarshipCredits(req.collegeId!, Number(page) || 1, Number(limit) || 20, studentId));
+  } catch (err) { next(err); }
+}
+
+export async function getScholarshipCredit(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.getScholarshipCredit(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+
+export async function createScholarshipCredit(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await service.createScholarshipCredit(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function updateScholarshipCredit(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.updateScholarshipCredit(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function deleteScholarshipCredit(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.deleteScholarshipCredit(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}

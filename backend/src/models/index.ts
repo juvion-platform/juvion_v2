@@ -85,6 +85,10 @@ export { OverpaymentRecord } from './finance/OverpaymentRecord';
 export { Refund } from './finance/Refund';
 export { Scholarship } from './finance/Scholarship';
 export { ScholarshipAllocation } from './finance/ScholarshipAllocation';
+export { ScholarshipClaim } from './finance/ScholarshipClaim';
+export { ScholarshipCredit } from './finance/ScholarshipCredit';
+export { ScholarshipEligibility } from './finance/ScholarshipEligibility';
+export { ScholarshipReceivable } from './finance/ScholarshipReceivable';
 export { StudentFeeAccount } from './finance/StudentFeeAccount';
 
 // === Hr ===

@@ -61,6 +61,22 @@ import {
   updateBounceRecordSchema,
   createOverpaymentRecordSchema,
   updateOverpaymentRecordSchema,
+  verifyScholarshipEligibilityBatchSchema,
+  submitScholarshipClaimsBatchSchema,
+  pollScholarshipClaimStatusSchema,
+  processScholarshipDisbursementSchema,
+  processHardshipConcessionSchema,
+  applyMeritScholarshipBatchSchema,
+  detectStaffWardConcessionSchema,
+  renewScholarshipsBatchSchema,
+  createScholarshipEligibilitySchema,
+  updateScholarshipEligibilitySchema,
+  createScholarshipClaimSchema,
+  updateScholarshipClaimSchema,
+  createScholarshipReceivableSchema,
+  updateScholarshipReceivableSchema,
+  createScholarshipCreditSchema,
+  updateScholarshipCreditSchema,
 } from './validation';
 
 const router = Router();
@@ -293,5 +309,46 @@ router.get('/payment-transactions/:id', authorize('finance', 'read'), ctrl.getPa
 router.post('/payment-transactions', authorize('finance', 'create'), validate(createPaymentTransactionSchema), ctrl.createPaymentTransaction);
 router.put('/payment-transactions/:id', authorize('finance', 'update'), validate(updatePaymentTransactionSchema), ctrl.updatePaymentTransaction);
 router.delete('/payment-transactions/:id', authorize('finance', 'delete'), ctrl.deletePaymentTransaction);
+
+// ═══ W03 Phase 4: Scholarship & Concession Workflow Routes ═══════════════════
+
+// Scholarship workflow actions
+router.post('/scholarships/eligibility/batch', authorize('finance', 'create'), validate(verifyScholarshipEligibilityBatchSchema), ctrl.verifyScholarshipEligibilityBatch);
+router.post('/scholarships/claims/submit-batch', authorize('finance', 'create'), validate(submitScholarshipClaimsBatchSchema), ctrl.submitScholarshipClaimsBatch);
+router.post('/scholarships/claims/poll-status', authorize('finance', 'read'), validate(pollScholarshipClaimStatusSchema), ctrl.pollScholarshipClaimStatus);
+router.post('/scholarships/disbursement/process', authorize('finance', 'update'), validate(processScholarshipDisbursementSchema), ctrl.processScholarshipDisbursement);
+router.post('/scholarship-receivables/:id/convert', authorize('finance', 'update'), ctrl.convertReceivableToLiability);
+router.post('/concessions/hardship', authorize('finance', 'create'), validate(processHardshipConcessionSchema), ctrl.processHardshipConcession);
+router.post('/concessions/merit/batch', authorize('finance', 'create'), validate(applyMeritScholarshipBatchSchema), ctrl.applyMeritScholarshipBatch);
+router.post('/concessions/staff-ward/detect', authorize('finance', 'create'), validate(detectStaffWardConcessionSchema), ctrl.detectStaffWardConcession);
+router.post('/scholarships/renewal/batch', authorize('finance', 'create'), validate(renewScholarshipsBatchSchema), ctrl.renewScholarshipsBatch);
+
+// ScholarshipEligibility CRUD
+router.get('/scholarship-eligibility', authorize('finance', 'read'), ctrl.listScholarshipEligibilities);
+router.get('/scholarship-eligibility/:id', authorize('finance', 'read'), ctrl.getScholarshipEligibility);
+router.post('/scholarship-eligibility', authorize('finance', 'create'), validate(createScholarshipEligibilitySchema), ctrl.createScholarshipEligibility);
+router.put('/scholarship-eligibility/:id', authorize('finance', 'update'), validate(updateScholarshipEligibilitySchema), ctrl.updateScholarshipEligibility);
+router.delete('/scholarship-eligibility/:id', authorize('finance', 'delete'), ctrl.deleteScholarshipEligibility);
+
+// ScholarshipClaim CRUD
+router.get('/scholarship-claims', authorize('finance', 'read'), ctrl.listScholarshipClaims);
+router.get('/scholarship-claims/:id', authorize('finance', 'read'), ctrl.getScholarshipClaim);
+router.post('/scholarship-claims', authorize('finance', 'create'), validate(createScholarshipClaimSchema), ctrl.createScholarshipClaim);
+router.put('/scholarship-claims/:id', authorize('finance', 'update'), validate(updateScholarshipClaimSchema), ctrl.updateScholarshipClaim);
+router.delete('/scholarship-claims/:id', authorize('finance', 'delete'), ctrl.deleteScholarshipClaim);
+
+// ScholarshipReceivable CRUD (action route before :id CRUD routes)
+router.get('/scholarship-receivables', authorize('finance', 'read'), ctrl.listScholarshipReceivables);
+router.get('/scholarship-receivables/:id', authorize('finance', 'read'), ctrl.getScholarshipReceivable);
+router.post('/scholarship-receivables', authorize('finance', 'create'), validate(createScholarshipReceivableSchema), ctrl.createScholarshipReceivable);
+router.put('/scholarship-receivables/:id', authorize('finance', 'update'), validate(updateScholarshipReceivableSchema), ctrl.updateScholarshipReceivable);
+router.delete('/scholarship-receivables/:id', authorize('finance', 'delete'), ctrl.deleteScholarshipReceivable);
+
+// ScholarshipCredit CRUD
+router.get('/scholarship-credits', authorize('finance', 'read'), ctrl.listScholarshipCredits);
+router.get('/scholarship-credits/:id', authorize('finance', 'read'), ctrl.getScholarshipCredit);
+router.post('/scholarship-credits', authorize('finance', 'create'), validate(createScholarshipCreditSchema), ctrl.createScholarshipCredit);
+router.put('/scholarship-credits/:id', authorize('finance', 'update'), validate(updateScholarshipCreditSchema), ctrl.updateScholarshipCredit);
+router.delete('/scholarship-credits/:id', authorize('finance', 'delete'), ctrl.deleteScholarshipCredit);
 
 export default router;

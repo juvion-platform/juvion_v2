@@ -25,6 +25,12 @@ import { Receipt } from '../../models/finance/Receipt';
 import { ReconciliationEntry } from '../../models/finance/ReconciliationEntry';
 import { BounceRecord } from '../../models/finance/BounceRecord';
 import { OverpaymentRecord } from '../../models/finance/OverpaymentRecord';
+import { ScholarshipEligibility } from '../../models/finance/ScholarshipEligibility';
+import { ScholarshipClaim } from '../../models/finance/ScholarshipClaim';
+import { ScholarshipReceivable } from '../../models/finance/ScholarshipReceivable';
+import { ScholarshipCredit } from '../../models/finance/ScholarshipCredit';
+import { SemesterResult } from '../../models/academic-ops/SemesterResult';
+import { AcademicYear } from '../../models/academic-structure/AcademicYear';
 import { Student } from '../../models/people/Student';
 import { Enrollment } from '../../models/academic-ops/Enrollment';
 import { paginate } from '../../shared/pagination';
@@ -2652,6 +2658,621 @@ export async function deleteOverpaymentRecord(collegeId: string, id: string, per
     entityType: 'OverpaymentRecord',
     entityId: id,
     entityName: `Overpayment Record`,
+    action: 'delete',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+// ═══ W03 Phase 4: Scholarship & Concession Workflow Functions ════════════════
+
+// W03-L2-026: Verify scholarship eligibility in batch
+export async function verifyScholarshipEligibilityBatch(
+  collegeId: string,
+  academicYearId: string,
+  performedBy: string,
+) {
+  const allocations = await ScholarshipAllocation.find({ collegeId, academicYearId }).lean();
+  let eligible = 0;
+  let pending = 0;
+
+  for (const allocation of allocations) {
+    const scholarship = await Scholarship.findOne({ _id: allocation.scholarshipId, collegeId }).lean();
+    if (!scholarship) continue;
+    const schemeCode = scholarship.type;
+    const isEligible = allocation.status === 'approved';
+
+    await ScholarshipEligibility.create({
+      collegeId,
+      studentId: allocation.studentId,
+      schemeCode,
+      academicYearId,
+      status: isEligible ? 'eligible' : 'pending',
+      verificationMethod: isEligible ? 'auto' : 'manual',
+      verifiedAt: isEligible ? new Date() : undefined,
+      documentsStatus: isEligible ? 'complete' : undefined,
+    });
+
+    if (isEligible) eligible++;
+    else pending++;
+  }
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'ScholarshipEligibility',
+    entityId: academicYearId,
+    entityName: `Eligibility Batch AY:${academicYearId}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return { total: allocations.length, eligible, pending };
+}
+
+// W03-L2-027: Submit scholarship claims in batch
+export async function submitScholarshipClaimsBatch(
+  collegeId: string,
+  schemeCode: string,
+  academicYearId: string,
+  performedBy: string,
+) {
+  const eligibilities = await ScholarshipEligibility.find({
+    collegeId,
+    schemeCode,
+    academicYearId,
+    status: 'eligible',
+  }).lean();
+
+  let submitted = 0;
+  let totalClaimAmount = 0;
+
+  for (const eligibility of eligibilities) {
+    const allocation = await ScholarshipAllocation.findOne({
+      collegeId,
+      studentId: eligibility.studentId,
+      academicYearId,
+    }).lean();
+    if (!allocation) continue;
+
+    await ScholarshipClaim.create({
+      collegeId,
+      scholarshipEligibilityId: eligibility._id,
+      studentId: eligibility.studentId,
+      schemeCode,
+      academicYearId,
+      claimAmount: allocation.amount,
+    });
+
+    submitted++;
+    totalClaimAmount += allocation.amount;
+  }
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'ScholarshipClaim',
+    entityId: academicYearId,
+    entityName: `Claims Batch scheme:${schemeCode} AY:${academicYearId}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return { submitted, totalClaimAmount };
+}
+
+// W03-L2-028: Poll scholarship claim status (stub for TS-EPass integration)
+export async function pollScholarshipClaimStatus(
+  collegeId: string,
+  academicYearId: string,
+  _performedBy: string,
+) {
+  const claims = await ScholarshipClaim.find({
+    collegeId,
+    academicYearId,
+    status: 'submitted',
+  }).lean();
+
+  return { pending: claims.length, claims };
+}
+
+// W03-L2-029: Process scholarship disbursement
+export async function processScholarshipDisbursement(
+  collegeId: string,
+  scholarshipClaimId: string,
+  disbursedAmount: number,
+  performedBy: string,
+) {
+  const claim = await ScholarshipClaim.findOne({ _id: scholarshipClaimId, collegeId });
+  if (!claim) throw new AppError(404, 'Scholarship claim not found');
+  if (claim.status !== 'approved') throw new AppError(400, 'Claim must be approved before disbursement');
+
+  let receivable = await ScholarshipReceivable.findOne({ collegeId, scholarshipClaimId });
+  if (!receivable) {
+    receivable = await ScholarshipReceivable.create({
+      collegeId,
+      scholarshipClaimId,
+      studentId: claim.studentId,
+      expectedAmount: claim.claimAmount,
+    });
+  }
+
+  receivable.status = 'disbursed';
+  receivable.disbursedAmount = disbursedAmount;
+  receivable.disbursedAt = new Date();
+  await receivable.save();
+
+  const invoice = await Invoice.findOne({
+    collegeId,
+    studentId: claim.studentId,
+    status: { $in: ['generated', 'sent', 'partially_paid', 'overdue'] },
+  });
+
+  let creditApplied = false;
+  let invoiceUpdated = false;
+
+  if (invoice) {
+    await ScholarshipCredit.create({
+      collegeId,
+      scholarshipReceivableId: receivable._id,
+      studentId: claim.studentId,
+      invoiceId: invoice._id,
+      amount: disbursedAmount,
+    });
+
+    const currentAllocated = invoice.scholarshipAllocated ?? 0;
+    invoice.scholarshipAllocated = currentAllocated + disbursedAmount;
+    const netPayable = (invoice.netPayable ?? invoice.totalAmount) - disbursedAmount;
+    invoice.netPayable = Math.max(0, netPayable);
+    await invoice.save();
+
+    creditApplied = true;
+    invoiceUpdated = true;
+  }
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'ScholarshipReceivable',
+    entityId: String(receivable._id),
+    entityName: `Disbursement for claim ${scholarshipClaimId}`,
+    action: 'update',
+    changes: [],
+    performedBy,
+  });
+
+  return { creditApplied, invoiceUpdated };
+}
+
+// W03-L2-030: Convert receivable to liability
+export async function convertReceivableToLiability(
+  collegeId: string,
+  receivableId: string,
+  performedBy: string,
+) {
+  const receivable = await ScholarshipReceivable.findOne({ _id: receivableId, collegeId });
+  if (!receivable) throw new AppError(404, 'Scholarship receivable not found');
+  if (receivable.status !== 'pending' && receivable.status !== 'overdue') {
+    throw new AppError(400, 'Only pending or overdue receivables can be converted to liability');
+  }
+
+  receivable.status = 'converted_to_liability';
+  await receivable.save();
+
+  const claim = await ScholarshipClaim.findOne({ _id: receivable.scholarshipClaimId, collegeId }).lean();
+  if (claim) {
+    const invoice = await Invoice.findOne({
+      collegeId,
+      studentId: claim.studentId,
+      status: { $in: ['generated', 'sent', 'partially_paid', 'overdue'] },
+    });
+    if (invoice) {
+      invoice.netPayable = (invoice.netPayable ?? invoice.totalAmount) + receivable.expectedAmount;
+      await invoice.save();
+    }
+  }
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'ScholarshipReceivable',
+    entityId: receivableId,
+    entityName: `Receivable converted to liability`,
+    action: 'update',
+    changes: [],
+    performedBy,
+  });
+
+  return receivable;
+}
+
+// W03-L2-031: Process hardship concession from M06 welfare referral
+export async function processHardshipConcession(
+  collegeId: string,
+  studentId: string,
+  recommendedRelief: number,
+  welfareReferralId: string | undefined,
+  approvedBy: string,
+  performedBy: string,
+) {
+  const currentYear = await AcademicYear.findOne({ collegeId }).sort({ createdAt: -1 }).lean();
+  if (!currentYear) throw new AppError(404, 'No academic year found');
+
+  const concession = await Concession.create({
+    collegeId,
+    studentId,
+    type: 'financial_hardship',
+    source: 'm06_referral',
+    flatAmount: recommendedRelief,
+    reason: 'Welfare referral hardship concession',
+    approvedBy,
+    academicYearId: currentYear._id,
+    status: 'approved',
+    welfareReferralId: welfareReferralId || undefined,
+  });
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'Concession',
+    entityId: String(concession._id),
+    entityName: `Hardship concession for student ${studentId}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return concession;
+}
+
+// W03-L2-032: Apply merit scholarship in batch
+export async function applyMeritScholarshipBatch(
+  collegeId: string,
+  academicYearId: string,
+  minCGPA: number,
+  amount: number,
+  maxRecipients: number,
+  performedBy: string,
+) {
+  const results = await SemesterResult.find({
+    collegeId,
+    cgpa: { $gte: minCGPA },
+  }).sort({ cgpa: -1 }).limit(maxRecipients).lean();
+
+  let awarded = 0;
+
+  for (const result of results) {
+    await ScholarshipAllocation.create({
+      collegeId,
+      scholarshipId: result.studentId,
+      studentId: result.studentId,
+      academicYearId,
+      amount,
+      status: 'approved',
+    });
+    awarded++;
+  }
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'ScholarshipAllocation',
+    entityId: academicYearId,
+    entityName: `Merit scholarship batch AY:${academicYearId}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return { awarded };
+}
+
+// W03-L2-033: Detect staff ward concessions (stub — requires M05 HR integration)
+export async function detectStaffWardConcession(
+  collegeId: string,
+  academicYearId: string,
+  performedBy: string,
+) {
+  await createAuditLog({
+    collegeId,
+    entityType: 'Concession',
+    entityId: academicYearId,
+    entityName: `Staff ward detection AY:${academicYearId}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+  return { detected: 0, message: 'Staff-ward detection requires M05 HR integration' };
+}
+
+// W03-L2-034: Renew scholarships in batch for new academic year
+export async function renewScholarshipsBatch(
+  collegeId: string,
+  academicYearId: string,
+  performedBy: string,
+) {
+  const priorAllocations = await ScholarshipAllocation.find({
+    collegeId,
+    status: 'approved',
+  }).lean();
+
+  let renewed = 0;
+
+  for (const allocation of priorAllocations) {
+    const scholarship = await Scholarship.findOne({ _id: allocation.scholarshipId, collegeId }).lean();
+    if (!scholarship) continue;
+    const schemeCode = scholarship.type;
+
+    await ScholarshipEligibility.create({
+      collegeId,
+      studentId: allocation.studentId,
+      schemeCode,
+      academicYearId,
+      status: 'pending',
+      verificationMethod: 'manual',
+    });
+    renewed++;
+  }
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'ScholarshipEligibility',
+    entityId: academicYearId,
+    entityName: `Renewal batch AY:${academicYearId}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return { renewed };
+}
+
+// ═══ ScholarshipEligibility CRUD ═════════════════════════════
+
+export async function listScholarshipEligibilities(
+  collegeId: string,
+  page = 1,
+  limit = 20,
+  academicYearId?: string,
+  status?: string,
+) {
+  const filter: Record<string, unknown> = { collegeId };
+  if (academicYearId) filter.academicYearId = academicYearId;
+  if (status) filter.status = status;
+  return paginate(ScholarshipEligibility, filter, page, limit, { createdAt: -1 });
+}
+
+export async function getScholarshipEligibility(collegeId: string, id: string) {
+  const doc = await ScholarshipEligibility.findOne({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Scholarship eligibility not found');
+  return doc;
+}
+
+export async function createScholarshipEligibility(collegeId: string, data: Record<string, unknown>, performedBy: string) {
+  const doc = await ScholarshipEligibility.create({ ...data, collegeId });
+  await createAuditLog({
+    collegeId,
+    entityType: 'ScholarshipEligibility',
+    entityId: String(doc._id),
+    entityName: `Eligibility for scheme ${String(doc.schemeCode)}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function updateScholarshipEligibility(collegeId: string, id: string, data: Record<string, unknown>, performedBy: string) {
+  const doc = await ScholarshipEligibility.findOneAndUpdate({ _id: id, collegeId }, data, { new: true });
+  if (!doc) throw new AppError(404, 'Scholarship eligibility not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'ScholarshipEligibility',
+    entityId: id,
+    entityName: `Eligibility for scheme ${String(doc.schemeCode)}`,
+    action: 'update',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function deleteScholarshipEligibility(collegeId: string, id: string, performedBy: string) {
+  const doc = await ScholarshipEligibility.findOneAndDelete({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Scholarship eligibility not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'ScholarshipEligibility',
+    entityId: id,
+    entityName: `Scholarship Eligibility`,
+    action: 'delete',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+// ═══ ScholarshipClaim CRUD ════════════════════════════════════
+
+export async function listScholarshipClaims(
+  collegeId: string,
+  page = 1,
+  limit = 20,
+  academicYearId?: string,
+  status?: string,
+) {
+  const filter: Record<string, unknown> = { collegeId };
+  if (academicYearId) filter.academicYearId = academicYearId;
+  if (status) filter.status = status;
+  return paginate(ScholarshipClaim, filter, page, limit, { createdAt: -1 });
+}
+
+export async function getScholarshipClaim(collegeId: string, id: string) {
+  const doc = await ScholarshipClaim.findOne({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Scholarship claim not found');
+  return doc;
+}
+
+export async function createScholarshipClaim(collegeId: string, data: Record<string, unknown>, performedBy: string) {
+  const doc = await ScholarshipClaim.create({ ...data, collegeId });
+  await createAuditLog({
+    collegeId,
+    entityType: 'ScholarshipClaim',
+    entityId: String(doc._id),
+    entityName: `Claim for scheme ${String(doc.schemeCode)}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function updateScholarshipClaim(collegeId: string, id: string, data: Record<string, unknown>, performedBy: string) {
+  const doc = await ScholarshipClaim.findOneAndUpdate({ _id: id, collegeId }, data, { new: true });
+  if (!doc) throw new AppError(404, 'Scholarship claim not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'ScholarshipClaim',
+    entityId: id,
+    entityName: `Claim for scheme ${String(doc.schemeCode)}`,
+    action: 'update',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function deleteScholarshipClaim(collegeId: string, id: string, performedBy: string) {
+  const doc = await ScholarshipClaim.findOneAndDelete({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Scholarship claim not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'ScholarshipClaim',
+    entityId: id,
+    entityName: `Scholarship Claim`,
+    action: 'delete',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+// ═══ ScholarshipReceivable CRUD ═══════════════════════════════
+
+export async function listScholarshipReceivables(
+  collegeId: string,
+  page = 1,
+  limit = 20,
+  status?: string,
+) {
+  const filter: Record<string, unknown> = { collegeId };
+  if (status) filter.status = status;
+  return paginate(ScholarshipReceivable, filter, page, limit, { createdAt: -1 });
+}
+
+export async function getScholarshipReceivable(collegeId: string, id: string) {
+  const doc = await ScholarshipReceivable.findOne({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Scholarship receivable not found');
+  return doc;
+}
+
+export async function createScholarshipReceivable(collegeId: string, data: Record<string, unknown>, performedBy: string) {
+  const doc = await ScholarshipReceivable.create({ ...data, collegeId });
+  await createAuditLog({
+    collegeId,
+    entityType: 'ScholarshipReceivable',
+    entityId: String(doc._id),
+    entityName: `Receivable ₹${doc.expectedAmount}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function updateScholarshipReceivable(collegeId: string, id: string, data: Record<string, unknown>, performedBy: string) {
+  const doc = await ScholarshipReceivable.findOneAndUpdate({ _id: id, collegeId }, data, { new: true });
+  if (!doc) throw new AppError(404, 'Scholarship receivable not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'ScholarshipReceivable',
+    entityId: id,
+    entityName: `Receivable ₹${doc.expectedAmount}`,
+    action: 'update',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function deleteScholarshipReceivable(collegeId: string, id: string, performedBy: string) {
+  const doc = await ScholarshipReceivable.findOneAndDelete({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Scholarship receivable not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'ScholarshipReceivable',
+    entityId: id,
+    entityName: `Scholarship Receivable`,
+    action: 'delete',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+// ═══ ScholarshipCredit CRUD ═══════════════════════════════════
+
+export async function listScholarshipCredits(
+  collegeId: string,
+  page = 1,
+  limit = 20,
+  studentId?: string,
+) {
+  const filter: Record<string, unknown> = { collegeId };
+  if (studentId) filter.studentId = studentId;
+  return paginate(ScholarshipCredit, filter, page, limit, { appliedAt: -1 });
+}
+
+export async function getScholarshipCredit(collegeId: string, id: string) {
+  const doc = await ScholarshipCredit.findOne({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Scholarship credit not found');
+  return doc;
+}
+
+export async function createScholarshipCredit(collegeId: string, data: Record<string, unknown>, performedBy: string) {
+  const doc = await ScholarshipCredit.create({ ...data, collegeId });
+  await createAuditLog({
+    collegeId,
+    entityType: 'ScholarshipCredit',
+    entityId: String(doc._id),
+    entityName: `Credit ₹${doc.amount}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function updateScholarshipCredit(collegeId: string, id: string, data: Record<string, unknown>, performedBy: string) {
+  const doc = await ScholarshipCredit.findOneAndUpdate({ _id: id, collegeId }, data, { new: true });
+  if (!doc) throw new AppError(404, 'Scholarship credit not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'ScholarshipCredit',
+    entityId: id,
+    entityName: `Credit ₹${doc.amount}`,
+    action: 'update',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function deleteScholarshipCredit(collegeId: string, id: string, performedBy: string) {
+  const doc = await ScholarshipCredit.findOneAndDelete({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Scholarship credit not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'ScholarshipCredit',
+    entityId: id,
+    entityName: `Scholarship Credit`,
     action: 'delete',
     changes: [],
     performedBy,

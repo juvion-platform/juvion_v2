@@ -519,3 +519,97 @@ export const createOverpaymentRecordSchema = z.object({
   resolution: z.enum(['refund', 'credit_forward', 'pending']).optional(),
 });
 export const updateOverpaymentRecordSchema = createOverpaymentRecordSchema.partial();
+
+// ═══ W03 Phase 4: Scholarship & Concession Workflow Schemas ══════════════════
+
+export const verifyScholarshipEligibilityBatchSchema = z.object({
+  academicYearId: z.string().min(1),
+});
+
+export const submitScholarshipClaimsBatchSchema = z.object({
+  schemeCode: z.string().min(1),
+  academicYearId: z.string().min(1),
+});
+
+export const pollScholarshipClaimStatusSchema = z.object({
+  academicYearId: z.string().min(1),
+});
+
+export const processScholarshipDisbursementSchema = z.object({
+  scholarshipClaimId: z.string().min(1),
+  disbursedAmount: z.number().positive(),
+});
+
+export const processHardshipConcessionSchema = z.object({
+  studentId: z.string().min(1),
+  recommendedRelief: z.number().positive(),
+  welfareReferralId: z.string().optional(),
+  approvedBy: z.string().min(1),
+});
+
+export const applyMeritScholarshipBatchSchema = z.object({
+  academicYearId: z.string().min(1),
+  minCGPA: z.number().min(0).max(10),
+  amount: z.number().positive(),
+  maxRecipients: z.number().int().positive(),
+});
+
+export const detectStaffWardConcessionSchema = z.object({
+  academicYearId: z.string().min(1),
+});
+
+export const renewScholarshipsBatchSchema = z.object({
+  academicYearId: z.string().min(1),
+});
+
+// ═══ ScholarshipEligibility CRUD ═════════════════════════════
+
+export const createScholarshipEligibilitySchema = z.object({
+  studentId: z.string().min(1),
+  schemeCode: z.string().min(1),
+  academicYearId: z.string().min(1),
+  status: z.enum(['pending', 'eligible', 'ineligible', 'expired']).optional(),
+  verificationMethod: z.enum(['auto', 'manual']).optional(),
+  verifiedAt: z.string().optional(),
+  documentsStatus: z.enum(['complete', 'incomplete', 'expired']).optional(),
+});
+export const updateScholarshipEligibilitySchema = createScholarshipEligibilitySchema.partial();
+
+// ═══ ScholarshipClaim CRUD ════════════════════════════════════
+
+export const createScholarshipClaimSchema = z.object({
+  scholarshipEligibilityId: z.string().min(1),
+  studentId: z.string().min(1),
+  schemeCode: z.string().min(1),
+  academicYearId: z.string().min(1),
+  claimAmount: z.number().positive(),
+  portalReference: z.string().optional(),
+  status: z.enum(['submitted', 'under_review', 'approved', 'rejected']).optional(),
+  rejectionReason: z.string().optional(),
+});
+export const updateScholarshipClaimSchema = createScholarshipClaimSchema.partial();
+
+// ═══ ScholarshipReceivable CRUD ═══════════════════════════════
+
+export const createScholarshipReceivableSchema = z.object({
+  scholarshipClaimId: z.string().min(1),
+  studentId: z.string().min(1),
+  expectedAmount: z.number().positive(),
+  expectedDisbursementDate: z.string().optional(),
+  status: z.enum(['pending', 'disbursed', 'overdue', 'converted_to_liability']).optional(),
+  disbursedAmount: z.number().optional(),
+  disbursedAt: z.string().optional(),
+});
+export const updateScholarshipReceivableSchema = createScholarshipReceivableSchema.partial();
+
+// ═══ ScholarshipCredit CRUD ═══════════════════════════════════
+
+export const createScholarshipCreditSchema = z.object({
+  scholarshipReceivableId: z.string().min(1),
+  studentId: z.string().min(1),
+  invoiceId: z.string().min(1),
+  invoiceLineItemId: z.string().optional(),
+  amount: z.number().positive(),
+  appliedAt: z.string().optional(),
+});
+export const updateScholarshipCreditSchema = createScholarshipCreditSchema.partial();
