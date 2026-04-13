@@ -33,6 +33,10 @@ import { LessonPlan } from '../../models/academic-ops/LessonPlan';
 import { CourseFeedback } from '../../models/academic-ops/CourseFeedback';
 import { CondonationRequest } from '../../models/academic-ops/CondonationRequest';
 import { ICondonationRequest } from '../../models/academic-ops/CondonationRequest';
+import { Assignment } from '../../models/academic-ops/Assignment';
+import { Submission } from '../../models/academic-ops/Submission';
+import { Quiz } from '../../models/academic-ops/Quiz';
+import { QuizAttempt } from '../../models/academic-ops/QuizAttempt';
 import { paginate } from '../../shared/pagination';
 import { createAuditLog } from '../../shared/audit';
 import { AppError } from '../../middleware/errorHandler';
@@ -2275,4 +2279,216 @@ export async function computeCIEForOffering(
       averageCIE,
     },
   };
+}
+
+// ═══ W02: Assignments ═══════════════════════════════════════
+
+export async function listAssignments(collegeId: string, page: number, limit: number, courseOfferingId?: string, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (courseOfferingId) filter.courseOfferingId = courseOfferingId;
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(Assignment, filter, page, limit, { createdAt: -1 }, ['courseOfferingId', 'createdBy']);
+}
+
+export async function getAssignment(collegeId: string, id: string) {
+  const doc = await Assignment.findOne({ _id: id, collegeId }).populate('courseOfferingId').populate('createdBy');
+  if (!doc) throw new AppError(404, 'Assignment not found');
+  return doc;
+}
+
+export async function createAssignment(collegeId: string, data: any, performedBy: string) {
+  const doc = await Assignment.create({ ...data, collegeId, createdBy: data.createdBy || performedBy });
+  await createAuditLog({
+    collegeId, entityType: 'Assignment', entityId: String(doc._id),
+    entityName: doc.title, action: 'create', changes: [], performedBy,
+  });
+  return doc;
+}
+
+export async function updateAssignment(collegeId: string, id: string, data: any, performedBy: string) {
+  const doc = await Assignment.findOneAndUpdate({ _id: id, collegeId }, { $set: data }, { new: true });
+  if (!doc) throw new AppError(404, 'Assignment not found');
+  await createAuditLog({
+    collegeId, entityType: 'Assignment', entityId: String(doc._id),
+    entityName: doc.title, action: 'update', changes: [], performedBy,
+  });
+  return doc;
+}
+
+export async function deleteAssignment(collegeId: string, id: string, performedBy: string) {
+  const doc = await Assignment.findOneAndDelete({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Assignment not found');
+  await createAuditLog({
+    collegeId, entityType: 'Assignment', entityId: String(doc._id),
+    entityName: doc.title, action: 'delete', changes: [], performedBy,
+  });
+  return { deleted: true };
+}
+
+// ═══ W02: Submissions ═══════════════════════════════════════
+
+export async function listSubmissions(collegeId: string, assignmentId: string) {
+  return Submission.find({ collegeId, assignmentId }).populate(STUDENT_POPULATE).lean();
+}
+
+export async function getSubmission(collegeId: string, id: string) {
+  const doc = await Submission.findOne({ _id: id, collegeId }).populate(STUDENT_POPULATE);
+  if (!doc) throw new AppError(404, 'Submission not found');
+  return doc;
+}
+
+export async function createSubmission(collegeId: string, data: any, performedBy: string) {
+  // Auto-check isLate by comparing with assignment's dueDate
+  const assignment = await Assignment.findOne({ _id: data.assignmentId, collegeId });
+  if (!assignment) throw new AppError(404, 'Assignment not found');
+
+  const submittedAt = new Date();
+  const isLate = submittedAt > assignment.dueDate;
+  const status = isLate ? 'late' : 'submitted';
+
+  const doc = await Submission.create({ ...data, collegeId, submittedAt, isLate, status });
+  await createAuditLog({
+    collegeId, entityType: 'Submission', entityId: String(doc._id),
+    entityName: `Submission-${String(doc._id).slice(-6)}`, action: 'create', changes: [], performedBy,
+  });
+  return doc;
+}
+
+export async function gradeSubmission(collegeId: string, id: string, marksObtained: number, remarks: string | undefined, performedBy: string) {
+  const doc = await Submission.findOneAndUpdate(
+    { _id: id, collegeId },
+    { $set: { marksObtained, remarks, gradedBy: performedBy, gradedAt: new Date(), status: 'graded' } },
+    { new: true },
+  );
+  if (!doc) throw new AppError(404, 'Submission not found');
+  await createAuditLog({
+    collegeId, entityType: 'Submission', entityId: String(doc._id),
+    entityName: `Submission-${String(doc._id).slice(-6)}`, action: 'update',
+    changes: [{ field: 'marksObtained', displayName: 'Marks Obtained', oldValue: '', newValue: String(marksObtained) }],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function deleteSubmission(collegeId: string, id: string, performedBy: string) {
+  const doc = await Submission.findOneAndDelete({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Submission not found');
+  await createAuditLog({
+    collegeId, entityType: 'Submission', entityId: String(doc._id),
+    entityName: `Submission-${String(doc._id).slice(-6)}`, action: 'delete', changes: [], performedBy,
+  });
+  return { deleted: true };
+}
+
+// ═══ W02: Quizzes ═══════════════════════════════════════════
+
+export async function listQuizzes(collegeId: string, page: number, limit: number, courseOfferingId?: string, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (courseOfferingId) filter.courseOfferingId = courseOfferingId;
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(Quiz, filter, page, limit, { createdAt: -1 }, ['courseOfferingId', 'createdBy']);
+}
+
+export async function getQuiz(collegeId: string, id: string) {
+  const doc = await Quiz.findOne({ _id: id, collegeId }).populate('courseOfferingId').populate('createdBy');
+  if (!doc) throw new AppError(404, 'Quiz not found');
+  return doc;
+}
+
+export async function createQuiz(collegeId: string, data: any, performedBy: string) {
+  const doc = await Quiz.create({ ...data, collegeId, createdBy: data.createdBy || performedBy });
+  await createAuditLog({
+    collegeId, entityType: 'Quiz', entityId: String(doc._id),
+    entityName: doc.title, action: 'create', changes: [], performedBy,
+  });
+  return doc;
+}
+
+export async function updateQuiz(collegeId: string, id: string, data: any, performedBy: string) {
+  const doc = await Quiz.findOneAndUpdate({ _id: id, collegeId }, { $set: data }, { new: true });
+  if (!doc) throw new AppError(404, 'Quiz not found');
+  await createAuditLog({
+    collegeId, entityType: 'Quiz', entityId: String(doc._id),
+    entityName: doc.title, action: 'update', changes: [], performedBy,
+  });
+  return doc;
+}
+
+export async function deleteQuiz(collegeId: string, id: string, performedBy: string) {
+  const doc = await Quiz.findOneAndDelete({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Quiz not found');
+  await createAuditLog({
+    collegeId, entityType: 'Quiz', entityId: String(doc._id),
+    entityName: doc.title, action: 'delete', changes: [], performedBy,
+  });
+  return { deleted: true };
+}
+
+// ═══ W02: Quiz Attempts ═════════════════════════════════════
+
+export async function listQuizAttempts(collegeId: string, quizId: string) {
+  return QuizAttempt.find({ collegeId, quizId }).populate(STUDENT_POPULATE).lean();
+}
+
+export async function getQuizAttempt(collegeId: string, id: string) {
+  const doc = await QuizAttempt.findOne({ _id: id, collegeId }).populate(STUDENT_POPULATE);
+  if (!doc) throw new AppError(404, 'Quiz attempt not found');
+  return doc;
+}
+
+export async function submitQuizAttempt(collegeId: string, data: any, performedBy: string) {
+  // 1. Look up the quiz to get questions for auto-grading
+  const quiz = await Quiz.findOne({ _id: data.quizId, collegeId });
+  if (!quiz) throw new AppError(404, 'Quiz not found');
+
+  const now = new Date();
+
+  // 2. Auto-grade answers
+  let totalMarks = 0;
+  let allAutoGradeable = true;
+  const gradedAnswers = (data.answers as { questionIndex: number; answer: string }[]).map((ans) => {
+    const question = quiz.questions[ans.questionIndex];
+    if (!question) {
+      return { ...ans, isCorrect: false, marksAwarded: 0 };
+    }
+
+    if (question.type === 'mcq' || question.type === 'true_false') {
+      const isCorrect = ans.answer.trim().toLowerCase() === question.correctAnswer.trim().toLowerCase();
+      const marksAwarded = isCorrect ? question.marks : 0;
+      totalMarks += marksAwarded;
+      return { ...ans, isCorrect, marksAwarded };
+    } else {
+      // short_answer cannot be auto-graded
+      allAutoGradeable = false;
+      return { ...ans, isCorrect: undefined, marksAwarded: undefined };
+    }
+  });
+
+  const doc = await QuizAttempt.create({
+    collegeId,
+    quizId: data.quizId,
+    studentId: data.studentId,
+    startedAt: now,
+    submittedAt: now,
+    answers: gradedAnswers,
+    totalMarks,
+    autoGraded: allAutoGradeable,
+    status: allAutoGradeable ? 'graded' : 'submitted',
+  });
+
+  await createAuditLog({
+    collegeId, entityType: 'QuizAttempt', entityId: String(doc._id),
+    entityName: `QuizAttempt-${String(doc._id).slice(-6)}`, action: 'create', changes: [], performedBy,
+  });
+  return doc;
+}
+
+export async function deleteQuizAttempt(collegeId: string, id: string, performedBy: string) {
+  const doc = await QuizAttempt.findOneAndDelete({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Quiz attempt not found');
+  await createAuditLog({
+    collegeId, entityType: 'QuizAttempt', entityId: String(doc._id),
+    entityName: `QuizAttempt-${String(doc._id).slice(-6)}`, action: 'delete', changes: [], performedBy,
+  });
+  return { deleted: true };
 }

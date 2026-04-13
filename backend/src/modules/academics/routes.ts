@@ -44,6 +44,10 @@ import {
   submitCondonationRequestSchema,
   reviewCondonationRequestSchema,
   computeCIESchema,
+  createAssignmentSchema, updateAssignmentSchema,
+  createSubmissionSchema, gradeSubmissionSchema,
+  createQuizSchema, updateQuizSchema,
+  submitQuizAttemptSchema,
 } from './validation';
 
 const router = Router();
@@ -288,5 +292,32 @@ router.put('/condonation-requests/:id/review', authorize('academics', 'update'),
 
 // ═══ W02: CIE Computation Engine ═══════════════════════════
 router.post('/internal-assessments/compute-cie', authorize('academics', 'create'), validate(computeCIESchema), ctrl.computeCIEForOffering);
+
+// ═══ W02: Assignments ═══════════════════════════════════════
+router.get('/assignments', authorize('academics', 'read'), ctrl.listAssignments);
+router.get('/assignments/:id', authorize('academics', 'read'), ctrl.getAssignment);
+router.post('/assignments', authorize('academics', 'create'), validate(createAssignmentSchema), ctrl.createAssignment);
+router.put('/assignments/:id', authorize('academics', 'update'), validate(updateAssignmentSchema), ctrl.updateAssignment);
+router.delete('/assignments/:id', authorize('academics', 'delete'), ctrl.deleteAssignment);
+
+// ═══ W02: Submissions ═══════════════════════════════════════
+router.get('/submissions', authorize('academics', 'read'), ctrl.listSubmissions);
+router.get('/submissions/:id', authorize('academics', 'read'), ctrl.getSubmission);
+router.post('/submissions', authorize('academics', 'create'), validate(createSubmissionSchema), ctrl.createSubmission);
+router.put('/submissions/:id/grade', authorize('academics', 'update'), validate(gradeSubmissionSchema), ctrl.gradeSubmission);
+router.delete('/submissions/:id', authorize('academics', 'delete'), ctrl.deleteSubmission);
+
+// ═══ W02: Quizzes ═══════════════════════════════════════════
+router.get('/quizzes', authorize('academics', 'read'), ctrl.listQuizzes);
+router.get('/quizzes/:id', authorize('academics', 'read'), ctrl.getQuiz);
+router.post('/quizzes', authorize('academics', 'create'), validate(createQuizSchema), ctrl.createQuiz);
+router.put('/quizzes/:id', authorize('academics', 'update'), validate(updateQuizSchema), ctrl.updateQuiz);
+router.delete('/quizzes/:id', authorize('academics', 'delete'), ctrl.deleteQuiz);
+
+// ═══ W02: Quiz Attempts ═════════════════════════════════════
+router.get('/quiz-attempts', authorize('academics', 'read'), ctrl.listQuizAttempts);
+router.get('/quiz-attempts/:id', authorize('academics', 'read'), ctrl.getQuizAttempt);
+router.post('/quiz-attempts', authorize('academics', 'create'), validate(submitQuizAttemptSchema), ctrl.submitQuizAttempt);
+router.delete('/quiz-attempts/:id', authorize('academics', 'delete'), ctrl.deleteQuizAttempt);
 
 export default router;

@@ -395,3 +395,68 @@ export const reviewCondonationRequestSchema = z.object({
 export const computeCIESchema = z.object({
   courseOfferingId: z.string().min(1, 'Course offering ID is required'),
 });
+
+// ═══ W02: Assignments ═══════════════════════════════════════
+
+export const createAssignmentSchema = z.object({
+  courseOfferingId: z.string().min(1),
+  assessmentId: z.string().optional(),
+  title: z.string().min(1),
+  description: z.string().min(1),
+  instructions: z.string().optional(),
+  maxMarks: z.number().min(0),
+  dueDate: z.string().min(1),
+  status: z.enum(['draft', 'published', 'closed', 'graded']).optional(),
+  coMappings: z.array(z.object({ coCode: z.string(), weight: z.number().min(0).max(1) })).optional(),
+  attachments: z.array(z.string()).optional(),
+});
+export const updateAssignmentSchema = createAssignmentSchema.partial();
+
+// ═══ W02: Submissions ═══════════════════════════════════════
+
+export const createSubmissionSchema = z.object({
+  assignmentId: z.string().min(1),
+  studentId: z.string().min(1),
+  content: z.string().optional(),
+  attachments: z.array(z.string()).optional(),
+});
+export const gradeSubmissionSchema = z.object({
+  marksObtained: z.number().min(0),
+  remarks: z.string().optional(),
+});
+
+// ═══ W02: Quizzes ═══════════════════════════════════════════
+
+export const createQuizSchema = z.object({
+  courseOfferingId: z.string().min(1),
+  assessmentId: z.string().optional(),
+  title: z.string().min(1),
+  description: z.string().optional(),
+  maxMarks: z.number().min(0),
+  duration: z.number().int().min(1),
+  startTime: z.string().min(1),
+  endTime: z.string().min(1),
+  status: z.enum(['draft', 'published', 'active', 'closed', 'graded']).optional(),
+  questions: z.array(z.object({
+    questionText: z.string().min(1),
+    type: z.enum(['mcq', 'true_false', 'short_answer']),
+    options: z.array(z.string()).optional(),
+    correctAnswer: z.string().min(1),
+    marks: z.number().min(0),
+    coCode: z.string().optional(),
+  })),
+  shuffleQuestions: z.boolean().optional(),
+  showResults: z.boolean().optional(),
+});
+export const updateQuizSchema = createQuizSchema.partial();
+
+// ═══ W02: Quiz Attempts ═════════════════════════════════════
+
+export const submitQuizAttemptSchema = z.object({
+  quizId: z.string().min(1),
+  studentId: z.string().min(1),
+  answers: z.array(z.object({
+    questionIndex: z.number().int().min(0),
+    answer: z.string(),
+  })),
+});

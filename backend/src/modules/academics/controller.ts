@@ -669,3 +669,87 @@ export async function computeCIEForOffering(req: AuthRequest, res: Response, nex
     res.json(result);
   } catch (e) { next(e); }
 }
+
+// ═══ W02: Assignments ═══════════════════════════════════════
+
+export async function listAssignments(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page = '1', limit = '20', courseOfferingId } = req.query as any;
+    res.json(await svc.listAssignments(req.collegeId!, +page, +limit, courseOfferingId, req.authScope));
+  } catch (e) { next(e); }
+}
+export async function getAssignment(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await svc.getAssignment(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }
+}
+export async function createAssignment(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await svc.createAssignment(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function updateAssignment(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await svc.updateAssignment(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function deleteAssignment(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await svc.deleteAssignment(req.collegeId!, req.params.id as string, who(req))); } catch (e) { next(e); }
+}
+
+// ═══ W02: Submissions ═══════════════════════════════════════
+
+export async function listSubmissions(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { assignmentId } = req.query as any;
+    res.json(await svc.listSubmissions(req.collegeId!, assignmentId));
+  } catch (e) { next(e); }
+}
+export async function getSubmission(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await svc.getSubmission(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }
+}
+export async function createSubmission(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await svc.createSubmission(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function gradeSubmission(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { marksObtained, remarks } = req.body;
+    res.json(await svc.gradeSubmission(req.collegeId!, req.params.id as string, marksObtained, remarks, who(req)));
+  } catch (e) { next(e); }
+}
+export async function deleteSubmission(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await svc.deleteSubmission(req.collegeId!, req.params.id as string, who(req))); } catch (e) { next(e); }
+}
+
+// ═══ W02: Quizzes ═══════════════════════════════════════════
+
+export async function listQuizzes(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page = '1', limit = '20', courseOfferingId } = req.query as any;
+    res.json(await svc.listQuizzes(req.collegeId!, +page, +limit, courseOfferingId, req.authScope));
+  } catch (e) { next(e); }
+}
+export async function getQuiz(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await svc.getQuiz(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }
+}
+export async function createQuiz(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await svc.createQuiz(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function updateQuiz(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await svc.updateQuiz(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function deleteQuiz(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await svc.deleteQuiz(req.collegeId!, req.params.id as string, who(req))); } catch (e) { next(e); }
+}
+
+// ═══ W02: Quiz Attempts ═════════════════════════════════════
+
+export async function listQuizAttempts(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { quizId } = req.query as any;
+    res.json(await svc.listQuizAttempts(req.collegeId!, quizId));
+  } catch (e) { next(e); }
+}
+export async function getQuizAttempt(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await svc.getQuizAttempt(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }
+}
+export async function submitQuizAttempt(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await svc.submitQuizAttempt(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function deleteQuizAttempt(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await svc.deleteQuizAttempt(req.collegeId!, req.params.id as string, who(req))); } catch (e) { next(e); }
+}
