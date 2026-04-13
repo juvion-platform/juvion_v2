@@ -638,3 +638,14 @@ export const generateTranscriptSchema = z.object({
   transcriptType: z.enum(['semester', 'consolidated', 'provisional']),
   semesterId: z.string().min(1).optional(),
 });
+
+// ═══ W02 Phase 3: Notifications & JNTU Integration ═══════════════════
+
+export const dispatchAcademicNotificationsSchema = z.object({
+  semesterId: z.string().min(1),
+  eventType: z.enum(['result_published', 'attendance_warning', 'exam_scheduled', 'assignment_due']),
+});
+
+export const submitResultsToJNTUSchema = z.object({
+  semesterId: z.string().min(1),
+});

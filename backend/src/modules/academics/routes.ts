@@ -75,6 +75,8 @@ import {
   transitionStudentStatesSchema,
   appendAcademicHistorySchema,
   generateTranscriptSchema,
+  dispatchAcademicNotificationsSchema,
+  submitResultsToJNTUSchema,
 } from './validation';
 
 const router = Router();
@@ -430,5 +432,12 @@ router.post('/risk-alerts/generate', authorize('academics', 'create'), validate(
 router.post('/students/transition-states', authorize('academics', 'create'), validate(transitionStudentStatesSchema), ctrl.transitionStudentStates);
 router.post('/students/append-history', authorize('academics', 'create'), validate(appendAcademicHistorySchema), ctrl.appendAcademicHistory);
 router.post('/transcripts/generate', authorize('academics', 'create'), validate(generateTranscriptSchema), ctrl.generateTranscript);
+
+// ═══ W02 Phase 3: Notifications ═════════════════════════════════
+router.post('/notifications/dispatch', authorize('academics', 'create'), validate(dispatchAcademicNotificationsSchema), ctrl.dispatchAcademicNotifications);
+
+// ═══ W02 Phase 3: JNTU Integration Stubs ════════════════════════
+router.post('/jntu/submit-results', authorize('academics', 'create'), validate(submitResultsToJNTUSchema), ctrl.submitResultsToJNTU);
+router.post('/jntu/fetch-regulations', authorize('academics', 'create'), ctrl.fetchJNTURegulations);
 
 export default router;

@@ -53,6 +53,8 @@ import { EvidenceRecord } from '../../models/compliance/EvidenceRecord';
 import { RiskAlert } from '../../models/governance/RiskAlert';
 import { AcademicHistory } from '../../models/people/AcademicHistory';
 import { Transcript } from '../../models/people/Transcript';
+import { Notification } from '../../models/communication/Notification';
+import { IntegrationLog } from '../../models/platform/IntegrationLog';
 import { paginate } from '../../shared/pagination';
 import { createAuditLog } from '../../shared/audit';
 import { AppError } from '../../middleware/errorHandler';
@@ -5205,4 +5207,185 @@ export async function generateTranscript(
   });
 
   return transcript.toObject() as unknown as Record<string, unknown>;
+}
+
+// ═══ W02 Phase 3: Notification Dispatch ════════════════════════════
+
+export async function dispatchAcademicNotifications(
+  collegeId: string,
+  semesterId: string,
+  eventType: 'result_published' | 'attendance_warning' | 'exam_scheduled' | 'assignment_due',
+  performedBy: string,
+): Promise<{ dispatched: number }> {
+  const { Types } = await import('mongoose');
+  const sentById = new Types.ObjectId(performedBy);
+  const notificationsToInsert: Array<{
+    collegeId: typeof Types.ObjectId.prototype;
+    title: string;
+    message: string;
+    type: string;
+    targetAudience: string;
+    targetIds?: typeof Types.ObjectId.prototype[];
+    channel: string;
+    status: string;
+    sentAt: Date;
+    sentBy: typeof Types.ObjectId.prototype;
+  }> = [];
+
+  const collegeOid = new Types.ObjectId(collegeId);
+
+  if (eventType === 'result_published') {
+    const results = await SemesterResult.find({ collegeId, semesterId, status: 'published' });
+    if (results.length > 0) {
+      notificationsToInsert.push({
+        collegeId: collegeOid,
+        title: 'Results Published',
+        message: `Semester results for semester ${semesterId} have been published. Please check your grade card.`,
+        type: 'info',
+        targetAudience: 'students',
+        channel: 'app',
+        status: 'sent',
+        sentAt: new Date(),
+        sentBy: sentById,
+      });
+    }
+  } else if (eventType === 'attendance_warning') {
+    const alerts = await AttendanceAlert.find({ collegeId, semesterId, status: 'active' });
+    for (const alert of alerts) {
+      notificationsToInsert.push({
+        collegeId: collegeOid,
+        title: 'Attendance Warning',
+        message: `Your attendance is below the required threshold. Please regularize attendance immediately.`,
+        type: 'alert',
+        targetAudience: 'individual',
+        targetIds: [new Types.ObjectId(String(alert.studentId))],
+        channel: 'app',
+        status: 'sent',
+        sentAt: new Date(),
+        sentBy: sentById,
+      });
+    }
+  } else if (eventType === 'exam_scheduled') {
+    const schedules = await ExamSchedule.find({ collegeId, semesterId });
+    if (schedules.length > 0) {
+      notificationsToInsert.push({
+        collegeId: collegeOid,
+        title: 'Exam Schedule Published',
+        message: `Exam schedule for semester ${semesterId} has been published. Please check the exam timetable.`,
+        type: 'reminder',
+        targetAudience: 'students',
+        channel: 'app',
+        status: 'sent',
+        sentAt: new Date(),
+        sentBy: sentById,
+      });
+    }
+  } else if (eventType === 'assignment_due') {
+    const now = new Date();
+    const cutoff = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+    const assignments = await Assignment.find({
+      collegeId,
+      status: 'published',
+      dueDate: { $gte: now, $lte: cutoff },
+    });
+    const offeringIds = [...new Set(assignments.map(a => String(a.courseOfferingId)))];
+    for (const _offeringId of offeringIds) {
+      notificationsToInsert.push({
+        collegeId: collegeOid,
+        title: 'Assignment Due Soon',
+        message: `You have assignments due within the next 48 hours. Please submit them on time.`,
+        type: 'reminder',
+        targetAudience: 'students',
+        channel: 'app',
+        status: 'sent',
+        sentAt: new Date(),
+        sentBy: sentById,
+      });
+    }
+    // If no assignments found, dispatched will be 0
+    if (assignments.length === 0) {
+      return { dispatched: 0 };
+    }
+  }
+
+  if (notificationsToInsert.length > 0) {
+    await Notification.insertMany(notificationsToInsert);
+  }
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'Notification',
+    entityId: semesterId,
+    entityName: `Academic notifications dispatch: ${eventType}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return { dispatched: notificationsToInsert.length };
+}
+
+// ═══ W02 Phase 3: JNTU Integration Stubs ═══════════════════════════
+
+export async function submitResultsToJNTU(
+  collegeId: string,
+  semesterId: string,
+  performedBy: string,
+): Promise<{ integrationLogId: string; status: string; message: string }> {
+  const log = await IntegrationLog.create({
+    collegeId,
+    provider: 'JNTU',
+    endpoint: '/api/v1/results/submit',
+    method: 'POST',
+    requestPayload: { semesterId, collegeId, submittedAt: new Date() },
+    status: 'pending',
+    startedAt: new Date(),
+  });
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'IntegrationLog',
+    entityId: String(log._id),
+    entityName: `JNTU result submission for semester ${semesterId}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return {
+    integrationLogId: String(log._id),
+    status: 'pending',
+    message: 'JNTU result submission queued (stub)',
+  };
+}
+
+export async function fetchJNTURegulations(
+  collegeId: string,
+  performedBy: string,
+): Promise<{ integrationLogId: string; status: string; message: string }> {
+  const log = await IntegrationLog.create({
+    collegeId,
+    provider: 'JNTU',
+    endpoint: '/api/v1/regulations',
+    method: 'GET',
+    requestPayload: { collegeId, requestedAt: new Date() },
+    status: 'pending',
+    startedAt: new Date(),
+  });
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'IntegrationLog',
+    entityId: String(log._id),
+    entityName: 'JNTU regulation fetch',
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return {
+    integrationLogId: String(log._id),
+    status: 'pending',
+    message: 'JNTU regulation fetch queued (stub)',
+  };
 }

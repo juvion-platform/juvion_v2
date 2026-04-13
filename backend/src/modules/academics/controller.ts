@@ -1090,3 +1090,28 @@ export async function generateTranscript(req: AuthRequest, res: Response, next: 
     res.status(201).json(result);
   } catch (e) { next(e); }
 }
+
+// ═══ W02 Phase 3: Notification Dispatch ═════════════════════════════
+export async function dispatchAcademicNotifications(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { semesterId, eventType } = req.body;
+    const result = await svc.dispatchAcademicNotifications(req.collegeId!, semesterId, eventType, who(req));
+    res.status(201).json(result);
+  } catch (e) { next(e); }
+}
+
+// ═══ W02 Phase 3: JNTU Integration Stubs ════════════════════════════
+export async function submitResultsToJNTU(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { semesterId } = req.body;
+    const result = await svc.submitResultsToJNTU(req.collegeId!, semesterId, who(req));
+    res.status(201).json(result);
+  } catch (e) { next(e); }
+}
+
+export async function fetchJNTURegulations(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const result = await svc.fetchJNTURegulations(req.collegeId!, who(req));
+    res.status(201).json(result);
+  } catch (e) { next(e); }
+}
