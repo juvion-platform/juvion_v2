@@ -1,10 +1,8 @@
-import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
-import { connectDB } from './config/db';
 import { errorHandler } from './middleware/errorHandler';
 import apiRouter from './routes';
 import authRouter from './modules/auth/routes';
@@ -14,7 +12,6 @@ import './shared/workflow/definitions';
 import './modules/admissions/workflow.handlers';
 
 const app = express();
-const PORT = process.env.PORT || 3003;
 
 app.use(helmet());
 
@@ -52,14 +49,5 @@ app.get('/api/health', (_req, res) => res.json({ status: 'ok', version: '2.0.0' 
 app.use('/api/auth', authRouter);
 app.use('/api', apiRouter);
 app.use(errorHandler);
-
-async function start() {
-  await connectDB();
-  app.listen(PORT, () => {
-    console.log(`Juvion v2 API running on http://localhost:${PORT}`);
-  });
-}
-
-start().catch(err => { console.error('Failed to start:', err); process.exit(1); });
 
 export default app;

@@ -44,4 +44,4 @@ const policySchema = new Schema<IPolicy>(
 policySchema.index({ collegeId: 1, role: 1, module: 1, isActive: 1 });
 policySchema.index({ collegeId: 1, isActive: 1 });
 
-export const Policy = mongoose.model<IPolicy>('Policy', policySchema);
+export const Policy = (mongoose.models['RbacPolicy'] as mongoose.Model<IPolicy>) || mongoose.model<IPolicy>('RbacPolicy', policySchema);
