@@ -4,6 +4,8 @@ import { Department } from '../../models/academic-structure/Department';
 import { Branch } from '../../models/academic-structure/Branch';
 import { Batch } from '../../models/academic-structure/Batch';
 import { Section } from '../../models/academic-structure/Section';
+import { LabBatch } from '../../models/academic-structure/LabBatch';
+import { Student } from '../../models/people/Student';
 import { AcademicYear } from '../../models/academic-structure/AcademicYear';
 import { Semester } from '../../models/academic-structure/Semester';
 import { Course } from '../../models/academic-ops/Course';
@@ -981,4 +983,154 @@ export async function publishAcademicCalendar(
   });
 
   return calendar;
+}
+
+// ═══ W02: Section Formation & Lab Batch Creation ═════════════
+
+export async function formSections(
+  collegeId: string,
+  branchId: string,
+  batchId: string,
+  semesterId: string,
+  year: number,
+  semester: number,
+  performedBy: string,
+) {
+  // 1. Find all active students for the given branch/batch
+  const students = await Student.find({
+    collegeId,
+    branchId,
+    batchId,
+    status: 'active',
+  }).lean();
+
+  if (students.length === 0) {
+    throw new AppError(404, 'No active students found for the given branch and batch');
+  }
+
+  // 2. Read the Branch to get intake (section capacity)
+  const branch = await Branch.findOne({ _id: branchId, collegeId });
+  const sectionCapacity = branch?.intake || 60;
+
+  // 3. Calculate number of sections needed
+  const numSections = Math.ceil(students.length / sectionCapacity);
+
+  const createdSections = [];
+  let studentsDistributed = 0;
+
+  // 4. Create each section with distributed students
+  for (let i = 0; i < numSections; i++) {
+    const sectionName = String.fromCharCode(65 + i); // 'A', 'B', 'C', ...
+    const startIdx = i * sectionCapacity;
+    const endIdx = Math.min(startIdx + sectionCapacity, students.length);
+    const sectionStudents = students.slice(startIdx, endIdx);
+    const studentIds = sectionStudents.map((s) => s._id);
+
+    const section = await Section.create({
+      collegeId,
+      branchId,
+      batchId,
+      year,
+      semester,
+      name: sectionName,
+      capacity: sectionCapacity,
+      studentIds,
+    });
+
+    studentsDistributed += sectionStudents.length;
+    createdSections.push(section);
+
+    await createAuditLog({
+      collegeId,
+      entityType: 'Section',
+      entityId: String(section._id),
+      entityName: sectionName,
+      action: 'create',
+      changes: [
+        { field: 'students', displayName: 'Students Assigned', oldValue: '0', newValue: String(sectionStudents.length) },
+        { field: 'semesterId', displayName: 'Semester', oldValue: '', newValue: semesterId },
+      ],
+      performedBy,
+    });
+  }
+
+  return { sectionsCreated: createdSections.length, studentsDistributed };
+}
+
+export async function createLabBatches(
+  collegeId: string,
+  sectionId: string,
+  labBatchSize: number = 25,
+  performedBy: string,
+) {
+  // 1. Find the Section
+  const section = await Section.findOne({ _id: sectionId, collegeId });
+  if (!section) throw new AppError(404, 'Section not found');
+
+  // 2. Get the section's studentIds
+  const studentIds = section.studentIds || [];
+  if (studentIds.length === 0) {
+    throw new AppError(400, 'Section has no students assigned');
+  }
+
+  // 3. Calculate batches needed
+  const numBatches = Math.ceil(studentIds.length / labBatchSize);
+
+  // 4. We need a semesterId for the LabBatch — look up from the section's semester
+  const semester = await Semester.findOne({
+    collegeId,
+    number: section.semester,
+    year: section.year,
+  });
+  if (!semester) throw new AppError(404, 'Semester not found for this section');
+
+  const createdBatches = [];
+
+  for (let i = 0; i < numBatches; i++) {
+    const batchName = `Batch ${i + 1}`;
+    const startIdx = i * labBatchSize;
+    const endIdx = Math.min(startIdx + labBatchSize, studentIds.length);
+    const batchStudents = studentIds.slice(startIdx, endIdx);
+
+    const labBatch = await LabBatch.create({
+      collegeId,
+      sectionId,
+      name: batchName,
+      capacity: labBatchSize,
+      studentIds: batchStudents,
+      semesterId: semester._id,
+    });
+
+    createdBatches.push(labBatch);
+
+    await createAuditLog({
+      collegeId,
+      entityType: 'LabBatch',
+      entityId: String(labBatch._id),
+      entityName: batchName,
+      action: 'create',
+      changes: [
+        { field: 'students', displayName: 'Students Assigned', oldValue: '0', newValue: String(batchStudents.length) },
+      ],
+      performedBy,
+    });
+  }
+
+  // 5. Update the Section's labBatchCount
+  section.labBatchCount = numBatches;
+  await section.save();
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'Section',
+    entityId: String(section._id),
+    entityName: section.name,
+    action: 'update',
+    changes: [
+      { field: 'labBatchCount', displayName: 'Lab Batch Count', oldValue: '0', newValue: String(numBatches) },
+    ],
+    performedBy,
+  });
+
+  return { labBatchesCreated: createdBatches.length };
 }

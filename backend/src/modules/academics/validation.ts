@@ -329,3 +329,17 @@ export const createCourseFeedbackSchema = z.object({
   comments: z.string().optional(),
 });
 export const updateCourseFeedbackSchema = createCourseFeedbackSchema.partial();
+
+// ═══ W02: Section Formation & Lab Batch Creation ═════════════
+
+export const formSectionsSchema = z.object({
+  branchId: z.string().min(1, 'Branch is required'),
+  batchId: z.string().min(1, 'Batch is required'),
+  semesterId: z.string().min(1, 'Semester is required'),
+  year: z.number().int().min(1).max(6),
+  semester: z.number().int().min(1).max(12),
+});
+
+export const createLabBatchesSchema = z.object({
+  labBatchSize: z.number().int().min(1).optional(),
+});

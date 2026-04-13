@@ -510,3 +510,24 @@ export async function publishAcademicCalendar(req: AuthRequest, res: Response, n
     res.json(result);
   } catch (e) { next(e); }
 }
+
+// ═══ W02: Section Formation & Lab Batch Creation ═════════════
+export async function formSections(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { branchId, batchId, semesterId, year, semester } = req.body;
+    const result = await svc.formSections(
+      req.collegeId!, branchId, batchId, semesterId, year, semester, who(req),
+    );
+    res.status(201).json(result);
+  } catch (e) { next(e); }
+}
+
+export async function createLabBatches(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { labBatchSize } = req.body;
+    const result = await svc.createLabBatches(
+      req.collegeId!, req.params.id as string, labBatchSize, who(req),
+    );
+    res.status(201).json(result);
+  } catch (e) { next(e); }
+}

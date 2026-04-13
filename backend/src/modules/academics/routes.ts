@@ -34,6 +34,8 @@ import {
   createLessonPlanSchema, updateLessonPlanSchema,
   createCourseFeedbackSchema,
   instantiateCurriculumSchema,
+  formSectionsSchema,
+  createLabBatchesSchema,
 } from './validation';
 
 const router = Router();
@@ -245,5 +247,9 @@ router.delete('/course-feedback/:id', authorize('academics', 'delete'), ctrl.del
 // ═══ W02: Curriculum Instantiation & Calendar Publish ═════════
 router.post('/curriculum/instantiate', authorize('academics', 'create'), validate(instantiateCurriculumSchema), ctrl.instantiateSemesterCurriculum);
 router.post('/academic-calendar/:id/publish', authorize('academics', 'update'), ctrl.publishAcademicCalendar);
+
+// ═══ W02: Section Formation & Lab Batch Creation ═════════════
+router.post('/sections/form', authorize('academics', 'create'), validate(formSectionsSchema), ctrl.formSections);
+router.post('/sections/:id/lab-batches', authorize('academics', 'create'), validate(createLabBatchesSchema), ctrl.createLabBatches);
 
 export default router;
