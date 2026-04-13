@@ -659,3 +659,13 @@ export async function reviewCondonationRequest(req: AuthRequest, res: Response, 
     res.json(result);
   } catch (e) { next(e); }
 }
+
+// ═══ W02: CIE Computation Engine ═══════════════════════════
+
+export async function computeCIEForOffering(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { courseOfferingId } = req.body;
+    const result = await svc.computeCIEForOffering(req.collegeId!, courseOfferingId, who(req));
+    res.json(result);
+  } catch (e) { next(e); }
+}

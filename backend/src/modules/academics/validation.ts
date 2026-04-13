@@ -389,3 +389,9 @@ export const reviewCondonationRequestSchema = z.object({
   decision: z.enum(['approved', 'rejected']),
   reviewRemarks: z.string().optional(),
 });
+
+// ═══ W02: CIE Computation Engine ═══════════════════════════
+
+export const computeCIESchema = z.object({
+  courseOfferingId: z.string().min(1, 'Course offering ID is required'),
+});

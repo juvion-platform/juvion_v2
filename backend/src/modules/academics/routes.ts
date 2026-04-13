@@ -43,6 +43,7 @@ import {
   refreshAttendanceSummarySchema,
   submitCondonationRequestSchema,
   reviewCondonationRequestSchema,
+  computeCIESchema,
 } from './validation';
 
 const router = Router();
@@ -284,5 +285,8 @@ router.post('/condonation-requests', authorize('academics', 'create'), validate(
 router.get('/condonation-requests', authorize('academics', 'read'), ctrl.listCondonationRequests);
 router.get('/condonation-requests/:id', authorize('academics', 'read'), ctrl.getCondonationRequest);
 router.put('/condonation-requests/:id/review', authorize('academics', 'update'), validate(reviewCondonationRequestSchema), ctrl.reviewCondonationRequest);
+
+// ═══ W02: CIE Computation Engine ═══════════════════════════
+router.post('/internal-assessments/compute-cie', authorize('academics', 'create'), validate(computeCIESchema), ctrl.computeCIEForOffering);
 
 export default router;

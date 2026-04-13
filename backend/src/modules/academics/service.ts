@@ -1979,3 +1979,293 @@ export async function reviewCondonationRequest(
 
   return doc;
 }
+
+// ═══ W02: CIE Computation Engine ═══════════════════════════
+
+export interface CIEComponentResult {
+  type: string;
+  rawMarks: number;
+  maxMarks: number;
+  normalizedMarks: number;
+  weight: number;
+  weightedMarks: number;
+}
+
+export interface CIEResult {
+  cieMarks: number;
+  totalCIEMarks: number;
+  isComplete: boolean;
+  components: CIEComponentResult[];
+}
+
+export interface CIEOfferingResult {
+  courseOfferingId: string;
+  results: Array<{
+    studentId: string;
+    cieMarks: number;
+    totalCIEMarks: number;
+    isComplete: boolean;
+    components: CIEComponentResult[];
+  }>;
+  summary: {
+    totalStudents: number;
+    computed: number;
+    incomplete: number;
+    averageCIE: number;
+  };
+}
+
+export async function computeCIE(
+  collegeId: string,
+  courseOfferingId: string,
+  studentId: string,
+): Promise<CIEResult> {
+  // 1. Load CourseOffering
+  const offering = await CourseOffering.findOne({ _id: courseOfferingId, collegeId });
+  if (!offering) throw new AppError(404, 'Course offering not found');
+
+  // 2. Load Course to get regulationId
+  const course = await Course.findOne({ _id: offering.courseId, collegeId });
+  if (!course) throw new AppError(404, 'Course not found');
+
+  // 3. Load Regulation to get cieFormula
+  const regulation = await Regulation.findOne({ _id: course.regulationId, collegeId });
+  if (!regulation) throw new AppError(404, 'Regulation not found');
+
+  // 4. Check if cieFormula is configured
+  if (!regulation.cieFormula || !regulation.cieFormula.components || regulation.cieFormula.components.length === 0) {
+    throw new AppError(400, 'CIE formula not configured for this regulation');
+  }
+
+  const { components: formulaComponents, totalCIEMarks } = regulation.cieFormula;
+
+  // 5. Load all InternalAssessments for this courseOffering with valid status
+  const assessments = await InternalAssessment.find({
+    collegeId,
+    courseOfferingId,
+    status: { $in: ['marks_entered', 'finalized'] },
+  }).sort({ date: 1 });
+
+  // 6. Load all InternalMarks for those assessments for this student
+  const assessmentIds = assessments.map((a) => a._id);
+  const marks = await InternalMark.find({
+    collegeId,
+    assessmentId: { $in: assessmentIds },
+    studentId,
+  });
+
+  // Build lookup: assessmentId -> mark
+  const markByAssessmentId = new Map<string, number>();
+  for (const m of marks) {
+    markByAssessmentId.set(String(m.assessmentId), m.marksObtained);
+  }
+
+  // 7. Process each formula component
+  let isComplete = true;
+  const componentResults: CIEComponentResult[] = [];
+
+  // Track which grouped components have been processed (for best_of grouping)
+  const processedGroups = new Set<string>();
+
+  for (const comp of formulaComponents) {
+    // Skip if this component was already processed as part of a group
+    if (comp.groupWith && processedGroups.has(comp.groupWith)) continue;
+    if (processedGroups.has(comp.type)) continue;
+
+    // For best_of with groupWith, gather both this type and the grouped type
+    const typesToMatch: string[] = [comp.type];
+    if (comp.aggregation === 'best_of' && comp.groupWith) {
+      typesToMatch.push(comp.groupWith);
+      processedGroups.add(comp.type);
+      processedGroups.add(comp.groupWith);
+    } else {
+      processedGroups.add(comp.type);
+    }
+
+    // Find all assessments matching the types
+    const matchingAssessments = assessments.filter((a) => typesToMatch.includes(a.type));
+
+    // Find the student's marks for those assessments
+    const studentMarks: { marksObtained: number; maxMarks: number; date?: Date }[] = [];
+    for (const a of matchingAssessments) {
+      const mark = markByAssessmentId.get(String(a._id));
+      if (mark !== undefined) {
+        studentMarks.push({ marksObtained: mark, maxMarks: a.maxMarks, date: a.date });
+      }
+    }
+
+    // If ANY component has no marks at all, mark isComplete = false
+    if (studentMarks.length === 0) {
+      isComplete = false;
+      componentResults.push({
+        type: comp.type,
+        rawMarks: 0,
+        maxMarks: comp.maxMarks,
+        normalizedMarks: 0,
+        weight: comp.weight,
+        weightedMarks: 0,
+      });
+      continue;
+    }
+
+    // Apply aggregation
+    let rawMarks = 0;
+    let rawMaxMarks = 0;
+
+    switch (comp.aggregation) {
+      case 'best_of': {
+        // Normalize each mark to a common scale, then pick the best
+        let bestNormalized = 0;
+        let bestRaw = 0;
+        let bestMax = 0;
+        for (const sm of studentMarks) {
+          const normalized = sm.maxMarks > 0 ? (sm.marksObtained / sm.maxMarks) * comp.maxMarks : 0;
+          if (normalized > bestNormalized) {
+            bestNormalized = normalized;
+            bestRaw = sm.marksObtained;
+            bestMax = sm.maxMarks;
+          }
+        }
+        rawMarks = bestRaw;
+        rawMaxMarks = bestMax;
+        break;
+      }
+      case 'average': {
+        const totalNormalized = studentMarks.reduce(
+          (sum, sm) => sum + (sm.maxMarks > 0 ? (sm.marksObtained / sm.maxMarks) * comp.maxMarks : 0),
+          0,
+        );
+        const avgRaw = studentMarks.reduce((sum, sm) => sum + sm.marksObtained, 0) / studentMarks.length;
+        // For average, we normalize the averaged result
+        const avgNormalized = totalNormalized / studentMarks.length;
+        componentResults.push({
+          type: comp.type,
+          rawMarks: Math.round(avgRaw * 100) / 100,
+          maxMarks: comp.maxMarks,
+          normalizedMarks: Math.round(avgNormalized * 100) / 100,
+          weight: comp.weight,
+          weightedMarks: Math.round(avgNormalized * comp.weight * 100) / 100,
+        });
+        continue;
+      }
+      case 'sum': {
+        rawMarks = studentMarks.reduce((sum, sm) => sum + sm.marksObtained, 0);
+        rawMaxMarks = studentMarks.reduce((sum, sm) => sum + sm.maxMarks, 0);
+        break;
+      }
+      case 'latest': {
+        // Take the most recent mark (last in date-sorted list)
+        const latest = studentMarks[studentMarks.length - 1];
+        rawMarks = latest?.marksObtained ?? 0;
+        rawMaxMarks = latest?.maxMarks ?? comp.maxMarks;
+        break;
+      }
+      default: {
+        // Fallback: treat as average
+        rawMarks = studentMarks.reduce((sum, sm) => sum + sm.marksObtained, 0) / studentMarks.length;
+        rawMaxMarks = studentMarks[0]?.maxMarks ?? comp.maxMarks;
+        break;
+      }
+    }
+
+    // Normalize to the formula component's maxMarks
+    const normalizedMarks = rawMaxMarks > 0 ? (rawMarks / rawMaxMarks) * comp.maxMarks : 0;
+    const weightedMarks = normalizedMarks * comp.weight;
+
+    componentResults.push({
+      type: comp.type,
+      rawMarks: Math.round(rawMarks * 100) / 100,
+      maxMarks: comp.maxMarks,
+      normalizedMarks: Math.round(normalizedMarks * 100) / 100,
+      weight: comp.weight,
+      weightedMarks: Math.round(weightedMarks * 100) / 100,
+    });
+  }
+
+  // 8. Sum all weightedMarks to get cieMarks
+  const rawCIE = componentResults.reduce((sum, c) => sum + c.weightedMarks, 0);
+
+  // 9. Cap at totalCIEMarks
+  const cieMarks = Math.min(Math.round(rawCIE * 100) / 100, totalCIEMarks);
+
+  // 10. Return breakdown
+  return {
+    cieMarks,
+    totalCIEMarks,
+    isComplete,
+    components: componentResults,
+  };
+}
+
+export async function computeCIEForOffering(
+  collegeId: string,
+  courseOfferingId: string,
+  performedBy: string,
+): Promise<CIEOfferingResult> {
+  // Verify the course offering exists
+  const offering = await CourseOffering.findOne({ _id: courseOfferingId, collegeId });
+  if (!offering) throw new AppError(404, 'Course offering not found');
+
+  // 1. Load all enrollments for this courseOfferingId with status 'enrolled'
+  const enrollments = await Enrollment.find({
+    collegeId,
+    courseOfferingId,
+    status: 'enrolled',
+  });
+
+  if (enrollments.length === 0) {
+    throw new AppError(400, 'No enrolled students found for this course offering');
+  }
+
+  // 2. For each enrolled student, call computeCIE()
+  const results: CIEOfferingResult['results'] = [];
+  let incompleteCount = 0;
+  let totalCIE = 0;
+
+  for (const enrollment of enrollments) {
+    const studentResult = await computeCIE(collegeId, courseOfferingId, String(enrollment.studentId));
+    const entry = {
+      studentId: String(enrollment.studentId),
+      cieMarks: studentResult.cieMarks,
+      totalCIEMarks: studentResult.totalCIEMarks,
+      isComplete: studentResult.isComplete,
+      components: studentResult.components,
+    };
+    results.push(entry);
+    totalCIE += studentResult.cieMarks;
+    if (!studentResult.isComplete) incompleteCount++;
+  }
+
+  // 3. Aggregate summary stats
+  const computedCount = results.length;
+  const averageCIE = computedCount > 0
+    ? Math.round((totalCIE / computedCount) * 100) / 100
+    : 0;
+
+  // 4. Create audit log
+  await createAuditLog({
+    collegeId,
+    entityType: 'CourseOffering',
+    entityId: courseOfferingId,
+    entityName: `CIE-Computation-${courseOfferingId.slice(-6)}`,
+    action: 'update',
+    changes: [{
+      field: 'cieComputation',
+      displayName: 'CIE Computation',
+      oldValue: '',
+      newValue: `Computed for ${computedCount} students, ${incompleteCount} incomplete`,
+    }],
+    performedBy,
+  });
+
+  return {
+    courseOfferingId,
+    results,
+    summary: {
+      totalStudents: enrollments.length,
+      computed: computedCount,
+      incomplete: incompleteCount,
+      averageCIE,
+    },
+  };
+}
