@@ -3,6 +3,10 @@ import { Schema, model, Document } from 'mongoose';
 export interface IPaymentGatewayLog extends Document {
   collegeId: Schema.Types.ObjectId;
   studentId: Schema.Types.ObjectId; orderId: string; gateway: string; amount: number; currency: string; status: string; gatewayResponse?: Record<string, any>; initiatedAt: Date; completedAt?: Date;
+  invoiceId?: Schema.Types.ObjectId;
+  signatureVerified?: boolean;
+  webhookReceivedAt?: Date;
+  idempotencyKey?: string;
 }
 
 const schema = new Schema<IPaymentGatewayLog>({
@@ -16,6 +20,10 @@ const schema = new Schema<IPaymentGatewayLog>({
   gatewayResponse: Schema.Types.Mixed,
   initiatedAt: { type: Date, default: Date.now },
   completedAt: Date,
+  invoiceId: { type: Schema.Types.ObjectId, ref: 'Invoice' },
+  signatureVerified: { type: Boolean },
+  webhookReceivedAt: { type: Date },
+  idempotencyKey: { type: String },
 }, { timestamps: true });
 
 schema.index({ collegeId: 1, orderId: 1 }, { unique: true });

@@ -5,6 +5,12 @@ export interface IInvoice extends Document {
   invoiceNumber: string; studentId?: Schema.Types.ObjectId; type: string; items: { description: string; amount: number }[]; totalAmount: number; dueDate: Date; status: string; issuedDate: Date;
   examType?: string;
   semesterId?: Schema.Types.ObjectId;
+  feeAgreementId?: Schema.Types.ObjectId;
+  netPayable?: number;
+  scholarshipAllocated?: number;
+  concessionApplied?: number;
+  paymentPlanId?: Schema.Types.ObjectId;
+  batchId?: string;
 }
 
 const schema = new Schema<IInvoice>({
@@ -15,10 +21,16 @@ const schema = new Schema<IInvoice>({
   items: [{ description: String, amount: Number }],
   totalAmount: { type: Number, required: true },
   dueDate: { type: Date, required: true },
-  status: { type: String, enum: ['draft', 'issued', 'paid', 'overdue', 'cancelled'], default: 'draft' },
+  status: { type: String, enum: ['draft', 'generated', 'sent', 'partially_paid', 'paid', 'overdue', 'disputed', 'confirmed', 'written_off', 'cancelled'], default: 'draft' },
   issuedDate: { type: Date, default: Date.now },
   examType: { type: String },
   semesterId: { type: Schema.Types.ObjectId, ref: 'Semester' },
+  feeAgreementId: { type: Schema.Types.ObjectId, ref: 'FeeAgreement' },
+  netPayable: { type: Number },
+  scholarshipAllocated: { type: Number, default: 0 },
+  concessionApplied: { type: Number, default: 0 },
+  paymentPlanId: { type: Schema.Types.ObjectId, ref: 'PaymentPlan' },
+  batchId: { type: String },
 }, { timestamps: true });
 
 schema.index({ collegeId: 1, invoiceNumber: 1 }, { unique: true });
