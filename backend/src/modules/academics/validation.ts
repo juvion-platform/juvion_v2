@@ -530,3 +530,9 @@ export const validateExternalMarksSchema = z.object({
 export const computeGradesSchema = z.object({
   semesterId: z.string().min(1),
 });
+
+// ═══ W02: SGPA/CGPA Computation ═══════════════════════════════
+
+export const computeSemesterResultsSchema = z.object({
+  semesterId: z.string().min(1, 'Semester ID is required'),
+});

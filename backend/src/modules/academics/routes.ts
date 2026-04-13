@@ -58,6 +58,7 @@ import {
   bulkEnterExternalMarksSchema,
   validateExternalMarksSchema,
   computeGradesSchema,
+  computeSemesterResultsSchema,
 } from './validation';
 
 const router = Router();
@@ -364,5 +365,8 @@ router.post('/external-marks/validate', authorize('academics', 'update'), valida
 
 // ═══ W02: Grade Computation ═════════════════════════════════
 router.post('/grades/compute', authorize('academics', 'create'), validate(computeGradesSchema), ctrl.computeGradesForSemester);
+
+// ═══ W02: SGPA/CGPA Computation ═══════════════════════════════
+router.post('/semester-results/compute', authorize('academics', 'create'), validate(computeSemesterResultsSchema), ctrl.computeSemesterResults);
 
 export default router;

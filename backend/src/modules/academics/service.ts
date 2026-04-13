@@ -3345,3 +3345,145 @@ export async function computeGradesForSemester(
 
   return { processed, passed, failed, backlogsCreated, gradeCards };
 }
+
+// ═══ W02: SGPA/CGPA Computation ═══════════════════════════════
+
+export function computeSGPA(
+  gradeCards: Array<{ gradePoints: number; credits: number }>,
+): number {
+  let totalWeighted = 0;
+  let totalCredits = 0;
+  for (const gc of gradeCards) {
+    if (gc.credits === 0) continue; // skip audit courses
+    totalWeighted += gc.gradePoints * gc.credits;
+    totalCredits += gc.credits;
+  }
+  if (totalCredits === 0) return 0;
+  return Math.round((totalWeighted / totalCredits) * 100) / 100;
+}
+
+export function computeCGPA(
+  allGradeCards: Array<{ courseId: string; gradePoints: number; credits: number }>,
+): number {
+  // Deduplicate by courseId — keep last entry (latest attempt)
+  const latestByCourse = new Map<string, { gradePoints: number; credits: number }>();
+  for (const gc of allGradeCards) {
+    latestByCourse.set(gc.courseId, { gradePoints: gc.gradePoints, credits: gc.credits });
+  }
+  let totalWeighted = 0;
+  let totalCredits = 0;
+  for (const entry of latestByCourse.values()) {
+    if (entry.credits === 0) continue; // skip audit courses
+    totalWeighted += entry.gradePoints * entry.credits;
+    totalCredits += entry.credits;
+  }
+  if (totalCredits === 0) return 0;
+  return Math.round((totalWeighted / totalCredits) * 100) / 100;
+}
+
+export async function computeSemesterResults(
+  collegeId: string,
+  semesterId: string,
+  performedBy: string,
+): Promise<{
+  processed: number;
+  results: Array<{
+    studentId: string;
+    sgpa: number;
+    cgpa: number;
+    totalCreditsEarned: number;
+    totalCreditsRegistered: number;
+    backlogs: number;
+    result: string;
+  }>;
+}> {
+  // 1. Get all unique studentIds who have GradeCards for this semester
+  const semGradeCards = await GradeCard.find({ collegeId, semesterId }).lean();
+  const studentIds = [...new Set(semGradeCards.map(gc => String(gc.studentId)))];
+
+  if (studentIds.length === 0) {
+    throw new AppError(404, 'No grade cards found for the given semester');
+  }
+
+  const results: Array<{
+    studentId: string;
+    sgpa: number;
+    cgpa: number;
+    totalCreditsEarned: number;
+    totalCreditsRegistered: number;
+    backlogs: number;
+    result: string;
+  }> = [];
+
+  for (const studentId of studentIds) {
+    // 2a. Get all GradeCards for this semester for this student
+    const studentSemCards = semGradeCards.filter(gc => String(gc.studentId) === studentId);
+
+    // 2b. Compute SGPA
+    const sgpa = computeSGPA(studentSemCards.map(gc => ({
+      gradePoints: gc.gradePoints,
+      credits: gc.credits,
+    })));
+
+    // 2c. Get ALL GradeCards across ALL semesters for CGPA
+    const allCards = await GradeCard.find({ collegeId, studentId }).lean();
+    const cgpa = computeCGPA(allCards.map(gc => ({
+      courseId: String(gc.courseId),
+      gradePoints: gc.gradePoints,
+      credits: gc.credits,
+    })));
+
+    // 2d. Credits earned = sum of credits where result = 'pass' (this semester)
+    const totalCreditsEarned = studentSemCards
+      .filter(gc => gc.result === 'pass')
+      .reduce((sum, gc) => sum + gc.credits, 0);
+
+    // 2e. Credits registered = sum of all credits for this semester
+    const totalCreditsRegistered = studentSemCards
+      .reduce((sum, gc) => sum + gc.credits, 0);
+
+    // 2f. Backlogs = number of GradeCards with result = 'fail' this semester
+    const backlogs = studentSemCards.filter(gc => gc.result === 'fail').length;
+
+    // 2g. Result: fail if any backlogs, else pass
+    const result = backlogs > 0 ? 'fail' : 'pass';
+
+    // 2h. Upsert SemesterResult
+    await SemesterResult.findOneAndUpdate(
+      { collegeId, studentId, semesterId },
+      {
+        collegeId,
+        studentId,
+        semesterId,
+        sgpa,
+        cgpa,
+        totalCreditsEarned,
+        totalCreditsRegistered,
+        backlogs,
+        result,
+        status: 'computed',
+      },
+      { upsert: true, new: true },
+    );
+
+    results.push({ studentId, sgpa, cgpa, totalCreditsEarned, totalCreditsRegistered, backlogs, result });
+  }
+
+  // 3. Audit log
+  await createAuditLog({
+    collegeId,
+    entityType: 'SemesterResult',
+    entityId: semesterId,
+    entityName: `Semester Result Computation - ${semesterId}`,
+    action: 'create',
+    changes: [{
+      field: 'semesterResultComputation',
+      displayName: 'Semester Result Computation',
+      oldValue: null,
+      newValue: `Processed: ${results.length} students`,
+    }],
+    performedBy,
+  });
+
+  return { processed: results.length, results };
+}

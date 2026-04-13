@@ -884,3 +884,13 @@ export async function computeGradesForSemester(req: AuthRequest, res: Response, 
     res.status(201).json(result);
   } catch (e) { next(e); }
 }
+
+// ═══ W02: SGPA/CGPA Computation ═══════════════════════════════
+
+export async function computeSemesterResults(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { semesterId } = req.body;
+    const result = await svc.computeSemesterResults(req.collegeId!, semesterId, who(req));
+    res.json(result);
+  } catch (e) { next(e); }
+}
