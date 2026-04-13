@@ -1000,3 +1000,29 @@ export async function updatePromotionDecision(req: AuthRequest, res: Response, n
     res.json(result);
   } catch (e) { next(e); }
 }
+
+// ═══ W02: OBE Attainment ════════════════════════════════════
+
+export async function computeCOAttainmentForSemester(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { semesterId, threshold = 50 } = req.body;
+    const result = await svc.computeCOAttainmentForSemester(req.collegeId!, semesterId, threshold, who(req));
+    res.status(201).json(result);
+  } catch (e) { next(e); }
+}
+
+export async function computePOAttainment(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { programmeId, semesterId } = req.body;
+    const result = await svc.computePOAttainment(req.collegeId!, programmeId, semesterId, who(req));
+    res.status(201).json(result);
+  } catch (e) { next(e); }
+}
+
+export async function computeProgrammeHealth(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { programmeId, semesterId } = req.body;
+    const result = await svc.computeProgrammeHealth(req.collegeId!, programmeId, semesterId, who(req));
+    res.status(201).json(result);
+  } catch (e) { next(e); }
+}

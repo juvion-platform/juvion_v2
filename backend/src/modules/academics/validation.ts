@@ -595,3 +595,20 @@ export const updatePromotionDecisionSchema_w02 = z.object({
   boardMeetingDate: z.string().optional(),
   effectiveDate: z.string().optional(),
 });
+
+// ═══ W02: OBE Attainment ════════════════════════════════════
+
+export const computeCOAttainmentSchema = z.object({
+  semesterId: z.string().min(1),
+  threshold: z.number().min(0).max(100).optional().default(50),
+});
+
+export const computePOAttainmentSchema = z.object({
+  programmeId: z.string().min(1),
+  semesterId: z.string().min(1),
+});
+
+export const computeProgrammeHealthSchema = z.object({
+  programmeId: z.string().min(1),
+  semesterId: z.string().min(1),
+});

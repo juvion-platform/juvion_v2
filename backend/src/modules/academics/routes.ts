@@ -67,6 +67,9 @@ import {
   clearBacklogSchema,
   determinePromotionsSchema,
   updatePromotionDecisionSchema_w02,
+  computeCOAttainmentSchema,
+  computePOAttainmentSchema,
+  computeProgrammeHealthSchema,
 } from './validation';
 
 const router = Router();
@@ -402,5 +405,10 @@ router.post('/promotions/determine', authorize('academics', 'create'), validate(
 router.get('/promotions', authorize('academics', 'read'), ctrl.listPromotionDecisions);
 router.get('/promotions/:id', authorize('academics', 'read'), ctrl.getPromotionDecision);
 router.put('/promotions/:id', authorize('academics', 'update'), validate(updatePromotionDecisionSchema_w02), ctrl.updatePromotionDecision);
+
+// ═══ W02: OBE Attainment ════════════════════════════════════
+router.post('/obe/co-attainment/compute', authorize('academics', 'create'), validate(computeCOAttainmentSchema), ctrl.computeCOAttainmentForSemester);
+router.post('/obe/po-attainment/compute', authorize('academics', 'create'), validate(computePOAttainmentSchema), ctrl.computePOAttainment);
+router.post('/obe/programme-health/compute', authorize('academics', 'create'), validate(computeProgrammeHealthSchema), ctrl.computeProgrammeHealth);
 
 export default router;

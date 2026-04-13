@@ -45,6 +45,10 @@ import { HallTicket } from '../../models/academic-ops/HallTicket';
 import { Backlog } from '../../models/academic-ops/Backlog';
 import { PromotionDecision } from '../../models/academic-ops/PromotionDecision';
 import { RevaluationRequest } from '../../models/academic-ops/RevaluationRequest';
+import { COAttainmentRecord } from '../../models/academic-ops/COAttainmentRecord';
+import { AttainmentRun } from '../../models/academic-ops/AttainmentRun';
+import { POAttainmentRecord } from '../../models/academic-ops/POAttainmentRecord';
+import { ProgrammeHealthMetrics } from '../../models/academic-ops/ProgrammeHealthMetrics';
 import { paginate } from '../../shared/pagination';
 import { createAuditLog } from '../../shared/audit';
 import { AppError } from '../../middleware/errorHandler';
@@ -4042,4 +4046,493 @@ export async function updatePromotionDecision(
   });
 
   return doc;
+}
+
+// ═══ W02: OBE Attainment ════════════════════════════════════
+
+function determineAttainmentLevel(percentage: number): number {
+  if (percentage >= 70) return 3;
+  if (percentage >= 60) return 2;
+  if (percentage >= 50) return 1;
+  return 0;
+}
+
+export async function computeCOAttainment(
+  collegeId: string,
+  courseOfferingId: string,
+  semesterId: string,
+  threshold: number,
+  performedBy: string,
+): Promise<{
+  courseOfferingId: string;
+  attainments: Array<{
+    coCode: string;
+    directAttainment: number;
+    indirectAttainment: number;
+    overallAttainment: number;
+    attainmentLevel: number;
+  }>;
+}> {
+  // 1. Create AttainmentRun
+  const run = await AttainmentRun.create({
+    collegeId,
+    semesterId,
+    runType: 'co',
+    status: 'running',
+    triggeredBy: performedBy,
+    startedAt: new Date(),
+  });
+
+  try {
+    // 2. Get CourseOffering to find courseId
+    const offering = await CourseOffering.findOne({ _id: courseOfferingId, collegeId }).lean();
+    if (!offering) throw new AppError(404, 'Course offering not found');
+
+    // 3. Get all CourseOutcomes for the course
+    const courseOutcomes = await CourseOutcome.find({ collegeId, courseId: offering.courseId }).lean();
+    if (courseOutcomes.length === 0) throw new AppError(404, 'No course outcomes found for this course');
+
+    // 4. Get all InternalAssessments for this offering with coMappings
+    const assessments = await InternalAssessment.find({ collegeId, courseOfferingId }).lean();
+
+    // 5. Get all InternalMarks for those assessments
+    const assessmentIds = assessments.map(a => a._id);
+    const allMarks = await InternalMark.find({ collegeId, assessmentId: { $in: assessmentIds } }).lean();
+
+    // Build a map: assessmentId -> marks[]
+    const marksByAssessment = new Map<string, typeof allMarks>();
+    for (const mark of allMarks) {
+      const key = String(mark.assessmentId);
+      const existing = marksByAssessment.get(key);
+      if (existing) {
+        existing.push(mark);
+      } else {
+        marksByAssessment.set(key, [mark]);
+      }
+    }
+
+    // 6. Get enrolled students
+    const enrollments = await Enrollment.find({ collegeId, courseOfferingId, status: 'enrolled' }).lean();
+    const totalStudents = enrollments.length;
+
+    // 7. Get CourseFeedback for indirect attainment
+    const feedbacks = await CourseFeedback.find({ collegeId, courseOfferingId }).lean();
+    const avgFeedbackRating = feedbacks.length > 0
+      ? feedbacks.reduce((sum, f) => sum + f.overallRating, 0) / feedbacks.length
+      : 0;
+    // Convert 1-5 scale to 0-100 scale for indirect attainment
+    const indirectBase = feedbacks.length > 0 ? (avgFeedbackRating / 5) * 100 : 50;
+
+    // 8. For each CO, compute attainment
+    const attainments: Array<{
+      coCode: string;
+      directAttainment: number;
+      indirectAttainment: number;
+      overallAttainment: number;
+      attainmentLevel: number;
+    }> = [];
+
+    for (const co of courseOutcomes) {
+      // Find assessments mapped to this CO
+      const mappedAssessments = assessments.filter(
+        a => a.coMappings && a.coMappings.some(m => m.coCode === co.code),
+      );
+
+      let directAttainment = 0;
+
+      if (mappedAssessments.length > 0 && totalStudents > 0) {
+        // For each assessment mapped to this CO, compute attainment
+        const assessmentAttainments: number[] = [];
+        for (const assessment of mappedAssessments) {
+          const marks = marksByAssessment.get(String(assessment._id)) || [];
+          const thresholdMarks = (threshold / 100) * assessment.maxMarks;
+          const studentsAbove = marks.filter(m => m.marksObtained >= thresholdMarks).length;
+          const attainmentPct = (studentsAbove / totalStudents) * 100;
+          assessmentAttainments.push(attainmentPct);
+        }
+        // Weighted average (equal weight for simplicity)
+        directAttainment = assessmentAttainments.reduce((s, v) => s + v, 0) / assessmentAttainments.length;
+      }
+
+      const indirectAttainment = indirectBase;
+      const overallAttainment = 0.8 * directAttainment + 0.2 * indirectAttainment;
+      const attainmentLevel = determineAttainmentLevel(overallAttainment);
+
+      // Count students above threshold across all mapped assessments for the record
+      let totalStudentsAbove = 0;
+      if (mappedAssessments.length > 0 && totalStudents > 0) {
+        // Use average students-above across assessments
+        let sumAbove = 0;
+        for (const assessment of mappedAssessments) {
+          const marks = marksByAssessment.get(String(assessment._id)) || [];
+          const thresholdMarks = (threshold / 100) * assessment.maxMarks;
+          sumAbove += marks.filter(m => m.marksObtained >= thresholdMarks).length;
+        }
+        totalStudentsAbove = Math.round(sumAbove / mappedAssessments.length);
+      }
+
+      // Upsert COAttainmentRecord
+      await COAttainmentRecord.findOneAndUpdate(
+        { collegeId, courseOfferingId, coCode: co.code },
+        {
+          collegeId,
+          courseOfferingId,
+          semesterId,
+          coCode: co.code,
+          directAttainment: Math.round(directAttainment * 100) / 100,
+          indirectAttainment: Math.round(indirectAttainment * 100) / 100,
+          overallAttainment: Math.round(overallAttainment * 100) / 100,
+          attainmentLevel,
+          threshold,
+          studentsAboveThreshold: totalStudentsAbove,
+          totalStudents,
+        },
+        { upsert: true, new: true },
+      );
+
+      attainments.push({
+        coCode: co.code,
+        directAttainment: Math.round(directAttainment * 100) / 100,
+        indirectAttainment: Math.round(indirectAttainment * 100) / 100,
+        overallAttainment: Math.round(overallAttainment * 100) / 100,
+        attainmentLevel,
+      });
+    }
+
+    // Update run to completed
+    run.status = 'completed';
+    run.completedAt = new Date();
+    run.summary = { courseOfferingId, coCount: attainments.length };
+    await run.save();
+
+    await createAuditLog({
+      collegeId,
+      entityType: 'COAttainmentRecord',
+      entityId: String(run._id),
+      entityName: `CO Attainment Run for offering ${courseOfferingId}`,
+      action: 'create',
+      changes: [],
+      performedBy,
+    });
+
+    return { courseOfferingId, attainments };
+  } catch (err) {
+    run.status = 'failed';
+    run.completedAt = new Date();
+    run.error = err instanceof Error ? err.message : 'Unknown error';
+    await run.save();
+    throw err;
+  }
+}
+
+export async function computeCOAttainmentForSemester(
+  collegeId: string,
+  semesterId: string,
+  threshold: number,
+  performedBy: string,
+): Promise<{ processed: number; offerings: Array<{ courseOfferingId: string; coCount: number }> }> {
+  const offerings = await CourseOffering.find({ collegeId, semesterId }).lean();
+  const results: Array<{ courseOfferingId: string; coCount: number }> = [];
+
+  for (const offering of offerings) {
+    const result = await computeCOAttainment(collegeId, String(offering._id), semesterId, threshold, performedBy);
+    results.push({ courseOfferingId: String(offering._id), coCount: result.attainments.length });
+  }
+
+  return { processed: results.length, offerings: results };
+}
+
+export async function computePOAttainment(
+  collegeId: string,
+  programmeId: string,
+  semesterId: string,
+  performedBy: string,
+): Promise<{
+  programmeId: string;
+  attainments: Array<{
+    poCode: string;
+    attainment: number;
+    attainmentLevel: number;
+    contributingCOCount: number;
+  }>;
+}> {
+  // 1. Create AttainmentRun
+  const run = await AttainmentRun.create({
+    collegeId,
+    semesterId,
+    runType: 'po',
+    status: 'running',
+    triggeredBy: performedBy,
+    startedAt: new Date(),
+  });
+
+  try {
+    // 2. Get all ProgramOutcomes for this programme
+    const programOutcomes = await ProgramOutcome.find({ collegeId, programmeId }).lean();
+    if (programOutcomes.length === 0) throw new AppError(404, 'No program outcomes found for this programme');
+
+    // 3. Get course offerings for this semester that belong to this programme
+    // via CurriculumMap: find courses mapped to this programme, then find offerings for those courses
+    const curriculumMaps = await CurriculumMap.find({ collegeId, programmeId }).lean();
+    const programmeCourseIds = new Set(curriculumMaps.map(cm => String(cm.courseId)));
+
+    const semesterOfferings = await CourseOffering.find({ collegeId, semesterId }).lean();
+    const relevantOfferings = semesterOfferings.filter(o => programmeCourseIds.has(String(o.courseId)));
+    const relevantOfferingIds = relevantOfferings.map(o => String(o._id));
+
+    // 4. Get all COAttainmentRecords for these offerings
+    const coRecords = await COAttainmentRecord.find({
+      collegeId,
+      courseOfferingId: { $in: relevantOfferingIds },
+      semesterId,
+    }).lean();
+
+    // Build a map: coCode -> COAttainmentRecord (may have multiple from different offerings)
+    const coRecordMap = new Map<string, typeof coRecords>();
+    for (const rec of coRecords) {
+      const key = rec.coCode;
+      const existing = coRecordMap.get(key);
+      if (existing) {
+        existing.push(rec);
+      } else {
+        coRecordMap.set(key, [rec]);
+      }
+    }
+
+    // 5. Get all CourseOutcomes that map to POs for relevant courses
+    const relevantCourseIds = relevantOfferings.map(o => o.courseId);
+    const courseOutcomes = await CourseOutcome.find({
+      collegeId,
+      courseId: { $in: relevantCourseIds },
+    }).lean();
+
+    // Build a lookup: coCode+courseOfferingId -> poMappings
+    // We need to link CO code to its offering for attainment lookup
+    const offeringByCourseId = new Map<string, string[]>();
+    for (const o of relevantOfferings) {
+      const key = String(o.courseId);
+      const existing = offeringByCourseId.get(key);
+      if (existing) {
+        existing.push(String(o._id));
+      } else {
+        offeringByCourseId.set(key, [String(o._id)]);
+      }
+    }
+
+    // 6. For each PO, compute attainment
+    const attainments: Array<{
+      poCode: string;
+      attainment: number;
+      attainmentLevel: number;
+      contributingCOCount: number;
+    }> = [];
+
+    for (const po of programOutcomes) {
+      // Find all COs mapped to this PO
+      const contributingCOs: Array<{
+        coCode: string;
+        courseOfferingId: string;
+        coAttainment: number;
+        mappingLevel: number;
+      }> = [];
+
+      for (const co of courseOutcomes) {
+        if (!co.poMappings) continue;
+        const mapping = co.poMappings.find(m => m.poCode === po.code);
+        if (!mapping) continue;
+
+        // Get offerings for this CO's course
+        const offeringIds = offeringByCourseId.get(String(co.courseId)) || [];
+        for (const offeringId of offeringIds) {
+          // Find the CO attainment record for this CO code and offering
+          const records = coRecordMap.get(co.code) || [];
+          const record = records.find(r => String(r.courseOfferingId) === offeringId);
+          if (record) {
+            contributingCOs.push({
+              coCode: co.code,
+              courseOfferingId: offeringId,
+              coAttainment: record.overallAttainment,
+              mappingLevel: mapping.level,
+            });
+          }
+        }
+      }
+
+      let poAttainmentValue = 0;
+      if (contributingCOs.length > 0) {
+        // Apply mapping level weight: weighted = coAttainment * (mappingLevel / 3)
+        const weightedValues = contributingCOs.map(c => c.coAttainment * (c.mappingLevel / 3));
+        poAttainmentValue = weightedValues.reduce((s, v) => s + v, 0) / weightedValues.length;
+      }
+
+      const attainmentLevel = determineAttainmentLevel(poAttainmentValue);
+
+      // Upsert POAttainmentRecord
+      await POAttainmentRecord.findOneAndUpdate(
+        { collegeId, programmeId, semesterId, poCode: po.code },
+        {
+          collegeId,
+          programmeId,
+          semesterId,
+          poCode: po.code,
+          attainment: Math.round(poAttainmentValue * 100) / 100,
+          attainmentLevel,
+          contributingCOs,
+        },
+        { upsert: true, new: true },
+      );
+
+      attainments.push({
+        poCode: po.code,
+        attainment: Math.round(poAttainmentValue * 100) / 100,
+        attainmentLevel,
+        contributingCOCount: contributingCOs.length,
+      });
+    }
+
+    // Update run
+    run.status = 'completed';
+    run.completedAt = new Date();
+    run.summary = { programmeId, poCount: attainments.length };
+    await run.save();
+
+    await createAuditLog({
+      collegeId,
+      entityType: 'POAttainmentRecord',
+      entityId: String(run._id),
+      entityName: `PO Attainment Run for programme ${programmeId}`,
+      action: 'create',
+      changes: [],
+      performedBy,
+    });
+
+    return { programmeId, attainments };
+  } catch (err) {
+    run.status = 'failed';
+    run.completedAt = new Date();
+    run.error = err instanceof Error ? err.message : 'Unknown error';
+    await run.save();
+    throw err;
+  }
+}
+
+export async function computeProgrammeHealth(
+  collegeId: string,
+  programmeId: string,
+  semesterId: string,
+  performedBy: string,
+): Promise<{
+  programmeId: string;
+  passRate: number;
+  avgCGPA: number;
+  backlogRatio: number;
+  attendanceAvg: number;
+  coAttainmentAvg: number;
+  poAttainmentAvg: number;
+  syllabusCompletion: number;
+  feedbackAvg: number;
+}> {
+  // 1. Get SemesterResults for this semester
+  const semesterResults = await SemesterResult.find({ collegeId, semesterId }).lean();
+  const totalStudents = semesterResults.length;
+
+  // 2. Pass rate
+  const passCount = semesterResults.filter(r => r.result === 'pass').length;
+  const passRate = totalStudents > 0 ? Math.round((passCount / totalStudents) * 10000) / 100 : 0;
+
+  // 3. Average CGPA
+  const avgCGPA = totalStudents > 0
+    ? Math.round((semesterResults.reduce((s, r) => s + r.cgpa, 0) / totalStudents) * 100) / 100
+    : 0;
+
+  // 4. Backlog ratio
+  const studentsWithBacklogs = semesterResults.filter(r => r.backlogs > 0).length;
+  const backlogRatio = totalStudents > 0
+    ? Math.round((studentsWithBacklogs / totalStudents) * 10000) / 100
+    : 0;
+
+  // 5. Attendance average
+  const attendanceSummaries = await AttendanceSummary.find({ collegeId, semesterId }).lean();
+  const attendanceAvg = attendanceSummaries.length > 0
+    ? Math.round((attendanceSummaries.reduce((s, a) => s + a.percentage, 0) / attendanceSummaries.length) * 100) / 100
+    : 0;
+
+  // 6. CO Attainment average — get offerings for this programme's courses
+  const curriculumMaps = await CurriculumMap.find({ collegeId, programmeId }).lean();
+  const programmeCourseIds = new Set(curriculumMaps.map(cm => String(cm.courseId)));
+  const semesterOfferings = await CourseOffering.find({ collegeId, semesterId }).lean();
+  const relevantOfferings = semesterOfferings.filter(o => programmeCourseIds.has(String(o.courseId)));
+  const relevantOfferingIds = relevantOfferings.map(o => String(o._id));
+
+  const coRecords = await COAttainmentRecord.find({
+    collegeId,
+    courseOfferingId: { $in: relevantOfferingIds },
+    semesterId,
+  }).lean();
+  const coAttainmentAvg = coRecords.length > 0
+    ? Math.round((coRecords.reduce((s, r) => s + r.overallAttainment, 0) / coRecords.length) * 100) / 100
+    : 0;
+
+  // 7. PO Attainment average
+  const poRecords = await POAttainmentRecord.find({ collegeId, programmeId, semesterId }).lean();
+  const poAttainmentAvg = poRecords.length > 0
+    ? Math.round((poRecords.reduce((s, r) => s + r.attainment, 0) / poRecords.length) * 100) / 100
+    : 0;
+
+  // 8. Syllabus completion average from course offerings
+  const syllabusCompletion = relevantOfferings.length > 0
+    ? Math.round(
+        (relevantOfferings.reduce((s, o) => s + (o.syllabusProgress || 0), 0) / relevantOfferings.length) * 100,
+      ) / 100
+    : 0;
+
+  // 9. Feedback average
+  const feedbacks = await CourseFeedback.find({
+    collegeId,
+    courseOfferingId: { $in: relevantOfferingIds },
+  }).lean();
+  const feedbackAvg = feedbacks.length > 0
+    ? Math.round((feedbacks.reduce((s, f) => s + f.overallRating, 0) / feedbacks.length) * 100) / 100
+    : 0;
+
+  // 10. Upsert ProgrammeHealthMetrics
+  await ProgrammeHealthMetrics.findOneAndUpdate(
+    { collegeId, programmeId, semesterId },
+    {
+      collegeId,
+      programmeId,
+      semesterId,
+      passRate,
+      avgCGPA,
+      backlogRatio,
+      attendanceAvg,
+      coAttainmentAvg,
+      poAttainmentAvg,
+      syllabusCompletion,
+      feedbackAvg,
+    },
+    { upsert: true, new: true },
+  );
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'ProgrammeHealthMetrics',
+    entityId: `${programmeId}-${semesterId}`,
+    entityName: `Programme Health for ${programmeId}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return {
+    programmeId,
+    passRate,
+    avgCGPA,
+    backlogRatio,
+    attendanceAvg,
+    coAttainmentAvg,
+    poAttainmentAvg,
+    syllabusCompletion,
+    feedbackAvg,
+  };
 }
