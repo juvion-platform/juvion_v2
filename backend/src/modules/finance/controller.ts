@@ -960,3 +960,234 @@ export async function updateScholarshipCredit(req: AuthRequest, res: Response, n
 export async function deleteScholarshipCredit(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.deleteScholarshipCredit(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
 }
+
+// ═══ W03 Phase 5: Defaulter Management ════════════════════════
+
+export async function identifyDefaulters(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await service.identifyDefaulters(req.collegeId!, who(req))); } catch (err) { next(err); }
+}
+
+export async function processEscalations(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.processEscalations(req.collegeId!, who(req))); } catch (err) { next(err); }
+}
+
+export async function computeDistressScore(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.computeDistressScore(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+export async function referToWelfare(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await service.referToWelfare(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+export async function processWelfareOutcome(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { outcome, m06CaseId } = req.body as { outcome: 'genuine_hardship' | 'no_distress' | 'inconclusive'; m06CaseId?: string };
+    res.json(await service.processWelfareOutcome(req.collegeId!, req.params.id as string, outcome, m06CaseId, who(req)));
+  } catch (err) { next(err); }
+}
+
+export async function recommendHolds(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.recommendHolds(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+export async function applyFinancialHold(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { studentId, defaulterRecordId, holdType, approvedBy } = req.body as { studentId: string; defaulterRecordId: string; holdType: 'exam_debarment' | 'hostel_restriction' | 'transcript_hold' | 'full_clearance_block'; approvedBy: string };
+    res.status(201).json(await service.applyFinancialHold(req.collegeId!, studentId, defaulterRecordId, holdType, approvedBy, who(req)));
+  } catch (err) { next(err); }
+}
+
+export async function checkFinancialHolds(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.checkFinancialHolds(req.collegeId!, req.params.studentId as string)); } catch (err) { next(err); }
+}
+
+export async function releaseFinancialHold(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { reason } = req.body as { reason: string };
+    res.json(await service.releaseFinancialHold(req.collegeId!, req.params.id as string, reason, who(req)));
+  } catch (err) { next(err); }
+}
+
+export async function resolveDefaulter(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { resolutionType } = req.body as { resolutionType: 'payment' | 'write_off' | 'concession' | 'other' };
+    res.json(await service.resolveDefaulter(req.collegeId!, req.params.id as string, resolutionType, who(req)));
+  } catch (err) { next(err); }
+}
+
+export async function logPhoneFollowUp(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { outcome, notes } = req.body as { outcome: string; notes?: string };
+    res.status(201).json(await service.logPhoneFollowUp(req.collegeId!, req.params.id as string, outcome, notes, who(req)));
+  } catch (err) { next(err); }
+}
+
+// ─── DefaulterRecord CRUD ─────────────────────────────────────
+
+export async function listDefaulterRecords(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page, limit, escalationStage } = req.query as { page?: string; limit?: string; escalationStage?: string };
+    res.json(await service.listDefaulterRecords(req.collegeId!, Number(page) || 1, Number(limit) || 20, escalationStage));
+  } catch (err) { next(err); }
+}
+
+export async function getDefaulterRecord(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.getDefaulterRecord(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+
+export async function createDefaulterRecord(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await service.createDefaulterRecord(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function updateDefaulterRecord(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.updateDefaulterRecord(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function deleteDefaulterRecord(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.deleteDefaulterRecord(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ─── EscalationAction CRUD ────────────────────────────────────
+
+export async function listEscalationActions(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page, limit } = req.query as { page?: string; limit?: string };
+    res.json(await service.listEscalationActions(req.collegeId!, Number(page) || 1, Number(limit) || 20));
+  } catch (err) { next(err); }
+}
+
+export async function getEscalationAction(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.getEscalationAction(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+
+export async function createEscalationAction(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await service.createEscalationAction(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function updateEscalationAction(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.updateEscalationAction(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function deleteEscalationAction(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.deleteEscalationAction(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ─── FinancialHold CRUD ───────────────────────────────────────
+
+export async function listFinancialHolds(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page, limit, studentId, holdStatus } = req.query as { page?: string; limit?: string; studentId?: string; holdStatus?: string };
+    res.json(await service.listFinancialHolds(req.collegeId!, Number(page) || 1, Number(limit) || 20, studentId, holdStatus));
+  } catch (err) { next(err); }
+}
+
+export async function getFinancialHold(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.getFinancialHold(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+
+export async function updateFinancialHold(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.updateFinancialHold(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function deleteFinancialHold(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.deleteFinancialHold(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ─── WelfareReferral CRUD ─────────────────────────────────────
+
+export async function listWelfareReferrals(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page, limit } = req.query as { page?: string; limit?: string };
+    res.json(await service.listWelfareReferrals(req.collegeId!, Number(page) || 1, Number(limit) || 20));
+  } catch (err) { next(err); }
+}
+
+export async function getWelfareReferral(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.getWelfareReferral(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+
+export async function createWelfareReferral(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await service.createWelfareReferral(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function updateWelfareReferral(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.updateWelfareReferral(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function deleteWelfareReferral(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.deleteWelfareReferral(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ═══ W03 Phase 7: Cross-Module Integration & Events ═════════
+
+export async function syncStudentStatus(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const result = await service.syncStudentFinancialStatus(req.collegeId!, req.body.studentId, who(req));
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+export async function getFinancialClearance(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const result = await service.checkFinancialClearance(req.collegeId!, req.params.studentId as string);
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+export async function getDistressSignals(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const result = await service.feedDistressSignals(req.collegeId!, req.params.defaulterRecordId as string);
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+export async function submitIndependentHardship(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const result = await service.receiveIndependentHardship(req.collegeId!, req.body, who(req));
+    res.status(201).json(result);
+  } catch (e) { next(e); }
+}
+
+export async function revenueDashboard(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { academicYearId } = req.query as { academicYearId?: string };
+    const result = await service.getRevenueDashboard(req.collegeId!, academicYearId);
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+export async function defaulterTrendAnalysis(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { months } = req.query as { months?: string };
+    const result = await service.getDefaulterTrendAnalysis(req.collegeId!, months ? Number(months) : undefined);
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+export async function feePolicy(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const result = await service.consumeFeePolicy(req.collegeId!);
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+export async function initiateGatewayPayment(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const result = await service.orchestrateGatewayPayment(req.collegeId!, req.body, who(req));
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+export async function submitTSEPassClaims(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const result = await service.orchestrateTSEPassIntegration(req.collegeId!, req.body, who(req));
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+export async function triggerReminderSequence(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const result = await service.executeReminderSequence(req.collegeId!, req.body.defaulterRecordId, who(req));
+    res.json(result);
+  } catch (e) { next(e); }
+}

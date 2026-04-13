@@ -77,6 +77,28 @@ import {
   updateScholarshipReceivableSchema,
   createScholarshipCreditSchema,
   updateScholarshipCreditSchema,
+  identifyDefaultersSchema,
+  processEscalationsSchema,
+  computeDistressScoreSchema,
+  referToWelfareSchema,
+  processWelfareOutcomeSchema,
+  recommendHoldsSchema,
+  applyFinancialHoldSchema,
+  releaseFinancialHoldSchema,
+  resolveDefaulterSchema,
+  logPhoneFollowUpSchema,
+  createDefaulterRecordSchema,
+  updateDefaulterRecordSchema,
+  createEscalationActionSchema,
+  updateEscalationActionSchema,
+  updateFinancialHoldSchema,
+  createWelfareReferralSchema,
+  updateWelfareReferralSchema,
+  syncStudentStatusSchema,
+  independentHardshipSchema,
+  initiateGatewayPaymentSchema,
+  submitTSEPassClaimsSchema,
+  triggerReminderSequenceSchema,
 } from './validation';
 
 const router = Router();
@@ -350,5 +372,60 @@ router.get('/scholarship-credits/:id', authorize('finance', 'read'), ctrl.getSch
 router.post('/scholarship-credits', authorize('finance', 'create'), validate(createScholarshipCreditSchema), ctrl.createScholarshipCredit);
 router.put('/scholarship-credits/:id', authorize('finance', 'update'), validate(updateScholarshipCreditSchema), ctrl.updateScholarshipCredit);
 router.delete('/scholarship-credits/:id', authorize('finance', 'delete'), ctrl.deleteScholarshipCredit);
+
+// ═══ W03 Phase 5: Defaulter Management ═══════════════════════
+
+// Workflow action routes (before CRUD :id routes)
+router.post('/defaulters/identify', authorize('finance', 'create'), validate(identifyDefaultersSchema), ctrl.identifyDefaulters);
+router.post('/defaulters/process-escalations', authorize('finance', 'update'), validate(processEscalationsSchema), ctrl.processEscalations);
+router.post('/defaulters/:id/compute-distress', authorize('finance', 'update'), validate(computeDistressScoreSchema), ctrl.computeDistressScore);
+router.post('/defaulters/:id/refer-welfare', authorize('finance', 'update'), validate(referToWelfareSchema), ctrl.referToWelfare);
+router.post('/defaulters/:id/welfare-outcome', authorize('finance', 'update'), validate(processWelfareOutcomeSchema), ctrl.processWelfareOutcome);
+router.post('/defaulters/:id/recommend-hold', authorize('finance', 'update'), validate(recommendHoldsSchema), ctrl.recommendHolds);
+router.post('/defaulters/:id/resolve', authorize('finance', 'update'), validate(resolveDefaulterSchema), ctrl.resolveDefaulter);
+router.post('/defaulters/:id/log-followup', authorize('finance', 'update'), validate(logPhoneFollowUpSchema), ctrl.logPhoneFollowUp);
+
+// DefaulterRecord CRUD
+router.get('/defaulters', authorize('finance', 'read'), ctrl.listDefaulterRecords);
+router.get('/defaulters/:id', authorize('finance', 'read'), ctrl.getDefaulterRecord);
+router.post('/defaulters', authorize('finance', 'create'), validate(createDefaulterRecordSchema), ctrl.createDefaulterRecord);
+router.put('/defaulters/:id', authorize('finance', 'update'), validate(updateDefaulterRecordSchema), ctrl.updateDefaulterRecord);
+router.delete('/defaulters/:id', authorize('finance', 'delete'), ctrl.deleteDefaulterRecord);
+
+// EscalationAction CRUD
+router.get('/escalation-actions', authorize('finance', 'read'), ctrl.listEscalationActions);
+router.get('/escalation-actions/:id', authorize('finance', 'read'), ctrl.getEscalationAction);
+router.post('/escalation-actions', authorize('finance', 'create'), validate(createEscalationActionSchema), ctrl.createEscalationAction);
+router.put('/escalation-actions/:id', authorize('finance', 'update'), validate(updateEscalationActionSchema), ctrl.updateEscalationAction);
+router.delete('/escalation-actions/:id', authorize('finance', 'delete'), ctrl.deleteEscalationAction);
+
+// FinancialHold - action routes before CRUD :id routes
+router.post('/holds', authorize('finance', 'create'), validate(applyFinancialHoldSchema), ctrl.applyFinancialHold);
+router.get('/holds', authorize('finance', 'read'), ctrl.listFinancialHolds);
+router.get('/holds/check/:studentId', authorize('finance', 'read'), ctrl.checkFinancialHolds);
+router.post('/holds/:id/release', authorize('finance', 'update'), validate(releaseFinancialHoldSchema), ctrl.releaseFinancialHold);
+router.get('/holds/:id', authorize('finance', 'read'), ctrl.getFinancialHold);
+router.put('/holds/:id', authorize('finance', 'update'), validate(updateFinancialHoldSchema), ctrl.updateFinancialHold);
+router.delete('/holds/:id', authorize('finance', 'delete'), ctrl.deleteFinancialHold);
+
+// WelfareReferral CRUD
+router.get('/welfare-referrals', authorize('finance', 'read'), ctrl.listWelfareReferrals);
+router.get('/welfare-referrals/:id', authorize('finance', 'read'), ctrl.getWelfareReferral);
+router.post('/welfare-referrals', authorize('finance', 'create'), validate(createWelfareReferralSchema), ctrl.createWelfareReferral);
+router.put('/welfare-referrals/:id', authorize('finance', 'update'), validate(updateWelfareReferralSchema), ctrl.updateWelfareReferral);
+router.delete('/welfare-referrals/:id', authorize('finance', 'delete'), ctrl.deleteWelfareReferral);
+
+// ═══ W03 Phase 7: Cross-Module Integration & Events ═════════
+
+router.post('/sync/student-status', authenticate, validate(syncStudentStatusSchema), ctrl.syncStudentStatus);
+router.get('/clearance/:studentId', authenticate, ctrl.getFinancialClearance);
+router.get('/distress-signals/:defaulterRecordId', authenticate, ctrl.getDistressSignals);
+router.post('/independent-hardship', authenticate, validate(independentHardshipSchema), ctrl.submitIndependentHardship);
+router.get('/dashboards/revenue', authenticate, ctrl.revenueDashboard);
+router.get('/dashboards/defaulter-trends', authenticate, ctrl.defaulterTrendAnalysis);
+router.get('/policies/fee', authenticate, ctrl.feePolicy);
+router.post('/gateway/initiate', authenticate, validate(initiateGatewayPaymentSchema), ctrl.initiateGatewayPayment);
+router.post('/ts-epass/submit', authenticate, validate(submitTSEPassClaimsSchema), ctrl.submitTSEPassClaims);
+router.post('/reminders/trigger', authenticate, validate(triggerReminderSequenceSchema), ctrl.triggerReminderSequence);
 
 export default router;
