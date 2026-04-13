@@ -10,6 +10,7 @@ export { EntranceExamScore } from './admissions/EntranceExamScore';
 export { Inquiry } from './admissions/Inquiry';
 
 // === People ===
+export { AcademicHistory } from './people/AcademicHistory';
 export { ExternalPerson } from './people/ExternalPerson';
 export { Faculty } from './people/Faculty';
 export { Organization } from './people/Organization';
@@ -17,6 +18,7 @@ export { Parent } from './people/Parent';
 export { Person } from './people/Person';
 export { Staff } from './people/Staff';
 export { Student } from './people/Student';
+export { Transcript } from './people/Transcript';
 
 // === Academic Structure ===
 export { AcademicYear } from './academic-structure/AcademicYear';
@@ -30,8 +32,10 @@ export { Semester } from './academic-structure/Semester';
 
 // === Academic Ops ===
 export { AcademicCalendar } from './academic-ops/AcademicCalendar';
+export { AttainmentRun } from './academic-ops/AttainmentRun';
 export { AttendanceRecord } from './academic-ops/AttendanceRecord';
 export { AttendanceSession } from './academic-ops/AttendanceSession';
+export { COAttainmentRecord } from './academic-ops/COAttainmentRecord';
 export { Course } from './academic-ops/Course';
 export { CourseFeedback } from './academic-ops/CourseFeedback';
 export { CourseOffering } from './academic-ops/CourseOffering';
@@ -46,7 +50,10 @@ export { GradeCard } from './academic-ops/GradeCard';
 export { InternalAssessment } from './academic-ops/InternalAssessment';
 export { InternalMark } from './academic-ops/InternalMark';
 export { LessonPlan } from './academic-ops/LessonPlan';
+export { POAttainmentRecord } from './academic-ops/POAttainmentRecord';
 export { ProgramOutcome } from './academic-ops/ProgramOutcome';
+export { ProgrammeHealthMetrics } from './academic-ops/ProgrammeHealthMetrics';
+export { QualityReport } from './academic-ops/QualityReport';
 export { SemesterResult } from './academic-ops/SemesterResult';
 export { Timetable } from './academic-ops/Timetable';
 export { TimetableSlot } from './academic-ops/TimetableSlot';
@@ -189,8 +196,10 @@ export { StudentProject } from './student-dev/StudentProject';
 // === Governance ===
 export { Committee } from './governance/Committee';
 export { CommitteeMeeting } from './governance/CommitteeMeeting';
+export { DashboardWidget } from './governance/DashboardWidget';
 export { GoverningBodyMember } from './governance/GoverningBodyMember';
 export { Policy } from './governance/Policy';
+export { RiskAlert } from './governance/RiskAlert';
 export { StrategicGoal } from './governance/StrategicGoal';
 
 // === Compliance ===
@@ -200,6 +209,7 @@ export { AccreditationCycle } from './compliance/AccreditationCycle';
 export { AffiliationStatus } from './compliance/AffiliationStatus';
 export { AuditFinding } from './compliance/AuditFinding';
 export { ComplianceCriteria } from './compliance/ComplianceCriteria';
+export { EvidenceRecord } from './compliance/EvidenceRecord';
 export { IQACReport } from './compliance/IQACReport';
 export { LegalCase } from './compliance/LegalCase';
 export { RTIRequest } from './compliance/RTIRequest';
@@ -215,13 +225,20 @@ export { SMSLog } from './communication/SMSLog';
 export { SurveyResponse } from './communication/SurveyResponse';
 export { WhatsAppLog } from './communication/WhatsAppLog';
 
+// === Platform ===
+export { InferenceLog } from './platform/InferenceLog';
+export { IntegrationLog } from './platform/IntegrationLog';
+
 // === Juvi ===
+export { AckRecord } from './juvi/AckRecord';
 export { JuviAction } from './juvi/JuviAction';
 export { JuviConversation } from './juvi/JuviConversation';
 export { JuviFeedback } from './juvi/JuviFeedback';
 export { JuviInsight } from './juvi/JuviInsight';
 export { JuviKnowledgeBase } from './juvi/JuviKnowledgeBase';
 export { JuviMessage } from './juvi/JuviMessage';
+export { JuviNoticeCard } from './juvi/JuviNoticeCard';
 export { JuviPersonaConfig } from './juvi/JuviPersonaConfig';
 export { JuviUsageMetric } from './juvi/JuviUsageMetric';
+export { StudyRecommendation } from './juvi/StudyRecommendation';
 
