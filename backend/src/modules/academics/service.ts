@@ -17,6 +17,8 @@ import { Timetable } from '../../models/academic-ops/Timetable';
 import { TimetableSlot } from '../../models/academic-ops/TimetableSlot';
 import { AttendanceSession } from '../../models/academic-ops/AttendanceSession';
 import { AttendanceRecord } from '../../models/academic-ops/AttendanceRecord';
+import { AttendanceSummary } from '../../models/academic-ops/AttendanceSummary';
+import { AttendanceAlert } from '../../models/academic-ops/AttendanceAlert';
 import { InternalAssessment } from '../../models/academic-ops/InternalAssessment';
 import { InternalMark } from '../../models/academic-ops/InternalMark';
 import { ExamRegistration } from '../../models/academic-ops/ExamRegistration';
@@ -32,6 +34,9 @@ import { CourseFeedback } from '../../models/academic-ops/CourseFeedback';
 import { paginate } from '../../shared/pagination';
 import { createAuditLog } from '../../shared/audit';
 import { AppError } from '../../middleware/errorHandler';
+import { FilterQuery } from 'mongoose';
+import { IAttendanceSummary } from '../../models/academic-ops/AttendanceSummary';
+import { IAttendanceAlert } from '../../models/academic-ops/AttendanceAlert';
 import { AuthScope } from '../../shared/rbac/types';
 import { applyAuthScope } from '../../shared/rbac/apply-scope';
 
@@ -1659,4 +1664,195 @@ export async function finalizeElectiveAllocations(
   });
 
   return { enrollmentsCreated };
+}
+
+// ═══ W02: Attendance Summary Auto-Update + Threshold Monitoring ═══
+
+/**
+ * Determine attendance category based on percentage.
+ */
+function categorizeAttendance(percentage: number): 'safe' | 'warning' | 'at_risk' | 'detained' {
+  if (percentage >= 85) return 'safe';
+  if (percentage >= 75) return 'warning';
+  if (percentage >= 65) return 'at_risk';
+  return 'detained';
+}
+
+/**
+ * Check attendance thresholds and create alerts when student crosses warning/at-risk/detained levels.
+ * W02-L2-009
+ */
+export async function checkAttendanceThresholds(
+  collegeId: string,
+  studentId: string,
+  courseOfferingId: string,
+  semesterId: string,
+  currentPercentage: number,
+  category: 'safe' | 'warning' | 'at_risk' | 'detained',
+) {
+  // No alert for safe category
+  if (category === 'safe') return null;
+
+  let alertType: 'warning' | 'at_risk' | 'detained';
+  let threshold: number;
+  if (category === 'warning') {
+    alertType = 'warning';
+    threshold = 75;
+  } else if (category === 'at_risk') {
+    alertType = 'at_risk';
+    threshold = 65;
+  } else {
+    alertType = 'detained';
+    threshold = 65;
+  }
+
+  // Check if alert of this type already exists
+  const existing = await AttendanceAlert.findOne({
+    collegeId,
+    studentId,
+    courseOfferingId,
+    semesterId,
+    alertType,
+  });
+
+  if (existing) return null;
+
+  const message = `Attendance at ${Math.round(currentPercentage * 100) / 100}% (below ${threshold}% threshold) for course offering ${courseOfferingId}`;
+
+  const alert = await AttendanceAlert.create({
+    collegeId,
+    studentId,
+    courseOfferingId,
+    semesterId,
+    alertType,
+    attendancePercent: Math.round(currentPercentage * 100) / 100,
+    threshold,
+    message,
+    isRead: false,
+    isNotified: false,
+  });
+
+  return alert;
+}
+
+/**
+ * Recompute attendance summary after attendance marking.
+ * W02-L2-008
+ */
+export async function updateAttendanceSummary(
+  collegeId: string,
+  studentId: string,
+  courseOfferingId: string,
+) {
+  // 1. Find CourseOffering to get semesterId
+  const offering = await CourseOffering.findOne({ _id: courseOfferingId, collegeId });
+  if (!offering) throw new AppError(404, 'Course offering not found');
+  const semesterId = String(offering.semesterId);
+
+  // 2. Count total AttendanceSessions for this courseOffering
+  const totalClasses = await AttendanceSession.countDocuments({
+    collegeId,
+    courseOfferingId,
+  });
+
+  // 3. Count attended records (present, late, od count as attended)
+  // We need session IDs for this courseOffering first
+  const sessionIds = await AttendanceSession.find(
+    { collegeId, courseOfferingId },
+    { _id: 1 },
+  ).lean();
+  const sessionIdList = sessionIds.map(s => s._id);
+
+  const attended = await AttendanceRecord.countDocuments({
+    collegeId,
+    studentId,
+    sessionId: { $in: sessionIdList },
+    status: { $in: ['present', 'late', 'od'] },
+  });
+
+  // 4. Calculate percentage (handle division by zero)
+  const percentage = totalClasses > 0
+    ? Math.round((attended / totalClasses) * 10000) / 100
+    : 0;
+
+  // 5. Determine category
+  const category = categorizeAttendance(percentage);
+
+  // 6. Simple projection (stub for AI forecast)
+  const projectedFinal = percentage;
+
+  // 7. Get previous summary to detect category change
+  const previousSummary = await AttendanceSummary.findOne({
+    collegeId,
+    studentId,
+    courseOfferingId,
+  }).lean();
+  const previousCategory = previousSummary?.category;
+
+  // 8. Upsert AttendanceSummary
+  const summary = await AttendanceSummary.findOneAndUpdate(
+    { collegeId, studentId, courseOfferingId },
+    {
+      collegeId,
+      studentId,
+      courseOfferingId,
+      semesterId,
+      totalClasses,
+      attended,
+      percentage,
+      category,
+      projectedFinal,
+      lastUpdatedAt: new Date(),
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true },
+  );
+
+  // 9. If category changed (or first time), check thresholds
+  if (category !== previousCategory) {
+    await checkAttendanceThresholds(
+      collegeId, studentId, courseOfferingId, semesterId, percentage, category,
+    );
+  }
+
+  return summary;
+}
+
+/**
+ * List attendance summaries with optional filters.
+ * W02-L2-008, 009
+ */
+export async function getAttendanceSummaries(
+  collegeId: string,
+  filters: { studentId?: string; courseOfferingId?: string; semesterId?: string; category?: string },
+  page: number,
+  limit: number,
+) {
+  const filter: FilterQuery<IAttendanceSummary> = { collegeId };
+  if (filters.studentId) filter.studentId = filters.studentId;
+  if (filters.courseOfferingId) filter.courseOfferingId = filters.courseOfferingId;
+  if (filters.semesterId) filter.semesterId = filters.semesterId;
+  if (filters.category) filter.category = filters.category;
+
+  return paginate(AttendanceSummary, filter, page, limit);
+}
+
+/**
+ * List attendance alerts with optional filters.
+ * W02-L2-009
+ */
+export async function getAttendanceAlerts(
+  collegeId: string,
+  filters: { studentId?: string; semesterId?: string; alertType?: string; isRead?: string },
+  page: number,
+  limit: number,
+) {
+  const filter: FilterQuery<IAttendanceAlert> = { collegeId };
+  if (filters.studentId) filter.studentId = filters.studentId;
+  if (filters.semesterId) filter.semesterId = filters.semesterId;
+  if (filters.alertType) filter.alertType = filters.alertType;
+  if (filters.isRead !== undefined && filters.isRead !== '') {
+    filter.isRead = filters.isRead === 'true';
+  }
+
+  return paginate(AttendanceAlert, filter, page, limit);
 }

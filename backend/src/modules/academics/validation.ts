@@ -365,3 +365,10 @@ export const finalizeElectiveAllocationsSchema = z.object({
   semesterId: z.string().min(1, 'Semester is required'),
   electiveGroup: z.string().min(1, 'Elective group is required'),
 });
+
+// ═══ W02: Attendance Summary & Alerts ═════════════════════════
+
+export const refreshAttendanceSummarySchema = z.object({
+  studentId: z.string().min(1, 'Student ID is required'),
+  courseOfferingId: z.string().min(1, 'Course offering ID is required'),
+});

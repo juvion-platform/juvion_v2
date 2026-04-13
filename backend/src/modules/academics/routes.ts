@@ -40,6 +40,7 @@ import {
   applySubstitutionSchema,
   optimizeElectiveAllocationsSchema,
   finalizeElectiveAllocationsSchema,
+  refreshAttendanceSummarySchema,
 } from './validation';
 
 const router = Router();
@@ -264,5 +265,14 @@ router.get('/timetables/:id/conflicts', authorize('academics', 'read'), ctrl.det
 router.put('/timetable-slots/:id/substitute', authorize('academics', 'update'), validate(applySubstitutionSchema), ctrl.applySubstitution);
 router.post('/elective-allocations/optimize', authorize('academics', 'create'), validate(optimizeElectiveAllocationsSchema), ctrl.optimizeElectiveAllocations);
 router.post('/elective-allocations/finalize', authorize('academics', 'create'), validate(finalizeElectiveAllocationsSchema), ctrl.finalizeElectiveAllocations);
+
+// ═══ W02: Attendance Summary & Alerts ═════════════════════════
+
+// Attendance Summaries
+router.get('/attendance-summary', authorize('academics', 'read'), ctrl.listAttendanceSummaries);
+router.post('/attendance-summary/refresh', authorize('academics', 'create'), validate(refreshAttendanceSummarySchema), ctrl.refreshAttendanceSummary);
+
+// Attendance Alerts
+router.get('/attendance-alerts', authorize('academics', 'read'), ctrl.listAttendanceAlerts);
 
 export default router;

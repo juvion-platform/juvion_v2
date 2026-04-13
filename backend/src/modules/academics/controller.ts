@@ -582,3 +582,41 @@ export async function finalizeElectiveAllocations(req: AuthRequest, res: Respons
     res.json(result);
   } catch (e) { next(e); }
 }
+
+// ═══ W02: Attendance Summary & Alerts ═════════════════════════
+
+export async function refreshAttendanceSummary(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { studentId, courseOfferingId } = req.body;
+    const result = await svc.updateAttendanceSummary(
+      req.collegeId!, studentId, courseOfferingId,
+    );
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+export async function listAttendanceSummaries(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { studentId, courseOfferingId, semesterId, category, page = '1', limit = '20' } = req.query as Record<string, string | undefined>;
+    const result = await svc.getAttendanceSummaries(
+      req.collegeId!,
+      { studentId, courseOfferingId, semesterId, category },
+      +(page || '1'),
+      +(limit || '20'),
+    );
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+export async function listAttendanceAlerts(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { studentId, semesterId, alertType, isRead, page = '1', limit = '20' } = req.query as Record<string, string | undefined>;
+    const result = await svc.getAttendanceAlerts(
+      req.collegeId!,
+      { studentId, semesterId, alertType, isRead },
+      +(page || '1'),
+      +(limit || '20'),
+    );
+    res.json(result);
+  } catch (e) { next(e); }
+}
