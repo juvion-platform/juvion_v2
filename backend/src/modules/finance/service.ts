@@ -1,4 +1,7 @@
 import { FeeStructure } from '../../models/finance/FeeStructure';
+import { FeeStructureInstance } from '../../models/finance/FeeStructureInstance';
+import { FeeComponent } from '../../models/finance/FeeComponent';
+import { FeeComponentRule } from '../../models/finance/FeeComponentRule';
 import { StudentFeeAccount } from '../../models/finance/StudentFeeAccount';
 import { FeeLineItem } from '../../models/finance/FeeLineItem';
 import { Payment } from '../../models/finance/Payment';
@@ -636,4 +639,375 @@ export async function deleteFinancialReport(collegeId: string, id: string, who: 
   if (!doc) throw new AppError(404, 'Report not found');
   await createAuditLog({ collegeId, entityType: 'FinancialReport', entityId: id, entityName: doc.reportType, action: 'delete', changes: [], performedBy: who });
   return doc;
+}
+
+// ═══ Fee Structure Instance Lifecycle ════════════════════
+
+export async function listFeeStructureInstances(collegeId: string, page = 1, limit = 20, academicYearId?: string, status?: string) {
+  const filter: any = { collegeId };
+  if (academicYearId) filter.academicYearId = academicYearId;
+  if (status) filter.status = status;
+  return paginate(FeeStructureInstance, filter, page, limit, { createdAt: -1 }, ['academicYearId', 'programmeId', 'branchId']);
+}
+
+export async function getFeeStructureInstance(collegeId: string, id: string) {
+  const doc = await FeeStructureInstance.findOne({ _id: id, collegeId }).populate('academicYearId programmeId branchId priorVersionId');
+  if (!doc) throw new AppError(404, 'Fee structure instance not found');
+  return doc;
+}
+
+export async function createFeeStructureInstance(collegeId: string, data: any, who: string) {
+  const doc = await FeeStructureInstance.create({ ...data, collegeId });
+  await createAuditLog({ collegeId, entityType: 'FeeStructureInstance', entityId: String(doc._id), entityName: `Fee Structure Instance`, action: 'create', changes: [], performedBy: who });
+  return doc;
+}
+
+export async function cloneFeeStructure(collegeId: string, sourceInstanceId: string, newAcademicYearId: string, who: string) {
+  const source = await FeeStructureInstance.findOne({ _id: sourceInstanceId, collegeId });
+  if (!source) throw new AppError(404, 'Source fee structure instance not found');
+
+  const sourceComponents = await FeeComponent.find({ feeStructureInstanceId: sourceInstanceId, collegeId });
+  const sourceComponentIds = sourceComponents.map(c => String(c._id));
+  const sourceRules = await FeeComponentRule.find({ feeComponentId: { $in: sourceComponentIds }, collegeId });
+
+  const newInstance = await FeeStructureInstance.create({
+    collegeId,
+    academicYearId: newAcademicYearId,
+    programmeId: source.programmeId,
+    branchId: source.branchId,
+    category: source.category,
+    quota: source.quota,
+    status: 'draft',
+    priorVersionId: source._id,
+    totalAmount: 0,
+  });
+
+  const oldToNewComponentId: Record<string, string> = {};
+  const clonedComponents = [];
+  for (const comp of sourceComponents) {
+    const newComp = await FeeComponent.create({
+      collegeId,
+      feeStructureInstanceId: newInstance._id,
+      name: comp.name,
+      amount: comp.amount,
+      isRefundable: comp.isRefundable,
+      componentType: comp.componentType,
+      isConditional: comp.isConditional,
+      displayOrder: comp.displayOrder,
+    });
+    oldToNewComponentId[String(comp._id)] = String(newComp._id);
+    clonedComponents.push(newComp);
+  }
+
+  for (const rule of sourceRules) {
+    const newComponentId = oldToNewComponentId[String(rule.feeComponentId)];
+    if (newComponentId) {
+      await FeeComponentRule.create({
+        collegeId,
+        feeComponentId: newComponentId,
+        conditionType: rule.conditionType,
+        conditionValue: rule.conditionValue,
+        operator: rule.operator,
+        status: rule.status,
+      });
+    }
+  }
+
+  const totalAmount = clonedComponents.reduce((sum, c) => sum + c.amount, 0);
+  newInstance.totalAmount = totalAmount;
+  await newInstance.save();
+
+  await createAuditLog({ collegeId, entityType: 'FeeStructureInstance', entityId: String(newInstance._id), entityName: `Cloned Fee Structure Instance`, action: 'create', changes: [], performedBy: who });
+
+  return { instance: newInstance, components: clonedComponents };
+}
+
+export async function submitFeeStructure(collegeId: string, instanceId: string, who: string) {
+  const instance = await FeeStructureInstance.findOne({ _id: instanceId, collegeId });
+  if (!instance) throw new AppError(404, 'Fee structure instance not found');
+  if (instance.status !== 'draft') throw new AppError(400, 'Can only submit draft structures');
+
+  let comparisonData: Record<string, unknown> = {};
+  if (instance.priorVersionId) {
+    const priorComponents = await FeeComponent.find({ feeStructureInstanceId: String(instance.priorVersionId), collegeId }).lean();
+    const currentComponents = await FeeComponent.find({ feeStructureInstanceId: instanceId, collegeId }).lean();
+
+    const priorMap = new Map(priorComponents.map(c => [c.name, c.amount]));
+    const compRows = currentComponents.map(c => {
+      const priorAmount = priorMap.get(c.name) ?? 0;
+      const changePct = priorAmount > 0 ? ((c.amount - priorAmount) / priorAmount) * 100 : 0;
+      return { name: c.name, priorAmount, newAmount: c.amount, changePct: Math.round(changePct * 100) / 100 };
+    });
+    comparisonData = { rows: compRows };
+  }
+
+  const estimatedStudents = 100;
+  const revenueProjection = instance.totalAmount * estimatedStudents;
+
+  instance.status = 'submitted';
+  instance.comparisonData = comparisonData;
+  instance.revenueProjection = revenueProjection;
+  await instance.save();
+
+  await createAuditLog({ collegeId, entityType: 'FeeStructureInstance', entityId: instanceId, entityName: `Fee Structure Instance`, action: 'update', changes: [], performedBy: who });
+  return instance;
+}
+
+export async function approveFeeStructure(collegeId: string, instanceId: string, who: string) {
+  const instance = await FeeStructureInstance.findOne({ _id: instanceId, collegeId });
+  if (!instance) throw new AppError(404, 'Fee structure instance not found');
+  if (instance.status !== 'submitted') throw new AppError(400, 'Can only approve submitted structures');
+
+  instance.status = 'approved';
+  instance.approvedBy = who as any;
+  instance.approvedAt = new Date();
+  await instance.save();
+
+  await createAuditLog({ collegeId, entityType: 'FeeStructureInstance', entityId: instanceId, entityName: `Fee Structure Instance`, action: 'update', changes: [], performedBy: who });
+  return instance;
+}
+
+export async function activateFeeStructure(collegeId: string, instanceId: string, who: string) {
+  const instance = await FeeStructureInstance.findOne({ _id: instanceId, collegeId });
+  if (!instance) throw new AppError(404, 'Fee structure instance not found');
+  if (instance.status !== 'approved') throw new AppError(400, 'Can only activate approved structures');
+
+  await FeeStructureInstance.updateMany(
+    {
+      collegeId,
+      programmeId: instance.programmeId,
+      branchId: instance.branchId,
+      quota: instance.quota,
+      category: instance.category,
+      status: 'active',
+    },
+    { status: 'superseded' },
+  );
+
+  instance.status = 'active';
+  instance.effectiveDate = new Date();
+  await instance.save();
+
+  await createAuditLog({ collegeId, entityType: 'FeeStructureInstance', entityId: instanceId, entityName: `Fee Structure Instance`, action: 'update', changes: [], performedBy: who });
+  return instance;
+}
+
+export async function rejectFeeStructure(collegeId: string, instanceId: string, comments: string, who: string) {
+  const instance = await FeeStructureInstance.findOne({ _id: instanceId, collegeId });
+  if (!instance) throw new AppError(404, 'Fee structure instance not found');
+  if (instance.status !== 'submitted') throw new AppError(400, 'Can only reject submitted structures');
+
+  instance.status = 'revision_required';
+  instance.rejectionComments = comments;
+  await instance.save();
+
+  await createAuditLog({ collegeId, entityType: 'FeeStructureInstance', entityId: instanceId, entityName: `Fee Structure Instance`, action: 'update', changes: [], performedBy: who });
+  return instance;
+}
+
+export async function archiveFeeStructure(collegeId: string, instanceId: string, who: string) {
+  const instance = await FeeStructureInstance.findOne({ _id: instanceId, collegeId });
+  if (!instance) throw new AppError(404, 'Fee structure instance not found');
+  if (!['active', 'superseded'].includes(instance.status)) throw new AppError(400, 'Can only archive active or superseded structures');
+
+  instance.status = 'archived';
+  await instance.save();
+
+  await createAuditLog({ collegeId, entityType: 'FeeStructureInstance', entityId: instanceId, entityName: `Fee Structure Instance`, action: 'update', changes: [], performedBy: who });
+  return instance;
+}
+
+export async function getFeeStructureComparison(collegeId: string, instanceId: string) {
+  const instance = await FeeStructureInstance.findOne({ _id: instanceId, collegeId });
+  if (!instance) throw new AppError(404, 'Fee structure instance not found');
+
+  if (instance.comparisonData && Object.keys(instance.comparisonData).length > 0) {
+    return instance.comparisonData;
+  }
+
+  if (!instance.priorVersionId) {
+    return { rows: [] };
+  }
+
+  const priorComponents = await FeeComponent.find({ feeStructureInstanceId: String(instance.priorVersionId), collegeId }).lean();
+  const currentComponents = await FeeComponent.find({ feeStructureInstanceId: instanceId, collegeId }).lean();
+
+  const priorMap = new Map(priorComponents.map(c => [c.name, c.amount]));
+  const rows = currentComponents.map(c => {
+    const priorAmount = priorMap.get(c.name) ?? 0;
+    const changePct = priorAmount > 0 ? ((c.amount - priorAmount) / priorAmount) * 100 : 0;
+    return { name: c.name, priorAmount, newAmount: c.amount, changePct: Math.round(changePct * 100) / 100 };
+  });
+
+  return { rows };
+}
+
+export async function getFeeStructureRevenueProjection(collegeId: string, instanceId: string) {
+  const instance = await FeeStructureInstance.findOne({ _id: instanceId, collegeId });
+  if (!instance) throw new AppError(404, 'Fee structure instance not found');
+
+  const estimatedStudents = 100;
+  const revenueProjection = instance.revenueProjection ?? instance.totalAmount * estimatedStudents;
+
+  return { instanceId, totalAmount: instance.totalAmount, estimatedStudents, revenueProjection };
+}
+
+// ═══ Fee Components ═══════════════════════════════════════
+
+export async function listFeeComponents(collegeId: string, feeStructureInstanceId: string, page = 1, limit = 20) {
+  return paginate(FeeComponent, { collegeId, feeStructureInstanceId }, page, limit, { displayOrder: 1 });
+}
+
+export async function getFeeComponent(collegeId: string, id: string) {
+  const doc = await FeeComponent.findOne({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Fee component not found');
+  return doc;
+}
+
+async function recalcInstanceTotalAmount(collegeId: string, feeStructureInstanceId: string) {
+  const components = await FeeComponent.find({ feeStructureInstanceId, collegeId }).lean();
+  const totalAmount = components.reduce((sum, c) => sum + c.amount, 0);
+  await FeeStructureInstance.findOneAndUpdate({ _id: feeStructureInstanceId, collegeId }, { totalAmount });
+}
+
+export async function createFeeComponent(collegeId: string, data: any, who: string) {
+  const doc = await FeeComponent.create({ ...data, collegeId });
+  await recalcInstanceTotalAmount(collegeId, data.feeStructureInstanceId);
+  await createAuditLog({ collegeId, entityType: 'FeeComponent', entityId: String(doc._id), entityName: doc.name, action: 'create', changes: [], performedBy: who });
+  return doc;
+}
+
+export async function updateFeeComponent(collegeId: string, id: string, data: any, who: string) {
+  const doc = await FeeComponent.findOneAndUpdate({ _id: id, collegeId }, data, { new: true });
+  if (!doc) throw new AppError(404, 'Fee component not found');
+  await recalcInstanceTotalAmount(collegeId, String(doc.feeStructureInstanceId));
+  await createAuditLog({ collegeId, entityType: 'FeeComponent', entityId: id, entityName: doc.name, action: 'update', changes: [], performedBy: who });
+  return doc;
+}
+
+export async function deleteFeeComponent(collegeId: string, id: string, who: string) {
+  const doc = await FeeComponent.findOneAndDelete({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Fee component not found');
+  await recalcInstanceTotalAmount(collegeId, String(doc.feeStructureInstanceId));
+  await createAuditLog({ collegeId, entityType: 'FeeComponent', entityId: id, entityName: doc.name, action: 'delete', changes: [], performedBy: who });
+  return doc;
+}
+
+// ═══ Fee Component Rules ══════════════════════════════════
+
+export async function listFeeComponentRules(collegeId: string, feeComponentId: string, page = 1, limit = 20) {
+  return paginate(FeeComponentRule, { collegeId, feeComponentId }, page, limit);
+}
+
+export async function createFeeComponentRule(collegeId: string, data: any, who: string) {
+  const doc = await FeeComponentRule.create({ ...data, collegeId });
+  await createAuditLog({ collegeId, entityType: 'FeeComponentRule', entityId: String(doc._id), entityName: `Rule: ${doc.conditionType}`, action: 'create', changes: [], performedBy: who });
+  return doc;
+}
+
+export async function updateFeeComponentRule(collegeId: string, id: string, data: any, who: string) {
+  const doc = await FeeComponentRule.findOneAndUpdate({ _id: id, collegeId }, data, { new: true });
+  if (!doc) throw new AppError(404, 'Fee component rule not found');
+  await createAuditLog({ collegeId, entityType: 'FeeComponentRule', entityId: id, entityName: `Rule: ${doc.conditionType}`, action: 'update', changes: [], performedBy: who });
+  return doc;
+}
+
+export async function deleteFeeComponentRule(collegeId: string, id: string, who: string) {
+  const doc = await FeeComponentRule.findOneAndDelete({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Fee component rule not found');
+  await createAuditLog({ collegeId, entityType: 'FeeComponentRule', entityId: id, entityName: `Rule: ${doc.conditionType}`, action: 'delete', changes: [], performedBy: who });
+  return doc;
+}
+
+// ═══ Fee Rules Engine ═════════════════════════════════════
+
+interface StudentProfile {
+  programmeId?: string;
+  branchId?: string;
+  regulationId?: string;
+  quota?: string;
+  category?: string;
+  isHosteler?: boolean;
+  hasTransport?: boolean;
+  labProgramme?: boolean;
+  batchId?: string;
+}
+
+function resolveProfileValue(profile: StudentProfile, conditionType: string): unknown {
+  switch (conditionType) {
+    case 'hostel': return profile.isHosteler;
+    case 'transport': return profile.hasTransport;
+    case 'lab_programme': return profile.labProgramme;
+    case 'quota': return profile.quota;
+    case 'category': return profile.category;
+    case 'regulation': return profile.regulationId;
+    case 'batch': return profile.batchId;
+    default: return undefined;
+  }
+}
+
+function evaluateRule(conditionType: string, conditionValue: string, operator: string, profile: StudentProfile): boolean {
+  const fieldValue = resolveProfileValue(profile, conditionType);
+  const isBooleanField = conditionType === 'hostel' || conditionType === 'transport' || conditionType === 'lab_programme';
+
+  switch (operator) {
+    case 'equals': {
+      if (isBooleanField) {
+        return fieldValue === (conditionValue === 'true');
+      }
+      return String(fieldValue) === conditionValue;
+    }
+    case 'in': {
+      const values = conditionValue.split(',').map(v => v.trim());
+      return values.includes(String(fieldValue));
+    }
+    case 'not_in': {
+      const values = conditionValue.split(',').map(v => v.trim());
+      return !values.includes(String(fieldValue));
+    }
+    case 'exists': return fieldValue !== undefined && fieldValue !== null && fieldValue !== '';
+    case 'not_exists': return fieldValue === undefined || fieldValue === null || fieldValue === '';
+    default: return false;
+  }
+}
+
+export async function evaluateFeeRules(collegeId: string, feeStructureInstanceId: string, studentProfile: StudentProfile) {
+  const components = await FeeComponent.find({ feeStructureInstanceId, collegeId }).lean();
+
+  const applicableComponents = [];
+  for (const component of components) {
+    if (!component.isConditional) {
+      applicableComponents.push({
+        componentId: String(component._id),
+        name: component.name,
+        amount: component.amount,
+        componentType: component.componentType,
+      });
+    } else {
+      const rules = await FeeComponentRule.find({ feeComponentId: String(component._id), collegeId }).lean();
+      const allRulesPass = rules.every(rule =>
+        evaluateRule(rule.conditionType, rule.conditionValue, rule.operator, studentProfile),
+      );
+      if (allRulesPass) {
+        applicableComponents.push({
+          componentId: String(component._id),
+          name: component.name,
+          amount: component.amount,
+          componentType: component.componentType,
+        });
+      }
+    }
+  }
+
+  const totalAmount = applicableComponents.reduce((sum, c) => sum + c.amount, 0);
+  return { applicableComponents, totalAmount };
+}
+
+export async function testFeeRulesWithProfiles(collegeId: string, feeStructureInstanceId: string, profiles: StudentProfile[]) {
+  const results = [];
+  for (const profile of profiles) {
+    const result = await evaluateFeeRules(collegeId, feeStructureInstanceId, profile);
+    results.push({ profile, ...result });
+  }
+  return results;
 }

@@ -20,6 +20,15 @@ import {
   createPaymentGatewayLogSchema, updatePaymentGatewayLogSchema,
   createFeeReminderSchema, updateFeeReminderSchema,
   createFinancialReportSchema,
+  createFeeStructureInstanceSchema,
+  cloneFeeStructureSchema,
+  rejectFeeStructureSchema,
+  createFeeComponentSchema,
+  updateFeeComponentSchema,
+  createFeeComponentRuleSchema,
+  updateFeeComponentRuleSchema,
+  evaluateFeeRulesSchema,
+  testFeeRulesSchema,
 } from './validation';
 
 const router = Router();
@@ -130,5 +139,33 @@ router.delete('/reminders/:id', authorize('finance', 'delete'), ctrl.deleteFeeRe
 router.get('/reports', authorize('finance', 'read'), ctrl.listFinancialReports);
 router.post('/reports', authorize('finance', 'create'), validate(createFinancialReportSchema), ctrl.createFinancialReport);
 router.delete('/reports/:id', authorize('finance', 'delete'), ctrl.deleteFinancialReport);
+
+// ═══ W03: Fee Structure Instance Lifecycle ═══════════════════
+router.get('/fee-structure-instances', authorize('finance', 'read'), ctrl.listFeeStructureInstances);
+router.get('/fee-structure-instances/:id', authorize('finance', 'read'), ctrl.getFeeStructureInstance);
+router.post('/fee-structure-instances', authorize('finance', 'create'), validate(createFeeStructureInstanceSchema), ctrl.createFeeStructureInstance);
+router.post('/fee-structures/clone', authorize('finance', 'create'), validate(cloneFeeStructureSchema), ctrl.cloneFeeStructure);
+router.post('/fee-structure-instances/:id/submit', authorize('finance', 'update'), ctrl.submitFeeStructure);
+router.post('/fee-structure-instances/:id/approve', authorize('finance', 'update'), ctrl.approveFeeStructure);
+router.post('/fee-structure-instances/:id/activate', authorize('finance', 'update'), ctrl.activateFeeStructure);
+router.post('/fee-structure-instances/:id/reject', authorize('finance', 'update'), validate(rejectFeeStructureSchema), ctrl.rejectFeeStructure);
+router.post('/fee-structure-instances/:id/archive', authorize('finance', 'update'), ctrl.archiveFeeStructure);
+router.get('/fee-structure-instances/:id/comparison', authorize('finance', 'read'), ctrl.getFeeStructureComparison);
+router.get('/fee-structure-instances/:id/revenue-projection', authorize('finance', 'read'), ctrl.getFeeStructureRevenueProjection);
+
+// ═══ W03: Fee Components ═════════════════════════════════════
+router.get('/fee-components', authorize('finance', 'read'), ctrl.listFeeComponents);
+router.get('/fee-components/:id', authorize('finance', 'read'), ctrl.getFeeComponent);
+router.post('/fee-components', authorize('finance', 'create'), validate(createFeeComponentSchema), ctrl.createFeeComponent);
+router.put('/fee-components/:id', authorize('finance', 'update'), validate(updateFeeComponentSchema), ctrl.updateFeeComponent);
+router.delete('/fee-components/:id', authorize('finance', 'delete'), ctrl.deleteFeeComponent);
+
+// ═══ W03: Fee Component Rules ════════════════════════════════
+router.post('/fee-component-rules/evaluate', authorize('finance', 'read'), validate(evaluateFeeRulesSchema), ctrl.evaluateFeeRules);
+router.post('/fee-component-rules/test', authorize('finance', 'read'), validate(testFeeRulesSchema), ctrl.testFeeRulesWithProfiles);
+router.get('/fee-component-rules', authorize('finance', 'read'), ctrl.listFeeComponentRules);
+router.post('/fee-component-rules', authorize('finance', 'create'), validate(createFeeComponentRuleSchema), ctrl.createFeeComponentRule);
+router.put('/fee-component-rules/:id', authorize('finance', 'update'), validate(updateFeeComponentRuleSchema), ctrl.updateFeeComponentRule);
+router.delete('/fee-component-rules/:id', authorize('finance', 'delete'), ctrl.deleteFeeComponentRule);
 
 export default router;

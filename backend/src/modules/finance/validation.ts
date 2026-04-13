@@ -230,3 +230,79 @@ export const createFinancialReportSchema = z.object({
   data: z.any().optional(),
 });
 export const updateFinancialReportSchema = createFinancialReportSchema.partial();
+
+// ═══ W03: Fee Structure Instance ═════════════════════════════
+
+export const createFeeStructureInstanceSchema = z.object({
+  academicYearId: z.string().min(1),
+  programmeId: z.string().min(1),
+  branchId: z.string().optional(),
+  category: z.string().optional(),
+  quota: z.enum(['management', 'convener', 'nri', 'spot', 'lateral']).optional(),
+  totalAmount: z.number().min(0).optional(),
+});
+
+export const cloneFeeStructureSchema = z.object({
+  sourceInstanceId: z.string().min(1),
+  newAcademicYearId: z.string().min(1),
+});
+
+export const rejectFeeStructureSchema = z.object({
+  comments: z.string().min(1),
+});
+
+// ═══ W03: Fee Component ══════════════════════════════════════
+
+export const createFeeComponentSchema = z.object({
+  feeStructureInstanceId: z.string().min(1),
+  name: z.string().min(1),
+  amount: z.number().min(0),
+  isRefundable: z.boolean().optional(),
+  componentType: z.enum(['tuition', 'hostel', 'transport', 'lab', 'exam', 'library', 'development', 'caution_deposit', 'other']),
+  isConditional: z.boolean().optional(),
+  displayOrder: z.number().int().optional(),
+});
+export const updateFeeComponentSchema = createFeeComponentSchema.partial();
+
+// ═══ W03: Fee Component Rule ═════════════════════════════════
+
+export const createFeeComponentRuleSchema = z.object({
+  feeComponentId: z.string().min(1),
+  conditionType: z.enum(['hostel', 'transport', 'lab_programme', 'quota', 'category', 'regulation', 'batch']),
+  conditionValue: z.string().min(1),
+  operator: z.enum(['equals', 'in', 'not_in', 'exists', 'not_exists']),
+  status: z.enum(['configured', 'draft']).optional(),
+});
+export const updateFeeComponentRuleSchema = createFeeComponentRuleSchema.partial();
+
+// ═══ W03: Fee Rules Engine ═══════════════════════════════════
+
+export const evaluateFeeRulesSchema = z.object({
+  feeStructureInstanceId: z.string().min(1),
+  studentProfile: z.object({
+    programmeId: z.string().optional(),
+    branchId: z.string().optional(),
+    regulationId: z.string().optional(),
+    quota: z.string().optional(),
+    category: z.string().optional(),
+    isHosteler: z.boolean().optional(),
+    hasTransport: z.boolean().optional(),
+    labProgramme: z.boolean().optional(),
+    batchId: z.string().optional(),
+  }),
+});
+
+export const testFeeRulesSchema = z.object({
+  feeStructureInstanceId: z.string().min(1),
+  profiles: z.array(z.object({
+    programmeId: z.string().optional(),
+    branchId: z.string().optional(),
+    regulationId: z.string().optional(),
+    quota: z.string().optional(),
+    category: z.string().optional(),
+    isHosteler: z.boolean().optional(),
+    hasTransport: z.boolean().optional(),
+    labProgramme: z.boolean().optional(),
+    batchId: z.string().optional(),
+  })),
+});

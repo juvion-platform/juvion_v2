@@ -305,3 +305,120 @@ export async function createFinancialReport(req: AuthRequest, res: Response, nex
 export async function deleteFinancialReport(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.deleteFinancialReport(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
 }
+
+// ═══ W03: Fee Structure Instance ══════════════════════════
+
+export async function listFeeStructureInstances(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page, limit, academicYearId, status } = req.query as any;
+    res.json(await service.listFeeStructureInstances(req.collegeId!, Number(page) || 1, Number(limit) || 20, academicYearId, status));
+  } catch (err) { next(err); }
+}
+
+export async function getFeeStructureInstance(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.getFeeStructureInstance(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+
+export async function createFeeStructureInstance(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await service.createFeeStructureInstance(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function cloneFeeStructure(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { sourceInstanceId, newAcademicYearId } = req.body;
+    res.status(201).json(await service.cloneFeeStructure(req.collegeId!, sourceInstanceId, newAcademicYearId, who(req)));
+  } catch (err) { next(err); }
+}
+
+export async function submitFeeStructure(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.submitFeeStructure(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+export async function approveFeeStructure(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.approveFeeStructure(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+export async function activateFeeStructure(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.activateFeeStructure(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+export async function rejectFeeStructure(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { comments } = req.body;
+    res.json(await service.rejectFeeStructure(req.collegeId!, req.params.id as string, comments, who(req)));
+  } catch (err) { next(err); }
+}
+
+export async function archiveFeeStructure(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.archiveFeeStructure(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+export async function getFeeStructureComparison(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.getFeeStructureComparison(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+
+export async function getFeeStructureRevenueProjection(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.getFeeStructureRevenueProjection(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+
+// ═══ W03: Fee Components ══════════════════════════════════
+
+export async function listFeeComponents(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { feeStructureInstanceId, page, limit } = req.query as any;
+    res.json(await service.listFeeComponents(req.collegeId!, feeStructureInstanceId, Number(page) || 1, Number(limit) || 20));
+  } catch (err) { next(err); }
+}
+
+export async function getFeeComponent(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.getFeeComponent(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+
+export async function createFeeComponent(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await service.createFeeComponent(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function updateFeeComponent(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.updateFeeComponent(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function deleteFeeComponent(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.deleteFeeComponent(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ═══ W03: Fee Component Rules ═════════════════════════════
+
+export async function listFeeComponentRules(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { feeComponentId, page, limit } = req.query as any;
+    res.json(await service.listFeeComponentRules(req.collegeId!, feeComponentId, Number(page) || 1, Number(limit) || 20));
+  } catch (err) { next(err); }
+}
+
+export async function createFeeComponentRule(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await service.createFeeComponentRule(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function updateFeeComponentRule(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.updateFeeComponentRule(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function deleteFeeComponentRule(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.deleteFeeComponentRule(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ═══ W03: Fee Rules Engine ════════════════════════════════
+
+export async function evaluateFeeRules(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { feeStructureInstanceId, studentProfile } = req.body;
+    res.json(await service.evaluateFeeRules(req.collegeId!, feeStructureInstanceId, studentProfile));
+  } catch (err) { next(err); }
+}
+
+export async function testFeeRulesWithProfiles(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { feeStructureInstanceId, profiles } = req.body;
+    res.json(await service.testFeeRulesWithProfiles(req.collegeId!, feeStructureInstanceId, profiles));
+  } catch (err) { next(err); }
+}
