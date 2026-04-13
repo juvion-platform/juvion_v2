@@ -16,7 +16,7 @@ const schema = new Schema<IEmployee>({
   employeeType: { type: String, enum: ['teaching', 'non_teaching', 'contract', 'visiting', 'adjunct'], required: true },
   joiningDate: { type: Date, required: true },
   reportingToId: { type: Schema.Types.ObjectId, ref: 'Employee' },
-  status: { type: String, enum: ['active', 'on_leave', 'resigned', 'retired', 'terminated'], default: 'active' },
+  status: { type: String, enum: ['active', 'on_leave', 'resigned', 'retired', 'terminated', 'separated'], default: 'active' },
   probationEndDate: Date,
   contractEndDate: Date,
   noticePeriodDays: { type: Number, default: 30 },

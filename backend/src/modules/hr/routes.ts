@@ -27,6 +27,19 @@ import {
   biometricSchema, odSchema, correctionSchema,
   createAttendanceAnomalySchema, updateAttendanceAnomalySchema,
   createAttendanceMonthlySummarySchema, updateAttendanceMonthlySummarySchema,
+  submitFDPCertificateSchema, verifyFDPSchema, computeComplianceSchema,
+  selfAssessmentSchema, reviewerAssessmentSchema, moderateSchema,
+  disputeSchema, resolveDisputeSchema,
+  createAppraisalCycleSchema, updateAppraisalCycleSchema,
+  createFDPRecordSchema, updateFDPRecordSchema,
+  createFDPComplianceSummarySchema, updateFDPComplianceSummarySchema,
+  initiateResignationSchema, processTerminationSchema, processDeathNotificationSchema,
+  rejectResignationSchema, waiveNoticeSchema, clearItemSchema,
+  createHandoverSchema, updateHandoverItemSchema, contractRenewalSchema,
+  createSeparationRequestSchema, updateSeparationRequestSchema,
+  createExitClearanceSchema, updateExitClearanceSchema,
+  createHandoverRecordSchema, updateHandoverRecordSchema,
+  createFinalSettlementSchema, updateFinalSettlementSchema,
 } from './validation';
 
 const router = Router();
@@ -200,5 +213,117 @@ router.get('/attendance-monthly-summaries/:id', authorize('hr', 'read'), ctrl.ge
 router.post('/attendance-monthly-summaries', authorize('hr', 'create'), validate(createAttendanceMonthlySummarySchema), ctrl.createAttendanceMonthlySummary);
 router.put('/attendance-monthly-summaries/:id', authorize('hr', 'update'), validate(updateAttendanceMonthlySummarySchema), ctrl.updateAttendanceMonthlySummary);
 router.delete('/attendance-monthly-summaries/:id', authorize('hr', 'delete'), ctrl.deleteAttendanceMonthlySummary);
+
+// ═══════════════════════════════════════════════════════════════════
+// W05 Phase 3 — FDP Tracking & Appraisal Routes
+// ═══════════════════════════════════════════════════════════════════
+
+// FDP Workflow Routes
+router.post('/fdp-records/submit', authorize('hr', 'create'), validate(submitFDPCertificateSchema), ctrl.submitFDPCertificate);
+router.post('/fdp-records/:id/ocr-extract', authorize('hr', 'update'), ctrl.ocrExtractFDP);
+router.post('/fdp-records/:id/verify', authorize('hr', 'update'), validate(verifyFDPSchema), ctrl.verifyFDPCertificate);
+
+// FDP Compliance Routes
+router.post('/fdp-compliance/compute', authorize('hr', 'update'), validate(computeComplianceSchema), ctrl.computeFDPComplianceGap);
+router.post('/fdp-compliance/nudge', authorize('hr', 'update'), ctrl.nudgeFDPShortfall);
+router.post('/fdp-compliance/report', authorize('hr', 'read'), ctrl.reportFDPToCompliance);
+
+// FDP Records CRUD
+router.get('/fdp-records', authorize('hr', 'read'), ctrl.listFDPRecords);
+router.get('/fdp-records/:id', authorize('hr', 'read'), ctrl.getFDPRecord);
+router.post('/fdp-records', authorize('hr', 'create'), validate(createFDPRecordSchema), ctrl.createFDPRecord);
+router.put('/fdp-records/:id', authorize('hr', 'update'), validate(updateFDPRecordSchema), ctrl.updateFDPRecord);
+router.delete('/fdp-records/:id', authorize('hr', 'delete'), ctrl.deleteFDPRecord);
+
+// FDP Compliance Summaries CRUD
+router.get('/fdp-compliance', authorize('hr', 'read'), ctrl.listFDPComplianceSummaries);
+router.get('/fdp-compliance/:id', authorize('hr', 'read'), ctrl.getFDPComplianceSummary);
+router.post('/fdp-compliance-summaries', authorize('hr', 'create'), validate(createFDPComplianceSummarySchema), ctrl.createFDPComplianceSummary);
+router.put('/fdp-compliance/:id', authorize('hr', 'update'), validate(updateFDPComplianceSummarySchema), ctrl.updateFDPComplianceSummary);
+router.delete('/fdp-compliance/:id', authorize('hr', 'delete'), ctrl.deleteFDPComplianceSummary);
+
+// Appraisal Cycle Workflow Routes
+router.post('/appraisal-cycles/:id/initiate', authorize('hr', 'update'), ctrl.initiateAppraisalCycle);
+router.post('/appraisal-cycles/:id/close', authorize('hr', 'update'), ctrl.finalizeAppraisalRatings);
+
+// Appraisal Cycles CRUD
+router.get('/appraisal-cycles', authorize('hr', 'read'), ctrl.listAppraisalCycles);
+router.get('/appraisal-cycles/:id', authorize('hr', 'read'), ctrl.getAppraisalCycle);
+router.post('/appraisal-cycles', authorize('hr', 'create'), validate(createAppraisalCycleSchema), ctrl.configureAppraisalCycle);
+router.put('/appraisal-cycles/:id', authorize('hr', 'update'), validate(updateAppraisalCycleSchema), ctrl.updateAppraisalCycle);
+router.delete('/appraisal-cycles/:id', authorize('hr', 'delete'), ctrl.deleteAppraisalCycle);
+
+// Appraisal Workflow Routes
+router.post('/appraisals/:id/self-assessment', authorize('hr', 'update'), validate(selfAssessmentSchema), ctrl.submitSelfAssessment);
+router.post('/appraisals/:id/aggregate', authorize('hr', 'update'), ctrl.aggregateAppraisalData);
+router.post('/appraisals/:id/reviewer-assessment', authorize('hr', 'update'), validate(reviewerAssessmentSchema), ctrl.submitReviewerAssessment);
+router.post('/appraisals/:id/moderate', authorize('hr', 'update'), validate(moderateSchema), ctrl.moderateAppraisalRatings);
+router.post('/appraisals/:id/dispute', authorize('hr', 'update'), validate(disputeSchema), ctrl.handleRatingDispute);
+router.post('/appraisals/:id/resolve-dispute', authorize('hr', 'update'), validate(resolveDisputeSchema), ctrl.resolveRatingDispute);
+router.post('/appraisals/generate-recommendations', authorize('hr', 'update'), ctrl.generatePromotionPIPRecommendations);
+
+// ═══════════════════════════════════════════════════════════════════
+// W05 Phase 4 — Exit & Separation Routes
+// ═══════════════════════════════════════════════════════════════════
+
+// Separation Workflow Routes
+router.post('/separations', authorize('hr', 'create'), validate(initiateResignationSchema), ctrl.initiateResignation);
+router.post('/separations/retirement/:employeeId', authorize('hr', 'create'), ctrl.processRetirement);
+router.post('/separations/termination', authorize('hr', 'create'), validate(processTerminationSchema), ctrl.processTermination);
+router.post('/separations/death', authorize('hr', 'create'), validate(processDeathNotificationSchema), ctrl.processDeathNotification);
+router.post('/separations/:id/accept', authorize('hr', 'update'), ctrl.acceptResignation);
+router.post('/separations/:id/reject', authorize('hr', 'update'), validate(rejectResignationSchema), ctrl.rejectResignation);
+router.post('/separations/:id/waive-notice', authorize('hr', 'update'), validate(waiveNoticeSchema), ctrl.waiveNoticePeriod);
+router.post('/separations/:id/relieve', authorize('hr', 'update'), ctrl.issueRelievingOrder);
+router.post('/separations/:id/archive', authorize('hr', 'update'), ctrl.archiveEmployeeRecord);
+router.post('/separations/:id/replacement-requisition', authorize('hr', 'create'), ctrl.triggerReplacementRequisition);
+
+// Clearance Routes
+router.post('/exit-clearance/:separationId/initiate', authorize('hr', 'create'), ctrl.initiateClearance);
+router.get('/exit-clearance/:separationId', authorize('hr', 'read'), ctrl.getClearanceStatusCtrl);
+router.post('/exit-clearance/:id/clear-item', authorize('hr', 'update'), validate(clearItemSchema), ctrl.clearItemCtrl);
+
+// Handover Routes
+router.post('/handover/:separationId', authorize('hr', 'create'), validate(createHandoverSchema), ctrl.createHandoverRecordCtrl);
+router.put('/handover/:id/item', authorize('hr', 'update'), validate(updateHandoverItemSchema), ctrl.updateHandoverItemCtrl);
+router.post('/handover/:id/verify', authorize('hr', 'update'), ctrl.verifyHandoverCtrl);
+
+// Settlement Routes
+router.post('/settlements/:separationId/compute', authorize('hr', 'create'), ctrl.computeFinalSettlementCtrl);
+router.post('/settlements/:id/approve', authorize('hr', 'update'), ctrl.approveSettlement);
+router.post('/settlements/:id/process', authorize('hr', 'update'), ctrl.processSettlement);
+
+// Special Case Routes
+router.get('/retirement-alerts', authorize('hr', 'read'), ctrl.detectUpcomingRetirements);
+router.get('/contract-expiry-alerts', authorize('hr', 'read'), ctrl.detectExpiringContracts);
+router.post('/contract-renewal', authorize('hr', 'update'), validate(contractRenewalSchema), ctrl.processContractRenewal);
+
+// Separation Requests CRUD
+router.get('/separation-requests', authorize('hr', 'read'), ctrl.listSeparationRequests);
+router.get('/separation-requests/:id', authorize('hr', 'read'), ctrl.getSeparationRequest);
+router.post('/separation-requests', authorize('hr', 'create'), validate(createSeparationRequestSchema), ctrl.createSeparationRequestCtrl);
+router.put('/separation-requests/:id', authorize('hr', 'update'), validate(updateSeparationRequestSchema), ctrl.updateSeparationRequest);
+router.delete('/separation-requests/:id', authorize('hr', 'delete'), ctrl.deleteSeparationRequest);
+
+// Exit Clearances CRUD
+router.get('/exit-clearances', authorize('hr', 'read'), ctrl.listExitClearances);
+router.get('/exit-clearances/:id', authorize('hr', 'read'), ctrl.getExitClearanceCtrl);
+router.post('/exit-clearances', authorize('hr', 'create'), validate(createExitClearanceSchema), ctrl.createExitClearanceCtrl);
+router.put('/exit-clearances/:id', authorize('hr', 'update'), validate(updateExitClearanceSchema), ctrl.updateExitClearanceCtrl);
+router.delete('/exit-clearances/:id', authorize('hr', 'delete'), ctrl.deleteExitClearanceCtrl);
+
+// Handover Records CRUD
+router.get('/handover-records', authorize('hr', 'read'), ctrl.listHandoverRecords);
+router.get('/handover-records/:id', authorize('hr', 'read'), ctrl.getHandoverRecordCtrl);
+router.post('/handover-records', authorize('hr', 'create'), validate(createHandoverRecordSchema), ctrl.createHandoverRecordCRUDCtrl);
+router.put('/handover-records/:id', authorize('hr', 'update'), validate(updateHandoverRecordSchema), ctrl.updateHandoverRecordCtrl);
+router.delete('/handover-records/:id', authorize('hr', 'delete'), ctrl.deleteHandoverRecordCtrl);
+
+// Final Settlements CRUD
+router.get('/final-settlements', authorize('hr', 'read'), ctrl.listFinalSettlements);
+router.get('/final-settlements/:id', authorize('hr', 'read'), ctrl.getFinalSettlement);
+router.post('/final-settlements', authorize('hr', 'create'), validate(createFinalSettlementSchema), ctrl.createFinalSettlementCtrl);
+router.put('/final-settlements/:id', authorize('hr', 'update'), validate(updateFinalSettlementSchema), ctrl.updateFinalSettlement);
+router.delete('/final-settlements/:id', authorize('hr', 'delete'), ctrl.deleteFinalSettlement);
 
 export default router;

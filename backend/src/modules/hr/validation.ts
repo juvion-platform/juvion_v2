@@ -358,3 +358,197 @@ export const createAttendanceMonthlySummarySchema = z.object({
   isLocked: z.boolean().optional(),
 });
 export const updateAttendanceMonthlySummarySchema = createAttendanceMonthlySummarySchema.partial();
+
+// ═══════════════════════════════════════════════════════════════════
+// W05 Phase 3 — FDP Tracking & Appraisal Schemas
+// ═══════════════════════════════════════════════════════════════════
+
+// ─── FDP Workflow ─────────────────────────────────────────────────
+
+export const submitFDPCertificateSchema = z.object({
+  facultyId: z.string().min(1),
+  activityType: z.enum(['fdp', 'workshop', 'seminar', 'conference', 'certification']),
+  title: z.string().min(1),
+  organiser: z.string().min(1),
+  startDate: z.string().min(1),
+  endDate: z.string().min(1),
+  hours: z.number().min(0),
+  certificateUrl: z.string().optional(),
+  complianceYear: z.number().int(),
+});
+
+export const verifyFDPSchema = z.object({
+  status: z.enum(['verified', 'rejected']),
+  remarks: z.string().optional(),
+});
+
+export const computeComplianceSchema = z.object({
+  facultyId: z.string().min(1),
+  academicYearId: z.string().min(1),
+});
+
+// ─── Appraisal Workflow ───────────────────────────────────────────
+
+export const selfAssessmentSchema = z.object({
+  selfRating: z.number().min(0).max(10),
+  selfAssessmentData: z.record(z.unknown()),
+});
+
+export const reviewerAssessmentSchema = z.object({
+  reviewerRating: z.number().min(0).max(10),
+  reviewerComments: z.string().min(1),
+});
+
+export const moderateSchema = z.object({
+  moderationAdjustment: z.number(),
+});
+
+export const disputeSchema = z.object({
+  disputeText: z.string().min(1),
+});
+
+export const resolveDisputeSchema = z.object({
+  resolution: z.enum(['confirmed', 'revised']),
+  revisedRating: z.number().optional(),
+});
+
+// ─── Appraisal Cycle CRUD ─────────────────────────────────────────
+
+export const createAppraisalCycleSchema = z.object({
+  academicYearId: z.string().min(1),
+  name: z.string().min(1),
+  startDate: z.string().min(1),
+  endDate: z.string().min(1),
+  selfAssessmentDeadline: z.string().min(1),
+  reviewerDeadline: z.string().min(1),
+  moderationDeadline: z.string().min(1),
+  applicableTo: z.enum(['faculty', 'staff', 'both']),
+  weightageTemplate: z.record(z.number()).optional(),
+});
+export const updateAppraisalCycleSchema = createAppraisalCycleSchema.partial();
+
+// ─── FDP Record CRUD ──────────────────────────────────────────────
+
+export const createFDPRecordSchema = z.object({
+  facultyId: z.string().min(1),
+  activityType: z.enum(['fdp', 'workshop', 'seminar', 'conference', 'certification']),
+  title: z.string().min(1),
+  organiser: z.string().min(1),
+  startDate: z.string().min(1),
+  endDate: z.string().min(1),
+  hours: z.number().min(0),
+  certificateUrl: z.string().optional(),
+  complianceYear: z.number().int(),
+  verificationStatus: z.enum(['pending', 'verified', 'rejected']).optional(),
+});
+export const updateFDPRecordSchema = createFDPRecordSchema.partial();
+
+// ─── FDP Compliance Summary CRUD ──────────────────────────────────
+
+export const createFDPComplianceSummarySchema = z.object({
+  facultyId: z.string().min(1),
+  academicYearId: z.string().min(1),
+  cadre: z.enum(['assistant_professor', 'associate_professor', 'professor']),
+  requiredHours: z.number().min(0),
+  completedHours: z.number().min(0),
+  gap: z.number().min(0),
+  complianceStatus: z.enum(['compliant', 'partial', 'non_compliant']),
+  lastComputedAt: z.string().min(1),
+});
+export const updateFDPComplianceSummarySchema = createFDPComplianceSummarySchema.partial();
+
+// ═══════════════════════════════════════════════════════════════════
+// W05 Phase 4 — Exit & Separation Schemas
+// ═══════════════════════════════════════════════════════════════════
+
+export const initiateResignationSchema = z.object({
+  employeeId: z.string().min(1),
+  requestedLastWorkingDay: z.string().min(1),
+  reason: z.string().min(1),
+});
+
+export const processTerminationSchema = z.object({
+  employeeId: z.string().min(1),
+  disciplinaryCaseId: z.string().min(1),
+  reason: z.string().min(1),
+});
+
+export const processDeathNotificationSchema = z.object({
+  employeeId: z.string().min(1),
+  reason: z.string().min(1),
+});
+
+export const rejectResignationSchema = z.object({
+  remarks: z.string().min(1),
+});
+
+export const waiveNoticeSchema = z.object({
+  newLastWorkingDay: z.string().min(1),
+});
+
+export const clearItemSchema = z.object({
+  department: z.string().min(1),
+  status: z.enum(['cleared', 'blocked']),
+  remarks: z.string().optional(),
+  blockedReason: z.string().optional(),
+});
+
+export const createHandoverSchema = z.object({
+  items: z.array(z.object({
+    category: z.enum(['course', 'mentee', 'research', 'admin', 'asset', 'lab']),
+    description: z.string().min(1),
+    successorId: z.string().optional(),
+    status: z.enum(['pending', 'completed']).optional(),
+  })),
+});
+
+export const updateHandoverItemSchema = z.object({
+  category: z.string().min(1),
+  status: z.enum(['pending', 'completed']),
+  successorId: z.string().optional(),
+  completedAt: z.string().optional(),
+});
+
+export const contractRenewalSchema = z.object({
+  employeeId: z.string().min(1),
+  newContractEndDate: z.string().min(1),
+  remarks: z.string().optional(),
+});
+
+// ─── Separation Request CRUD ─────────────────────────────────────
+export const createSeparationRequestSchema = z.object({
+  employeeId: z.string().min(1),
+  separationType: z.enum(['resignation', 'retirement', 'termination', 'death', 'contract_end']),
+  requestedLastWorkingDay: z.string().optional(),
+  reason: z.string().min(1),
+});
+export const updateSeparationRequestSchema = createSeparationRequestSchema.partial();
+
+// ─── Exit Clearance CRUD ─────────────────────────────────────────
+export const createExitClearanceSchema = z.object({
+  separationRequestId: z.string().min(1),
+  employeeId: z.string().min(1),
+});
+export const updateExitClearanceSchema = createExitClearanceSchema.partial();
+
+// ─── Handover Record CRUD ────────────────────────────────────────
+export const createHandoverRecordSchema = z.object({
+  separationRequestId: z.string().min(1),
+  employeeId: z.string().min(1),
+  items: z.array(z.object({
+    category: z.enum(['course', 'mentee', 'research', 'admin', 'asset', 'lab']),
+    description: z.string().min(1),
+    status: z.enum(['pending', 'completed']).optional(),
+  })).optional(),
+});
+export const updateHandoverRecordSchema = createHandoverRecordSchema.partial();
+
+// ─── Final Settlement CRUD ───────────────────────────────────────
+export const createFinalSettlementSchema = z.object({
+  separationRequestId: z.string().min(1),
+  employeeId: z.string().min(1),
+  leaveEncashmentDays: z.number().min(0),
+  leaveEncashmentAmount: z.number().min(0),
+  netSettlement: z.number(),
+});
+export const updateFinalSettlementSchema = createFinalSettlementSchema.partial();

@@ -1,6 +1,8 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../../middleware/authenticate';
 import * as service from './service';
+import * as fdpAppraisalService from './fdp-appraisal-service';
+import * as exitService from './exit-service';
 
 const who = (req: AuthRequest) => req.user?.name || 'System';
 
@@ -547,4 +549,317 @@ export async function updateAttendanceMonthlySummary(req: AuthRequest, res: Resp
 }
 export async function deleteAttendanceMonthlySummary(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.deleteAttendanceMonthlySummary(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// W05 Phase 3 — FDP Tracking & Appraisal Controllers
+// ═══════════════════════════════════════════════════════════════════
+
+// ─── FDP Workflow ─────────────────────────────────────────────────
+
+export async function submitFDPCertificate(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await fdpAppraisalService.submitFDPCertificate(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function ocrExtractFDP(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await fdpAppraisalService.ocrExtractFDP(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+export async function verifyFDPCertificate(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await fdpAppraisalService.verifyFDPCertificate(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function computeFDPComplianceGap(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { facultyId, academicYearId } = req.body;
+    res.json(await fdpAppraisalService.computeFDPComplianceGap(req.collegeId!, facultyId, academicYearId, who(req)));
+  } catch (err) { next(err); }
+}
+export async function nudgeFDPShortfall(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { academicYearId } = req.body;
+    res.json(await fdpAppraisalService.nudgeFDPShortfall(req.collegeId!, academicYearId));
+  } catch (err) { next(err); }
+}
+export async function reportFDPToCompliance(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { academicYearId } = req.body;
+    res.json(await fdpAppraisalService.reportFDPToCompliance(req.collegeId!, academicYearId));
+  } catch (err) { next(err); }
+}
+
+// ─── Appraisal Cycle Workflow ─────────────────────────────────────
+
+export async function configureAppraisalCycle(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await fdpAppraisalService.configureAppraisalCycle(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function initiateAppraisalCycle(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await fdpAppraisalService.initiateAppraisalCycle(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+export async function finalizeAppraisalRatings(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await fdpAppraisalService.finalizeAppraisalRatings(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ─── Appraisal Workflow ───────────────────────────────────────────
+
+export async function submitSelfAssessment(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await fdpAppraisalService.submitSelfAssessment(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function aggregateAppraisalData(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { appraisalType } = req.body;
+    if (appraisalType === 'staff') {
+      res.json(await fdpAppraisalService.aggregateStaffAppraisalData(req.collegeId!, req.params.id as string, who(req)));
+    } else {
+      res.json(await fdpAppraisalService.aggregateFacultyAppraisalData(req.collegeId!, req.params.id as string, who(req)));
+    }
+  } catch (err) { next(err); }
+}
+export async function submitReviewerAssessment(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await fdpAppraisalService.submitReviewerAssessment(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function moderateAppraisalRatings(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await fdpAppraisalService.moderateAppraisalRatings(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function handleRatingDispute(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await fdpAppraisalService.handleRatingDispute(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function resolveRatingDispute(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await fdpAppraisalService.resolveRatingDispute(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function generatePromotionPIPRecommendations(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { cycleId } = req.body;
+    res.json(await fdpAppraisalService.generatePromotionPIPRecommendations(req.collegeId!, cycleId, who(req)));
+  } catch (err) { next(err); }
+}
+
+// ─── FDP Record CRUD ──────────────────────────────────────────────
+
+export async function listFDPRecords(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page, limit, facultyId, verificationStatus } = req.query as any;
+    res.json(await fdpAppraisalService.listFDPRecords(req.collegeId!, Number(page) || 1, Number(limit) || 20, facultyId, verificationStatus));
+  } catch (err) { next(err); }
+}
+export async function getFDPRecord(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await fdpAppraisalService.getFDPRecord(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+export async function createFDPRecord(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await fdpAppraisalService.createFDPRecord(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function updateFDPRecord(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await fdpAppraisalService.updateFDPRecord(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function deleteFDPRecord(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await fdpAppraisalService.deleteFDPRecord(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ─── FDP Compliance Summary CRUD ──────────────────────────────────
+
+export async function listFDPComplianceSummaries(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page, limit, facultyId, academicYearId } = req.query as any;
+    res.json(await fdpAppraisalService.listFDPComplianceSummaries(req.collegeId!, Number(page) || 1, Number(limit) || 20, facultyId, academicYearId));
+  } catch (err) { next(err); }
+}
+export async function getFDPComplianceSummary(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await fdpAppraisalService.getFDPComplianceSummary(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+export async function createFDPComplianceSummary(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await fdpAppraisalService.createFDPComplianceSummary(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function updateFDPComplianceSummary(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await fdpAppraisalService.updateFDPComplianceSummary(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function deleteFDPComplianceSummary(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await fdpAppraisalService.deleteFDPComplianceSummary(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ─── Appraisal Cycle CRUD ─────────────────────────────────────────
+
+export async function listAppraisalCycles(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page, limit, status } = req.query as any;
+    res.json(await fdpAppraisalService.listAppraisalCycles(req.collegeId!, Number(page) || 1, Number(limit) || 20, status));
+  } catch (err) { next(err); }
+}
+export async function getAppraisalCycle(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await fdpAppraisalService.getAppraisalCycle(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+export async function createAppraisalCycleRecord(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await fdpAppraisalService.createAppraisalCycle(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function updateAppraisalCycle(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await fdpAppraisalService.updateAppraisalCycle(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function deleteAppraisalCycle(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await fdpAppraisalService.deleteAppraisalCycle(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// W05 Phase 4 — Exit & Separation Controllers
+// ═══════════════════════════════════════════════════════════════════
+
+// ─── Separation Initiation ───────────────────────────────────────
+export async function initiateResignation(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await exitService.initiateResignation(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function processRetirement(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.processRetirement(req.collegeId!, req.params.employeeId as string, who(req))); } catch (err) { next(err); }
+}
+export async function processTermination(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await exitService.processTermination(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function processDeathNotification(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await exitService.processDeathNotification(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+
+// ─── Resignation Approval ────────────────────────────────────────
+export async function acceptResignation(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.acceptResignation(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+export async function rejectResignation(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.rejectResignation(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function waiveNoticePeriod(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.waiveNoticePeriod(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+
+// ─── Clearance ───────────────────────────────────────────────────
+export async function initiateClearance(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await exitService.initiateClearance(req.collegeId!, req.params.separationId as string, who(req))); } catch (err) { next(err); }
+}
+export async function clearItemCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.clearItem(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function getClearanceStatusCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.getClearanceStatus(req.collegeId!, req.params.separationId as string)); } catch (err) { next(err); }
+}
+
+// ─── Handover ────────────────────────────────────────────────────
+export async function createHandoverRecordCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await exitService.createHandoverRecord(req.collegeId!, req.params.separationId as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function updateHandoverItemCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.updateHandoverItem(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function verifyHandoverCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.verifyHandover(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ─── Settlement ──────────────────────────────────────────────────
+export async function computeFinalSettlementCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await exitService.computeFinalSettlement(req.collegeId!, req.params.separationId as string, who(req))); } catch (err) { next(err); }
+}
+export async function approveSettlement(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.approveSettlement(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+export async function processSettlement(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.processSettlement(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ─── Completion ──────────────────────────────────────────────────
+export async function issueRelievingOrder(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.issueRelievingOrder(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+export async function archiveEmployeeRecord(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.archiveEmployeeRecord(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+export async function triggerReplacementRequisition(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.triggerReplacementRequisition(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ─── Special Cases ───────────────────────────────────────────────
+export async function detectUpcomingRetirements(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const withinMonths = Number(req.query.withinMonths) || 3;
+    res.json(await exitService.detectUpcomingRetirements(req.collegeId!, withinMonths));
+  } catch (err) { next(err); }
+}
+export async function detectExpiringContracts(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const withinMonths = Number(req.query.withinMonths) || 3;
+    res.json(await exitService.detectExpiringContracts(req.collegeId!, withinMonths));
+  } catch (err) { next(err); }
+}
+export async function processContractRenewal(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.processContractRenewal(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+
+// ─── Separation CRUD ─────────────────────────────────────────────
+export async function listSeparationRequests(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page, limit, status } = req.query as any;
+    res.json(await exitService.listSeparationRequests(req.collegeId!, Number(page) || 1, Number(limit) || 20, status));
+  } catch (err) { next(err); }
+}
+export async function getSeparationRequest(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.getSeparationRequest(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+export async function createSeparationRequestCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await exitService.createSeparationRequest(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function updateSeparationRequest(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.updateSeparationRequest(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function deleteSeparationRequest(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.deleteSeparationRequest(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ─── Exit Clearance CRUD ─────────────────────────────────────────
+export async function listExitClearances(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page, limit } = req.query as any;
+    res.json(await exitService.listExitClearances(req.collegeId!, Number(page) || 1, Number(limit) || 20));
+  } catch (err) { next(err); }
+}
+export async function getExitClearanceCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.getExitClearance(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+export async function createExitClearanceCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await exitService.createExitClearance(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function updateExitClearanceCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.updateExitClearance(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function deleteExitClearanceCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.deleteExitClearance(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ─── Handover Record CRUD ────────────────────────────────────────
+export async function listHandoverRecords(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page, limit } = req.query as any;
+    res.json(await exitService.listHandoverRecords(req.collegeId!, Number(page) || 1, Number(limit) || 20));
+  } catch (err) { next(err); }
+}
+export async function getHandoverRecordCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.getHandoverRecord(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+export async function createHandoverRecordCRUDCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await exitService.createHandoverRecordCRUD(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function updateHandoverRecordCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.updateHandoverRecord(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function deleteHandoverRecordCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.deleteHandoverRecord(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ─── Final Settlement CRUD ───────────────────────────────────────
+export async function listFinalSettlements(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page, limit } = req.query as any;
+    res.json(await exitService.listFinalSettlements(req.collegeId!, Number(page) || 1, Number(limit) || 20));
+  } catch (err) { next(err); }
+}
+export async function getFinalSettlement(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.getFinalSettlement(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+export async function createFinalSettlementCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await exitService.createFinalSettlement(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function updateFinalSettlement(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.updateFinalSettlement(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function deleteFinalSettlement(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.deleteFinalSettlement(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
 }
