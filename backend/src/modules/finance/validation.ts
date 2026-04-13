@@ -613,3 +613,96 @@ export const createScholarshipCreditSchema = z.object({
   appliedAt: z.string().optional(),
 });
 export const updateScholarshipCreditSchema = createScholarshipCreditSchema.partial();
+
+// ═══ W03 Phase 5: Defaulter Management ═══════════════════════
+
+export const identifyDefaultersSchema = z.object({});
+
+export const processEscalationsSchema = z.object({});
+
+export const computeDistressScoreSchema = z.object({});
+
+export const referToWelfareSchema = z.object({});
+
+export const processWelfareOutcomeSchema = z.object({
+  outcome: z.enum(['genuine_hardship', 'no_distress', 'inconclusive']),
+  m06CaseId: z.string().optional(),
+});
+
+export const recommendHoldsSchema = z.object({});
+
+export const applyFinancialHoldSchema = z.object({
+  studentId: z.string().min(1),
+  defaulterRecordId: z.string().min(1),
+  holdType: z.enum(['exam_debarment', 'hostel_restriction', 'transcript_hold', 'full_clearance_block']),
+  approvedBy: z.string().min(1),
+});
+
+export const releaseFinancialHoldSchema = z.object({
+  reason: z.string().min(1),
+});
+
+export const resolveDefaulterSchema = z.object({
+  resolutionType: z.enum(['payment', 'write_off', 'concession', 'other']),
+});
+
+export const logPhoneFollowUpSchema = z.object({
+  outcome: z.string().min(1),
+  notes: z.string().optional(),
+});
+
+// ─── DefaulterRecord CRUD ─────────────────────────────────────
+
+export const createDefaulterRecordSchema = z.object({
+  studentId: z.string().min(1),
+  invoiceId: z.string().min(1),
+  overdueAmount: z.number().nonnegative(),
+  daysOverdue: z.number().int().nonnegative().optional(),
+  escalationStage: z.enum(['stage_1', 'stage_2', 'stage_3', 'stage_4', 'welfare_referred', 'resolved', 'exited_hardship', 'exited_write_off']).optional(),
+  welfareReferralStatus: z.enum(['none', 'referred', 'returned']).optional(),
+  distressScore: z.number().optional(),
+  resolutionDate: z.string().optional(),
+  resolutionType: z.enum(['payment', 'write_off', 'concession', 'other']).optional(),
+});
+export const updateDefaulterRecordSchema = createDefaulterRecordSchema.partial();
+
+// ─── EscalationAction CRUD ────────────────────────────────────
+
+export const createEscalationActionSchema = z.object({
+  defaulterRecordId: z.string().min(1),
+  actionType: z.enum(['sms_reminder', 'whatsapp_parent', 'hold_recommendation', 'phone_call_flag', 'legal_notice_flag', 'welfare_referral']),
+  status: z.enum(['scheduled', 'executed', 'cancelled']).optional(),
+  executedAt: z.string().optional(),
+  outcome: z.string().optional(),
+  notes: z.string().optional(),
+});
+export const updateEscalationActionSchema = createEscalationActionSchema.partial();
+
+// ─── FinancialHold CRUD ───────────────────────────────────────
+
+export const createFinancialHoldSchema = z.object({
+  studentId: z.string().min(1),
+  defaulterRecordId: z.string().min(1),
+  holdType: z.enum(['exam_debarment', 'hostel_restriction', 'transcript_hold', 'full_clearance_block']),
+  approvedBy: z.string().min(1),
+  holdStatus: z.enum(['active', 'released']).optional(),
+  effectiveDate: z.string().optional(),
+  releaseDate: z.string().optional(),
+  releasedBy: z.string().optional(),
+  releaseReason: z.string().optional(),
+});
+export const updateFinancialHoldSchema = createFinancialHoldSchema.partial();
+
+// ─── WelfareReferral CRUD ─────────────────────────────────────
+
+export const createWelfareReferralSchema = z.object({
+  defaulterRecordId: z.string().min(1),
+  studentId: z.string().min(1),
+  distressScore: z.number().min(0).max(1),
+  referredBy: z.string().min(1),
+  referralStatus: z.enum(['referred', 'returned']).optional(),
+  outcome: z.enum(['genuine_hardship', 'no_distress', 'inconclusive']).optional(),
+  returnedAt: z.string().optional(),
+  m06CaseId: z.string().optional(),
+});
+export const updateWelfareReferralSchema = createWelfareReferralSchema.partial();

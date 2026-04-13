@@ -30,6 +30,11 @@ import { ScholarshipClaim } from '../../models/finance/ScholarshipClaim';
 import { ScholarshipReceivable } from '../../models/finance/ScholarshipReceivable';
 import { ScholarshipCredit } from '../../models/finance/ScholarshipCredit';
 import { SemesterResult } from '../../models/academic-ops/SemesterResult';
+import { AttendanceSummary } from '../../models/academic-ops/AttendanceSummary';
+import { DefaulterRecord } from '../../models/finance/DefaulterRecord';
+import { EscalationAction } from '../../models/finance/EscalationAction';
+import { FinancialHold } from '../../models/finance/FinancialHold';
+import { WelfareReferral } from '../../models/finance/WelfareReferral';
 import { AcademicYear } from '../../models/academic-structure/AcademicYear';
 import { Student } from '../../models/people/Student';
 import { Enrollment } from '../../models/academic-ops/Enrollment';
@@ -3273,6 +3278,699 @@ export async function deleteScholarshipCredit(collegeId: string, id: string, per
     entityType: 'ScholarshipCredit',
     entityId: id,
     entityName: `Scholarship Credit`,
+    action: 'delete',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// W03 Phase 5: Defaulter Management (W03-L2-035 to W03-L2-046)
+// ═══════════════════════════════════════════════════════════════
+
+// ─── W03-L2-035: Identify Defaulters ─────────────────────────
+export async function identifyDefaulters(collegeId: string, performedBy: string) {
+  const now = new Date();
+  const overdueInvoices = await Invoice.find({
+    collegeId,
+    status: { $in: ['sent', 'generated', 'partially_paid'] },
+    dueDate: { $lt: now },
+  }).lean();
+
+  let identified = 0;
+  let totalOverdueAmount = 0;
+
+  for (const invoice of overdueInvoices) {
+    const existing = await DefaulterRecord.findOne({
+      collegeId,
+      invoiceId: invoice._id,
+      escalationStage: { $nin: ['resolved', 'exited_hardship', 'exited_write_off'] },
+    }).lean();
+    if (existing) continue;
+
+    if (!invoice.studentId) continue;
+
+    const daysOverdue = Math.floor((now.getTime() - new Date(invoice.dueDate).getTime()) / 86400000);
+    const overdueAmount = (invoice.netPayable ?? invoice.totalAmount) - (invoice.scholarshipAllocated ?? 0) - (invoice.concessionApplied ?? 0);
+
+    let escalationStage: 'stage_1' | 'stage_2' | 'stage_3' | 'stage_4' = 'stage_1';
+    if (daysOverdue >= 60) escalationStage = 'stage_4';
+    else if (daysOverdue >= 21) escalationStage = 'stage_3';
+    else if (daysOverdue >= 14) escalationStage = 'stage_2';
+    else escalationStage = 'stage_1';
+
+    await DefaulterRecord.create({
+      collegeId,
+      studentId: invoice.studentId,
+      invoiceId: invoice._id,
+      overdueAmount: Math.max(0, overdueAmount),
+      daysOverdue,
+      escalationStage,
+    });
+
+    identified++;
+    totalOverdueAmount += Math.max(0, overdueAmount);
+  }
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'DefaulterRecord',
+    entityId: 'batch',
+    entityName: `Defaulter Identification`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return { identified, totalOverdueAmount };
+}
+
+// ─── W03-L2-036/037/041/044: Process Escalations ─────────────
+export async function processEscalations(collegeId: string, performedBy: string) {
+  const now = new Date();
+  const activeRecords = await DefaulterRecord.find({
+    collegeId,
+    escalationStage: { $nin: ['resolved', 'exited_hardship', 'exited_write_off'] },
+  }).lean();
+
+  let processed = 0;
+  let escalated = 0;
+  const actions: unknown[] = [];
+
+  for (const record of activeRecords) {
+    const invoice = await Invoice.findOne({ _id: record.invoiceId, collegeId }).lean();
+    if (!invoice) continue;
+
+    const daysOverdue = Math.floor((now.getTime() - new Date(invoice.dueDate).getTime()) / 86400000);
+    const currentStage = record.escalationStage as string;
+    let newStage = currentStage;
+    let actionCreated: unknown = null;
+
+    const stageOrder: Record<string, number> = {
+      stage_1: 1, stage_2: 2, stage_3: 3, stage_4: 4,
+      welfare_referred: 2.5, resolved: 99, exited_hardship: 99, exited_write_off: 99,
+    };
+    const currentOrder = stageOrder[currentStage] ?? 0;
+
+    if (daysOverdue >= 60 && record.overdueAmount > 50000 && currentOrder < 4) {
+      newStage = 'stage_4';
+      actionCreated = await EscalationAction.create({
+        collegeId,
+        defaulterRecordId: record._id,
+        actionType: 'legal_notice_flag',
+        status: 'scheduled',
+        executedAt: now,
+      });
+    } else if (daysOverdue >= 21 && currentOrder < 3 && record.welfareReferralStatus !== 'referred') {
+      newStage = 'stage_3';
+      actionCreated = await EscalationAction.create({
+        collegeId,
+        defaulterRecordId: record._id,
+        actionType: 'hold_recommendation',
+        status: 'scheduled',
+        executedAt: now,
+      });
+    } else if (daysOverdue >= 14 && currentOrder < 2) {
+      newStage = 'stage_2';
+      actionCreated = await EscalationAction.create({
+        collegeId,
+        defaulterRecordId: record._id,
+        actionType: 'whatsapp_parent',
+        status: 'executed',
+        executedAt: now,
+      });
+    } else if (daysOverdue >= 7 && currentStage === 'stage_1') {
+      actionCreated = await EscalationAction.create({
+        collegeId,
+        defaulterRecordId: record._id,
+        actionType: 'sms_reminder',
+        status: 'executed',
+        executedAt: now,
+      });
+    }
+
+    const updateData: Record<string, unknown> = { daysOverdue };
+    if (newStage !== currentStage) {
+      updateData.escalationStage = newStage;
+      escalated++;
+    }
+
+    await DefaulterRecord.findByIdAndUpdate(record._id, updateData);
+
+    if (actionCreated) actions.push(actionCreated);
+    processed++;
+  }
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'DefaulterRecord',
+    entityId: 'batch',
+    entityName: `Escalation Processing`,
+    action: 'update',
+    changes: [],
+    performedBy,
+  });
+
+  return { processed, escalated, actions };
+}
+
+// ─── W03-L2-038: Compute Distress Score ──────────────────────
+export async function computeDistressScore(collegeId: string, defaulterRecordId: string, performedBy: string) {
+  const record = await DefaulterRecord.findOne({ _id: defaulterRecordId, collegeId });
+  if (!record) throw new AppError(404, 'Defaulter record not found');
+
+  const studentId = String(record.studentId);
+  const signals: { type: string; value: number; weight: number }[] = [];
+
+  // Signal 1: attendance_drop
+  const attendanceSummary = await AttendanceSummary.findOne({ collegeId, studentId: record.studentId })
+    .sort({ createdAt: -1 })
+    .lean();
+  const attendanceSignal = attendanceSummary
+    ? Math.max(0, Math.min(1, (75 - attendanceSummary.percentage) / 75))
+    : 0;
+  signals.push({ type: 'attendance_drop', value: attendanceSignal, weight: 0.2 });
+
+  // Signal 2: communication_withdrawal (stub)
+  signals.push({ type: 'communication_withdrawal', value: 0, weight: 0.2 });
+
+  // Signal 3: prior_welfare (stub)
+  signals.push({ type: 'prior_welfare', value: 0, weight: 0.2 });
+
+  // Signal 4: academic_decline
+  const semesterResults = await SemesterResult.find({ collegeId, studentId: record.studentId })
+    .sort({ createdAt: -1 })
+    .limit(2)
+    .lean();
+  let academicSignal = 0;
+  if (semesterResults.length >= 2) {
+    const current = semesterResults[0]!;
+    const prior = semesterResults[1]!;
+    if (prior.sgpa > 0) {
+      academicSignal = Math.max(0, Math.min(1, (prior.sgpa - current.sgpa) / prior.sgpa));
+    }
+  }
+  signals.push({ type: 'academic_decline', value: academicSignal, weight: 0.2 });
+
+  // Signal 5: scholarship_pending
+  const pendingScholarship = await ScholarshipReceivable.findOne({
+    collegeId,
+    studentId: record.studentId,
+    status: { $in: ['pending', 'overdue'] },
+  }).lean();
+  const scholarshipSignal = pendingScholarship ? 1.0 : 0;
+  signals.push({ type: 'scholarship_pending', value: scholarshipSignal, weight: 0.2 });
+
+  const distressScore = signals.reduce((sum, s) => sum + s.value * s.weight, 0);
+
+  record.distressSignals = signals;
+  record.distressScore = distressScore;
+  await record.save();
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'DefaulterRecord',
+    entityId: defaulterRecordId,
+    entityName: `Distress Score: ${distressScore.toFixed(2)}`,
+    action: 'update',
+    changes: [],
+    performedBy,
+  });
+
+  return {
+    distressScore,
+    signals,
+    threshold: 0.6,
+    recommendReferral: distressScore > 0.6,
+    studentId,
+  };
+}
+
+// ─── W03-L2-039: Refer to Welfare ────────────────────────────
+export async function referToWelfare(collegeId: string, defaulterRecordId: string, performedBy: string) {
+  const record = await DefaulterRecord.findOne({ _id: defaulterRecordId, collegeId });
+  if (!record) throw new AppError(404, 'Defaulter record not found');
+
+  const stageOrder: Record<string, number> = { stage_1: 1, stage_2: 2, stage_3: 3, stage_4: 4 };
+  if ((stageOrder[record.escalationStage] ?? 0) < 2) {
+    throw new AppError(400, 'Welfare referral requires escalation stage 2 or higher');
+  }
+
+  const referral = await WelfareReferral.create({
+    collegeId,
+    defaulterRecordId: record._id,
+    studentId: record.studentId,
+    distressScore: record.distressScore ?? 0,
+    distressSignals: record.distressSignals,
+    referredBy: performedBy,
+  });
+
+  record.welfareReferralStatus = 'referred';
+  record.escalationStage = 'welfare_referred';
+  await record.save();
+
+  await EscalationAction.create({
+    collegeId,
+    defaulterRecordId: record._id,
+    actionType: 'welfare_referral',
+    status: 'executed',
+    executedAt: new Date(),
+  });
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'WelfareReferral',
+    entityId: String(referral._id),
+    entityName: `Welfare Referral`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return referral;
+}
+
+// ─── W03-L2-040: Process Welfare Outcome ─────────────────────
+export async function processWelfareOutcome(
+  collegeId: string,
+  defaulterRecordId: string,
+  outcome: 'genuine_hardship' | 'no_distress' | 'inconclusive',
+  m06CaseId: string | undefined,
+  performedBy: string,
+) {
+  const record = await DefaulterRecord.findOne({ _id: defaulterRecordId, collegeId });
+  if (!record) throw new AppError(404, 'Defaulter record not found');
+
+  const referral = await WelfareReferral.findOne({ collegeId, defaulterRecordId: record._id });
+  if (!referral) throw new AppError(404, 'Welfare referral not found');
+
+  referral.outcome = outcome;
+  referral.returnedAt = new Date();
+  referral.referralStatus = 'returned';
+  if (m06CaseId) referral.m06CaseId = m06CaseId;
+  await referral.save();
+
+  record.welfareReferralStatus = 'returned';
+
+  if (outcome === 'genuine_hardship') {
+    record.escalationStage = 'exited_hardship';
+  } else if (outcome === 'no_distress') {
+    record.escalationStage = 'stage_3';
+  }
+  // inconclusive: keep as welfare_referred
+
+  await record.save();
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'WelfareReferral',
+    entityId: String(referral._id),
+    entityName: `Welfare Outcome: ${outcome}`,
+    action: 'update',
+    changes: [],
+    performedBy,
+  });
+
+  return { outcome, newStage: record.escalationStage };
+}
+
+// ─── W03-L2-041: Recommend Holds ─────────────────────────────
+export async function recommendHolds(collegeId: string, defaulterRecordId: string, performedBy: string) {
+  const record = await DefaulterRecord.findOne({ _id: defaulterRecordId, collegeId });
+  if (!record) throw new AppError(404, 'Defaulter record not found');
+
+  let holdTypes: string[] = [];
+  if (record.escalationStage === 'stage_4') {
+    holdTypes = ['exam_debarment', 'hostel_restriction', 'transcript_hold', 'full_clearance_block'];
+  } else if (record.escalationStage === 'stage_3') {
+    holdTypes = ['exam_debarment', 'hostel_restriction', 'transcript_hold'];
+  }
+
+  await EscalationAction.create({
+    collegeId,
+    defaulterRecordId: record._id,
+    actionType: 'hold_recommendation',
+    status: 'executed',
+    executedAt: new Date(),
+    outcome: holdTypes.join(', '),
+  });
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'DefaulterRecord',
+    entityId: defaulterRecordId,
+    entityName: `Hold Recommendation`,
+    action: 'update',
+    changes: [],
+    performedBy,
+  });
+
+  return { recommended: holdTypes };
+}
+
+// ─── W03-L2-042: Apply Financial Hold ────────────────────────
+export async function applyFinancialHold(
+  collegeId: string,
+  studentId: string,
+  defaulterRecordId: string,
+  holdType: 'exam_debarment' | 'hostel_restriction' | 'transcript_hold' | 'full_clearance_block',
+  approvedBy: string,
+  performedBy: string,
+) {
+  const hold = await FinancialHold.create({
+    collegeId,
+    studentId,
+    defaulterRecordId,
+    holdType,
+    approvedBy,
+    holdStatus: 'active',
+    effectiveDate: new Date(),
+  });
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'FinancialHold',
+    entityId: String(hold._id),
+    entityName: `Hold: ${holdType}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return hold;
+}
+
+// ─── W03-L2-043: Check Financial Holds ───────────────────────
+export async function checkFinancialHolds(collegeId: string, studentId: string) {
+  const holds = await FinancialHold.find({ collegeId, studentId, holdStatus: 'active' }).lean();
+  const holdTypes = holds.map(h => h.holdType);
+  const hasActiveHold = holds.length > 0;
+  const message = hasActiveHold
+    ? `Student has ${holds.length} active financial hold(s): ${holdTypes.join(', ')}`
+    : 'No active financial holds';
+  return { hasActiveHold, holdTypes, holds, message };
+}
+
+// ─── W03-L2-045: Release Financial Hold ──────────────────────
+export async function releaseFinancialHold(collegeId: string, holdId: string, reason: string, performedBy: string) {
+  const hold = await FinancialHold.findOne({ _id: holdId, collegeId });
+  if (!hold) throw new AppError(404, 'Financial hold not found');
+
+  hold.holdStatus = 'released';
+  hold.releaseDate = new Date();
+  hold.releasedBy = performedBy as unknown as typeof hold.releasedBy;
+  hold.releaseReason = reason;
+  await hold.save();
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'FinancialHold',
+    entityId: holdId,
+    entityName: `Hold Released`,
+    action: 'update',
+    changes: [],
+    performedBy,
+  });
+
+  return hold;
+}
+
+// ─── W03-L2-045: Resolve Defaulter ───────────────────────────
+export async function resolveDefaulter(
+  collegeId: string,
+  defaulterRecordId: string,
+  resolutionType: 'payment' | 'write_off' | 'concession' | 'other',
+  performedBy: string,
+) {
+  const record = await DefaulterRecord.findOne({ _id: defaulterRecordId, collegeId });
+  if (!record) throw new AppError(404, 'Defaulter record not found');
+
+  record.escalationStage = 'resolved';
+  record.resolutionDate = new Date();
+  record.resolutionType = resolutionType;
+  await record.save();
+
+  // Release all active holds for this student+defaulter
+  await FinancialHold.updateMany(
+    { collegeId, studentId: record.studentId, defaulterRecordId: record._id, holdStatus: 'active' },
+    { holdStatus: 'released', releaseDate: new Date(), releaseReason: `Auto-released on resolution: ${resolutionType}` },
+  );
+
+  // Cancel any scheduled escalation actions
+  await EscalationAction.updateMany(
+    { collegeId, defaulterRecordId: record._id, status: 'scheduled' },
+    { status: 'cancelled' },
+  );
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'DefaulterRecord',
+    entityId: defaulterRecordId,
+    entityName: `Resolved: ${resolutionType}`,
+    action: 'update',
+    changes: [],
+    performedBy,
+  });
+
+  return record;
+}
+
+// ─── W03-L2-046: Log Phone Follow-Up ─────────────────────────
+export async function logPhoneFollowUp(
+  collegeId: string,
+  defaulterRecordId: string,
+  outcome: string,
+  notes: string | undefined,
+  performedBy: string,
+) {
+  const action = await EscalationAction.create({
+    collegeId,
+    defaulterRecordId,
+    actionType: 'phone_call_flag',
+    status: 'executed',
+    executedAt: new Date(),
+    outcome,
+    notes,
+  });
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'EscalationAction',
+    entityId: String(action._id),
+    entityName: `Phone Follow-Up`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return action;
+}
+
+// ─── DefaulterRecord CRUD ─────────────────────────────────────
+export async function listDefaulterRecords(collegeId: string, page = 1, limit = 20, escalationStage?: string) {
+  const filter: Record<string, unknown> = { collegeId };
+  if (escalationStage) filter.escalationStage = escalationStage;
+  return paginate(DefaulterRecord, filter, page, limit);
+}
+
+export async function getDefaulterRecord(collegeId: string, id: string) {
+  const doc = await DefaulterRecord.findOne({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Defaulter record not found');
+  return doc;
+}
+
+export async function createDefaulterRecord(collegeId: string, data: Record<string, unknown>, performedBy: string) {
+  const doc = await DefaulterRecord.create({ ...data, collegeId });
+  await createAuditLog({
+    collegeId,
+    entityType: 'DefaulterRecord',
+    entityId: String(doc._id),
+    entityName: `Defaulter Record`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function updateDefaulterRecord(collegeId: string, id: string, data: Record<string, unknown>, performedBy: string) {
+  const doc = await DefaulterRecord.findOneAndUpdate({ _id: id, collegeId }, data, { new: true });
+  if (!doc) throw new AppError(404, 'Defaulter record not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'DefaulterRecord',
+    entityId: id,
+    entityName: `Defaulter Record`,
+    action: 'update',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function deleteDefaulterRecord(collegeId: string, id: string, performedBy: string) {
+  const doc = await DefaulterRecord.findOneAndDelete({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Defaulter record not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'DefaulterRecord',
+    entityId: id,
+    entityName: `Defaulter Record`,
+    action: 'delete',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+// ─── EscalationAction CRUD ────────────────────────────────────
+export async function listEscalationActions(collegeId: string, page = 1, limit = 20) {
+  return paginate(EscalationAction, { collegeId }, page, limit);
+}
+
+export async function getEscalationAction(collegeId: string, id: string) {
+  const doc = await EscalationAction.findOne({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Escalation action not found');
+  return doc;
+}
+
+export async function createEscalationAction(collegeId: string, data: Record<string, unknown>, performedBy: string) {
+  const doc = await EscalationAction.create({ ...data, collegeId });
+  await createAuditLog({
+    collegeId,
+    entityType: 'EscalationAction',
+    entityId: String(doc._id),
+    entityName: `Escalation Action: ${doc.actionType}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function updateEscalationAction(collegeId: string, id: string, data: Record<string, unknown>, performedBy: string) {
+  const doc = await EscalationAction.findOneAndUpdate({ _id: id, collegeId }, data, { new: true });
+  if (!doc) throw new AppError(404, 'Escalation action not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'EscalationAction',
+    entityId: id,
+    entityName: `Escalation Action`,
+    action: 'update',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function deleteEscalationAction(collegeId: string, id: string, performedBy: string) {
+  const doc = await EscalationAction.findOneAndDelete({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Escalation action not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'EscalationAction',
+    entityId: id,
+    entityName: `Escalation Action`,
+    action: 'delete',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+// ─── FinancialHold CRUD ───────────────────────────────────────
+export async function listFinancialHolds(collegeId: string, page = 1, limit = 20, studentId?: string, holdStatus?: string) {
+  const filter: Record<string, unknown> = { collegeId };
+  if (studentId) filter.studentId = studentId;
+  if (holdStatus) filter.holdStatus = holdStatus;
+  return paginate(FinancialHold, filter, page, limit);
+}
+
+export async function getFinancialHold(collegeId: string, id: string) {
+  const doc = await FinancialHold.findOne({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Financial hold not found');
+  return doc;
+}
+
+export async function updateFinancialHold(collegeId: string, id: string, data: Record<string, unknown>, performedBy: string) {
+  const doc = await FinancialHold.findOneAndUpdate({ _id: id, collegeId }, data, { new: true });
+  if (!doc) throw new AppError(404, 'Financial hold not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'FinancialHold',
+    entityId: id,
+    entityName: `Financial Hold`,
+    action: 'update',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function deleteFinancialHold(collegeId: string, id: string, performedBy: string) {
+  const doc = await FinancialHold.findOneAndDelete({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Financial hold not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'FinancialHold',
+    entityId: id,
+    entityName: `Financial Hold`,
+    action: 'delete',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+// ─── WelfareReferral CRUD ─────────────────────────────────────
+export async function listWelfareReferrals(collegeId: string, page = 1, limit = 20) {
+  return paginate(WelfareReferral, { collegeId }, page, limit);
+}
+
+export async function getWelfareReferral(collegeId: string, id: string) {
+  const doc = await WelfareReferral.findOne({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Welfare referral not found');
+  return doc;
+}
+
+export async function createWelfareReferral(collegeId: string, data: Record<string, unknown>, performedBy: string) {
+  const doc = await WelfareReferral.create({ ...data, collegeId });
+  await createAuditLog({
+    collegeId,
+    entityType: 'WelfareReferral',
+    entityId: String(doc._id),
+    entityName: `Welfare Referral`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function updateWelfareReferral(collegeId: string, id: string, data: Record<string, unknown>, performedBy: string) {
+  const doc = await WelfareReferral.findOneAndUpdate({ _id: id, collegeId }, data, { new: true });
+  if (!doc) throw new AppError(404, 'Welfare referral not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'WelfareReferral',
+    entityId: id,
+    entityName: `Welfare Referral`,
+    action: 'update',
+    changes: [],
+    performedBy,
+  });
+  return doc;
+}
+
+export async function deleteWelfareReferral(collegeId: string, id: string, performedBy: string) {
+  const doc = await WelfareReferral.findOneAndDelete({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Welfare referral not found');
+  await createAuditLog({
+    collegeId,
+    entityType: 'WelfareReferral',
+    entityId: id,
+    entityName: `Welfare Referral`,
     action: 'delete',
     changes: [],
     performedBy,

@@ -90,6 +90,12 @@ export { ScholarshipCredit } from './finance/ScholarshipCredit';
 export { ScholarshipEligibility } from './finance/ScholarshipEligibility';
 export { ScholarshipReceivable } from './finance/ScholarshipReceivable';
 export { StudentFeeAccount } from './finance/StudentFeeAccount';
+export { PaymentRequest } from './finance/PaymentRequest';
+export { VendorPayment } from './finance/VendorPayment';
+export { DefaulterRecord } from './finance/DefaulterRecord';
+export { EscalationAction } from './finance/EscalationAction';
+export { FinancialHold } from './finance/FinancialHold';
+export { WelfareReferral } from './finance/WelfareReferral';
 
 // === Hr ===
 export { Appraisal } from './hr/Appraisal';
