@@ -372,3 +372,20 @@ export const refreshAttendanceSummarySchema = z.object({
   studentId: z.string().min(1, 'Student ID is required'),
   courseOfferingId: z.string().min(1, 'Course offering ID is required'),
 });
+
+// ═══ W02: Condonation Request Workflow ═══════════════════════
+
+export const submitCondonationRequestSchema = z.object({
+  studentId: z.string().min(1, 'Student ID is required'),
+  courseOfferingId: z.string().min(1, 'Course offering ID is required'),
+  semesterId: z.string().min(1, 'Semester ID is required'),
+  reason: z.enum(['medical', 'od', 'family_emergency', 'other']),
+  description: z.string().min(1, 'Description is required'),
+  supportingDocuments: z.array(z.string()).optional(),
+  classesRequested: z.number().int().positive('Classes requested must be a positive integer'),
+});
+
+export const reviewCondonationRequestSchema = z.object({
+  decision: z.enum(['approved', 'rejected']),
+  reviewRemarks: z.string().optional(),
+});

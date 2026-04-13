@@ -41,6 +41,8 @@ import {
   optimizeElectiveAllocationsSchema,
   finalizeElectiveAllocationsSchema,
   refreshAttendanceSummarySchema,
+  submitCondonationRequestSchema,
+  reviewCondonationRequestSchema,
 } from './validation';
 
 const router = Router();
@@ -274,5 +276,13 @@ router.post('/attendance-summary/refresh', authorize('academics', 'create'), val
 
 // Attendance Alerts
 router.get('/attendance-alerts', authorize('academics', 'read'), ctrl.listAttendanceAlerts);
+
+// ═══ W02: Condonation Request Workflow ═══════════════════════
+
+// Condonation Requests
+router.post('/condonation-requests', authorize('academics', 'create'), validate(submitCondonationRequestSchema), ctrl.submitCondonationRequest);
+router.get('/condonation-requests', authorize('academics', 'read'), ctrl.listCondonationRequests);
+router.get('/condonation-requests/:id', authorize('academics', 'read'), ctrl.getCondonationRequest);
+router.put('/condonation-requests/:id/review', authorize('academics', 'update'), validate(reviewCondonationRequestSchema), ctrl.reviewCondonationRequest);
 
 export default router;

@@ -31,6 +31,8 @@ import { ProgramOutcome } from '../../models/academic-ops/ProgramOutcome';
 import { ElectiveAllocation } from '../../models/academic-ops/ElectiveAllocation';
 import { LessonPlan } from '../../models/academic-ops/LessonPlan';
 import { CourseFeedback } from '../../models/academic-ops/CourseFeedback';
+import { CondonationRequest } from '../../models/academic-ops/CondonationRequest';
+import { ICondonationRequest } from '../../models/academic-ops/CondonationRequest';
 import { paginate } from '../../shared/pagination';
 import { createAuditLog } from '../../shared/audit';
 import { AppError } from '../../middleware/errorHandler';
@@ -1855,4 +1857,125 @@ export async function getAttendanceAlerts(
   }
 
   return paginate(AttendanceAlert, filter, page, limit);
+}
+
+// ═══ W02: Condonation Request Workflow ═══════════════════════
+
+/**
+ * Submit a new condonation request.
+ */
+export async function submitCondonationRequest(
+  collegeId: string,
+  data: {
+    studentId: string;
+    courseOfferingId: string;
+    semesterId: string;
+    reason: string;
+    description: string;
+    supportingDocuments?: string[];
+    classesRequested: number;
+  },
+  performedBy: string,
+) {
+  const doc = await CondonationRequest.create({
+    ...data,
+    collegeId,
+    status: 'submitted',
+  });
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'CondonationRequest',
+    entityId: String(doc._id),
+    entityName: `Condonation-${String(doc._id).slice(-6)}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return doc;
+}
+
+/**
+ * List condonation requests with optional filters.
+ */
+export async function listCondonationRequests(
+  collegeId: string,
+  filters: { studentId?: string; semesterId?: string; status?: string; courseOfferingId?: string },
+  page: number,
+  limit: number,
+) {
+  const filter: FilterQuery<ICondonationRequest> = { collegeId };
+  if (filters.studentId) filter.studentId = filters.studentId;
+  if (filters.semesterId) filter.semesterId = filters.semesterId;
+  if (filters.status) filter.status = filters.status;
+  if (filters.courseOfferingId) filter.courseOfferingId = filters.courseOfferingId;
+
+  return paginate(CondonationRequest, filter, page, limit);
+}
+
+/**
+ * Get a single condonation request.
+ */
+export async function getCondonationRequest(collegeId: string, id: string) {
+  const doc = await CondonationRequest.findOne({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Condonation request not found');
+  return doc;
+}
+
+/**
+ * Review (approve/reject) a condonation request.
+ */
+export async function reviewCondonationRequest(
+  collegeId: string,
+  id: string,
+  decision: 'approved' | 'rejected',
+  reviewRemarks: string | undefined,
+  performedBy: string,
+) {
+  const doc = await CondonationRequest.findOne({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Condonation request not found');
+
+  if (doc.status !== 'submitted' && doc.status !== 'under_review') {
+    throw new AppError(400, `Cannot review a request with status '${doc.status}'`);
+  }
+
+  doc.status = decision;
+  doc.reviewedBy = performedBy as any;
+  doc.reviewedAt = new Date();
+  if (reviewRemarks !== undefined) {
+    doc.reviewRemarks = reviewRemarks;
+  }
+
+  if (decision === 'approved') {
+    doc.linkedToEligibility = true;
+
+    // Update AttendanceSummary: add condoned classes to attended count
+    const summary = await AttendanceSummary.findOne({
+      collegeId,
+      studentId: doc.studentId,
+      courseOfferingId: doc.courseOfferingId,
+    });
+    if (summary) {
+      summary.attended += doc.classesRequested;
+      summary.percentage = summary.totalClasses > 0
+        ? Math.round((summary.attended / summary.totalClasses) * 10000) / 100
+        : 0;
+      await summary.save();
+    }
+  }
+
+  await doc.save();
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'CondonationRequest',
+    entityId: String(doc._id),
+    entityName: `Condonation-${String(doc._id).slice(-6)}`,
+    action: 'update',
+    changes: [{ field: 'status', displayName: 'Status', oldValue: 'submitted', newValue: decision }],
+    performedBy,
+  });
+
+  return doc;
 }

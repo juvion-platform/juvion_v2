@@ -620,3 +620,42 @@ export async function listAttendanceAlerts(req: AuthRequest, res: Response, next
     res.json(result);
   } catch (e) { next(e); }
 }
+
+// ═══ W02: Condonation Request Workflow ═══════════════════════
+
+export async function submitCondonationRequest(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const result = await svc.submitCondonationRequest(req.collegeId!, req.body, who(req));
+    res.status(201).json(result);
+  } catch (e) { next(e); }
+}
+
+export async function listCondonationRequests(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { studentId, semesterId, status, courseOfferingId, page = '1', limit = '20' } = req.query as Record<string, string | undefined>;
+    const result = await svc.listCondonationRequests(
+      req.collegeId!,
+      { studentId, semesterId, status, courseOfferingId },
+      +(page || '1'),
+      +(limit || '20'),
+    );
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+export async function getCondonationRequest(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const result = await svc.getCondonationRequest(req.collegeId!, req.params.id as string);
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+export async function reviewCondonationRequest(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { decision, reviewRemarks } = req.body;
+    const result = await svc.reviewCondonationRequest(
+      req.collegeId!, req.params.id as string, decision, reviewRemarks, who(req),
+    );
+    res.json(result);
+  } catch (e) { next(e); }
+}
