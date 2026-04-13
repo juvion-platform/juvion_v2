@@ -49,6 +49,10 @@ import { COAttainmentRecord } from '../../models/academic-ops/COAttainmentRecord
 import { AttainmentRun } from '../../models/academic-ops/AttainmentRun';
 import { POAttainmentRecord } from '../../models/academic-ops/POAttainmentRecord';
 import { ProgrammeHealthMetrics } from '../../models/academic-ops/ProgrammeHealthMetrics';
+import { EvidenceRecord } from '../../models/compliance/EvidenceRecord';
+import { RiskAlert } from '../../models/governance/RiskAlert';
+import { AcademicHistory } from '../../models/people/AcademicHistory';
+import { Transcript } from '../../models/people/Transcript';
 import { paginate } from '../../shared/pagination';
 import { createAuditLog } from '../../shared/audit';
 import { AppError } from '../../middleware/errorHandler';
@@ -4535,4 +4539,670 @@ export async function computeProgrammeHealth(
     syllabusCompletion,
     feedbackAvg,
   };
+}
+
+// ═══ W02 Phase 3: Compliance Evidence Feed (Task 4) ══════════════
+
+export async function feedComplianceEvidence(
+  collegeId: string,
+  semesterId: string,
+  performedBy: string,
+): Promise<{ evidenceCreated: number }> {
+  const evidenceRecords: Array<{
+    collegeId: string;
+    criterionCode: string;
+    evidenceType: string;
+    title: string;
+    description: string;
+    sourceModule: string;
+    sourceEntityType: string;
+    sourceEntityId?: string;
+    data: Record<string, unknown>;
+    semesterId: string;
+    status: string;
+    uploadedBy: string;
+  }> = [];
+
+  // 1. CO Attainment records
+  const coRecords = await COAttainmentRecord.find({ collegeId, semesterId }).lean();
+  for (const rec of coRecords) {
+    evidenceRecords.push({
+      collegeId,
+      criterionCode: 'NBA-PO-attainment',
+      evidenceType: 'co_attainment',
+      title: `CO Attainment: ${rec.coCode} for offering ${String(rec.courseOfferingId)}`,
+      description: `CO attainment record for ${rec.coCode} — overall attainment: ${rec.overallAttainment}`,
+      sourceModule: 'M03',
+      sourceEntityType: 'COAttainmentRecord',
+      sourceEntityId: String(rec._id),
+      data: {
+        coCode: rec.coCode,
+        courseOfferingId: String(rec.courseOfferingId),
+        overallAttainment: rec.overallAttainment,
+      },
+      semesterId,
+      status: 'draft',
+      uploadedBy: performedBy,
+    });
+  }
+
+  // 2. PO Attainment records
+  const poRecords = await POAttainmentRecord.find({ collegeId, semesterId }).lean();
+  for (const rec of poRecords) {
+    evidenceRecords.push({
+      collegeId,
+      criterionCode: 'NBA-PO-attainment',
+      evidenceType: 'po_attainment',
+      title: `PO Attainment: ${rec.poCode} for programme ${String(rec.programmeId)}`,
+      description: `PO attainment record for ${rec.poCode} — attainment: ${rec.attainment}`,
+      sourceModule: 'M03',
+      sourceEntityType: 'POAttainmentRecord',
+      sourceEntityId: String(rec._id),
+      data: {
+        poCode: rec.poCode,
+        programmeId: String(rec.programmeId),
+        attainment: rec.attainment,
+        attainmentLevel: rec.attainmentLevel,
+      },
+      semesterId,
+      status: 'draft',
+      uploadedBy: performedBy,
+    });
+  }
+
+  // 3. Pass rate from SemesterResults
+  const semesterResults = await SemesterResult.find({ collegeId, semesterId }).lean();
+  if (semesterResults.length > 0) {
+    const passCount = semesterResults.filter(r => r.result === 'pass').length;
+    const passRateValue = Math.round((passCount / semesterResults.length) * 10000) / 100;
+    evidenceRecords.push({
+      collegeId,
+      criterionCode: 'NBA-PO-attainment',
+      evidenceType: 'pass_rate',
+      title: `Semester Pass Rate: ${passRateValue}%`,
+      description: `Pass rate for semester — ${passCount}/${semesterResults.length} students passed`,
+      sourceModule: 'M03',
+      sourceEntityType: 'SemesterResult',
+      data: {
+        passRate: passRateValue,
+        totalStudents: semesterResults.length,
+        passCount,
+      },
+      semesterId,
+      status: 'draft',
+      uploadedBy: performedBy,
+    });
+  }
+
+  // 4. Attendance averages
+  const attendanceSummaries = await AttendanceSummary.find({ collegeId, semesterId }).lean();
+  if (attendanceSummaries.length > 0) {
+    const avgAttendance = Math.round(
+      (attendanceSummaries.reduce((s, a) => s + a.percentage, 0) / attendanceSummaries.length) * 100,
+    ) / 100;
+    evidenceRecords.push({
+      collegeId,
+      criterionCode: 'NBA-PO-attainment',
+      evidenceType: 'attendance',
+      title: `Average Attendance: ${avgAttendance}%`,
+      description: `Average attendance across ${attendanceSummaries.length} student-course records`,
+      sourceModule: 'M03',
+      sourceEntityType: 'AttendanceSummary',
+      data: {
+        avgAttendance,
+        totalRecords: attendanceSummaries.length,
+      },
+      semesterId,
+      status: 'draft',
+      uploadedBy: performedBy,
+    });
+  }
+
+  // 5. Course feedback averages
+  const offerings = await CourseOffering.find({ collegeId, semesterId }).lean();
+  const offeringIds = offerings.map(o => String(o._id));
+  const feedbacks = await CourseFeedback.find({
+    collegeId,
+    courseOfferingId: { $in: offeringIds },
+  }).lean();
+  if (feedbacks.length > 0) {
+    const avgFeedback = Math.round(
+      (feedbacks.reduce((s, f) => s + f.overallRating, 0) / feedbacks.length) * 100,
+    ) / 100;
+    evidenceRecords.push({
+      collegeId,
+      criterionCode: 'NBA-PO-attainment',
+      evidenceType: 'feedback',
+      title: `Average Course Feedback: ${avgFeedback}/5`,
+      description: `Average feedback across ${feedbacks.length} feedback submissions`,
+      sourceModule: 'M03',
+      sourceEntityType: 'CourseFeedback',
+      data: {
+        avgFeedback,
+        totalFeedbacks: feedbacks.length,
+      },
+      semesterId,
+      status: 'draft',
+      uploadedBy: performedBy,
+    });
+  }
+
+  // 6. Bulk create evidence records
+  if (evidenceRecords.length > 0) {
+    await EvidenceRecord.insertMany(evidenceRecords);
+  }
+
+  // 7. Audit log
+  await createAuditLog({
+    collegeId,
+    entityType: 'EvidenceRecord',
+    entityId: semesterId,
+    entityName: `Compliance Evidence Feed for semester ${semesterId}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return { evidenceCreated: evidenceRecords.length };
+}
+
+// ═══ W02 Phase 3: Dashboard Data APIs (Task 4) ══════════════════
+
+export async function getAcademicPerformanceDashboard(
+  collegeId: string,
+  semesterId: string,
+): Promise<{
+  semesterId: string;
+  passRate: number;
+  avgSGPA: number;
+  avgCGPA: number;
+  totalStudents: number;
+  backlogCount: number;
+  gradeDistribution: Record<string, number>;
+  topPerformers: Array<{ studentId: string; cgpa: number }>;
+}> {
+  // 1. SemesterResults → passRate, avgSGPA, avgCGPA, totalStudents
+  const semesterResults = await SemesterResult.find({ collegeId, semesterId }).lean();
+  const totalStudents = semesterResults.length;
+  const passCount = semesterResults.filter(r => r.result === 'pass').length;
+  const passRate = totalStudents > 0 ? Math.round((passCount / totalStudents) * 10000) / 100 : 0;
+  const avgSGPA = totalStudents > 0
+    ? Math.round((semesterResults.reduce((s, r) => s + r.sgpa, 0) / totalStudents) * 100) / 100
+    : 0;
+  const avgCGPA = totalStudents > 0
+    ? Math.round((semesterResults.reduce((s, r) => s + r.cgpa, 0) / totalStudents) * 100) / 100
+    : 0;
+  const backlogCount = semesterResults.filter(r => r.backlogs > 0).length;
+
+  // 2. GradeCards → grade distribution
+  const gradeCards = await GradeCard.find({ collegeId, semesterId }).lean();
+  const gradeDistribution: Record<string, number> = {};
+  for (const gc of gradeCards) {
+    const grade = gc.grade;
+    gradeDistribution[grade] = (gradeDistribution[grade] || 0) + 1;
+  }
+
+  // 3. Top 10 performers by cgpa
+  const sorted = [...semesterResults].sort((a, b) => b.cgpa - a.cgpa);
+  const topPerformers = sorted.slice(0, 10).map(r => ({
+    studentId: String(r.studentId),
+    cgpa: r.cgpa,
+  }));
+
+  return {
+    semesterId,
+    passRate,
+    avgSGPA,
+    avgCGPA,
+    totalStudents,
+    backlogCount,
+    gradeDistribution,
+    topPerformers,
+  };
+}
+
+export async function getAttendanceAnalyticsDashboard(
+  collegeId: string,
+  semesterId: string,
+): Promise<{
+  semesterId: string;
+  overallAvgAttendance: number;
+  categoryDistribution: { safe: number; warning: number; at_risk: number; detained: number };
+  courseWiseAttendance: Array<{ courseOfferingId: string; avgAttendance: number }>;
+  alertsCount: number;
+}> {
+  // 1. AttendanceSummary → averages and category counts
+  const summaries = await AttendanceSummary.find({ collegeId, semesterId }).lean();
+  const overallAvgAttendance = summaries.length > 0
+    ? Math.round((summaries.reduce((s, a) => s + a.percentage, 0) / summaries.length) * 100) / 100
+    : 0;
+
+  const categoryDistribution = { safe: 0, warning: 0, at_risk: 0, detained: 0 };
+  for (const s of summaries) {
+    const cat = s.category as keyof typeof categoryDistribution;
+    if (cat in categoryDistribution) {
+      categoryDistribution[cat]++;
+    }
+  }
+
+  // Course-wise attendance
+  const courseMap = new Map<string, { total: number; count: number }>();
+  for (const s of summaries) {
+    const key = String(s.courseOfferingId);
+    const existing = courseMap.get(key);
+    if (existing) {
+      existing.total += s.percentage;
+      existing.count++;
+    } else {
+      courseMap.set(key, { total: s.percentage, count: 1 });
+    }
+  }
+  const courseWiseAttendance: Array<{ courseOfferingId: string; avgAttendance: number }> = [];
+  for (const [courseOfferingId, { total, count }] of courseMap) {
+    courseWiseAttendance.push({
+      courseOfferingId,
+      avgAttendance: Math.round((total / count) * 100) / 100,
+    });
+  }
+
+  // 2. AttendanceAlerts count
+  const alertsCount = await AttendanceAlert.countDocuments({ collegeId, semesterId });
+
+  return {
+    semesterId,
+    overallAvgAttendance,
+    categoryDistribution,
+    courseWiseAttendance,
+    alertsCount,
+  };
+}
+
+// ═══ W02 Phase 3: Risk Alert Generation (Task 4) ════════════════
+
+export async function generateRiskAlerts(
+  collegeId: string,
+  semesterId: string,
+  performedBy: string,
+): Promise<{ alertsCreated: number }> {
+  const alerts: Array<{
+    collegeId: string;
+    alertType: string;
+    severity: string;
+    title: string;
+    description: string;
+    affectedEntity: { type: string; id: string; name: string };
+    metrics?: Record<string, unknown>;
+    suggestedAction?: string;
+    status: string;
+  }> = [];
+
+  // 1. Low attendance: AttendanceSummary where percentage < 65 → critical alert
+  const lowAttendance = await AttendanceSummary.find({
+    collegeId,
+    semesterId,
+    percentage: { $lt: 65 },
+  }).lean();
+  for (const summary of lowAttendance) {
+    alerts.push({
+      collegeId,
+      alertType: 'low_attendance',
+      severity: 'critical',
+      title: `Low Attendance: Student ${String(summary.studentId)}`,
+      description: `Student has ${summary.percentage}% attendance in course offering ${String(summary.courseOfferingId)}, below the 65% threshold`,
+      affectedEntity: {
+        type: 'Student',
+        id: String(summary.studentId),
+        name: `Student ${String(summary.studentId)}`,
+      },
+      metrics: {
+        percentage: summary.percentage,
+        courseOfferingId: String(summary.courseOfferingId),
+      },
+      suggestedAction: 'Issue warning to student and notify parent/guardian',
+      status: 'active',
+    });
+  }
+
+  // 2. High backlog rate: > 20% of students have backlogs → warning
+  const semesterResults = await SemesterResult.find({ collegeId, semesterId }).lean();
+  if (semesterResults.length > 0) {
+    const studentsWithBacklogs = semesterResults.filter(r => r.backlogs > 0).length;
+    const backlogRate = (studentsWithBacklogs / semesterResults.length) * 100;
+    if (backlogRate > 20) {
+      alerts.push({
+        collegeId,
+        alertType: 'high_backlog_rate',
+        severity: 'warning',
+        title: `High Backlog Rate: ${Math.round(backlogRate)}%`,
+        description: `${studentsWithBacklogs} out of ${semesterResults.length} students have backlogs (${Math.round(backlogRate)}%)`,
+        affectedEntity: {
+          type: 'Semester',
+          id: semesterId,
+          name: `Semester ${semesterId}`,
+        },
+        metrics: {
+          backlogRate: Math.round(backlogRate * 100) / 100,
+          studentsWithBacklogs,
+          totalStudents: semesterResults.length,
+        },
+        suggestedAction: 'Review academic support programs and remedial measures',
+        status: 'active',
+      });
+    }
+
+    // 3. Low pass rate: < 60% for any course → warning
+    // Group results by checking grade cards per course
+    const gradeCards = await GradeCard.find({ collegeId, semesterId }).lean();
+    const courseResults = new Map<string, { pass: number; total: number }>();
+    for (const gc of gradeCards) {
+      const courseId = String(gc.courseId);
+      const existing = courseResults.get(courseId);
+      if (existing) {
+        existing.total++;
+        if (gc.result === 'pass') existing.pass++;
+      } else {
+        courseResults.set(courseId, { pass: gc.result === 'pass' ? 1 : 0, total: 1 });
+      }
+    }
+    for (const [courseId, { pass, total }] of courseResults) {
+      const coursePassRate = (pass / total) * 100;
+      if (coursePassRate < 60) {
+        alerts.push({
+          collegeId,
+          alertType: 'low_pass_rate',
+          severity: 'warning',
+          title: `Low Pass Rate: Course ${courseId}`,
+          description: `Course has a ${Math.round(coursePassRate)}% pass rate (${pass}/${total} students passed)`,
+          affectedEntity: {
+            type: 'Course',
+            id: courseId,
+            name: `Course ${courseId}`,
+          },
+          metrics: {
+            passRate: Math.round(coursePassRate * 100) / 100,
+            passCount: pass,
+            totalStudents: total,
+          },
+          suggestedAction: 'Review teaching methodology and consider additional tutorials',
+          status: 'active',
+        });
+      }
+    }
+  }
+
+  // 4. Syllabus delay: CourseOffering syllabusProgress < 40% → info alert
+  const offerings = await CourseOffering.find({
+    collegeId,
+    semesterId,
+    syllabusProgress: { $lt: 40 },
+  }).lean();
+  for (const offering of offerings) {
+    alerts.push({
+      collegeId,
+      alertType: 'syllabus_delay',
+      severity: 'info',
+      title: `Syllabus Delay: Offering ${String(offering._id)}`,
+      description: `Course offering has only ${offering.syllabusProgress || 0}% syllabus completed`,
+      affectedEntity: {
+        type: 'CourseOffering',
+        id: String(offering._id),
+        name: `Course Offering ${String(offering._id)}`,
+      },
+      metrics: {
+        syllabusProgress: offering.syllabusProgress || 0,
+        courseId: String(offering.courseId),
+      },
+      suggestedAction: 'Review lesson plan and consider additional sessions',
+      status: 'active',
+    });
+  }
+
+  // 5. Bulk create alerts
+  if (alerts.length > 0) {
+    await RiskAlert.insertMany(alerts);
+  }
+
+  // 6. Audit log
+  await createAuditLog({
+    collegeId,
+    entityType: 'RiskAlert',
+    entityId: semesterId,
+    entityName: `Risk Alert Generation for semester ${semesterId}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return { alertsCreated: alerts.length };
+}
+
+// ═══ W02 Phase 3: Student Lifecycle Transitions (Task 5) ════════
+
+export async function transitionStudentStates(
+  collegeId: string,
+  semesterId: string,
+  performedBy: string,
+): Promise<{ transitioned: number; transitions: Array<{ studentId: string; from: string; to: string }> }> {
+  // 1. Get published SemesterResults
+  const results = await SemesterResult.find({ collegeId, semesterId, status: 'published' }).lean();
+  const transitions: Array<{ studentId: string; from: string; to: string }> = [];
+
+  for (const result of results) {
+    // 2. Determine new state based on promotionStatus
+    let newStatus: string | undefined;
+    switch (result.promotionStatus) {
+      case 'graduated':
+        newStatus = 'graduated';
+        break;
+      case 'detained':
+        newStatus = 'detained';
+        break;
+      case 'year_back':
+        newStatus = 'year_back';
+        break;
+      case 'promoted':
+        newStatus = 'active';
+        break;
+      default:
+        continue; // skip pending or unknown
+    }
+
+    // 3. Only transition if current status is 'active'
+    const student = await Student.findOne({ _id: result.studentId, collegeId, status: 'active' });
+    if (!student) continue;
+
+    const fromStatus = student.status;
+    if (fromStatus === newStatus) continue;
+
+    // 4. Update Student model
+    student.status = newStatus;
+    await student.save();
+
+    transitions.push({
+      studentId: String(result.studentId),
+      from: fromStatus,
+      to: newStatus,
+    });
+  }
+
+  // 5. Audit log
+  await createAuditLog({
+    collegeId,
+    entityType: 'Student',
+    entityId: semesterId,
+    entityName: `Student State Transitions for semester ${semesterId}`,
+    action: 'update',
+    changes: transitions.map(t => ({
+      field: `student:${t.studentId}:status`,
+      displayName: `Student ${t.studentId} status`,
+      oldValue: t.from,
+      newValue: t.to,
+    })),
+    performedBy,
+  });
+
+  return { transitioned: transitions.length, transitions };
+}
+
+// ═══ W02 Phase 3: Academic History (Task 5) ═════════════════════
+
+export async function appendAcademicHistory(
+  collegeId: string,
+  semesterId: string,
+  performedBy: string,
+): Promise<{ recorded: number }> {
+  // 1. Get published SemesterResults
+  const results = await SemesterResult.find({ collegeId, semesterId, status: 'published' }).lean();
+  let recorded = 0;
+
+  // 2. Upsert AcademicHistory for each result
+  for (const result of results) {
+    await AcademicHistory.findOneAndUpdate(
+      { collegeId, studentId: result.studentId, semesterId },
+      {
+        collegeId,
+        studentId: result.studentId,
+        semesterId,
+        sgpa: result.sgpa,
+        cgpa: result.cgpa,
+        creditsEarned: result.totalCreditsEarned,
+        creditsRegistered: result.totalCreditsRegistered,
+        backlogs: result.backlogs,
+        result: result.result,
+        promotionStatus: result.promotionStatus,
+        recordedAt: new Date(),
+      },
+      { upsert: true, new: true },
+    );
+    recorded++;
+  }
+
+  // 3. Audit log
+  await createAuditLog({
+    collegeId,
+    entityType: 'AcademicHistory',
+    entityId: semesterId,
+    entityName: `Academic History for semester ${semesterId}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return { recorded };
+}
+
+// ═══ W02 Phase 3: Transcript Generation Stub (Task 5) ═══════════
+
+export async function generateTranscript(
+  collegeId: string,
+  studentId: string,
+  transcriptType: string,
+  semesterId: string | undefined,
+  performedBy: string,
+): Promise<Record<string, unknown>> {
+  let data: Record<string, unknown>;
+
+  if (transcriptType === 'semester') {
+    if (!semesterId) throw new AppError(400, 'semesterId is required for semester transcript');
+    const gradeCards = await GradeCard.find({ collegeId, studentId, semesterId }).lean();
+    const semesterResult = await SemesterResult.findOne({ collegeId, studentId, semesterId }).lean();
+    data = {
+      transcriptType: 'semester',
+      studentId,
+      semesterId,
+      gradeCards: gradeCards.map(gc => ({
+        courseId: String(gc.courseId),
+        internalMarks: gc.internalMarks,
+        externalMarks: gc.externalMarks,
+        totalMarks: gc.totalMarks,
+        grade: gc.grade,
+        gradePoints: gc.gradePoints,
+        credits: gc.credits,
+        result: gc.result,
+      })),
+      semesterResult: semesterResult ? {
+        sgpa: semesterResult.sgpa,
+        cgpa: semesterResult.cgpa,
+        totalCreditsEarned: semesterResult.totalCreditsEarned,
+        totalCreditsRegistered: semesterResult.totalCreditsRegistered,
+        backlogs: semesterResult.backlogs,
+        result: semesterResult.result,
+      } : null,
+    };
+  } else if (transcriptType === 'consolidated') {
+    const gradeCards = await GradeCard.find({ collegeId, studentId }).lean();
+    const semesterResults = await SemesterResult.find({ collegeId, studentId }).lean();
+    data = {
+      transcriptType: 'consolidated',
+      studentId,
+      gradeCards: gradeCards.map(gc => ({
+        semesterId: String(gc.semesterId),
+        courseId: String(gc.courseId),
+        internalMarks: gc.internalMarks,
+        externalMarks: gc.externalMarks,
+        totalMarks: gc.totalMarks,
+        grade: gc.grade,
+        gradePoints: gc.gradePoints,
+        credits: gc.credits,
+        result: gc.result,
+      })),
+      semesterResults: semesterResults.map(sr => ({
+        semesterId: String(sr.semesterId),
+        sgpa: sr.sgpa,
+        cgpa: sr.cgpa,
+        totalCreditsEarned: sr.totalCreditsEarned,
+        totalCreditsRegistered: sr.totalCreditsRegistered,
+        backlogs: sr.backlogs,
+        result: sr.result,
+      })),
+    };
+  } else {
+    // provisional
+    const semesterResults = await SemesterResult.find({ collegeId, studentId }).lean();
+    const latestResult = semesterResults.sort((a, b) => {
+      const aTime = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
+      const bTime = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
+      return bTime - aTime;
+    })[0];
+    data = {
+      transcriptType: 'provisional',
+      studentId,
+      latestResult: latestResult ? {
+        semesterId: String(latestResult.semesterId),
+        sgpa: latestResult.sgpa,
+        cgpa: latestResult.cgpa,
+        totalCreditsEarned: latestResult.totalCreditsEarned,
+        totalCreditsRegistered: latestResult.totalCreditsRegistered,
+        result: latestResult.result,
+        promotionStatus: latestResult.promotionStatus,
+      } : null,
+    };
+  }
+
+  // Create Transcript record
+  const transcript = await Transcript.create({
+    collegeId,
+    studentId,
+    transcriptType,
+    semesterId: semesterId || undefined,
+    title: `${transcriptType.charAt(0).toUpperCase() + transcriptType.slice(1)} Transcript`,
+    data,
+    status: 'generated',
+    generatedAt: new Date(),
+    generatedBy: performedBy,
+    fileUrl: undefined, // PDF generation stub — not implemented yet
+  });
+
+  // Audit log
+  await createAuditLog({
+    collegeId,
+    entityType: 'Transcript',
+    entityId: String(transcript._id),
+    entityName: `${transcriptType} transcript for student ${studentId}`,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return transcript.toObject() as unknown as Record<string, unknown>;
 }

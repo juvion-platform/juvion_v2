@@ -1026,3 +1026,67 @@ export async function computeProgrammeHealth(req: AuthRequest, res: Response, ne
     res.status(201).json(result);
   } catch (e) { next(e); }
 }
+
+// ═══ W02 Phase 3: Compliance Evidence Feed ══════════════════════
+export async function feedComplianceEvidence(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { semesterId } = req.body;
+    const result = await svc.feedComplianceEvidence(req.collegeId!, semesterId, who(req));
+    res.status(201).json(result);
+  } catch (e) { next(e); }
+}
+
+// ═══ W02 Phase 3: Dashboard Data APIs ═══════════════════════════
+export async function getAcademicPerformanceDashboard(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const semesterId = req.query.semesterId as string;
+    if (!semesterId) throw new AppError(400, 'semesterId query param is required');
+    const result = await svc.getAcademicPerformanceDashboard(req.collegeId!, semesterId);
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+export async function getAttendanceAnalyticsDashboard(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const semesterId = req.query.semesterId as string;
+    if (!semesterId) throw new AppError(400, 'semesterId query param is required');
+    const result = await svc.getAttendanceAnalyticsDashboard(req.collegeId!, semesterId);
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+// ═══ W02 Phase 3: Risk Alerts ═══════════════════════════════════
+export async function generateRiskAlerts(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { semesterId } = req.body;
+    const result = await svc.generateRiskAlerts(req.collegeId!, semesterId, who(req));
+    res.status(201).json(result);
+  } catch (e) { next(e); }
+}
+
+// ═══ W02 Phase 3: Student Lifecycle State Transitions ═══════════
+export async function transitionStudentStates(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { semesterId } = req.body;
+    const result = await svc.transitionStudentStates(req.collegeId!, semesterId, who(req));
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+// ═══ W02 Phase 3: Academic History ══════════════════════════════
+export async function appendAcademicHistory(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { semesterId } = req.body;
+    const result = await svc.appendAcademicHistory(req.collegeId!, semesterId, who(req));
+    res.status(201).json(result);
+  } catch (e) { next(e); }
+}
+
+// ═══ W02 Phase 3: Transcript Generation ═════════════════════════
+export async function generateTranscript(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { studentId, transcriptType, semesterId } = req.body;
+    const result = await svc.generateTranscript(req.collegeId!, studentId, transcriptType, semesterId, who(req));
+    res.status(201).json(result);
+  } catch (e) { next(e); }
+}

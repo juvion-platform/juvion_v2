@@ -612,3 +612,29 @@ export const computeProgrammeHealthSchema = z.object({
   programmeId: z.string().min(1),
   semesterId: z.string().min(1),
 });
+
+// ═══ W02 Phase 3: Compliance / Dashboards / Risk ════════════════
+
+export const feedComplianceEvidenceSchema = z.object({
+  semesterId: z.string().min(1),
+});
+
+export const generateRiskAlertsSchema = z.object({
+  semesterId: z.string().min(1),
+});
+
+// ═══ W02 Phase 3: Student Lifecycle ═════════════════════════════
+
+export const transitionStudentStatesSchema = z.object({
+  semesterId: z.string().min(1),
+});
+
+export const appendAcademicHistorySchema = z.object({
+  semesterId: z.string().min(1),
+});
+
+export const generateTranscriptSchema = z.object({
+  studentId: z.string().min(1),
+  transcriptType: z.enum(['semester', 'consolidated', 'provisional']),
+  semesterId: z.string().min(1).optional(),
+});

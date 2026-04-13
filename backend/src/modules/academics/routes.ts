@@ -70,6 +70,11 @@ import {
   computeCOAttainmentSchema,
   computePOAttainmentSchema,
   computeProgrammeHealthSchema,
+  feedComplianceEvidenceSchema,
+  generateRiskAlertsSchema,
+  transitionStudentStatesSchema,
+  appendAcademicHistorySchema,
+  generateTranscriptSchema,
 } from './validation';
 
 const router = Router();
@@ -410,5 +415,20 @@ router.put('/promotions/:id', authorize('academics', 'update'), validate(updateP
 router.post('/obe/co-attainment/compute', authorize('academics', 'create'), validate(computeCOAttainmentSchema), ctrl.computeCOAttainmentForSemester);
 router.post('/obe/po-attainment/compute', authorize('academics', 'create'), validate(computePOAttainmentSchema), ctrl.computePOAttainment);
 router.post('/obe/programme-health/compute', authorize('academics', 'create'), validate(computeProgrammeHealthSchema), ctrl.computeProgrammeHealth);
+
+// ═══ W02 Phase 3: Compliance Evidence Feed ══════════════════════
+router.post('/compliance/evidence-feed', authorize('academics', 'create'), validate(feedComplianceEvidenceSchema), ctrl.feedComplianceEvidence);
+
+// ═══ W02 Phase 3: Dashboards ════════════════════════════════════
+router.get('/dashboards/academic-performance', authorize('academics', 'read'), ctrl.getAcademicPerformanceDashboard);
+router.get('/dashboards/attendance-analytics', authorize('academics', 'read'), ctrl.getAttendanceAnalyticsDashboard);
+
+// ═══ W02 Phase 3: Risk Alerts ═══════════════════════════════════
+router.post('/risk-alerts/generate', authorize('academics', 'create'), validate(generateRiskAlertsSchema), ctrl.generateRiskAlerts);
+
+// ═══ W02 Phase 3: Student Lifecycle ═════════════════════════════
+router.post('/students/transition-states', authorize('academics', 'create'), validate(transitionStudentStatesSchema), ctrl.transitionStudentStates);
+router.post('/students/append-history', authorize('academics', 'create'), validate(appendAcademicHistorySchema), ctrl.appendAcademicHistory);
+router.post('/transcripts/generate', authorize('academics', 'create'), validate(generateTranscriptSchema), ctrl.generateTranscript);
 
 export default router;
