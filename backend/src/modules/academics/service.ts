@@ -38,6 +38,10 @@ import { Submission } from '../../models/academic-ops/Submission';
 import { Quiz } from '../../models/academic-ops/Quiz';
 import { QuizAttempt } from '../../models/academic-ops/QuizAttempt';
 import { FeeLineItem } from '../../models/finance/FeeLineItem';
+import { Invoice } from '../../models/finance/Invoice';
+import { SeatingPlan } from '../../models/academic-ops/SeatingPlan';
+import { InvigilationRoster } from '../../models/academic-ops/InvigilationRoster';
+import { HallTicket } from '../../models/academic-ops/HallTicket';
 import { paginate } from '../../shared/pagination';
 import { createAuditLog } from '../../shared/audit';
 import { AppError } from '../../middleware/errorHandler';
@@ -2757,4 +2761,222 @@ export async function checkBulkEligibility(
       feeIssues,
     },
   };
+}
+
+// ═══ W02: Exam Fee Invoice Generation ═══════════════════════
+
+export async function generateExamFeeInvoice(
+  collegeId: string,
+  studentId: string,
+  semesterId: string,
+  examType: string,
+  feeAmount: number,
+  performedBy: string,
+) {
+  const invoiceNumber = `EXM-${semesterId.slice(-4)}-${Date.now()}`;
+  const invoice = await Invoice.create({
+    collegeId,
+    invoiceNumber,
+    studentId,
+    type: 'fee',
+    items: [{ description: `Exam fee - ${examType}`, amount: feeAmount }],
+    totalAmount: feeAmount,
+    dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+    status: 'issued',
+    issuedDate: new Date(),
+    examType,
+    semesterId,
+  });
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'Invoice',
+    entityId: String(invoice._id),
+    entityName: invoiceNumber,
+    action: 'create',
+    changes: [],
+    performedBy,
+  });
+
+  return invoice;
+}
+
+// ═══ W02: Seating Plan CRUD ═════════════════════════════════
+
+export async function listSeatingPlans(collegeId: string, page: number, limit: number, examScheduleId?: string, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (examScheduleId) filter.examScheduleId = examScheduleId;
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(SeatingPlan, filter, page, limit, { createdAt: -1 }, ['examScheduleId']);
+}
+
+export async function createSeatingPlan(collegeId: string, data: any, performedBy: string) {
+  const doc = await SeatingPlan.create({ ...data, collegeId });
+  await createAuditLog({ collegeId, entityType: 'SeatingPlan', entityId: String(doc._id), entityName: doc.roomName, action: 'create', changes: [], performedBy });
+  return doc;
+}
+
+export async function updateSeatingPlan(collegeId: string, id: string, data: any, _performedBy: string) {
+  const doc = await SeatingPlan.findOneAndUpdate({ _id: id, collegeId }, { $set: data }, { new: true });
+  if (!doc) throw new AppError(404, 'Seating plan not found');
+  return doc;
+}
+
+export async function deleteSeatingPlan(collegeId: string, id: string, _performedBy: string) {
+  const doc = await SeatingPlan.findOneAndDelete({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Seating plan not found');
+  return { deleted: true };
+}
+
+// ═══ W02: Invigilation Roster CRUD ══════════════════════════
+
+export async function listInvigilationRosters(collegeId: string, page: number, limit: number, examScheduleId?: string, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (examScheduleId) filter.examScheduleId = examScheduleId;
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(InvigilationRoster, filter, page, limit, { createdAt: -1 }, ['examScheduleId']);
+}
+
+export async function createInvigilationRoster(collegeId: string, data: any, performedBy: string) {
+  const doc = await InvigilationRoster.create({ ...data, collegeId });
+  await createAuditLog({ collegeId, entityType: 'InvigilationRoster', entityId: String(doc._id), entityName: `Roster for ${String(doc.examScheduleId)}`, action: 'create', changes: [], performedBy });
+  return doc;
+}
+
+export async function updateInvigilationRoster(collegeId: string, id: string, data: any, _performedBy: string) {
+  const doc = await InvigilationRoster.findOneAndUpdate({ _id: id, collegeId }, { $set: data }, { new: true });
+  if (!doc) throw new AppError(404, 'Invigilation roster not found');
+  return doc;
+}
+
+export async function deleteInvigilationRoster(collegeId: string, id: string, _performedBy: string) {
+  const doc = await InvigilationRoster.findOneAndDelete({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Invigilation roster not found');
+  return { deleted: true };
+}
+
+// ═══ W02: Hall Ticket Generation ════════════════════════════
+
+export async function generateHallTickets(
+  collegeId: string,
+  semesterId: string,
+  examType: string,
+  performedBy: string,
+): Promise<{
+  generated: number;
+  skipped: number;
+  tickets: Array<{ studentId: string; hallTicketNumber: string; eligibilityStatus: string; courseCount: number }>;
+}> {
+  // 1. Get all eligibility results
+  const bulkResult = await checkBulkEligibility(collegeId, semesterId, performedBy);
+  const allResults = bulkResult.results;
+
+  // 2. Group results by studentId
+  const byStudent = new Map<string, EligibilityResult[]>();
+  for (const r of allResults) {
+    const existing = byStudent.get(r.studentId) || [];
+    existing.push(r);
+    byStudent.set(r.studentId, existing);
+  }
+
+  let generated = 0;
+  let skipped = 0;
+  const tickets: Array<{ studentId: string; hallTicketNumber: string; eligibilityStatus: string; courseCount: number }> = [];
+
+  let index = 0;
+  for (const [studentId, results] of byStudent) {
+    // 3a. Determine overall eligibility status
+    const eligibleCount = results.filter(r => r.isEligible).length;
+    let eligibilityStatus: string;
+    if (eligibleCount === results.length) {
+      eligibilityStatus = 'eligible';
+    } else if (eligibleCount > 0) {
+      eligibilityStatus = 'conditional';
+    } else {
+      eligibilityStatus = 'ineligible';
+    }
+
+    // 3b. Collect reasons for ineligible courses
+    const reasons = results
+      .filter(r => !r.isEligible)
+      .flatMap(r => r.reasons);
+
+    // 3c. Generate hallTicketNumber
+    const hallTicketNumber = `HT-${semesterId.slice(-4)}-${String(index + 1).padStart(4, '0')}`;
+
+    // 3d. Get courseIds from the course offerings
+    const courseOfferingIds = results.map(r => r.courseOfferingId);
+    const offerings = await CourseOffering.find({ _id: { $in: courseOfferingIds }, collegeId }).select('courseId');
+    const courses = offerings.map(o => ({ courseId: o.courseId }));
+
+    // 3e. Upsert HallTicket
+    const ticket = await HallTicket.findOneAndUpdate(
+      { collegeId, studentId, semesterId },
+      {
+        $set: {
+          collegeId,
+          studentId,
+          semesterId,
+          hallTicketNumber,
+          examType,
+          courses,
+          eligibilityStatus,
+          reasons,
+          issuedAt: eligibilityStatus !== 'ineligible' ? new Date() : undefined,
+          status: eligibilityStatus !== 'ineligible' ? 'issued' : 'draft',
+        },
+      },
+      { upsert: true, new: true },
+    );
+
+    if (eligibilityStatus === 'ineligible') {
+      skipped++;
+    } else {
+      generated++;
+    }
+
+    tickets.push({
+      studentId,
+      hallTicketNumber: String(ticket.hallTicketNumber),
+      eligibilityStatus,
+      courseCount: courses.length,
+    });
+
+    index++;
+  }
+
+  // 4. Audit log
+  await createAuditLog({
+    collegeId,
+    entityType: 'HallTicket',
+    entityId: semesterId,
+    entityName: `Hall Ticket Generation - ${semesterId}`,
+    action: 'create',
+    changes: [{
+      field: 'hallTicketGeneration',
+      displayName: 'Hall Ticket Generation',
+      oldValue: null,
+      newValue: `Generated: ${generated}, Skipped: ${skipped}`,
+    }],
+    performedBy,
+  });
+
+  return { generated, skipped, tickets };
+}
+
+export async function listHallTickets(collegeId: string, page: number, limit: number, semesterId?: string, studentId?: string, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (semesterId) filter.semesterId = semesterId;
+  if (studentId) filter.studentId = studentId;
+  if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
+  return paginate(HallTicket, filter, page, limit, { createdAt: -1 }, [STUDENT_POPULATE, 'semesterId', 'courses.courseId'] as any);
+}
+
+export async function getHallTicket(collegeId: string, id: string) {
+  const doc = await HallTicket.findOne({ _id: id, collegeId })
+    .populate(STUDENT_POPULATE)
+    .populate('semesterId')
+    .populate('courses.courseId');
+  if (!doc) throw new AppError(404, 'Hall ticket not found');
+  return doc;
 }

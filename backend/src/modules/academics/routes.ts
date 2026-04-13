@@ -49,6 +49,12 @@ import {
   createQuizSchema, updateQuizSchema,
   submitQuizAttemptSchema,
   checkBulkEligibilitySchema,
+  generateExamFeeInvoiceSchema,
+  createSeatingPlanSchema_w02,
+  updateSeatingPlanSchema,
+  createInvigilationRosterSchema,
+  updateInvigilationRosterSchema,
+  generateHallTicketsSchema,
 } from './validation';
 
 const router = Router();
@@ -328,5 +334,25 @@ router.post('/offerings/:id/update-progress', authorize('academics', 'update'), 
 // ═══ W02: Hall Ticket Eligibility ═══════════════════════════
 router.get('/eligibility/check', authorize('academics', 'read'), ctrl.checkHallTicketEligibility);
 router.post('/eligibility/bulk-check', authorize('academics', 'create'), validate(checkBulkEligibilitySchema), ctrl.checkBulkEligibility);
+
+// ═══ W02: Exam Fee & Seating ════════════════════════════════
+router.post('/exam-fees/generate', authorize('academics', 'create'), validate(generateExamFeeInvoiceSchema), ctrl.generateExamFeeInvoice);
+
+// Seating Plans
+router.get('/seating-plans', authorize('academics', 'read'), ctrl.listSeatingPlans);
+router.post('/seating-plans', authorize('academics', 'create'), validate(createSeatingPlanSchema_w02), ctrl.createSeatingPlan);
+router.put('/seating-plans/:id', authorize('academics', 'update'), validate(updateSeatingPlanSchema), ctrl.updateSeatingPlan);
+router.delete('/seating-plans/:id', authorize('academics', 'delete'), ctrl.deleteSeatingPlan);
+
+// Invigilation Rosters
+router.get('/invigilation-rosters', authorize('academics', 'read'), ctrl.listInvigilationRosters);
+router.post('/invigilation-rosters', authorize('academics', 'create'), validate(createInvigilationRosterSchema), ctrl.createInvigilationRoster);
+router.put('/invigilation-rosters/:id', authorize('academics', 'update'), validate(updateInvigilationRosterSchema), ctrl.updateInvigilationRoster);
+router.delete('/invigilation-rosters/:id', authorize('academics', 'delete'), ctrl.deleteInvigilationRoster);
+
+// ═══ W02: Hall Tickets ══════════════════════════════════════
+router.post('/hall-tickets/generate', authorize('academics', 'create'), validate(generateHallTicketsSchema), ctrl.generateHallTickets);
+router.get('/hall-tickets', authorize('academics', 'read'), ctrl.listHallTickets);
+router.get('/hall-tickets/:id', authorize('academics', 'read'), ctrl.getHallTicket);
 
 export default router;

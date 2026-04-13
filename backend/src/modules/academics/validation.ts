@@ -466,3 +466,43 @@ export const submitQuizAttemptSchema = z.object({
 export const checkBulkEligibilitySchema = z.object({
   semesterId: z.string().min(1, 'Semester ID is required'),
 });
+
+// ═══ W02: Exam Fee & Seating ════════════════════════════════
+
+export const generateExamFeeInvoiceSchema = z.object({
+  studentId: z.string().min(1),
+  semesterId: z.string().min(1),
+  examType: z.enum(['regular', 'supplementary', 'improvement']),
+  feeAmount: z.number().positive(),
+});
+
+export const createSeatingPlanSchema_w02 = z.object({
+  examScheduleId: z.string().min(1),
+  roomName: z.string().min(1),
+  capacity: z.number().int().positive(),
+  assignments: z.array(z.object({
+    seatNumber: z.string().min(1),
+    studentId: z.string().min(1),
+    examRegistrationId: z.string().min(1),
+  })).optional(),
+  status: z.enum(['draft', 'published']).optional(),
+});
+export const updateSeatingPlanSchema = createSeatingPlanSchema_w02.partial();
+
+export const createInvigilationRosterSchema = z.object({
+  examScheduleId: z.string().min(1),
+  duties: z.array(z.object({
+    facultyId: z.string().min(1),
+    roomName: z.string().min(1),
+    role: z.enum(['chief', 'assistant', 'flying_squad']),
+  })),
+  status: z.enum(['draft', 'published']).optional(),
+});
+export const updateInvigilationRosterSchema = createInvigilationRosterSchema.partial();
+
+// ═══ W02: Hall Tickets ══════════════════════════════════════
+
+export const generateHallTicketsSchema = z.object({
+  semesterId: z.string().min(1),
+  examType: z.enum(['regular', 'supplementary', 'improvement']),
+});

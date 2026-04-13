@@ -793,3 +793,66 @@ export async function checkBulkEligibility(req: AuthRequest, res: Response, next
     res.json(result);
   } catch (e) { next(e); }
 }
+
+// ═══ W02: Exam Fee & Seating ════════════════════════════════
+
+export async function generateExamFeeInvoice(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { studentId, semesterId, examType, feeAmount } = req.body;
+    const result = await svc.generateExamFeeInvoice(req.collegeId!, studentId, semesterId, examType, feeAmount, who(req));
+    res.status(201).json(result);
+  } catch (e) { next(e); }
+}
+
+export async function listSeatingPlans(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page = '1', limit = '20', examScheduleId } = req.query as any;
+    res.json(await svc.listSeatingPlans(req.collegeId!, +page, +limit, examScheduleId, req.authScope));
+  } catch (e) { next(e); }
+}
+export async function createSeatingPlan(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await svc.createSeatingPlan(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function updateSeatingPlan(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await svc.updateSeatingPlan(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function deleteSeatingPlan(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await svc.deleteSeatingPlan(req.collegeId!, req.params.id as string, who(req))); } catch (e) { next(e); }
+}
+
+export async function listInvigilationRosters(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page = '1', limit = '20', examScheduleId } = req.query as any;
+    res.json(await svc.listInvigilationRosters(req.collegeId!, +page, +limit, examScheduleId, req.authScope));
+  } catch (e) { next(e); }
+}
+export async function createInvigilationRoster(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await svc.createInvigilationRoster(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function updateInvigilationRoster(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await svc.updateInvigilationRoster(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function deleteInvigilationRoster(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await svc.deleteInvigilationRoster(req.collegeId!, req.params.id as string, who(req))); } catch (e) { next(e); }
+}
+
+// ═══ W02: Hall Tickets ══════════════════════════════════════
+
+export async function generateHallTickets(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { semesterId, examType } = req.body;
+    const result = await svc.generateHallTickets(req.collegeId!, semesterId, examType, who(req));
+    res.status(201).json(result);
+  } catch (e) { next(e); }
+}
+
+export async function listHallTickets(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page = '1', limit = '20', semesterId, studentId } = req.query as any;
+    res.json(await svc.listHallTickets(req.collegeId!, +page, +limit, semesterId, studentId, req.authScope));
+  } catch (e) { next(e); }
+}
+
+export async function getHallTicket(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await svc.getHallTicket(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }
+}
