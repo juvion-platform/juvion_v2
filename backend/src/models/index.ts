@@ -277,6 +277,19 @@ export { SkillCertification } from './student-dev/SkillCertification';
 export { SportsTeam } from './student-dev/SportsTeam';
 export { SportsTeamMember } from './student-dev/SportsTeamMember';
 export { StudentProject } from './student-dev/StudentProject';
+export { Fest } from './student-dev/Fest';
+export { Competition } from './student-dev/Competition';
+export { Workshop } from './student-dev/Workshop';
+export { SDProgramme } from './student-dev/SDProgramme';
+export { Award } from './student-dev/Award';
+export { AwardInstance } from './student-dev/AwardInstance';
+export { Certificate } from './student-dev/Certificate';
+export { ActivityBudget } from './student-dev/ActivityBudget';
+export { BudgetLineItem } from './student-dev/BudgetLineItem';
+export { Sponsorship } from './student-dev/Sponsorship';
+export { SponsorContact } from './student-dev/SponsorContact';
+export { Portfolio } from './student-dev/Portfolio';
+export { PortfolioEntry } from './student-dev/PortfolioEntry';
 
 // === Governance ===
 export { Committee } from './governance/Committee';
