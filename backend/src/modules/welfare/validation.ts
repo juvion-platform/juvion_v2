@@ -200,3 +200,484 @@ export const createParentMeetingSchema = z.object({
   status: z.enum(['scheduled', 'completed', 'cancelled', 'no_show']).optional(),
 });
 export const updateParentMeetingSchema = createParentMeetingSchema.partial();
+
+// ═══════════════════════════════════════════════════════════════
+// W06 WORKFLOW VALIDATION SCHEMAS
+// ═══════════════════════════════════════════════════════════════
+
+// ═══ GGM Schemas ════════════════════════════════════════════
+
+export const fileGrievanceSchema = z.object({
+  complainantId: z.string().min(1),
+  complainantType: z.enum(['student', 'parent', 'staff', 'anonymous']),
+  category: z.string().min(1),
+  subCategory: z.string().optional(),
+  subject: z.string().min(1),
+  description: z.string().min(1),
+  isAnonymous: z.boolean().optional(),
+  attachments: z.array(z.string()).optional(),
+});
+
+export const triageGrievanceSchema = z.object({
+  priority: z.enum(['low', 'medium', 'high', 'critical']),
+  category: z.string().optional(),
+  subCategory: z.string().optional(),
+  assignedDepartment: z.string().optional(),
+  assignedTo: z.string().optional(),
+  slaHours: z.number().int().min(1).optional(),
+  remarks: z.string().optional(),
+});
+
+export const resolveGrievanceSchema = z.object({
+  resolution: z.string().min(1),
+  actionTaken: z.string().min(1),
+  preventiveMeasures: z.string().optional(),
+});
+
+export const escalateGrievanceSchema = z.object({
+  escalateTo: z.string().min(1),
+  reason: z.string().min(1),
+  newPriority: z.enum(['medium', 'high', 'critical']).optional(),
+});
+
+export const grievanceFeedbackSchema = z.object({
+  rating: z.number().int().min(1).max(5),
+  comments: z.string().optional(),
+  satisfied: z.boolean(),
+});
+
+export const reopenGrievanceSchema = z.object({
+  reason: z.string().min(1),
+});
+
+export const addInternalNoteSchema = z.object({
+  note: z.string().min(1),
+  visibility: z.enum(['internal', 'committee']).optional(),
+});
+
+export const assignGrievanceSchema = z.object({
+  assigneeId: z.string().min(1),
+  assigneeRole: z.string().optional(),
+  remarks: z.string().optional(),
+});
+
+export const reviewSystemicPatternSchema = z.object({
+  status: z.enum(['acknowledged', 'action_planned', 'resolved', 'dismissed']),
+  actionPlan: z.string().optional(),
+  remarks: z.string().optional(),
+});
+
+// ═══ ARC Schemas ════════════════════════════════════════════
+
+export const fileARCComplaintSchema = z.object({
+  complainantId: z.string().optional(),
+  isAnonymous: z.boolean().optional(),
+  victimId: z.string().optional(),
+  accusedIds: z.array(z.string()).optional(),
+  incidentDate: z.string().min(1),
+  incidentLocation: z.string().optional(),
+  description: z.string().min(1),
+  severity: z.enum(['minor', 'major', 'severe']).optional(),
+  attachments: z.array(z.string()).optional(),
+});
+
+export const assessARCSchema = z.object({
+  severity: z.enum(['minor', 'major', 'severe']),
+  isRagging: z.boolean(),
+  remarks: z.string().optional(),
+  recommendedAction: z.string().optional(),
+});
+
+export const arcInvestigationSchema = z.object({
+  investigatorId: z.string().min(1),
+  investigationPlan: z.string().optional(),
+  deadline: z.string().optional(),
+});
+
+export const arcWitnessSchema = z.object({
+  witnessId: z.string().min(1),
+  statement: z.string().min(1),
+  recordedDate: z.string().optional(),
+});
+
+export const arcCompleteInvestigationSchema = z.object({
+  findings: z.string().min(1),
+  evidenceSummary: z.string().optional(),
+  recommendation: z.string().optional(),
+});
+
+export const arcHearingScheduleSchema = z.object({
+  hearingDate: z.string().min(1),
+  venue: z.string().optional(),
+  panelMembers: z.array(z.string()).optional(),
+  agenda: z.string().optional(),
+});
+
+export const arcHearingRecordSchema = z.object({
+  proceedings: z.string().min(1),
+  accusedPresent: z.boolean().optional(),
+  complainantPresent: z.boolean().optional(),
+  witnessStatements: z.array(z.string()).optional(),
+});
+
+export const arcDecisionSchema = z.object({
+  decision: z.string().min(1),
+  penalty: z.string().optional(),
+  penaltyType: z.enum(['warning', 'suspension', 'expulsion', 'rustication', 'fine', 'community_service', 'other']).optional(),
+  penaltyDuration: z.string().optional(),
+  remarks: z.string().optional(),
+});
+
+export const arcAppealSchema = z.object({
+  appealReason: z.string().min(1),
+  newEvidence: z.string().optional(),
+  requestedOutcome: z.string().optional(),
+});
+
+export const arcAppealDecisionSchema = z.object({
+  decision: z.enum(['upheld', 'modified', 'overturned']),
+  modifiedPenalty: z.string().optional(),
+  remarks: z.string().optional(),
+});
+
+export const arcFirSchema = z.object({
+  policeStation: z.string().min(1),
+  firNumber: z.string().optional(),
+  filingDate: z.string().optional(),
+  sections: z.array(z.string()).optional(),
+  remarks: z.string().optional(),
+});
+
+export const arcUGCReportSchema = z.object({
+  reportingPeriod: z.string().min(1),
+  year: z.number().int(),
+  quarter: z.number().int().min(1).max(4).optional(),
+});
+
+// ═══ DISC Schemas ═══════════════════════════════════════════
+
+export const fileMisconductSchema = z.object({
+  reportedBy: z.string().min(1),
+  studentId: z.string().min(1),
+  incidentDate: z.string().min(1),
+  incidentLocation: z.string().optional(),
+  category: z.string().min(1),
+  description: z.string().min(1),
+  severity: z.enum(['minor', 'major', 'severe']).optional(),
+  witnessIds: z.array(z.string()).optional(),
+  attachments: z.array(z.string()).optional(),
+});
+
+export const disciplinaryInquiryStartSchema = z.object({
+  inquiryOfficerId: z.string().min(1),
+  inquiryPlan: z.string().optional(),
+  deadline: z.string().optional(),
+});
+
+export const disciplinaryInquiryCompleteSchema = z.object({
+  findings: z.string().min(1),
+  evidenceSummary: z.string().optional(),
+  recommendation: z.string().optional(),
+});
+
+export const disciplinaryHearingScheduleSchema = z.object({
+  hearingDate: z.string().min(1),
+  venue: z.string().optional(),
+  panelMembers: z.array(z.string()).optional(),
+  agenda: z.string().optional(),
+});
+
+export const disciplinaryHearingRecordSchema = z.object({
+  proceedings: z.string().min(1),
+  studentPresent: z.boolean().optional(),
+  parentPresent: z.boolean().optional(),
+  witnessStatements: z.array(z.string()).optional(),
+});
+
+export const disciplinaryDecisionSchema = z.object({
+  decision: z.string().min(1),
+  penalty: z.string().optional(),
+  penaltyType: z.enum(['warning', 'fine', 'suspension', 'rustication', 'expulsion', 'community_service', 'other']).optional(),
+  penaltyDuration: z.string().optional(),
+  remarks: z.string().optional(),
+});
+
+export const disciplinaryAppealSchema = z.object({
+  appealReason: z.string().min(1),
+  newEvidence: z.string().optional(),
+  requestedOutcome: z.string().optional(),
+});
+
+export const disciplinaryAppealDecisionSchema = z.object({
+  decision: z.enum(['upheld', 'modified', 'overturned']),
+  modifiedPenalty: z.string().optional(),
+  remarks: z.string().optional(),
+});
+
+// ═══ ICC Schemas ════════════════════════════════════════════
+
+export const fileICCComplaintSchema = z.object({
+  complainantId: z.string().optional(),
+  isAnonymous: z.boolean().optional(),
+  respondentId: z.string().optional(),
+  respondentType: z.enum(['student', 'staff', 'faculty', 'other']).optional(),
+  incidentDate: z.string().min(1),
+  incidentLocation: z.string().optional(),
+  description: z.string().min(1),
+  category: z.enum(['sexual_harassment', 'stalking', 'voyeurism', 'cyber_harassment', 'other']).optional(),
+  attachments: z.array(z.string()).optional(),
+});
+
+export const assessICCSchema = z.object({
+  isPrimaFacie: z.boolean(),
+  severity: z.enum(['low', 'medium', 'high', 'critical']).optional(),
+  interimMeasures: z.array(z.string()).optional(),
+  remarks: z.string().optional(),
+});
+
+export const iccInquiryStartSchema = z.object({
+  inquiryCommitteeMembers: z.array(z.string()).optional(),
+  deadline: z.string().optional(),
+});
+
+export const iccInquiryCompleteSchema = z.object({
+  findings: z.string().min(1),
+  evidenceSummary: z.string().optional(),
+  recommendation: z.string().optional(),
+});
+
+export const iccHearingScheduleSchema = z.object({
+  hearingDate: z.string().min(1),
+  venue: z.string().optional(),
+  panelMembers: z.array(z.string()).optional(),
+});
+
+export const iccHearingRecordSchema = z.object({
+  proceedings: z.string().min(1),
+  respondentPresent: z.boolean().optional(),
+  complainantPresent: z.boolean().optional(),
+  witnessStatements: z.array(z.string()).optional(),
+});
+
+export const iccRecommendationSchema = z.object({
+  recommendation: z.string().min(1),
+  penalty: z.string().optional(),
+  compensationAmount: z.number().optional(),
+  remarks: z.string().optional(),
+});
+
+export const iccAppealSchema = z.object({
+  appealReason: z.string().min(1),
+  newEvidence: z.string().optional(),
+});
+
+export const iccAppealDecisionSchema = z.object({
+  decision: z.enum(['upheld', 'modified', 'overturned']),
+  modifiedRecommendation: z.string().optional(),
+  remarks: z.string().optional(),
+});
+
+export const iccAnnualReportSchema = z.object({
+  year: z.number().int(),
+  reportingPeriod: z.string().min(1),
+});
+
+// ═══ SCST Schemas ═══════════════════════════════════════════
+
+export const fileSCSTComplaintSchema = z.object({
+  complainantId: z.string().optional(),
+  isAnonymous: z.boolean().optional(),
+  victimId: z.string().optional(),
+  accusedId: z.string().optional(),
+  incidentDate: z.string().min(1),
+  description: z.string().min(1),
+  category: z.string().optional(),
+  actSections: z.array(z.string()).optional(),
+  attachments: z.array(z.string()).optional(),
+});
+
+export const scstInvestigateSchema = z.object({
+  investigatorId: z.string().min(1),
+  findings: z.string().optional(),
+  deadline: z.string().optional(),
+});
+
+export const scstDecisionSchema = z.object({
+  decision: z.string().min(1),
+  actionTaken: z.string().optional(),
+  remarks: z.string().optional(),
+});
+
+export const scstPoliceReferralSchema = z.object({
+  policeStation: z.string().min(1),
+  firNumber: z.string().optional(),
+  sections: z.array(z.string()).optional(),
+  remarks: z.string().optional(),
+});
+
+export const scstQuarterlyReportSchema = z.object({
+  year: z.number().int(),
+  quarter: z.number().int().min(1).max(4),
+  reportingPeriod: z.string().min(1),
+});
+
+// ═══ GRC Schemas ════════════════════════════════════════════
+
+export const fileGRCComplaintSchema = z.object({
+  complainantId: z.string().optional(),
+  isAnonymous: z.boolean().optional(),
+  respondentId: z.string().optional(),
+  category: z.string().min(1),
+  subject: z.string().min(1),
+  description: z.string().min(1),
+  attachments: z.array(z.string()).optional(),
+});
+
+export const grcInvestigateSchema = z.object({
+  investigatorId: z.string().min(1),
+  findings: z.string().optional(),
+  deadline: z.string().optional(),
+});
+
+export const grcHearingScheduleSchema = z.object({
+  hearingDate: z.string().min(1),
+  venue: z.string().optional(),
+  panelMembers: z.array(z.string()).optional(),
+});
+
+export const grcHearingRecordSchema = z.object({
+  proceedings: z.string().min(1),
+  respondentPresent: z.boolean().optional(),
+  complainantPresent: z.boolean().optional(),
+});
+
+export const grcDecisionSchema = z.object({
+  decision: z.string().min(1),
+  remedy: z.string().optional(),
+  remarks: z.string().optional(),
+});
+
+export const grcOmbudsmanAppealSchema = z.object({
+  appealReason: z.string().min(1),
+  newEvidence: z.string().optional(),
+  requestedOutcome: z.string().optional(),
+});
+
+// ═══ Mentoring Schemas ══════════════════════════════════════
+
+export const assignMentorSchema = z.object({
+  mentorId: z.string().min(1),
+  studentId: z.string().min(1),
+  academicYearId: z.string().min(1),
+  semesterId: z.string().optional(),
+});
+
+export const bulkAssignMentorsSchema = z.object({
+  assignments: z.array(z.object({
+    mentorId: z.string().min(1),
+    studentIds: z.array(z.string().min(1)),
+  })),
+  academicYearId: z.string().min(1),
+  semesterId: z.string().optional(),
+});
+
+export const recordMentorSessionSchema = z.object({
+  assignmentId: z.string().min(1),
+  mentorId: z.string().min(1),
+  studentId: z.string().min(1),
+  sessionDate: z.string().min(1),
+  sessionType: z.enum(['scheduled', 'walk_in', 'emergency']).optional(),
+  topics: z.array(z.string()).optional(),
+  notes: z.string().optional(),
+  actionItems: z.array(z.string()).optional(),
+  followUpDate: z.string().optional(),
+});
+
+export const flagMentorConcernSchema = z.object({
+  mentorId: z.string().min(1),
+  studentId: z.string().min(1),
+  category: z.string().min(1),
+  severity: z.enum(['low', 'medium', 'high', 'critical']),
+  description: z.string().min(1),
+});
+
+export const referToCounsellingSchema = z.object({
+  studentId: z.string().min(1),
+  referralSource: z.enum(['mentor', 'faculty', 'self', 'parent', 'ccd']).optional(),
+  referredBy: z.string().min(1),
+  reason: z.string().min(1),
+  urgency: z.enum(['routine', 'urgent', 'emergency']).optional(),
+});
+
+export const updateMentorAssignmentSchema_wf = z.object({
+  status: z.string().optional(),
+  mentorId: z.string().optional(),
+  semesterId: z.string().optional(),
+});
+
+export const updateMentorConcernSchema_wf = z.object({
+  status: z.string().optional(),
+  actionTaken: z.string().optional(),
+  severity: z.string().optional(),
+});
+
+// ═══ Counselling Schemas ════════════════════════════════════
+
+export const updateCounsellingReferralSchema = z.object({
+  status: z.string().optional(),
+  appointmentDates: z.array(z.string()).optional(),
+  followUpStatus: z.string().optional(),
+});
+
+export const closeCounsellingReferralSchema = z.object({
+  reason: z.string().min(1),
+});
+
+// ═══ CCD Schemas ════════════════════════════════════════════
+
+export const ingestRiskSignalSchema = z.object({
+  studentId: z.string().min(1),
+  source: z.string().min(1),
+  signalType: z.string().min(1),
+  weight: z.number().optional(),
+  metadata: z.record(z.any()).optional(),
+  description: z.string().optional(),
+});
+
+export const acknowledgeCCDAlertSchema = z.object({
+  initialAssessment: z.string().min(1),
+});
+
+export const investigateCCDAlertSchema = z.object({
+  findings: z.string().optional(),
+});
+
+export const ccdInterventionSchema = z.object({
+  type: z.string().min(1),
+  description: z.string().min(1),
+  assignedTo: z.string().optional(),
+  scheduledDate: z.string().optional(),
+  outcome: z.string().optional(),
+});
+
+export const ccdFalsePositiveSchema = z.object({
+  reason: z.string().min(1),
+});
+
+export const createCCDThresholdSchema = z.object({
+  name: z.string().min(1),
+  priority: z.string().min(1),
+  scoreThreshold: z.number(),
+  crossModuleMinimum: z.number().optional(),
+  autoEscalate: z.boolean().optional(),
+  notifyRoles: z.array(z.string()).optional(),
+});
+
+export const updateCCDThresholdSchema = z.object({
+  name: z.string().optional(),
+  scoreThreshold: z.number().optional(),
+  crossModuleMinimum: z.number().optional(),
+  autoEscalate: z.boolean().optional(),
+  notifyRoles: z.array(z.string()).optional(),
+  isActive: z.boolean().optional(),
+});

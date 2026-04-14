@@ -170,6 +170,20 @@ export { ParentMeeting } from './welfare/ParentMeeting';
 export { StudentGrievance } from './welfare/StudentGrievance';
 export { TransportAllocation } from './welfare/TransportAllocation';
 export { TransportRoute } from './welfare/TransportRoute';
+export { GrievanceAssignment } from './welfare/GrievanceAssignment';
+export { SystemicPattern } from './welfare/SystemicPattern';
+export { ICCComplaint } from './welfare/ICCComplaint';
+export { ICCAnnualReport } from './welfare/ICCAnnualReport';
+export { SCSTComplaint } from './welfare/SCSTComplaint';
+export { GRCComplaint } from './welfare/GRCComplaint';
+export { MentorAssignment } from './welfare/MentorAssignment';
+export { MentorSession } from './welfare/MentorSession';
+export { MentorConcern } from './welfare/MentorConcern';
+export { CounsellingReferral } from './welfare/CounsellingReferral';
+export { MisconductReport } from './welfare/MisconductReport';
+export { RiskSignal } from './welfare/RiskSignal';
+export { CCDThreshold } from './welfare/CCDThreshold';
+export { CCDIntervention } from './welfare/CCDIntervention';
 
 // === Campus ===
 export { Bed } from './campus/Bed';
@@ -263,6 +277,19 @@ export { SkillCertification } from './student-dev/SkillCertification';
 export { SportsTeam } from './student-dev/SportsTeam';
 export { SportsTeamMember } from './student-dev/SportsTeamMember';
 export { StudentProject } from './student-dev/StudentProject';
+export { Fest } from './student-dev/Fest';
+export { Competition } from './student-dev/Competition';
+export { Workshop } from './student-dev/Workshop';
+export { SDProgramme } from './student-dev/SDProgramme';
+export { Award } from './student-dev/Award';
+export { AwardInstance } from './student-dev/AwardInstance';
+export { Certificate } from './student-dev/Certificate';
+export { ActivityBudget } from './student-dev/ActivityBudget';
+export { BudgetLineItem } from './student-dev/BudgetLineItem';
+export { Sponsorship } from './student-dev/Sponsorship';
+export { SponsorContact } from './student-dev/SponsorContact';
+export { Portfolio } from './student-dev/Portfolio';
+export { PortfolioEntry } from './student-dev/PortfolioEntry';
 
 // === Governance ===
 export { Committee } from './governance/Committee';
