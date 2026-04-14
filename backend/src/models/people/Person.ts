@@ -18,6 +18,10 @@ export interface IPerson extends Document {
   };
   photo?: string;
   biometricEnrolled?: boolean;
+  // W01 intake enhancements
+  nationality?: string;
+  digilockerConsent?: boolean;
+  digilockerLinked?: boolean;
 }
 
 const schema = new Schema<IPerson>({
@@ -38,6 +42,10 @@ const schema = new Schema<IPerson>({
   },
   photo: String,
   biometricEnrolled: { type: Boolean, default: false },
+  // W01 intake enhancements
+  nationality: String,
+  digilockerConsent: { type: Boolean, default: false },
+  digilockerLinked: { type: Boolean, default: false },
 }, { timestamps: true });
 
 schema.index({ collegeId: 1, aadhaar: 1 }, { unique: true, partialFilterExpression: { aadhaar: { $exists: true, $ne: null } } });

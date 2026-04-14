@@ -151,3 +151,11 @@ export const updateCancellationSchema = z.object({
   refundStatus: z.enum(['not_applicable', 'pending', 'processed', 'failed']).optional(),
   notes: z.string().optional(),
 });
+
+// ═══ W01 Business Logic Schemas ═══════════════════════════
+
+export const generateMeritListSchema = z.object({ allotmentRoundId: z.string().min(1), academicYearId: z.string().min(1), programmeId: z.string().min(1), branchId: z.string().optional(), quota: z.enum(['management', 'convener', 'nri', 'lateral']), criteria: z.object({ sortBy: z.string().min(1), tieBreaker: z.string().optional() }) });
+export const approveCancellationSchema = z.object({ approvedBy: z.string().min(1) });
+export const uploadDocumentSchema = z.object({ documentType: z.string().min(1), fileUrl: z.string().min(1) });
+export const createSpotRoundSchema = z.object({ academicYearId: z.string().min(1), name: z.string().min(1), startDate: z.string().min(1), endDate: z.string().min(1), eligibilityCriteria: z.string().optional(), maxSeats: z.number().optional() });
+export const updateSpotRoundSchema = createSpotRoundSchema.partial();

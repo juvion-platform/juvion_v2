@@ -8,6 +8,8 @@ export { CounselingAllotment } from './admissions/CounselingAllotment';
 export { DocumentChecklist } from './admissions/DocumentChecklist';
 export { EntranceExamScore } from './admissions/EntranceExamScore';
 export { Inquiry } from './admissions/Inquiry';
+export { MeritList } from './admissions/MeritList';
+export { SpotRound } from './admissions/SpotRound';
 
 // === People ===
 export { AcademicHistory } from './people/AcademicHistory';
@@ -58,6 +60,7 @@ export { POAttainmentRecord } from './academic-ops/POAttainmentRecord';
 export { ProgramOutcome } from './academic-ops/ProgramOutcome';
 export { ProgrammeHealthMetrics } from './academic-ops/ProgrammeHealthMetrics';
 export { QualityReport } from './academic-ops/QualityReport';
+export { LateralCreditMapping } from './academic-ops/LateralCreditMapping';
 export { SemesterResult } from './academic-ops/SemesterResult';
 export { Timetable } from './academic-ops/Timetable';
 export { TimetableSlot } from './academic-ops/TimetableSlot';
@@ -231,6 +234,7 @@ export { LabClearance } from './campus/LabClearance';
 export { LabEquipment } from './campus/LabEquipment';
 export { LabIncident } from './campus/LabIncident';
 export { LabSlotBooking } from './campus/LabSlotBooking';
+export { LabAccess } from './campus/LabAccess';
 export { MealTransaction } from './campus/MealTransaction';
 export { MessFacility } from './campus/MessFacility';
 export { MessSubscription } from './campus/MessSubscription';

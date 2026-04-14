@@ -3,6 +3,7 @@
 
 import { Router } from 'express';
 import { authenticate } from '../../middleware/authenticate';
+import { authorize } from '../../middleware/authorize';
 import { validate } from '../../middleware/validate';
 import * as ctrl from './workflow.controller';
 import {
@@ -14,6 +15,8 @@ import {
   addToWaitlistSchema,
   createFeeNegotiationSchema, resolveFeeNegotiationSchema,
   createCancellationSchema, updateCancellationSchema,
+  generateMeritListSchema, approveCancellationSchema, uploadDocumentSchema,
+  createSpotRoundSchema, updateSpotRoundSchema,
 } from './workflow.validation';
 
 const router = Router();
@@ -67,5 +70,49 @@ router.put('/fee-negotiations/:id/resolve', validate(resolveFeeNegotiationSchema
 router.get('/cancellations', ctrl.listCancellations);
 router.post('/cancellations', validate(createCancellationSchema), ctrl.createCancellation);
 router.put('/cancellations/:id', validate(updateCancellationSchema), ctrl.updateCancellation);
+
+// ═══ W01 Business Logic Routes ═══════════════════════════
+
+// ── Merit Lists ────────────────────────────────────────────
+router.get('/merit-lists', authorize('admissions', 'read'), ctrl.listMeritListsCtrl);
+router.get('/merit-lists/:id', authorize('admissions', 'read'), ctrl.getMeritListCtrl);
+router.post('/merit-lists', authorize('admissions', 'create'), validate(generateMeritListSchema), ctrl.generateMeritListCtrl);
+router.post('/merit-lists/:id/publish', authorize('admissions', 'update'), ctrl.publishMeritListCtrl);
+
+// ── Allotment Algorithm ────────────────────────────────────
+router.post('/allotment-rounds/:id/execute', authorize('admissions', 'update'), ctrl.executeAllotmentRoundCtrl);
+router.post('/allotment-rounds/:id/publish', authorize('admissions', 'update'), ctrl.publishAllotmentResultsCtrl);
+router.post('/waitlist/:id/promote', authorize('admissions', 'update'), ctrl.promoteFromWaitlistCtrl);
+
+// ── Offer Lifecycle ────────────────────────────────────────
+router.post('/offers/:id/accept', authorize('admissions', 'update'), ctrl.acceptOfferCtrl);
+router.post('/offers/:id/reject', authorize('admissions', 'update'), ctrl.rejectOfferCtrl);
+router.post('/offers/:id/expire', authorize('admissions', 'update'), ctrl.handleOfferExpiryCtrl);
+
+// ── Cancellation ───────────────────────────────────────────
+router.post('/cancellations/:id/approve', authorize('admissions', 'update'), validate(approveCancellationSchema), ctrl.approveCancellationCtrl);
+router.post('/cancellations/:id/execute', authorize('admissions', 'update'), ctrl.executeCancellationCtrl);
+router.get('/cancellations/:id/refund', authorize('admissions', 'read'), ctrl.calculateRefundCtrl);
+
+// ── Import Execution ───────────────────────────────────────
+router.post('/imports/:id/execute', authorize('admissions', 'update'), ctrl.executeImportBatchCtrl);
+
+// ── Eligibility Checks ────────────────────────────────────
+router.post('/applicants/:id/eligibility/lateral', authorize('admissions', 'read'), ctrl.checkLateralEligibilityCtrl);
+router.post('/applicants/:id/eligibility/nri', authorize('admissions', 'read'), ctrl.checkNRIEligibilityCtrl);
+router.post('/applicants/:id/eligibility/scholarship', authorize('admissions', 'read'), ctrl.checkScholarshipEligibilityCtrl);
+
+// ── Document Actions ───────────────────────────────────────
+router.post('/documents/:applicantId/upload', authorize('admissions', 'create'), validate(uploadDocumentSchema), ctrl.uploadDocumentCtrl);
+router.post('/documents/:applicantId/ocr', authorize('admissions', 'update'), ctrl.triggerOCRCtrl);
+
+// ── Convener Reporting ─────────────────────────────────────
+router.get('/reporting-tracker', authorize('admissions', 'read'), ctrl.getReportingTrackerCtrl);
+router.post('/counseling/:id/report', authorize('admissions', 'update'), ctrl.recordStudentReportingCtrl);
+
+// ── Spot Rounds ────────────────────────────────────────────
+router.get('/spot-rounds', authorize('admissions', 'read'), ctrl.listSpotRoundsCtrl);
+router.post('/spot-rounds', authorize('admissions', 'create'), validate(createSpotRoundSchema), ctrl.createSpotRoundCtrl);
+router.put('/spot-rounds/:id', authorize('admissions', 'update'), validate(updateSpotRoundSchema), ctrl.updateSpotRoundCtrl);
 
 export default router;
