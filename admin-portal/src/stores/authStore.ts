@@ -17,7 +17,7 @@ interface AuthState {
   hasPermission: (module: string, action: string) => boolean;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   token: localStorage.getItem('token'),
   collegeId: localStorage.getItem('collegeId'),
@@ -67,7 +67,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ user: null, token: null, collegeId: null, collegeName: null, colleges: [], isSuperAdmin: false, permissions: [] });
   },
   hasPermission: (module, action) => {
-    const perms = useAuthStore.getState().permissions;
+    const perms = get().permissions;
     return perms.includes(`${module}:${action}`) || perms.includes(`${module}:*`) || perms.includes('*:*');
   },
 }));
