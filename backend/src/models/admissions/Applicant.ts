@@ -68,6 +68,11 @@ export interface IApplicant extends Document {
   meritScore?: number;
   workflowInstanceId?: Schema.Types.ObjectId;
   importBatchId?: Schema.Types.ObjectId;
+  // W01 intake enhancements
+  nriPassportNumber?: string;
+  nriVisaValidity?: Date;
+  scholarshipEligible?: boolean;
+  scholarshipScheme?: string;
 }
 
 const schema = new Schema<IApplicant>({
@@ -142,6 +147,11 @@ const schema = new Schema<IApplicant>({
   meritScore: Number,
   workflowInstanceId: { type: Schema.Types.ObjectId, ref: 'WorkflowInstance' },
   importBatchId: { type: Schema.Types.ObjectId, ref: 'LeadImportBatch' },
+  // W01 intake enhancements
+  nriPassportNumber: String,
+  nriVisaValidity: Date,
+  scholarshipEligible: { type: Boolean, default: false },
+  scholarshipScheme: String,
 }, { timestamps: true });
 
 schema.index({ collegeId: 1, applicationNumber: 1 }, { unique: true });
