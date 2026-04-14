@@ -14,6 +14,22 @@ import {
   createIQACReportSchema, updateIQACReportSchema,
   createRTIRequestSchema, updateRTIRequestSchema,
   createLegalCaseSchema, updateLegalCaseSchema,
+  // W07 Workflow Schemas
+  createEvidenceTypeSchema, updateEvidenceTypeSchema,
+  createCollectionRuleSchema, updateCollectionRuleSchema,
+  uploadEvidenceSchema, overrideQualitySchema,
+  createCriterionMappingSchema, updateCriterionMappingSchema,
+  createRubricSchema, updateRubricSchema,
+  interpretCriterionSchema, loadFrameworkSchema,
+  computeReadinessSchema, createSnapshotSchema,
+  detectGapsSchema, assignGapSchema, updateGapPrioritySchema,
+  createRemediationPlanSchema, updateRemediationPlanSchema,
+  updateRemediationTaskSchema, verifyRemediationTaskSchema, closeRemediationPlanSchema,
+  createReportTemplateSchema,
+  initiateReportSchema, updateSectionSchema, reviewSectionSchema,
+  approveSectionSchema, requestRevisionSchema, approveReportSchema, submitReportSchema,
+  createDeadlineSchema, updateDeadlineSchema, acknowledgeDeadlineSchema,
+  recordVisitOutcomeSchema, transitionCycleSchema,
 } from './validation';
 
 const router = Router();
@@ -91,5 +107,105 @@ router.get('/legal-cases/:id', authorize('compliance', 'read'), ctrl.getLegalCas
 router.post('/legal-cases', authorize('compliance', 'create'), validate(createLegalCaseSchema), ctrl.createLegalCase);
 router.put('/legal-cases/:id', authorize('compliance', 'update'), validate(updateLegalCaseSchema), ctrl.updateLegalCase);
 router.delete('/legal-cases/:id', authorize('compliance', 'delete'), ctrl.deleteLegalCase);
+
+// ═══ W07 Workflow Routes ═══════════════════════════════════
+
+// ── Evidence Types ─────────────────────────────────────────
+router.get('/evidence-types', authorize('compliance', 'read'), ctrl.listEvidenceTypesCtrl);
+router.get('/evidence-types/:id', authorize('compliance', 'read'), ctrl.getEvidenceTypeCtrl);
+router.post('/evidence-types', authorize('compliance', 'create'), validate(createEvidenceTypeSchema), ctrl.createEvidenceTypeCtrl);
+router.put('/evidence-types/:id', authorize('compliance', 'update'), validate(updateEvidenceTypeSchema), ctrl.updateEvidenceTypeCtrl);
+router.delete('/evidence-types/:id', authorize('compliance', 'delete'), ctrl.deleteEvidenceTypeCtrl);
+
+// ── Collection Rules ───────────────────────────────────────
+router.get('/evidence-collection-rules', authorize('compliance', 'read'), ctrl.listCollectionRulesCtrl);
+router.get('/evidence-collection-rules/:id', authorize('compliance', 'read'), ctrl.getCollectionRuleCtrl);
+router.post('/evidence-collection-rules', authorize('compliance', 'create'), validate(createCollectionRuleSchema), ctrl.createCollectionRuleCtrl);
+router.put('/evidence-collection-rules/:id', authorize('compliance', 'update'), validate(updateCollectionRuleSchema), ctrl.updateCollectionRuleCtrl);
+router.delete('/evidence-collection-rules/:id', authorize('compliance', 'delete'), ctrl.deleteCollectionRuleCtrl);
+
+// ── Evidence Records ───────────────────────────────────────
+router.get('/evidence/stats', authorize('compliance', 'read'), ctrl.getEvidenceStatsCtrl);
+router.get('/evidence-records', authorize('compliance', 'read'), ctrl.listEvidenceRecordsCtrl);
+router.get('/evidence-records/:id', authorize('compliance', 'read'), ctrl.getEvidenceRecordCtrl);
+router.post('/evidence-records/upload', authorize('compliance', 'create'), validate(uploadEvidenceSchema), ctrl.uploadEvidenceCtrl);
+router.put('/evidence-records/:id/quality-override', authorize('compliance', 'update'), validate(overrideQualitySchema), ctrl.overrideEvidenceQualityCtrl);
+router.post('/evidence-records/:id/verify', authorize('compliance', 'update'), ctrl.verifyEvidenceCtrl);
+router.post('/evidence/sync/:sourceModule', authorize('compliance', 'update'), ctrl.syncModuleEvidenceCtrl);
+
+// ── Criterion Mappings ─────────────────────────────────────
+router.get('/criterion-evidence-mappings', authorize('compliance', 'read'), ctrl.listCriterionMappingsCtrl);
+router.post('/criterion-evidence-mappings/suggest/:criterionId', authorize('compliance', 'read'), ctrl.suggestMappingsCtrl);
+router.get('/criterion-evidence-mappings/:id', authorize('compliance', 'read'), ctrl.getCriterionMappingCtrl);
+router.post('/criterion-evidence-mappings', authorize('compliance', 'create'), validate(createCriterionMappingSchema), ctrl.createCriterionMappingCtrl);
+router.put('/criterion-evidence-mappings/:id', authorize('compliance', 'update'), validate(updateCriterionMappingSchema), ctrl.updateCriterionMappingCtrl);
+router.delete('/criterion-evidence-mappings/:id', authorize('compliance', 'delete'), ctrl.deleteCriterionMappingCtrl);
+
+// ── Assessment Rubrics ─────────────────────────────────────
+router.get('/assessment-rubrics', authorize('compliance', 'read'), ctrl.listRubricsCtrl);
+router.get('/assessment-rubrics/:id', authorize('compliance', 'read'), ctrl.getRubricCtrl);
+router.post('/assessment-rubrics', authorize('compliance', 'create'), validate(createRubricSchema), ctrl.createRubricCtrl);
+router.put('/assessment-rubrics/:id', authorize('compliance', 'update'), validate(updateRubricSchema), ctrl.updateRubricCtrl);
+router.delete('/assessment-rubrics/:id', authorize('compliance', 'delete'), ctrl.deleteRubricCtrl);
+
+// ── Criteria Enhancement ───────────────────────────────────
+router.put('/compliance-criteria/:id/interpret', authorize('compliance', 'update'), validate(interpretCriterionSchema), ctrl.interpretCriterionCtrl);
+router.post('/frameworks/load', authorize('compliance', 'create'), validate(loadFrameworkSchema), ctrl.loadFrameworkCtrl);
+
+// ── Readiness ──────────────────────────────────────────────
+router.get('/readiness/scores', authorize('compliance', 'read'), ctrl.listReadinessScoresCtrl);
+router.post('/readiness/compute', authorize('compliance', 'create'), validate(computeReadinessSchema), ctrl.computeReadinessCtrl);
+router.get('/readiness/snapshots', authorize('compliance', 'read'), ctrl.listSnapshotsCtrl);
+router.post('/readiness/snapshots', authorize('compliance', 'create'), validate(createSnapshotSchema), ctrl.createSnapshotCtrl);
+router.get('/readiness/dashboard/:bodyId', authorize('compliance', 'read'), ctrl.getReadinessDashboardCtrl);
+router.get('/readiness/predict/:bodyId', authorize('compliance', 'read'), ctrl.predictGradeCtrl);
+
+// ── Gaps ───────────────────────────────────────────────────
+router.get('/gaps/stats', authorize('compliance', 'read'), ctrl.getGapStatsCtrl);
+router.get('/gaps', authorize('compliance', 'read'), ctrl.listGapsCtrl);
+router.get('/gaps/:id', authorize('compliance', 'read'), ctrl.getGapCtrl);
+router.post('/gaps/prioritize', authorize('compliance', 'create'), validate(detectGapsSchema), ctrl.detectGapsCtrl);
+router.put('/gaps/:id/assign', authorize('compliance', 'update'), validate(assignGapSchema), ctrl.assignGapCtrl);
+router.put('/gaps/:id/priority', authorize('compliance', 'update'), validate(updateGapPrioritySchema), ctrl.updateGapPriorityCtrl);
+router.post('/gaps/:id/resolve', authorize('compliance', 'update'), ctrl.resolveGapCtrl);
+
+// ── Remediation ────────────────────────────────────────────
+router.get('/remediation-plans', authorize('compliance', 'read'), ctrl.listRemediationPlansCtrl);
+router.get('/remediation-plans/:id', authorize('compliance', 'read'), ctrl.getRemediationPlanCtrl);
+router.post('/remediation-plans', authorize('compliance', 'create'), validate(createRemediationPlanSchema), ctrl.createRemediationPlanCtrl);
+router.put('/remediation-plans/:id', authorize('compliance', 'update'), validate(updateRemediationPlanSchema), ctrl.updateRemediationPlanCtrl);
+router.put('/remediation-plans/:id/tasks/:taskIdx', authorize('compliance', 'update'), validate(updateRemediationTaskSchema), ctrl.updateRemediationTaskCtrl);
+router.post('/remediation-plans/:id/tasks/:taskIdx/verify', authorize('compliance', 'update'), validate(verifyRemediationTaskSchema), ctrl.verifyRemediationTaskCtrl);
+router.post('/remediation-plans/:id/close', authorize('compliance', 'update'), validate(closeRemediationPlanSchema), ctrl.closeRemediationPlanCtrl);
+router.get('/remediation-plans/:id/progress', authorize('compliance', 'read'), ctrl.getRemediationProgressCtrl);
+
+// ── Report Templates ───────────────────────────────────────
+router.get('/report-templates', authorize('compliance', 'read'), ctrl.listReportTemplatesCtrl);
+router.get('/report-templates/:id', authorize('compliance', 'read'), ctrl.getReportTemplateCtrl);
+router.post('/report-templates', authorize('compliance', 'create'), validate(createReportTemplateSchema), ctrl.createReportTemplateCtrl);
+
+// ── Reports ────────────────────────────────────────────────
+router.get('/reports', authorize('compliance', 'read'), ctrl.listReportsCtrl);
+router.post('/reports/initiate', authorize('compliance', 'create'), validate(initiateReportSchema), ctrl.initiateReportCtrl);
+router.get('/reports/:id', authorize('compliance', 'read'), ctrl.getReportCtrl);
+router.post('/reports/:id/sections/:sectionId/generate', authorize('compliance', 'update'), ctrl.generateSectionCtrl);
+router.put('/reports/:id/sections/:sectionId', authorize('compliance', 'update'), validate(updateSectionSchema), ctrl.updateSectionCtrl);
+router.post('/reports/:id/sections/:sectionId/review', authorize('compliance', 'update'), validate(reviewSectionSchema), ctrl.reviewSectionCtrl);
+router.post('/reports/:id/sections/:sectionId/approve', authorize('compliance', 'update'), validate(approveSectionSchema), ctrl.approveSectionCtrl);
+router.post('/reports/:id/sections/:sectionId/revision', authorize('compliance', 'update'), validate(requestRevisionSchema), ctrl.requestSectionRevisionCtrl);
+router.post('/reports/:id/assemble', authorize('compliance', 'update'), ctrl.assembleReportCtrl);
+router.post('/reports/:id/approve', authorize('compliance', 'update'), validate(approveReportSchema), ctrl.approveReportCtrl);
+router.post('/reports/:id/submit', authorize('compliance', 'update'), validate(submitReportSchema), ctrl.submitReportCtrl);
+
+// ── Submission Artifacts ───────────────────────────────────
+router.get('/submission-artifacts', authorize('compliance', 'read'), ctrl.listSubmissionArtifactsCtrl);
+
+// ── Deadlines + Visit ──────────────────────────────────────
+router.get('/deadlines', authorize('compliance', 'read'), ctrl.listDeadlinesCtrl);
+router.post('/deadlines', authorize('compliance', 'create'), validate(createDeadlineSchema), ctrl.createDeadlineCtrl);
+router.put('/deadlines/:id', authorize('compliance', 'update'), validate(updateDeadlineSchema), ctrl.updateDeadlineCtrl);
+router.post('/deadlines/:id/acknowledge', authorize('compliance', 'update'), validate(acknowledgeDeadlineSchema), ctrl.acknowledgeDeadlineCtrl);
+router.post('/accreditation-cycles/:id/visit-outcome', authorize('compliance', 'update'), validate(recordVisitOutcomeSchema), ctrl.recordVisitOutcomeCtrl);
+router.put('/accreditation-cycles/:id/status', authorize('compliance', 'update'), validate(transitionCycleSchema), ctrl.transitionCycleCtrl);
 
 export default router;

@@ -1,0 +1,5 @@
+import { Schema, model, Document } from 'mongoose';
+export interface IEvidenceCollectionRule extends Document { collegeId: Schema.Types.ObjectId; evidenceTypeId: Schema.Types.ObjectId; triggerEvent?: string; syncSchedule?: string; sourceQuery?: any; extractionMapping?: any; qualityThresholds: { minPresenceScore: number; minCompletenessScore: number; maxAgeDays: number }; isActive: boolean; }
+const schema = new Schema<IEvidenceCollectionRule>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, evidenceTypeId: { type: Schema.Types.ObjectId, ref: 'EvidenceType', required: true }, triggerEvent: String, syncSchedule: String, sourceQuery: Schema.Types.Mixed, extractionMapping: Schema.Types.Mixed, qualityThresholds: { minPresenceScore: { type: Number, default: 50 }, minCompletenessScore: { type: Number, default: 60 }, maxAgeDays: { type: Number, default: 365 } }, isActive: { type: Boolean, default: true } }, { timestamps: true });
+schema.index({ collegeId: 1, evidenceTypeId: 1 });
+export const EvidenceCollectionRule = model<IEvidenceCollectionRule>('EvidenceCollectionRule', schema);

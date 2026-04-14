@@ -325,6 +325,18 @@ export { IQACReport } from './compliance/IQACReport';
 export { LegalCase } from './compliance/LegalCase';
 export { RTIRequest } from './compliance/RTIRequest';
 export { RegulatoryFiling } from './compliance/RegulatoryFiling';
+export { EvidenceType } from './compliance/EvidenceType';
+export { EvidenceCollectionRule } from './compliance/EvidenceCollectionRule';
+export { CriterionEvidenceMapping } from './compliance/CriterionEvidenceMapping';
+export { AssessmentRubric } from './compliance/AssessmentRubric';
+export { ReadinessScore } from './compliance/ReadinessScore';
+export { ReadinessSnapshot } from './compliance/ReadinessSnapshot';
+export { GapRecord } from './compliance/GapRecord';
+export { AccreditationReport } from './compliance/AccreditationReport';
+export { ReportSection } from './compliance/ReportSection';
+export { ReportTemplate } from './compliance/ReportTemplate';
+export { SubmissionArtifact } from './compliance/SubmissionArtifact';
+export { RemediationPlan } from './compliance/RemediationPlan';
 
 // === Communication ===
 export { Announcement } from './communication/Announcement';
