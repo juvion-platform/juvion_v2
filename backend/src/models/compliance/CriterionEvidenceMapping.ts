@@ -1,0 +1,5 @@
+import { Schema, model, Document } from 'mongoose';
+export interface ICriterionEvidenceMapping extends Document { collegeId: Schema.Types.ObjectId; criterionId: Schema.Types.ObjectId; evidenceTypeId: Schema.Types.ObjectId; contributionWeight: number; isMandatory: boolean; notes?: string; suggestedByAI: boolean; confirmedByHuman: boolean; }
+const schema = new Schema<ICriterionEvidenceMapping>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, criterionId: { type: Schema.Types.ObjectId, ref: 'ComplianceCriteria', required: true }, evidenceTypeId: { type: Schema.Types.ObjectId, ref: 'EvidenceType', required: true }, contributionWeight: { type: Number, default: 50 }, isMandatory: { type: Boolean, default: false }, notes: String, suggestedByAI: { type: Boolean, default: false }, confirmedByHuman: { type: Boolean, default: false } }, { timestamps: true });
+schema.index({ collegeId: 1, criterionId: 1, evidenceTypeId: 1 }, { unique: true });
+export const CriterionEvidenceMapping = model<ICriterionEvidenceMapping>('CriterionEvidenceMapping', schema);

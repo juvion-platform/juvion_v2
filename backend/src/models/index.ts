@@ -19,6 +19,10 @@ export { Person } from './people/Person';
 export { Staff } from './people/Staff';
 export { Student } from './people/Student';
 export { Transcript } from './people/Transcript';
+export { ExitRequest } from './people/ExitRequest';
+export { DocumentTemplate } from './people/DocumentTemplate';
+export { ExitDocument } from './people/ExitDocument';
+export { Alumni } from './people/Alumni';
 
 // === Academic Structure ===
 export { AcademicYear } from './academic-structure/AcademicYear';
@@ -152,6 +156,22 @@ export { PlacementSeason } from './placement/PlacementSeason';
 export { PlacementTraining } from './placement/PlacementTraining';
 export { RoundResult } from './placement/RoundResult';
 export { TrainingAttendance } from './placement/TrainingAttendance';
+export { CareerProfile } from './placement/CareerProfile';
+export { CompanyEngagementLog } from './placement/CompanyEngagementLog';
+export { CompanyProgrammeAffinity } from './placement/CompanyProgrammeAffinity';
+export { PlacementDrive } from './placement/PlacementDrive';
+export { DriveApplication } from './placement/DriveApplication';
+export { InterviewSchedule } from './placement/InterviewSchedule';
+export { RecruiterAccount } from './placement/RecruiterAccount';
+export { RecruiterActivityLog } from './placement/RecruiterActivityLog';
+export { PlacementReadinessScore } from './placement/PlacementReadinessScore';
+export { SkillRecord } from './placement/SkillRecord';
+export { PlacementBar } from './placement/PlacementBar';
+export { OptOutRecord } from './placement/OptOutRecord';
+export { AlumniCareerRecord } from './placement/AlumniCareerRecord';
+export { AlumniCareer } from './placement/AlumniCareer';
+export { AlumniEngagement } from './placement/AlumniEngagement';
+export { MentorMatch } from './placement/MentorMatch';
 
 // === Welfare ===
 export { AntiRaggingComplaint } from './welfare/AntiRaggingComplaint';
@@ -184,6 +204,8 @@ export { MisconductReport } from './welfare/MisconductReport';
 export { RiskSignal } from './welfare/RiskSignal';
 export { CCDThreshold } from './welfare/CCDThreshold';
 export { CCDIntervention } from './welfare/CCDIntervention';
+export { DropoutRiskAlert } from './welfare/DropoutRiskAlert';
+export { ExitInterview } from './welfare/ExitInterview';
 
 // === Campus ===
 export { Bed } from './campus/Bed';
@@ -312,6 +334,18 @@ export { IQACReport } from './compliance/IQACReport';
 export { LegalCase } from './compliance/LegalCase';
 export { RTIRequest } from './compliance/RTIRequest';
 export { RegulatoryFiling } from './compliance/RegulatoryFiling';
+export { EvidenceType } from './compliance/EvidenceType';
+export { EvidenceCollectionRule } from './compliance/EvidenceCollectionRule';
+export { CriterionEvidenceMapping } from './compliance/CriterionEvidenceMapping';
+export { AssessmentRubric } from './compliance/AssessmentRubric';
+export { ReadinessScore } from './compliance/ReadinessScore';
+export { ReadinessSnapshot } from './compliance/ReadinessSnapshot';
+export { GapRecord } from './compliance/GapRecord';
+export { AccreditationReport } from './compliance/AccreditationReport';
+export { ReportSection } from './compliance/ReportSection';
+export { ReportTemplate } from './compliance/ReportTemplate';
+export { SubmissionArtifact } from './compliance/SubmissionArtifact';
+export { RemediationPlan } from './compliance/RemediationPlan';
 
 // === Communication ===
 export { Announcement } from './communication/Announcement';
@@ -339,4 +373,9 @@ export { JuviNoticeCard } from './juvi/JuviNoticeCard';
 export { JuviPersonaConfig } from './juvi/JuviPersonaConfig';
 export { JuviUsageMetric } from './juvi/JuviUsageMetric';
 export { StudyRecommendation } from './juvi/StudyRecommendation';
+
+// === Workflow ===
+export { ClearanceWorkflow } from './workflow/ClearanceWorkflow';
+export { ClearanceItem } from './workflow/ClearanceItem';
+export { EscalationLog } from './workflow/EscalationLog';
 

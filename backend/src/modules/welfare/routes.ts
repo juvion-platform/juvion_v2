@@ -45,6 +45,10 @@ import {
   ingestRiskSignalSchema, acknowledgeCCDAlertSchema, investigateCCDAlertSchema,
   ccdInterventionSchema, ccdFalsePositiveSchema,
   createCCDThresholdSchema, updateCCDThresholdSchema,
+  // W10 dropout & exit interview schemas
+  createDropoutRiskAlertSchema, assignDropoutAlertSchema,
+  logOutreachAttemptSchema, resolveDropoutAlertSchema,
+  recordExitInterviewSchema, scheduleExitInterviewSchema,
 } from './validation';
 
 const router = Router();
@@ -307,5 +311,20 @@ router.get('/ccd/thresholds', authorize('welfare', 'read'), ctrl.listCCDThreshol
 router.get('/ccd/thresholds/:id', authorize('welfare', 'read'), ctrl.getCCDThresholdCtrl);
 router.post('/ccd/thresholds', authorize('welfare', 'create'), validate(createCCDThresholdSchema), ctrl.createCCDThresholdCtrl);
 router.put('/ccd/thresholds/:id', authorize('welfare', 'update'), validate(updateCCDThresholdSchema), ctrl.updateCCDThresholdCtrl);
+
+// ── W10 Dropout Risk Alerts ────────────────────────────────
+router.get('/dropout-risk-alerts', authorize('welfare', 'read'), ctrl.listDropoutRiskAlertsCtrl);
+router.get('/dropout-risk-alerts/:id', authorize('welfare', 'read'), ctrl.getDropoutRiskAlertCtrl);
+router.post('/dropout-risk-alerts', authorize('welfare', 'create'), validate(createDropoutRiskAlertSchema), ctrl.createDropoutRiskAlertCtrl);
+router.put('/dropout-risk-alerts/:id/assign', authorize('welfare', 'update'), validate(assignDropoutAlertSchema), ctrl.assignDropoutAlertCtrl);
+router.post('/dropout-risk-alerts/:id/outreach', authorize('welfare', 'update'), validate(logOutreachAttemptSchema), ctrl.logOutreachAttemptCtrl);
+router.put('/dropout-risk-alerts/:id/resolve', authorize('welfare', 'update'), validate(resolveDropoutAlertSchema), ctrl.resolveDropoutAlertCtrl);
+
+// ── W10 Exit Interviews ────────────────────────────────────
+router.get('/exit-interviews', authorize('welfare', 'read'), ctrl.listExitInterviewsCtrl);
+router.post('/exit-interviews', authorize('welfare', 'create'), validate(recordExitInterviewSchema), ctrl.recordExitInterviewCtrl);
+router.post('/exit-interviews/schedule', authorize('welfare', 'create'), validate(scheduleExitInterviewSchema), ctrl.scheduleExitInterviewCtrl);
+router.get('/exit-interviews/:id', authorize('welfare', 'read'), ctrl.getExitInterviewCtrl);
+router.post('/exit-interviews/:id/decline', authorize('welfare', 'update'), ctrl.declineExitInterviewCtrl);
 
 export default router;

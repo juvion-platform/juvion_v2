@@ -1,38 +1,7 @@
 import { Schema, model, Document } from 'mongoose';
-
-export interface IEvidenceRecord extends Document {
-  collegeId: Schema.Types.ObjectId;
-  accreditationCycleId?: Schema.Types.ObjectId;
-  criterionCode: string;
-  evidenceType: string;
-  title: string;
-  description?: string;
-  sourceModule: string;
-  sourceEntityType: string;
-  sourceEntityId?: Schema.Types.ObjectId;
-  data: Record<string, any>;
-  semesterId?: Schema.Types.ObjectId;
-  status: string;
-  uploadedBy?: Schema.Types.ObjectId;
-}
-
-const schema = new Schema<IEvidenceRecord>({
-  collegeId: { type: Schema.Types.ObjectId, required: true, index: true },
-  accreditationCycleId: { type: Schema.Types.ObjectId, ref: 'AccreditationCycle' },
-  criterionCode: { type: String, required: true },
-  evidenceType: { type: String, enum: ['co_attainment', 'po_attainment', 'pass_rate', 'faculty_metrics', 'attendance', 'feedback', 'other'], required: true },
-  title: { type: String, required: true },
-  description: String,
-  sourceModule: { type: String, required: true },
-  sourceEntityType: { type: String, required: true },
-  sourceEntityId: Schema.Types.ObjectId,
-  data: { type: Schema.Types.Mixed, required: true },
-  semesterId: { type: Schema.Types.ObjectId, ref: 'Semester' },
-  status: { type: String, enum: ['draft', 'submitted', 'accepted', 'rejected'], required: true, default: 'draft' },
-  uploadedBy: { type: Schema.Types.ObjectId, ref: 'Person' },
-}, { timestamps: true });
-
+export interface IEvidenceRecord extends Document { collegeId: Schema.Types.ObjectId; accreditationCycleId?: Schema.Types.ObjectId; criterionCode: string; evidenceType: string; evidenceTypeId?: Schema.Types.ObjectId; title: string; description?: string; sourceModule: string; sourceEntityType: string; sourceEntityId?: Schema.Types.ObjectId; academicYearId?: Schema.Types.ObjectId; programmeId?: Schema.Types.ObjectId; departmentId?: Schema.Types.ObjectId; data: Record<string, unknown>; attachments?: Array<{ fileName: string; fileUrl: string; uploadedAt: Date }>; scores?: { presence: number; completeness: number; recency: number; quality: number; composite: number }; qualityOverride?: { overriddenBy: Schema.Types.ObjectId; reason: string; overriddenAt: Date }; semesterId?: Schema.Types.ObjectId; version?: number; status: string; uploadedBy?: Schema.Types.ObjectId; }
+const schema = new Schema<IEvidenceRecord>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, accreditationCycleId: { type: Schema.Types.ObjectId, ref: 'AccreditationCycle' }, criterionCode: { type: String, required: true }, evidenceType: { type: String, enum: ['co_attainment', 'po_attainment', 'pass_rate', 'faculty_metrics', 'attendance', 'feedback', 'other'], required: true }, evidenceTypeId: { type: Schema.Types.ObjectId, ref: 'EvidenceType' }, title: { type: String, required: true }, description: String, sourceModule: { type: String, required: true }, sourceEntityType: { type: String, required: true }, sourceEntityId: Schema.Types.ObjectId, academicYearId: { type: Schema.Types.ObjectId, ref: 'AcademicYear' }, programmeId: { type: Schema.Types.ObjectId, ref: 'Programme' }, departmentId: { type: Schema.Types.ObjectId, ref: 'Department' }, data: { type: Schema.Types.Mixed, required: true }, attachments: [{ fileName: { type: String, required: true }, fileUrl: { type: String, required: true }, uploadedAt: { type: Date, required: true } }], scores: { presence: Number, completeness: Number, recency: Number, quality: Number, composite: Number }, qualityOverride: { overriddenBy: { type: Schema.Types.ObjectId, ref: 'Person' }, reason: String, overriddenAt: Date }, semesterId: { type: Schema.Types.ObjectId, ref: 'Semester' }, version: { type: Number, default: 1 }, status: { type: String, enum: ['collected', 'flagged', 'verified', 'superseded', 'archived'], default: 'collected' }, uploadedBy: { type: Schema.Types.ObjectId, ref: 'Person' } }, { timestamps: true });
 schema.index({ collegeId: 1, criterionCode: 1 });
 schema.index({ collegeId: 1, accreditationCycleId: 1 });
-
+schema.index({ collegeId: 1, evidenceTypeId: 1, status: 1 });
 export const EvidenceRecord = model<IEvidenceRecord>('EvidenceRecord', schema);
