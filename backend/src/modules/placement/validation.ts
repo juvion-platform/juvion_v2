@@ -204,3 +204,57 @@ export const createPlacementReportSchema = z.object({
   data: z.any().optional(),
 });
 export const updatePlacementReportSchema = createPlacementReportSchema.partial();
+
+// ═══ W04 Workflow Schemas ═══════════════════════════════════
+
+// ─── CRM ────────────────────────────────────────────────────
+export const createEngagementLogSchema = z.object({ companyId: z.string().min(1), placementSeasonId: z.string().optional(), type: z.enum(['outreach', 'mou_signed', 'mou_lapsed', 'onboarding', 'feedback', 'blacklist', 'suspension', 'alumni_referral', 'drive_completed', 'general', 'touchpoint']), outcome: z.enum(['interested', 'maybe', 'declined', 'positive', 'negative', 'neutral']).optional(), notes: z.string().min(1), actorId: z.string().min(1) });
+export const scorePipelineSchema = z.object({ placementSeasonId: z.string().min(1) });
+export const blacklistCompanySchema = z.object({ reason: z.string().min(1) });
+export const registerRecruiterAccountSchema = z.object({ personId: z.string().min(1), companyId: z.string().min(1), designation: z.string().min(1), email: z.string().email(), phone: z.string().optional() });
+export const verifyRecruiterAccountSchema = z.object({ verifiedBy: z.string().min(1) });
+export const deactivateRecruiterAccountSchema = z.object({ reason: z.string().min(1) });
+
+// ─── Season ─────────────────────────────────────────────────
+export const transitionSeasonSchema = z.object({ status: z.enum(['planning', 'pre_season', 'open', 'active', 'wind_down', 'closed']) });
+
+// ─── Drive ──────────────────────────────────────────────────
+export const createDriveSchema_wf = z.object({ placementSeasonId: z.string().min(1), companyId: z.string().min(1), jobPostingId: z.string().min(1), type: z.enum(['on_campus', 'virtual', 'pool', 'off_campus']).optional(), applicationWindow: z.object({ openDate: z.string().min(1), closeDate: z.string().min(1) }), driveDate: z.string().optional(), venue: z.string().optional(), virtualLink: z.string().optional() });
+export const transitionDriveSchema = z.object({ status: z.string().min(1) });
+export const cancelDriveSchema = z.object({ reason: z.string().min(1) });
+export const applyToDriveSchema = z.object({ driveId: z.string().min(1), jobPostingId: z.string().min(1), studentId: z.string().min(1), resumeUrl: z.string().optional() });
+export const withdrawApplicationSchema = z.object({ reason: z.string().min(1) });
+export const scheduleInterviewsSchema = z.object({ slots: z.array(z.object({ studentId: z.string(), slotStart: z.string(), slotEnd: z.string(), venue: z.string().optional(), virtualLink: z.string().optional(), panelInfo: z.string().optional() })).min(1) });
+export const updateInterviewOutcomeSchema = z.object({ status: z.enum(['scheduled', 'confirmed', 'rescheduled', 'completed', 'no_show', 'cancelled']), outcome: z.enum(['selected', 'not_selected', 'pending']).optional() });
+export const checkEligibilitySchema = z.object({ studentId: z.string().min(1), jobPostingId: z.string().min(1) });
+
+// ─── Offer ──────────────────────────────────────────────────
+export const createOfferSchema_wf = z.object({ driveId: z.string().min(1), jobPostingId: z.string().min(1), studentId: z.string().min(1), companyId: z.string().min(1), packageLpa: z.number().min(0), role: z.string().optional(), location: z.string().optional(), bondTerms: z.string().optional(), responseDeadline: z.string().optional(), source: z.enum(['campus', 'off_campus', 'ppo']).optional() });
+export const releaseOfferSchema = z.object({ dreamOfferId: z.string().min(1) });
+
+// ─── Bar + Opt-Out ──────────────────────────────────────────
+export const applyPlacementBarSchema = z.object({ studentId: z.string().min(1), reason: z.string().min(1), barType: z.enum(['disciplinary', 'academic_fraud', 'fee_default', 'other']), appliedBy: z.string().min(1) });
+export const liftPlacementBarSchema = z.object({ liftedBy: z.string().min(1), liftConditions: z.string().optional() });
+export const recordOptOutSchema = z.object({ studentId: z.string().min(1), placementSeasonId: z.string().min(1), reason: z.enum(['higher_education', 'entrepreneurship', 'family_business', 'personal', 'other']), reasonDetail: z.string().optional(), evidenceUrl: z.string().optional(), recordedBy: z.string().min(1) });
+export const voidOptOutSchema = z.object({ voidReason: z.string().min(1) });
+
+// ─── Career Profile ─────────────────────────────────────────
+export const initCareerProfilesSchema = z.object({ placementSeasonId: z.string().min(1), studentIds: z.array(z.string()).min(1) });
+export const updateCareerProfileSchema_wf = z.object({ careerPreferences: z.object({ targetRoles: z.array(z.string()).optional(), preferredLocations: z.array(z.string()).optional(), expectedCtcLpa: z.number().optional(), willingToRelocate: z.boolean().optional() }).optional(), cocurricularHighlights: z.array(z.object({ type: z.enum(['technical', 'sports', 'cultural', 'service', 'leadership']), title: z.string(), description: z.string(), rank: z.string().optional(), year: z.number() })).optional(), photoUrl: z.string().optional() });
+export const validateProfileItemSchema = z.object({ itemIndex: z.number().int().min(0), validated: z.boolean() });
+export const refreshAcademicDataSchema = z.object({ cgpa: z.number(), activeBacklogs: z.number().int(), lastResultSemester: z.number().int() });
+export const computeBatchReadinessSchema = z.object({ placementSeasonId: z.string().min(1) });
+
+// ─── Skill Records ──────────────────────────────────────────
+export const createSkillRecordSchema = z.object({ studentId: z.string().min(1), skillName: z.string().min(1), category: z.enum(['aptitude', 'technical', 'soft_skills', 'domain']), source: z.enum(['assessment', 'training_assessment', 'self_reported', 'certification', 'mock_interview']), score: z.number().optional(), percentile: z.number().optional(), vendor: z.string().optional(), assessedAt: z.string().optional() });
+export const updateSkillRecordSchema = createSkillRecordSchema.partial();
+export const ingestExternalAssessmentSchema = z.object({ studentId: z.string().min(1), vendor: z.string().min(1), skills: z.array(z.object({ skillName: z.string(), category: z.enum(['aptitude', 'technical', 'soft_skills', 'domain']), score: z.number(), percentile: z.number().optional() })).min(1) });
+
+// ─── Training ───────────────────────────────────────────────
+export const updateTrainingSessionSchema_wf = z.object({ sessionIndex: z.number().int().min(0), status: z.enum(['conducted', 'cancelled']) });
+export const recordTrainingAssessmentSchema = z.object({ trainingId: z.string().min(1), studentId: z.string().min(1), score: z.number(), skillName: z.string().min(1), skillCategory: z.enum(['aptitude', 'technical', 'soft_skills', 'domain']) });
+
+// ─── Alumni Career ──────────────────────────────────────────
+export const initAlumniCareerRecordSchema = z.object({ personId: z.string().min(1), alumniProfileId: z.string().min(1), currentEmployer: z.string().optional(), currentRole: z.string().optional(), ctcRange: z.string().optional(), industry: z.string().optional(), location: z.string().optional(), careerStatus: z.enum(['employed', 'seeking', 'higher_education', 'entrepreneur', 'unknown']).optional(), updateSource: z.enum(['system_seeded', 'self_report', 'tpo_entry', 'survey']) });
+export const updateAlumniCareerRecordSchema = initAlumniCareerRecordSchema.partial();
+export const batchInitAlumniSchema = z.object({ alumniProfiles: z.array(z.object({ personId: z.string(), alumniProfileId: z.string(), employer: z.string().optional(), role: z.string().optional() })).min(1) });

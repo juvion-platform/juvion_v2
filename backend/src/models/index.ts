@@ -152,6 +152,19 @@ export { PlacementSeason } from './placement/PlacementSeason';
 export { PlacementTraining } from './placement/PlacementTraining';
 export { RoundResult } from './placement/RoundResult';
 export { TrainingAttendance } from './placement/TrainingAttendance';
+export { CareerProfile } from './placement/CareerProfile';
+export { CompanyEngagementLog } from './placement/CompanyEngagementLog';
+export { CompanyProgrammeAffinity } from './placement/CompanyProgrammeAffinity';
+export { PlacementDrive } from './placement/PlacementDrive';
+export { DriveApplication } from './placement/DriveApplication';
+export { InterviewSchedule } from './placement/InterviewSchedule';
+export { RecruiterAccount } from './placement/RecruiterAccount';
+export { RecruiterActivityLog } from './placement/RecruiterActivityLog';
+export { PlacementReadinessScore } from './placement/PlacementReadinessScore';
+export { SkillRecord } from './placement/SkillRecord';
+export { PlacementBar } from './placement/PlacementBar';
+export { OptOutRecord } from './placement/OptOutRecord';
+export { AlumniCareerRecord } from './placement/AlumniCareerRecord';
 
 // === Welfare ===
 export { AntiRaggingComplaint } from './welfare/AntiRaggingComplaint';

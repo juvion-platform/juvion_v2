@@ -1,6 +1,10 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../../middleware/authenticate';
 import * as service from './service';
+import * as crmService from './crm-service';
+import * as drivesService from './drives-offers-service';
+import * as profileService from './profile-train-service';
+import * as alumniService from './alumni-service';
 
 const who = (req: AuthRequest) => req.user?.name || 'System';
 
@@ -298,4 +302,296 @@ export async function createPlacementReport(req: AuthRequest, res: Response, nex
 }
 export async function deletePlacementReport(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.deletePlacementReport(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ═══════════════════════════════════════════════════════════
+// W04 Workflow Controllers
+// ═══════════════════════════════════════════════════════════
+
+// ─── CRM: Company Engagement ─────────────────────────────
+
+export async function listEngagementLogsCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page = '1', limit = '20' } = req.query as any;
+    res.json(await crmService.listEngagementLogs(req.collegeId!, req.params.id as string, +page, +limit));
+  } catch (err) { next(err); }
+}
+export async function createEngagementLogCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await crmService.createEngagementLog(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function scorePipelineCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await crmService.scorePipeline(req.collegeId!, req.body.placementSeasonId, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+export async function getPipelineDashboardCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await crmService.getPipelineDashboard(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+export async function blacklistCompanyCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await crmService.blacklistCompany(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function reinstateCompanyCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await crmService.reinstateCompany(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+export async function listProgrammeAffinityCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page = '1', limit = '20' } = req.query as any;
+    res.json(await crmService.listProgrammeAffinity(req.collegeId!, req.params.id as string, +page, +limit));
+  } catch (err) { next(err); }
+}
+export async function generateSeasonAnalyticsCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await crmService.generateSeasonAnalytics(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ─── Recruiter Portal ────────────────────────────────────
+
+export async function listRecruiterAccountsCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page = '1', limit = '20', status, companyId } = req.query as any;
+    res.json(await crmService.listRecruiterAccounts(req.collegeId!, +page, +limit, status, companyId));
+  } catch (err) { next(err); }
+}
+export async function getRecruiterAccountCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await crmService.getRecruiterAccount(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+export async function registerRecruiterAccountCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await crmService.registerRecruiterAccount(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function verifyRecruiterAccountCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await crmService.verifyRecruiterAccount(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function deactivateRecruiterAccountCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await crmService.deactivateRecruiterAccount(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function getRecruiterActivityLogCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page = '1', limit = '20' } = req.query as any;
+    res.json(await crmService.getRecruiterActivityLog(req.collegeId!, req.params.id as string, +page, +limit));
+  } catch (err) { next(err); }
+}
+
+// ─── Season + Drive ──────────────────────────────────────
+
+export async function transitionSeasonCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await drivesService.transitionSeason(req.collegeId!, req.params.id as string, req.body.status, who(req))); } catch (err) { next(err); }
+}
+export async function getSeasonStatisticsCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await drivesService.getSeasonStatistics(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+export async function listDrivesCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page = '1', limit = '20', placementSeasonId, status } = req.query as any;
+    res.json(await drivesService.listDrives(req.collegeId!, +page, +limit, placementSeasonId, status));
+  } catch (err) { next(err); }
+}
+export async function getDriveCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await drivesService.getDrive(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+export async function createDriveCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await drivesService.createDrive(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function transitionDriveCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await drivesService.transitionDrive(req.collegeId!, req.params.id as string, req.body.status, who(req))); } catch (err) { next(err); }
+}
+export async function cancelDriveCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await drivesService.cancelDrive(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function listDriveApplicationsCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page = '1', limit = '20', status } = req.query as any;
+    res.json(await drivesService.listDriveApplications(req.collegeId!, req.params.id as string, +page, +limit, status));
+  } catch (err) { next(err); }
+}
+export async function getDriveApplicationCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await drivesService.getDriveApplication(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+export async function applyToDriveCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await drivesService.applyToDrive(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function withdrawApplicationCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await drivesService.withdrawApplication(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function generateShortlistCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await drivesService.generateShortlist(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+export async function releaseShortlistCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await drivesService.releaseShortlist(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+export async function listInterviewSchedulesCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page = '1', limit = '20' } = req.query as any;
+    res.json(await drivesService.listInterviewSchedules(req.collegeId!, req.params.id as string, +page, +limit));
+  } catch (err) { next(err); }
+}
+export async function getInterviewScheduleCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await drivesService.getInterviewSchedule(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+export async function scheduleInterviewsCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await drivesService.scheduleInterviews(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function updateInterviewOutcomeCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await drivesService.updateInterviewOutcome(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function checkEligibilityCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await drivesService.checkEligibility(req.collegeId!, req.body.studentId, req.body.jobPostingId)); } catch (err) { next(err); }
+}
+export async function checkDreamPolicyCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await drivesService.checkDreamPolicy(req.collegeId!, req.body.studentId, req.body.jobPostingId)); } catch (err) { next(err); }
+}
+
+// ─── Offer Workflow ──────────────────────────────────────
+
+export async function listOffersByDriveCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page = '1', limit = '20', driveId } = req.query as any;
+    res.json(await drivesService.listOffersByDrive(req.collegeId!, req.params.id as string || driveId, +page, +limit));
+  } catch (err) { next(err); }
+}
+export async function createOfferFromDriveCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await drivesService.createOfferFromDrive(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function acceptOfferCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await drivesService.acceptOffer(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+export async function rejectOfferCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await drivesService.rejectOffer(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+export async function handleRenegeCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await drivesService.handleRenege(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+export async function handleLapseCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await drivesService.handleLapse(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+export async function releaseOfferCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await drivesService.releaseOffer(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+
+// ─── Bar + Opt-Out ───────────────────────────────────────
+
+export async function listPlacementBarsCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page = '1', limit = '20', studentId, status } = req.query as any;
+    res.json(await drivesService.listPlacementBars(req.collegeId!, +page, +limit, studentId, status));
+  } catch (err) { next(err); }
+}
+export async function applyPlacementBarCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await drivesService.applyPlacementBar(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function liftPlacementBarCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await drivesService.liftPlacementBar(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function listOptOutsCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page = '1', limit = '20', placementSeasonId } = req.query as any;
+    res.json(await drivesService.listOptOuts(req.collegeId!, +page, +limit, placementSeasonId));
+  } catch (err) { next(err); }
+}
+export async function recordOptOutCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await drivesService.recordOptOut(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function voidOptOutCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await drivesService.voidOptOut(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function closeDriveCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await drivesService.closeDrive(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ─── Career Profile ──────────────────────────────────────
+
+export async function listCareerProfilesCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page = '1', limit = '20', placementSeasonId, status } = req.query as any;
+    res.json(await profileService.listCareerProfiles(req.collegeId!, +page, +limit, placementSeasonId, status));
+  } catch (err) { next(err); }
+}
+export async function getCareerProfileCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await profileService.getCareerProfile(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+export async function initCareerProfilesCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await profileService.initCareerProfiles(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function updateCareerProfileCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await profileService.updateCareerProfile(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function validateProfileItemCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await profileService.validateProfileItem(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function refreshAcademicDataCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await profileService.refreshAcademicData(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+
+// ─── Readiness Scores ────────────────────────────────────
+
+export async function listReadinessScoresCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page = '1', limit = '20', placementSeasonId, category } = req.query as any;
+    res.json(await profileService.listReadinessScores(req.collegeId!, +page, +limit, placementSeasonId, category));
+  } catch (err) { next(err); }
+}
+export async function getReadinessScoreCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { placementSeasonId } = req.query as any;
+    res.json(await profileService.getReadinessScore(req.collegeId!, req.params.studentId as string, placementSeasonId));
+  } catch (err) { next(err); }
+}
+export async function computeBatchReadinessCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await profileService.computeBatchReadiness(req.collegeId!, req.body.placementSeasonId, who(req))); } catch (err) { next(err); }
+}
+
+// ─── Skill Records ───────────────────────────────────────
+
+export async function listSkillRecordsCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page = '1', limit = '20', studentId, category } = req.query as any;
+    res.json(await profileService.listSkillRecords(req.collegeId!, req.params.studentId as string || studentId, +page, +limit, category));
+  } catch (err) { next(err); }
+}
+export async function getSkillRecordCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await profileService.getSkillRecord(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+export async function createSkillRecordCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await profileService.createSkillRecord(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function updateSkillRecordCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await profileService.updateSkillRecord(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function deleteSkillRecordCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await profileService.deleteSkillRecord(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+export async function ingestExternalAssessmentCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await profileService.ingestExternalAssessment(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+
+// ─── Training Workflow ───────────────────────────────────
+
+export async function updateTrainingSessionCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await profileService.updateTrainingSession(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function recordTrainingAssessmentCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await profileService.recordTrainingAssessment(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function getTrainingCompletionStatsCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await profileService.getTrainingCompletionStats(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+
+// ─── Alumni Career Records ───────────────────────────────
+
+export async function listAlumniCareerRecordsCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page = '1', limit = '20', careerStatus } = req.query as any;
+    res.json(await alumniService.listAlumniCareerRecords(req.collegeId!, +page, +limit, careerStatus));
+  } catch (err) { next(err); }
+}
+export async function getAlumniCareerRecordCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await alumniService.getAlumniCareerRecord(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+export async function initAlumniCareerRecordCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await alumniService.initAlumniCareerRecord(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function updateAlumniCareerRecordCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await alumniService.updateAlumniCareerRecord(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function batchInitAlumniCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await alumniService.batchInitFromGraduation(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function getAlumniAnalyticsCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await alumniService.getAlumniAnalytics(req.collegeId!)); } catch (err) { next(err); }
 }

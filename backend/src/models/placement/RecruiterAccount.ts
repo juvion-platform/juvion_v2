@@ -1,0 +1,6 @@
+import { Schema, model, Document } from 'mongoose';
+export interface IRecruiterAccount extends Document { collegeId: Schema.Types.ObjectId; personId: Schema.Types.ObjectId; companyId: Schema.Types.ObjectId; designation: string; email: string; phone?: string; status: string; verifiedBy?: Schema.Types.ObjectId; verifiedAt?: Date; deactivationReason?: string; lastLoginAt?: Date; }
+const schema = new Schema<IRecruiterAccount>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, personId: { type: Schema.Types.ObjectId, ref: 'Person', required: true }, companyId: { type: Schema.Types.ObjectId, ref: 'Company', required: true }, designation: { type: String, required: true }, email: { type: String, required: true }, phone: String, status: { type: String, enum: ['registered', 'verified', 'active', 'deactivated'], default: 'registered' }, verifiedBy: { type: Schema.Types.ObjectId, ref: 'Person' }, verifiedAt: Date, deactivationReason: String, lastLoginAt: Date }, { timestamps: true });
+schema.index({ collegeId: 1, companyId: 1 });
+schema.index({ collegeId: 1, email: 1 }, { unique: true });
+export const RecruiterAccount = model<IRecruiterAccount>('RecruiterAccount', schema);
