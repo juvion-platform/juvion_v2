@@ -2,6 +2,7 @@ import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../../middleware/authenticate';
 import { AppError } from '../../middleware/errorHandler';
 import * as svc from './service';
+import * as deliveryService from './academic-delivery-service';
 
 const who = (req: AuthRequest) => req.user?.name || 'System';
 
@@ -1113,5 +1114,150 @@ export async function fetchJNTURegulations(req: AuthRequest, res: Response, next
   try {
     const result = await svc.fetchJNTURegulations(req.collegeId!, who(req));
     res.status(201).json(result);
+  } catch (e) { next(e); }
+}
+
+// ═══ W02 Academic Year Delivery ════════════════════════════════════════
+
+// ── Curriculum & Scheduling ────────────────────────────────────────────
+export async function instantiateCurriculumCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await deliveryService.instantiateCurriculum(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function formSectionsCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await deliveryService.formSections(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function assignFacultyCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await deliveryService.assignFacultyToOffering(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function optimizeElectivesCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await deliveryService.optimizeElectiveAllocation(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function finalizeElectivesCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await deliveryService.finalizeElectiveAllocation(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function detectConflictsCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await deliveryService.detectTimetableConflicts(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }
+}
+
+// ── Attendance ─────────────────────────────────────────────────────────
+export async function computeAttendanceSummaryCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { studentId, courseOfferingId } = req.body;
+    res.json(await deliveryService.computeAttendanceSummary(req.collegeId!, studentId, courseOfferingId));
+  } catch (e) { next(e); }
+}
+export async function checkAttendanceThresholdCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { studentId, courseOfferingId, threshold } = req.query as any;
+    res.json(await deliveryService.checkAttendanceThreshold(req.collegeId!, studentId, courseOfferingId, threshold ? +threshold : undefined));
+  } catch (e) { next(e); }
+}
+export async function generateAttendanceAlertsCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { courseOfferingId } = req.body;
+    res.json(await deliveryService.generateAttendanceAlerts(req.collegeId!, courseOfferingId, who(req)));
+  } catch (e) { next(e); }
+}
+export async function submitCondonationCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await deliveryService.submitCondonationRequest(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function resolveCondonationCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await deliveryService.resolveCondonationRequest(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
+}
+
+// ── CIE & Marks ────────────────────────────────────────────────────────
+export async function computeCIECtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await deliveryService.computeCIE(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function computeBatchCIECtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { courseOfferingId } = req.body;
+    res.json(await deliveryService.computeBatchCIE(req.collegeId!, courseOfferingId, who(req)));
+  } catch (e) { next(e); }
+}
+export async function bulkEnterExternalMarksCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await deliveryService.bulkEnterExternalMarks(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function validateExternalMarksCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { examScheduleId } = req.body;
+    res.json(await deliveryService.validateExternalMarks(req.collegeId!, examScheduleId, req.body, who(req)));
+  } catch (e) { next(e); }
+}
+
+// ── Results & Promotion ────────────────────────────────────────────────
+export async function computeResultsCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await deliveryService.computeSemesterResults(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function publishResultsCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await deliveryService.publishResults(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function promoteStudentsCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await deliveryService.promoteStudents(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function registerBacklogCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await deliveryService.registerBacklog(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function clearBacklogCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await deliveryService.clearBacklog(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function submitRevaluationCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await deliveryService.submitRevaluationRequest(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+
+// ── Exam Management ────────────────────────────────────────────────────
+export async function checkHallTicketEligibilityCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { studentId, semesterId } = req.body;
+    res.json(await deliveryService.checkHallTicketEligibility(req.collegeId!, studentId, semesterId));
+  } catch (e) { next(e); }
+}
+export async function generateHallTicketsCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await deliveryService.generateHallTickets(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function generateSeatingPlanCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await deliveryService.generateSeatingPlan(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function assignInvigilationCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await deliveryService.assignInvigilationDuty(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
+}
+
+// ── OBE ────────────────────────────────────────────────────────────────
+export async function computeCOAttainmentCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await deliveryService.computeCOAttainment(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function aggregatePOAttainmentCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await deliveryService.aggregatePOAttainment(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function computeProgrammeHealthCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await deliveryService.computeProgrammeHealth(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function createAttainmentRunCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await deliveryService.createAttainmentRun(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+
+// ── Academic Reads ─────────────────────────────────────────────────────
+export async function getStudentAttendanceReportCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { semesterId } = req.query as any;
+    res.json(await deliveryService.getStudentAttendanceReport(req.collegeId!, req.params.id as string, semesterId));
+  } catch (e) { next(e); }
+}
+export async function getStudentAcademicSummaryCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await deliveryService.getStudentAcademicSummary(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }
+}
+export async function getCourseDeliveryProgressCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await deliveryService.getCourseDeliveryProgress(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }
+}
+export async function getExamCalendarCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { semesterId } = req.query as any;
+    res.json(await deliveryService.getExamCalendar(req.collegeId!, semesterId));
+  } catch (e) { next(e); }
+}
+export async function getSemesterEnrollmentCountCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { semesterId, programmeId } = req.query as any;
+    res.json(await deliveryService.getSemesterEnrollmentCount(req.collegeId!, semesterId, programmeId));
   } catch (e) { next(e); }
 }

@@ -649,3 +649,19 @@ export const dispatchAcademicNotificationsSchema = z.object({
 export const submitResultsToJNTUSchema = z.object({
   semesterId: z.string().min(1),
 });
+
+// ═══ W02 Academic Delivery Schemas ═══════════════════════════
+export const optimizeElectivesSchema = z.object({ semesterId: z.string().min(1), electiveGroupId: z.string().min(1) });
+export const submitCondonationSchema = z.object({ studentId: z.string().min(1), courseOfferingId: z.string().min(1), reason: z.string().min(1), supportingDocUrl: z.string().optional() });
+export const resolveCondonationSchema = z.object({ approved: z.boolean(), approvedBy: z.string().min(1), remarks: z.string().optional() });
+export const bulkExternalMarksSchema = z.object({ examScheduleId: z.string().min(1), marks: z.array(z.object({ studentId: z.string(), marksObtained: z.number() })).min(1) });
+export const validateMarksSchema = z.object({ validatedBy: z.string().min(1) });
+export const computeResultsSchema = z.object({ semesterId: z.string().min(1), programmeId: z.string().min(1) });
+export const publishResultsSchema = z.object({ semesterId: z.string().min(1), programmeId: z.string().min(1), publishedBy: z.string().min(1) });
+export const promoteStudentsSchema = z.object({ semesterId: z.string().min(1), programmeId: z.string().min(1) });
+export const registerBacklogSchema = z.object({ studentId: z.string().min(1), courseOfferingId: z.string().min(1), semesterId: z.string().min(1), examType: z.string().optional() });
+export const submitRevaluationSchema = z.object({ studentId: z.string().min(1), examScheduleId: z.string().min(1), courseOfferingId: z.string().min(1), reason: z.string().min(1) });
+export const generateSeatingPlanSchema = z.object({ venues: z.array(z.string()).min(1), studentsPerRoom: z.number().optional() });
+export const assignInvigilationSchema = z.object({ facultyIds: z.array(z.string()).min(1) });
+export const aggregatePOAttainmentSchema = z.object({ programmeId: z.string().min(1), semesterId: z.string().min(1) });
+export const createAttainmentRunSchema = z.object({ semesterId: z.string().min(1), programmeId: z.string().min(1), runType: z.string().min(1) });

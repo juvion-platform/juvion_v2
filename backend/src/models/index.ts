@@ -10,6 +10,14 @@ export { EntranceExamScore } from './admissions/EntranceExamScore';
 export { Inquiry } from './admissions/Inquiry';
 export { MeritList } from './admissions/MeritList';
 export { SpotRound } from './admissions/SpotRound';
+export { SeatInventory } from './admissions/SeatInventory';
+export { AllotmentRound } from './admissions/AllotmentRound';
+export { AllotmentResult } from './admissions/AllotmentResult';
+export { Waitlist } from './admissions/Waitlist';
+export { FeeNegotiation } from './admissions/FeeNegotiation';
+export { AdmissionCancellation } from './admissions/AdmissionCancellation';
+export { LeadImportBatch } from './admissions/LeadImportBatch';
+export { LeadInteraction } from './admissions/LeadInteraction';
 
 // === People ===
 export { AcademicHistory } from './people/AcademicHistory';
@@ -61,9 +69,26 @@ export { ProgramOutcome } from './academic-ops/ProgramOutcome';
 export { ProgrammeHealthMetrics } from './academic-ops/ProgrammeHealthMetrics';
 export { QualityReport } from './academic-ops/QualityReport';
 export { LateralCreditMapping } from './academic-ops/LateralCreditMapping';
+export { CourseMaterial } from './academic-ops/CourseMaterial';
 export { SemesterResult } from './academic-ops/SemesterResult';
 export { Timetable } from './academic-ops/Timetable';
 export { TimetableSlot } from './academic-ops/TimetableSlot';
+export { Assignment } from './academic-ops/Assignment';
+export { Submission } from './academic-ops/Submission';
+export { Quiz } from './academic-ops/Quiz';
+export { QuizAttempt } from './academic-ops/QuizAttempt';
+export { Backlog } from './academic-ops/Backlog';
+export { RevaluationRequest } from './academic-ops/RevaluationRequest';
+export { HallTicket } from './academic-ops/HallTicket';
+export { SeatingPlan } from './academic-ops/SeatingPlan';
+export { InvigilationRoster } from './academic-ops/InvigilationRoster';
+export { PromotionDecision } from './academic-ops/PromotionDecision';
+export { AttendanceSummary } from './academic-ops/AttendanceSummary';
+export { AttendanceAlert } from './academic-ops/AttendanceAlert';
+export { CondonationRequest } from './academic-ops/CondonationRequest';
+
+// === Academic Structure (extra) ===
+export { LabBatch } from './academic-structure/LabBatch';
 
 // === Finance ===
 export { Budget } from './finance/Budget';
@@ -140,6 +165,8 @@ export { SelectionCommittee } from './hr/SelectionCommittee';
 export { SeparationRequest } from './hr/SeparationRequest';
 export { Training } from './hr/Training';
 export { TrainingParticipant } from './hr/TrainingParticipant';
+export { FacultyWorkload } from './hr/FacultyWorkload';
+export { DutyLog } from './hr/DutyLog';
 
 // === Placement ===
 export { AlumniEvent } from './placement/AlumniEvent';
