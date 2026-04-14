@@ -170,6 +170,20 @@ export { ParentMeeting } from './welfare/ParentMeeting';
 export { StudentGrievance } from './welfare/StudentGrievance';
 export { TransportAllocation } from './welfare/TransportAllocation';
 export { TransportRoute } from './welfare/TransportRoute';
+export { GrievanceAssignment } from './welfare/GrievanceAssignment';
+export { SystemicPattern } from './welfare/SystemicPattern';
+export { ICCComplaint } from './welfare/ICCComplaint';
+export { ICCAnnualReport } from './welfare/ICCAnnualReport';
+export { SCSTComplaint } from './welfare/SCSTComplaint';
+export { GRCComplaint } from './welfare/GRCComplaint';
+export { MentorAssignment } from './welfare/MentorAssignment';
+export { MentorSession } from './welfare/MentorSession';
+export { MentorConcern } from './welfare/MentorConcern';
+export { CounsellingReferral } from './welfare/CounsellingReferral';
+export { MisconductReport } from './welfare/MisconductReport';
+export { RiskSignal } from './welfare/RiskSignal';
+export { CCDThreshold } from './welfare/CCDThreshold';
+export { CCDIntervention } from './welfare/CCDIntervention';
 
 // === Campus ===
 export { Bed } from './campus/Bed';
