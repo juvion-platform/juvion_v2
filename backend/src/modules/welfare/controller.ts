@@ -5,6 +5,7 @@ import * as ggmService from './ggm-service';
 import * as arcDiscService from './arc-disc-service';
 import * as iccScstGrcService from './icc-scst-grc-service';
 import * as mentCounsCcdService from './ment-couns-ccd-service';
+import * as dropoutService from './dropout-service';
 
 const who = (req: AuthRequest) => req.user?.name || 'System';
 
@@ -762,4 +763,45 @@ export async function createCCDThresholdCtrl(req: AuthRequest, res: Response, ne
 }
 export async function updateCCDThresholdCtrl(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await mentCounsCcdService.updateCCDThreshold(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// W10 DROPOUT RISK & EXIT INTERVIEW CONTROLLERS
+// ═══════════════════════════════════════════════════════════════
+
+// ─── Dropout Risk Alerts ────────────────────────────────────
+export async function listDropoutRiskAlertsCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await dropoutService.listDropoutRiskAlerts(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+}
+export async function getDropoutRiskAlertCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await dropoutService.getDropoutRiskAlert(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+export async function createDropoutRiskAlertCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await dropoutService.createDropoutRiskAlert(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function assignDropoutAlertCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await dropoutService.assignDropoutAlert(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function logOutreachAttemptCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await dropoutService.logOutreachAttempt(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function resolveDropoutAlertCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await dropoutService.resolveDropoutAlert(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+
+// ─── Exit Interviews ────────────────────────────────────────
+export async function listExitInterviewsCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await dropoutService.listExitInterviews(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+}
+export async function getExitInterviewCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await dropoutService.getExitInterview(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+export async function recordExitInterviewCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await dropoutService.recordExitInterview(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function scheduleExitInterviewCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await dropoutService.scheduleExitInterview(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function declineExitInterviewCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await dropoutService.declineExitInterview(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
 }

@@ -36,6 +36,10 @@ import {
   createSkillRecordSchema, updateSkillRecordSchema, ingestExternalAssessmentSchema,
   updateTrainingSessionSchema_wf, recordTrainingAssessmentSchema,
   initAlumniCareerRecordSchema, updateAlumniCareerRecordSchema, batchInitAlumniSchema,
+  // W10 alumni engagement schemas
+  createAlumniCareerSchema_wf, updateAlumniCareerSchema_wf,
+  createAlumniEngagementSchema, respondToEngagementSchema,
+  suggestMentorMatchSchema, approveMentorMatchSchema,
 } from './validation';
 
 const router = Router();
@@ -250,5 +254,28 @@ router.post('/alumni-career-records/batch-init', authorize('placement', 'create'
 router.get('/alumni-career-records/:id', authorize('placement', 'read'), ctrl.getAlumniCareerRecordCtrl);
 router.put('/alumni-career-records/:id', authorize('placement', 'update'), validate(updateAlumniCareerRecordSchema), ctrl.updateAlumniCareerRecordCtrl);
 router.get('/alumni-analytics', authorize('placement', 'read'), ctrl.getAlumniAnalyticsCtrl);
+
+// ── W10 Alumni Career ──────────────────────────────────────
+router.get('/alumni-careers', authorize('placement', 'read'), ctrl.listAlumniCareersCtrl);
+router.get('/alumni-careers/:id', authorize('placement', 'read'), ctrl.getAlumniCareerEntryCtrl);
+router.post('/alumni-careers', authorize('placement', 'create'), validate(createAlumniCareerSchema_wf), ctrl.createAlumniCareerCtrl);
+router.put('/alumni-careers/:id', authorize('placement', 'update'), validate(updateAlumniCareerSchema_wf), ctrl.updateAlumniCareerCtrl);
+router.delete('/alumni-careers/:id', authorize('placement', 'delete'), ctrl.deleteAlumniCareerCtrl);
+
+// ── W10 Alumni Engagement ──────────────────────────────────
+router.get('/alumni-engagements', authorize('placement', 'read'), ctrl.listAlumniEngagementsCtrl);
+router.get('/alumni-engagements/:id', authorize('placement', 'read'), ctrl.getAlumniEngagementCtrl);
+router.post('/alumni-engagements', authorize('placement', 'create'), validate(createAlumniEngagementSchema), ctrl.createAlumniEngagementCtrl);
+router.post('/alumni-engagements/:id/respond', authorize('placement', 'update'), validate(respondToEngagementSchema), ctrl.respondToEngagementCtrl);
+router.post('/alumni-engagements/:id/remind', authorize('placement', 'update'), ctrl.sendEngagementReminderCtrl);
+
+// ── W10 Mentor Matches ─────────────────────────────────────
+router.get('/mentor-matches', authorize('placement', 'read'), ctrl.listMentorMatchesCtrl);
+router.get('/mentor-matches/:id', authorize('placement', 'read'), ctrl.getMentorMatchCtrl);
+router.post('/mentor-matches', authorize('placement', 'create'), validate(suggestMentorMatchSchema), ctrl.suggestMentorMatchCtrl);
+router.post('/mentor-matches/:id/approve', authorize('placement', 'update'), validate(approveMentorMatchSchema), ctrl.approveMentorMatchCtrl);
+router.post('/mentor-matches/:id/introduce', authorize('placement', 'update'), ctrl.introduceMentorMatchCtrl);
+router.post('/mentor-matches/:id/activate', authorize('placement', 'update'), ctrl.activateMentorMatchCtrl);
+router.post('/mentor-matches/:id/close', authorize('placement', 'update'), ctrl.closeMentorMatchCtrl);
 
 export default router;

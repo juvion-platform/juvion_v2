@@ -5,6 +5,7 @@ import * as crmService from './crm-service';
 import * as drivesService from './drives-offers-service';
 import * as profileService from './profile-train-service';
 import * as alumniService from './alumni-service';
+import * as alumniEngService from './alumni-engagement-service';
 
 const who = (req: AuthRequest) => req.user?.name || 'System';
 
@@ -594,4 +595,65 @@ export async function batchInitAlumniCtrl(req: AuthRequest, res: Response, next:
 }
 export async function getAlumniAnalyticsCtrl(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await alumniService.getAlumniAnalytics(req.collegeId!)); } catch (err) { next(err); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// W10 ALUMNI ENGAGEMENT CONTROLLERS
+// ═══════════════════════════════════════════════════════════════
+
+// ─── Alumni Career ──────────────────────────────────────────
+export async function listAlumniCareersCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await alumniEngService.listAlumniCareers(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+}
+export async function getAlumniCareerEntryCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await alumniEngService.getAlumniCareerEntry(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+export async function createAlumniCareerCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await alumniEngService.createAlumniCareer(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function updateAlumniCareerCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await alumniEngService.updateAlumniCareer(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function deleteAlumniCareerCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await alumniEngService.deleteAlumniCareer(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ─── Alumni Engagement ──────────────────────────────────────
+export async function listAlumniEngagementsCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await alumniEngService.listAlumniEngagements(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+}
+export async function getAlumniEngagementCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await alumniEngService.getAlumniEngagement(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+export async function createAlumniEngagementCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await alumniEngService.createAlumniEngagement(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function respondToEngagementCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await alumniEngService.respondToEngagement(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function sendEngagementReminderCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await alumniEngService.sendEngagementReminder(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ─── Mentor Matches ─────────────────────────────────────────
+export async function listMentorMatchesCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await alumniEngService.listMentorMatches(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20)); } catch (err) { next(err); }
+}
+export async function getMentorMatchCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await alumniEngService.getMentorMatch(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+export async function suggestMentorMatchCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await alumniEngService.suggestMentorMatch(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function approveMentorMatchCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await alumniEngService.approveMentorMatch(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function introduceMentorMatchCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await alumniEngService.introduceMentorMatch(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+export async function activateMentorMatchCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await alumniEngService.activateMentorMatch(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+export async function closeMentorMatchCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await alumniEngService.closeMentorMatch(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
 }

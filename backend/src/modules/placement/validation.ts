@@ -258,3 +258,11 @@ export const recordTrainingAssessmentSchema = z.object({ trainingId: z.string().
 export const initAlumniCareerRecordSchema = z.object({ personId: z.string().min(1), alumniProfileId: z.string().min(1), currentEmployer: z.string().optional(), currentRole: z.string().optional(), ctcRange: z.string().optional(), industry: z.string().optional(), location: z.string().optional(), careerStatus: z.enum(['employed', 'seeking', 'higher_education', 'entrepreneur', 'unknown']).optional(), updateSource: z.enum(['system_seeded', 'self_report', 'tpo_entry', 'survey']) });
 export const updateAlumniCareerRecordSchema = initAlumniCareerRecordSchema.partial();
 export const batchInitAlumniSchema = z.object({ alumniProfiles: z.array(z.object({ personId: z.string(), alumniProfileId: z.string(), employer: z.string().optional(), role: z.string().optional() })).min(1) });
+
+// ═══ W10 Alumni Engagement Schemas ══════════════════════════
+export const createAlumniCareerSchema_wf = z.object({ alumniId: z.string().min(1), companyName: z.string().min(1), jobTitle: z.string().min(1), location: z.string().optional(), startDate: z.string().min(1), endDate: z.string().optional(), isCurrent: z.boolean().optional(), packageLpa: z.number().optional(), source: z.enum(['placement', 'self_reported', 'linkedin', 'tracking_form']) });
+export const updateAlumniCareerSchema_wf = createAlumniCareerSchema_wf.partial();
+export const createAlumniEngagementSchema = z.object({ alumniId: z.string().min(1), type: z.enum(['career_tracking_invitation', 'career_update', 'mentor_registration', 'event_participation', 'guest_lecture', 'donation']), metadata: z.record(z.any()).optional() });
+export const respondToEngagementSchema = z.object({ status: z.enum(['responded', 'declined']) });
+export const suggestMentorMatchSchema = z.object({ alumniId: z.string().min(1), studentId: z.string().min(1), matchScore: z.number().min(0).max(100), matchReasons: z.array(z.string()).min(1) });
+export const approveMentorMatchSchema = z.object({ approvedBy: z.string().min(1) });

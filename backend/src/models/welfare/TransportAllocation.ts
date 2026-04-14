@@ -6,7 +6,7 @@ const schema = new Schema<ITransportAllocation>({
   routeId: { type: Schema.Types.ObjectId, ref: 'TransportRoute', required: true },
   stopName: { type: String, required: true },
   academicYearId: { type: Schema.Types.ObjectId, ref: 'AcademicYear', required: true },
-  status: { type: String, enum: ['active', 'cancelled'], default: 'active' },
+  status: { type: String, enum: ['active', 'cancelled', 'exit_cleared'], default: 'active' },
   stopId: { type: Schema.Types.ObjectId, ref: 'RouteStop' },
   boardingPoint: String,
   allocationType: { type: String, enum: ['auto', 'student_selected'] },

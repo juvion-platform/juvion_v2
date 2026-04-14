@@ -8,6 +8,13 @@ export interface IAlumniProfile extends Document {
   industry?: string;
   lastUpdated?: Date;
   updateSource?: string;
+  alumniId?: Schema.Types.ObjectId;
+  studentId?: Schema.Types.ObjectId;
+  programmeId?: Schema.Types.ObjectId;
+  branchId?: Schema.Types.ObjectId;
+  batchId?: Schema.Types.ObjectId;
+  engagementStatus: string;
+  lastContactDate?: Date;
 }
 
 const schema = new Schema<IAlumniProfile>({
@@ -24,6 +31,13 @@ const schema = new Schema<IAlumniProfile>({
   industry: String,
   lastUpdated: Date,
   updateSource: { type: String, enum: ['system', 'self_report', 'tpo_entry'] },
+  alumniId: { type: Schema.Types.ObjectId, ref: 'Alumni' },
+  studentId: { type: Schema.Types.ObjectId, ref: 'Student' },
+  programmeId: { type: Schema.Types.ObjectId, ref: 'Programme' },
+  branchId: { type: Schema.Types.ObjectId, ref: 'Branch' },
+  batchId: { type: Schema.Types.ObjectId, ref: 'Batch' },
+  engagementStatus: { type: String, enum: ['active', 'inactive', 'revoked'], default: 'active' },
+  lastContactDate: Date,
 }, { timestamps: true });
 
 schema.index({ collegeId: 1, personId: 1 }, { unique: true });

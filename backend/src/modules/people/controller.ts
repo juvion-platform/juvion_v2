@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../../middleware/authenticate';
 import * as svc from './service';
+import * as exitService from './exit-service';
 
 const who = (req: AuthRequest) => req.user?.name || 'System';
 const qp = (req: AuthRequest) => {
@@ -135,4 +136,117 @@ export async function updateOrganization(req: AuthRequest, res: Response, next: 
 }
 export async function deleteOrganization(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await svc.deleteOrganization(req.collegeId!, req.params.id as string, who(req))); } catch (e) { next(e); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// W10 EXIT WORKFLOW CONTROLLERS
+// ═══════════════════════════════════════════════════════════════
+
+// ─── Exit Requests ──────────────────────────────────────────
+export async function submitExitRequestCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await exitService.submitExitRequest(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function getExitRequestCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.getExitRequest(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }
+}
+export async function listExitRequestsCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page = '1', limit = '20', status } = req.query as Record<string, string | undefined>;
+    res.json(await exitService.listExitRequests(req.collegeId!, +page!, +limit!, status));
+  } catch (e) { next(e); }
+}
+export async function approveExitRequestCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.approveExitRequest(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function rejectExitRequestCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.rejectExitRequest(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function cancelExitRequestCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.cancelExitRequest(req.collegeId!, req.params.id as string, who(req))); } catch (e) { next(e); }
+}
+export async function getExitSummaryCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.getExitSummary(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }
+}
+
+// ─── Student Lifecycle ──────────────────────────────────────
+export async function transitionStudentCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.transitionStudent(req.collegeId!, req.params.id as string, req.body.status, who(req))); } catch (e) { next(e); }
+}
+export async function checkGraduationEligibilityCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.checkGraduationEligibility(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }
+}
+export async function sealStudentRecordCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.sealStudentRecord(req.collegeId!, req.params.id as string, who(req))); } catch (e) { next(e); }
+}
+
+// ─── Clearance ──────────────────────────────────────────────
+export async function initiateClearanceCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await exitService.initiateClearanceWorkflow(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function getClearanceWorkflowCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.getClearanceWorkflow(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }
+}
+export async function listClearanceWorkflowsCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page = '1', limit = '20', status } = req.query as Record<string, string | undefined>;
+    res.json(await exitService.listClearanceWorkflows(req.collegeId!, +page!, +limit!, status));
+  } catch (e) { next(e); }
+}
+export async function completeClearanceItemCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.completeClearanceItem(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function waiveClearanceItemCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.waiveClearanceItem(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function listPendingClearanceItemsCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { assigneeRole, page = '1', limit = '20' } = req.query as Record<string, string | undefined>;
+    res.json(await exitService.listPendingClearanceItems(req.collegeId!, assigneeRole || '', +page!, +limit!));
+  } catch (e) { next(e); }
+}
+export async function getClearanceDashboardCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.getClearanceDashboard(req.collegeId!)); } catch (e) { next(e); }
+}
+export async function logEscalationCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await exitService.logEscalation(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+
+// ─── Documents ──────────────────────────────────────────────
+export async function listDocumentTemplatesCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page = '1', limit = '20', type } = req.query as Record<string, string | undefined>;
+    res.json(await exitService.listDocumentTemplates(req.collegeId!, +page!, +limit!, type));
+  } catch (e) { next(e); }
+}
+export async function getDocumentTemplateCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.getDocumentTemplate(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }
+}
+export async function createDocumentTemplateCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await exitService.createDocumentTemplate(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function generateDocumentCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await exitService.generateDocument(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function signDocumentCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.signDocument(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function issueDocumentCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.issueDocument(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function revokeDocumentCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.revokeDocument(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
+}
+
+// ─── Alumni ─────────────────────────────────────────────────
+export async function createAlumniRecordCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await exitService.createAlumniRecord(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function getAlumniCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await exitService.getAlumni(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }
+}
+export async function listAlumniCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page = '1', limit = '20', programmeId } = req.query as Record<string, string | undefined>;
+    res.json(await exitService.listAlumni(req.collegeId!, +page!, +limit!, programmeId));
+  } catch (e) { next(e); }
 }
