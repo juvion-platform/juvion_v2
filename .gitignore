@@ -11,3 +11,4 @@ coverage/
 *.tsbuildinfo
 .vite/
 .turbo/
+package-lock.json
