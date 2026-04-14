@@ -61,6 +61,7 @@ export { ProgramOutcome } from './academic-ops/ProgramOutcome';
 export { ProgrammeHealthMetrics } from './academic-ops/ProgrammeHealthMetrics';
 export { QualityReport } from './academic-ops/QualityReport';
 export { LateralCreditMapping } from './academic-ops/LateralCreditMapping';
+export { CourseMaterial } from './academic-ops/CourseMaterial';
 export { SemesterResult } from './academic-ops/SemesterResult';
 export { Timetable } from './academic-ops/Timetable';
 export { TimetableSlot } from './academic-ops/TimetableSlot';
@@ -140,6 +141,8 @@ export { SelectionCommittee } from './hr/SelectionCommittee';
 export { SeparationRequest } from './hr/SeparationRequest';
 export { Training } from './hr/Training';
 export { TrainingParticipant } from './hr/TrainingParticipant';
+export { FacultyWorkload } from './hr/FacultyWorkload';
+export { DutyLog } from './hr/DutyLog';
 
 // === Placement ===
 export { AlumniEvent } from './placement/AlumniEvent';

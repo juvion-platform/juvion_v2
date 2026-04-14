@@ -1191,3 +1191,160 @@ export async function triggerReminderSequence(req: AuthRequest, res: Response, n
     res.json(result);
   } catch (e) { next(e); }
 }
+
+// ═══ W03 Fee Lifecycle & Revenue Assurance ══════════════════
+
+import * as feeLifecycleService from './fee-lifecycle-service';
+
+// ── Fee Configuration ──────────────────────────────────────
+
+export async function cloneFeeStructureCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await feeLifecycleService.cloneFeeStructure(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function submitFeeStructureCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await feeLifecycleService.submitFeeStructure(req.collegeId!, req.params.id as string, who(req))); } catch (e) { next(e); }
+}
+export async function approveFeeStructureCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await feeLifecycleService.approveFeeStructure(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function evaluateFeeRulesCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await feeLifecycleService.evaluateFeeComponentRules(req.collegeId!, req.body)); } catch (e) { next(e); }
+}
+
+// ── Invoice Generation ─────────────────────────────────────
+
+export async function generateSemesterInvoiceCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await feeLifecycleService.generateSemesterInvoice(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function generateBatchInvoicesCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await feeLifecycleService.generateBatchInvoices(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function generateExamFeeInvoiceCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await feeLifecycleService.generateExamFeeInvoice(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function adjustInvoiceCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await feeLifecycleService.adjustInvoice(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function disputeInvoiceCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await feeLifecycleService.disputeInvoice(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function writeOffInvoiceCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await feeLifecycleService.writeOffInvoice(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
+}
+
+// ── Payment Processing ─────────────────────────────────────
+
+export async function recordOnlinePaymentCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await feeLifecycleService.recordOnlinePayment(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function recordCounterPaymentCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await feeLifecycleService.recordCounterPayment(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function importBankStatementCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await feeLifecycleService.importBankStatement(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function matchPaymentCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await feeLifecycleService.matchPaymentToInvoice(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function detectDuplicateCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await feeLifecycleService.detectDuplicatePayment(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }
+}
+export async function handleBounceCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await feeLifecycleService.handleBounce(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
+}
+
+// ── Receipts ───────────────────────────────────────────────
+
+export async function generateReceiptCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await feeLifecycleService.generateReceipt(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function cancelReceiptCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await feeLifecycleService.cancelReceipt(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function reissueReceiptCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await feeLifecycleService.reissueReceipt(req.collegeId!, req.params.id as string, who(req))); } catch (e) { next(e); }
+}
+
+// ── Reconciliation ─────────────────────────────────────────
+
+export async function runReconciliationCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await feeLifecycleService.runReconciliation(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function resolveDiscrepancyCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await feeLifecycleService.resolveDiscrepancy(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
+}
+
+// ── Refunds ────────────────────────────────────────────────
+
+export async function requestRefundCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await feeLifecycleService.requestRefund(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function approveRefundCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await feeLifecycleService.approveRefund(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function processRefundCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await feeLifecycleService.processRefund(req.collegeId!, req.params.id as string, who(req))); } catch (e) { next(e); }
+}
+
+// ── Scholarships & Concessions ─────────────────────────────
+
+export async function verifyScholarshipEligibilityCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await feeLifecycleService.verifyScholarshipEligibility(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function submitClaimBatchCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await feeLifecycleService.submitScholarshipClaimBatch(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function processDisbursementCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await feeLifecycleService.processScholarshipDisbursement(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function applyHardshipConcessionCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await feeLifecycleService.applyHardshipConcession(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function applyMeritScholarshipCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await feeLifecycleService.applyMeritScholarship(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function renewScholarshipCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await feeLifecycleService.renewScholarshipEligibility(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+
+// ── Defaulter Management ───────────────────────────────────
+
+export async function identifyDefaultersCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await feeLifecycleService.identifyDefaulters(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function escalateDefaulterCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await feeLifecycleService.escalateDefaulter(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function computeDistressCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await feeLifecycleService.computeDistressScore(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }
+}
+export async function referToWelfareCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await feeLifecycleService.referToWelfare(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function applyHoldCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await feeLifecycleService.applyFinancialHold(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function releaseHoldCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await feeLifecycleService.releaseFinancialHold(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
+}
+
+// ── Financial Clearance ────────────────────────────────────
+
+export async function checkFinancialClearanceCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await feeLifecycleService.checkFinancialClearance(req.collegeId!, req.params.studentId as string)); } catch (e) { next(e); }
+}
+
+// ── Vendor Payments ────────────────────────────────────────
+
+export async function scheduleVendorPaymentCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await feeLifecycleService.scheduleVendorPayment(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+export async function confirmVendorPaymentCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await feeLifecycleService.confirmVendorPayment(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
+}
+
+// ── Revenue Reports ────────────────────────────────────────
+
+export async function generateRevenueReportCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await feeLifecycleService.generateRevenueReport(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
