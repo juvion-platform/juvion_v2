@@ -29,6 +29,18 @@ export const updateLeaveType = (id: string, data: any) =>
 export const deleteLeaveType = (id: string) =>
   api.delete(`${BASE}/leave-types/${id}`).then(r => r.data);
 
+// ─── Designations ────────────────────────────────────────
+export const listDesignations = (page = 1, limit = 20) =>
+  api.get(`${BASE}/designations`, { params: { page, limit } }).then(r => r.data);
+export const getDesignation = (id: string) =>
+  api.get(`${BASE}/designations/${id}`).then(r => r.data);
+export const createDesignation = (data: any) =>
+  api.post(`${BASE}/designations`, data).then(r => r.data);
+export const updateDesignation = (id: string, data: any) =>
+  api.put(`${BASE}/designations/${id}`, data).then(r => r.data);
+export const deleteDesignation = (id: string) =>
+  api.delete(`${BASE}/designations/${id}`).then(r => r.data);
+
 // ─── Leave Applications ──────────────────────────────────
 export const listLeaveApplications = (page = 1, limit = 20, employeeId?: string, status?: string) =>
   api.get(`${BASE}/leave-applications`, { params: { page, limit, employeeId, status } }).then(r => r.data);

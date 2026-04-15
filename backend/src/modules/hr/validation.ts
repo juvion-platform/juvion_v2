@@ -651,3 +651,14 @@ export const createPayrollDataExtractSchema = z.object({
   status: z.enum(['draft', 'reviewed', 'released']).optional(),
 });
 export const updatePayrollDataExtractSchema = createPayrollDataExtractSchema.partial();
+
+// ═══ Designation ════════════════════════════════════════════
+
+export const createDesignationSchema = z.object({
+  code: z.string().min(1),
+  name: z.string().min(1),
+  level: z.number().int().optional(),
+  category: z.enum(['teaching', 'non_teaching', 'administrative']),
+  isActive: z.boolean().optional(),
+});
+export const updateDesignationSchema = createDesignationSchema.partial();

@@ -1,3 +1,4 @@
+import { Designation } from '../../models/hr/Designation';
 import { Employee } from '../../models/hr/Employee';
 import { LeaveType } from '../../models/hr/LeaveType';
 import { LeaveApplication } from '../../models/hr/LeaveApplication';
@@ -1482,5 +1483,39 @@ export async function deleteAttendanceMonthlySummary(collegeId: string, id: stri
   const doc = await AttendanceMonthlySummary.findOneAndDelete({ _id: id, collegeId });
   if (!doc) throw new AppError(404, 'Monthly summary not found');
   await createAuditLog({ collegeId, entityType: 'AttendanceMonthlySummary', entityId: id, entityName: `Summary ${doc.month}/${doc.year}`, action: 'delete', changes: [], performedBy: who });
+  return doc;
+}
+
+// ═══ Designation ═════════════════════════════════════════
+
+export async function listDesignations(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+  const filter: any = { collegeId };
+  if (authScope) applyAuthScope(filter, authScope);
+  return paginate(Designation, filter, page, limit, { code: 1 });
+}
+
+export async function getDesignation(collegeId: string, id: string) {
+  const doc = await Designation.findOne({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Designation not found');
+  return doc;
+}
+
+export async function createDesignation(collegeId: string, data: any, who: string) {
+  const doc = await Designation.create({ ...data, collegeId });
+  await createAuditLog({ collegeId, entityType: 'Designation', entityId: String(doc._id), entityName: data.name, action: 'create', changes: [], performedBy: who });
+  return doc;
+}
+
+export async function updateDesignation(collegeId: string, id: string, data: any, who: string) {
+  const doc = await Designation.findOneAndUpdate({ _id: id, collegeId }, data, { new: true });
+  if (!doc) throw new AppError(404, 'Designation not found');
+  await createAuditLog({ collegeId, entityType: 'Designation', entityId: id, entityName: doc.name, action: 'update', changes: [], performedBy: who });
+  return doc;
+}
+
+export async function deleteDesignation(collegeId: string, id: string, who: string) {
+  const doc = await Designation.findOneAndDelete({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Designation not found');
+  await createAuditLog({ collegeId, entityType: 'Designation', entityId: id, entityName: doc.name, action: 'delete', changes: [], performedBy: who });
   return doc;
 }

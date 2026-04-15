@@ -3,13 +3,14 @@ import { useState } from 'react';
 import {
   LayoutDashboard, UserPlus, Users, GraduationCap, IndianRupee,
   Briefcase, Heart, Building2, TrendingUp, Shield, Landmark,
-  Settings, Bot, ChevronLeft, Menu, BookOpen, LogOut, ArrowLeftRight, ChevronDown
+  Settings, Bot, ChevronLeft, Menu, BookOpen, LogOut, ArrowLeftRight, ChevronDown, Database
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuthStore } from '../stores/authStore';
 
 const NAV_ITEMS = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard', iconColor: 'text-sky-400', module: null },
+  { to: '/master-data', icon: Database, label: 'Master Data', iconColor: 'text-slate-400', module: null },
   { to: '/admissions', icon: UserPlus, label: 'Admissions', iconColor: 'text-emerald-400', module: 'admissions' },
   { to: '/people', icon: Users, label: 'People', iconColor: 'text-blue-400', module: 'people' },
   { to: '/academics', icon: GraduationCap, label: 'Academics', iconColor: 'text-amber-400', module: 'academics' },

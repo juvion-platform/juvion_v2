@@ -136,6 +136,7 @@ export { AppraisalCycle } from './hr/AppraisalCycle';
 export { AppointmentOrder } from './hr/AppointmentOrder';
 export { AttendanceAnomaly } from './hr/AttendanceAnomaly';
 export { AttendanceMonthlySummary } from './hr/AttendanceMonthlySummary';
+export { Designation } from './hr/Designation';
 export { DisciplinaryCase } from './hr/DisciplinaryCase';
 export { DisciplinaryOutcome } from './hr/DisciplinaryOutcome';
 export { Employee } from './hr/Employee';
