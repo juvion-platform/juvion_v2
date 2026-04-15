@@ -34,7 +34,7 @@ import {
   OnDuty, DisciplinaryCase, DisciplinaryOutcome, Promotion, FDPRecord, FDPComplianceSummary,
   TrainingParticipant, EmployeeAttendance, AttendanceAnomaly, AttendanceMonthlySummary,
   PayrollDataExtract, ExitProcess, SeparationRequest, ExitClearance, FinalSettlement,
-  HandoverRecord, FacultyWorkload, DutyLog,
+  HandoverRecord, FacultyWorkload, DutyLog, Designation,
   // Placement
   Company, PlacementSeason, JobPosting, InternshipPosting, PlacementTraining,
   PlacementRegistration, PlacementRound, InternshipApplication, TrainingAttendance,
@@ -376,6 +376,7 @@ async function seed() {
     HandoverRecord.deleteMany({ collegeId: CID }),
     FacultyWorkload.deleteMany({ collegeId: CID }),
     DutyLog.deleteMany({ collegeId: CID }),
+    Designation.deleteMany({ collegeId: CID }),
     // W04 Placement workflow
     CareerProfile.deleteMany({ collegeId: CID }),
     CompanyEngagementLog.deleteMany({ collegeId: CID }),
@@ -786,6 +787,17 @@ async function seed() {
   await Employee.updateOne({ _id: employees[3]._id }, { reportingToId: employees[0]._id });
   console.log('Employees created');
 
+  // --- Designations ---
+  await Designation.create([
+    { collegeId: CID, code: 'PROF', name: 'Professor', category: 'teaching', level: 1, isActive: true },
+    { collegeId: CID, code: 'ASSOC-PROF', name: 'Associate Professor', category: 'teaching', level: 2, isActive: true },
+    { collegeId: CID, code: 'ASST-PROF', name: 'Assistant Professor', category: 'teaching', level: 3, isActive: true },
+    { collegeId: CID, code: 'LAB-TECH', name: 'Lab Technician', category: 'non_teaching', level: 5, isActive: true },
+    { collegeId: CID, code: 'AO', name: 'Administrative Officer', category: 'administrative', level: 4, isActive: true },
+    { collegeId: CID, code: 'REG', name: 'Registrar', category: 'administrative', level: 1, isActive: true },
+  ]);
+  console.log('Designations created');
+
   // --- Rooms ---
   const rooms = await Room.create([
     { collegeId: CID, buildingId: bldgMain._id, roomNumber: 'MB-101', floor: 1, type: 'classroom', capacity: 60, hasProjector: true, hasAC: true, status: 'available' },
@@ -1109,7 +1121,7 @@ async function seed() {
     { collegeId: CID, invoiceNumber: 'INV-2024-001', studentId: students[0]._id, type: 'fee', items: [{ description: 'Tuition Fee - Sem 5', amount: 150000 }, { description: 'Development Fee', amount: 25000 }], totalAmount: 175000, dueDate: new Date('2024-08-15'), status: 'paid', issuedDate: new Date('2024-07-15') },
     { collegeId: CID, invoiceNumber: 'INV-2024-002', studentId: students[1]._id, type: 'fee', items: [{ description: 'Tuition Fee - Sem 5', amount: 150000 }, { description: 'Development Fee', amount: 25000 }], totalAmount: 175000, dueDate: new Date('2024-08-15'), status: 'overdue', issuedDate: new Date('2024-07-15') },
     { collegeId: CID, invoiceNumber: 'INV-2024-003', studentId: students[3]._id, type: 'hostel', items: [{ description: 'Hostel Fee - AY 2024-25', amount: 50000 }], totalAmount: 50000, dueDate: new Date('2024-08-15'), status: 'paid', issuedDate: new Date('2024-07-15') },
-    { collegeId: CID, invoiceNumber: 'INV-2024-004', studentId: students[5]._id, type: 'transport', items: [{ description: 'Transport Fee - AY 2024-25', amount: 30000 }], totalAmount: 30000, dueDate: new Date('2024-09-01'), status: 'issued', issuedDate: new Date('2024-08-01') },
+    { collegeId: CID, invoiceNumber: 'INV-2024-004', studentId: students[5]._id, type: 'transport', items: [{ description: 'Transport Fee - AY 2024-25', amount: 30000 }], totalAmount: 30000, dueDate: new Date('2024-09-01'), status: 'sent', issuedDate: new Date('2024-08-01') },
   ]);
   console.log('Invoices created');
 
@@ -1141,7 +1153,7 @@ async function seed() {
 
   // --- Placement Seasons ---
   const [placementSeason2024, placementSeason2025] = await PlacementSeason.create([
-    { collegeId: CID, academicYearId: ay2023._id, name: 'Campus Placements 2023-24', startDate: new Date('2023-09-01'), endDate: new Date('2024-05-31'), status: 'completed' },
+    { collegeId: CID, academicYearId: ay2023._id, name: 'Campus Placements 2023-24', startDate: new Date('2023-09-01'), endDate: new Date('2024-05-31'), status: 'closed' },
     { collegeId: CID, academicYearId: ay2024._id, name: 'Campus Placements 2024-25', startDate: new Date('2024-09-01'), endDate: new Date('2025-05-31'), status: 'active' },
   ]);
   console.log('Placement Seasons created');
@@ -1830,7 +1842,7 @@ async function seed() {
 
   // --- Anti-Ragging Complaint ---
   await AntiRaggingComplaint.create([
-    { collegeId: CID, isAnonymous: true, accusedIds: [students[6]._id], description: 'Senior students forcing juniors to run errands in hostel', incidentDate: new Date('2025-02-10'), severity: 'minor', status: 'action_taken', committeeRemarks: 'Investigated. Verbal warning issued to accused.', actionTaken: 'Warning letter placed in record. Counseling mandated.' },
+    { collegeId: CID, isAnonymous: true, accusedIds: [students[6]._id], description: 'Senior students forcing juniors to run errands in hostel', incidentDate: new Date('2025-02-10'), severity: 'minor', status: 'decision_issued', committeeRemarks: 'Investigated. Verbal warning issued to accused.', actionTaken: 'Warning letter placed in record. Counseling mandated.' },
   ]);
   console.log('Anti-Ragging Complaints created');
 
@@ -2015,7 +2027,7 @@ async function seed() {
   await PlacementOffer.create([
     { collegeId: CID, jobPostingId: jobPostings[0]._id, studentId: students[8]._id, companyId: companies[0]._id, packageLpa: 7, offerDate: new Date('2024-03-15'), joiningDate: new Date('2024-07-15'), status: 'accepted' },
     { collegeId: CID, jobPostingId: jobPostings[0]._id, studentId: students[9]._id, companyId: companies[0]._id, packageLpa: 7, offerDate: new Date('2024-03-15'), joiningDate: new Date('2024-07-15'), status: 'accepted' },
-    { collegeId: CID, jobPostingId: jobPostings[2]._id, studentId: students[0]._id, companyId: companies[3]._id, packageLpa: 18, offerDate: new Date('2025-04-20'), status: 'offered' },
+    { collegeId: CID, jobPostingId: jobPostings[2]._id, studentId: students[0]._id, companyId: companies[3]._id, packageLpa: 18, offerDate: new Date('2025-04-20'), status: 'extended' },
   ]);
   console.log('Placement Offers created');
 
@@ -2766,7 +2778,7 @@ async function seed() {
   console.log('Beds created');
 
   const drivers = await Driver.create([
-    { collegeId: CID, personId: staffMembers[2]._id, licenseNumber: 'TS-DL-2020-123456', licenseType: 'HMV', licenseExpiry: new Date('2027-06-30'), vehicleAssignment: vehicles[0]._id, status: 'active' },
+    { collegeId: CID, personId: staffMembers[2]._id, licenseNumber: 'TS-DL-2020-123456', licenseType: 'HMV', licenseExpiry: new Date('2027-06-30'), vehicleAssignment: vehicles[0]._id, isActive: true },
   ]);
   console.log('Drivers created');
 

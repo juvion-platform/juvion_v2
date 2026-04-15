@@ -999,3 +999,24 @@ export async function updatePayrollDataExtract(req: AuthRequest, res: Response, 
 export async function deletePayrollDataExtract(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await compliancePayrollService.deletePayrollDataExtract(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
 }
+
+// ═══ Designation ══════════════════════════════════════════
+
+export async function listDesignations(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page, limit } = req.query as any;
+    res.json(await service.listDesignations(req.collegeId!, Number(page) || 1, Number(limit) || 20, req.authScope));
+  } catch (err) { next(err); }
+}
+export async function getDesignation(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.getDesignation(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+export async function createDesignation(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await service.createDesignation(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function updateDesignation(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.updateDesignation(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function deleteDesignation(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.deleteDesignation(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
