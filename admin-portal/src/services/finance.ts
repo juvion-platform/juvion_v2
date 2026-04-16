@@ -238,3 +238,63 @@ export const updateFinancialHold = (id: string, data: any) =>
   api.put(`${BASE}/financial-holds/${id}`, data).then(r => r.data);
 export const deleteFinancialHold = (id: string) =>
   api.delete(`${BASE}/financial-holds/${id}`).then(r => r.data);
+
+// ─── Scholarship Eligibility ─────────────────────────────
+export const listScholarshipEligibility = (page = 1, limit = 20) =>
+  api.get(`${BASE}/scholarship-eligibility`, { params: { page, limit } }).then(r => r.data);
+export const createScholarshipEligibility = (data: any) =>
+  api.post(`${BASE}/scholarship-eligibility`, data).then(r => r.data);
+export const updateScholarshipEligibility = (id: string, data: any) =>
+  api.put(`${BASE}/scholarship-eligibility/${id}`, data).then(r => r.data);
+export const deleteScholarshipEligibility = (id: string) =>
+  api.delete(`${BASE}/scholarship-eligibility/${id}`).then(r => r.data);
+
+// ─── Scholarship Claims ──────────────────────────────────
+export const listScholarshipClaims = (page = 1, limit = 20) =>
+  api.get(`${BASE}/scholarship-claims`, { params: { page, limit } }).then(r => r.data);
+export const createScholarshipClaim = (data: any) =>
+  api.post(`${BASE}/scholarship-claims`, data).then(r => r.data);
+export const updateScholarshipClaim = (id: string, data: any) =>
+  api.put(`${BASE}/scholarship-claims/${id}`, data).then(r => r.data);
+export const deleteScholarshipClaim = (id: string) =>
+  api.delete(`${BASE}/scholarship-claims/${id}`).then(r => r.data);
+
+// ─── Fee Agreements ──────────────────────────────────────
+export const listFeeAgreements = (page = 1, limit = 20) =>
+  api.get(`${BASE}/fee-agreements`, { params: { page, limit } }).then(r => r.data);
+export const createFeeAgreement = (data: any) =>
+  api.post(`${BASE}/fee-agreements`, data).then(r => r.data);
+export const updateFeeAgreement = (id: string, data: any) =>
+  api.put(`${BASE}/fee-agreements/${id}`, data).then(r => r.data);
+export const deleteFeeAgreement = (id: string) =>
+  api.delete(`${BASE}/fee-agreements/${id}`).then(r => r.data);
+
+// ─── Payment Plans ───────────────────────────────────────
+export const listPaymentPlans = (page = 1, limit = 20) =>
+  api.get(`${BASE}/payment-plans`, { params: { page, limit } }).then(r => r.data);
+export const createPaymentPlan = (data: any) =>
+  api.post(`${BASE}/payment-plans`, data).then(r => r.data);
+export const updatePaymentPlan = (id: string, data: any) =>
+  api.put(`${BASE}/payment-plans/${id}`, data).then(r => r.data);
+export const deletePaymentPlan = (id: string) =>
+  api.delete(`${BASE}/payment-plans/${id}`).then(r => r.data);
+
+// ─── Reconciliation Entries ──────────────────────────────
+export const listReconciliationEntries = (page = 1, limit = 20) =>
+  api.get(`${BASE}/reconciliation-entries`, { params: { page, limit } }).then(r => r.data);
+export const createReconciliationEntry = (data: any) =>
+  api.post(`${BASE}/reconciliation-entries`, data).then(r => r.data);
+export const updateReconciliationEntry = (id: string, data: any) =>
+  api.put(`${BASE}/reconciliation-entries/${id}`, data).then(r => r.data);
+export const deleteReconciliationEntry = (id: string) =>
+  api.delete(`${BASE}/reconciliation-entries/${id}`).then(r => r.data);
+
+// ─── Bounce Records ──────────────────────────────────────
+export const listBounceRecords = (page = 1, limit = 20) =>
+  api.get(`${BASE}/bounce-records`, { params: { page, limit } }).then(r => r.data);
+export const createBounceRecord = (data: any) =>
+  api.post(`${BASE}/bounce-records`, data).then(r => r.data);
+export const updateBounceRecord = (id: string, data: any) =>
+  api.put(`${BASE}/bounce-records/${id}`, data).then(r => r.data);
+export const deleteBounceRecord = (id: string) =>
+  api.delete(`${BASE}/bounce-records/${id}`).then(r => r.data);

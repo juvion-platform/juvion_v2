@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getStats, listPersons, deletePerson } from '../services/people';
-import { Users, GraduationCap, Briefcase, UserCheck, Building2, ArrowLeft, Search, Trash2, Pencil, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Users, GraduationCap, Briefcase, UserCheck, Building2, ArrowLeft, Search, Trash2, Pencil, ChevronLeft, ChevronRight, LogOut, ClipboardCheck, FileText, Award } from 'lucide-react';
 import DataTable from '../components/ui/DataTable';
 
 import StudentsPage from './people/StudentsPage';
@@ -13,6 +13,10 @@ import FacultyFormPage from './people/FacultyFormPage';
 import StaffFormPage from './people/StaffFormPage';
 import ParentsPage from './people/ParentsPage';
 import OrganizationsPage from './people/OrganizationsPage';
+import ExitRequestsPage from './people/ExitRequestsPage';
+import ClearancePage from './people/ClearancePage';
+import ExitDocumentsPage from './people/ExitDocumentsPage';
+import AlumniPage from './people/AlumniPage';
 
 const CARDS = [
   { to: 'students', icon: GraduationCap, label: 'Students', desc: 'Student profiles & enrollment', iconBg: 'bg-primary-50 text-primary-600', border: 'border-primary-200 hover:border-primary-400', statKey: 'students' },
@@ -20,6 +24,13 @@ const CARDS = [
   { to: 'staff', icon: Briefcase, label: 'Staff', desc: 'Non-teaching staff', iconBg: 'bg-teal-50 text-teal-600', border: 'border-teal-200 hover:border-teal-400', statKey: 'staff' },
   { to: 'parents', icon: UserCheck, label: 'Parents', desc: 'Guardian profiles & contacts', iconBg: 'bg-orange-50 text-orange-500', border: 'border-orange-200 hover:border-orange-400', statKey: 'parents' },
   { to: 'organizations', icon: Building2, label: 'Organizations', desc: 'Partner & external orgs', iconBg: 'bg-primary-100 text-primary-700', border: 'border-primary-200 hover:border-primary-400', statKey: 'organizations' },
+];
+
+const EXIT_CARDS = [
+  { to: 'exit-requests', icon: LogOut, label: 'Exit Requests', desc: 'Withdrawal, transfer & exit requests', iconBg: 'bg-red-50 text-red-600', border: 'border-red-200 hover:border-red-400' },
+  { to: 'clearance', icon: ClipboardCheck, label: 'Clearance', desc: 'Clearance workflow orchestration', iconBg: 'bg-amber-50 text-amber-600', border: 'border-amber-200 hover:border-amber-400' },
+  { to: 'exit-documents', icon: FileText, label: 'Exit Documents', desc: 'TC, migration cert & templates', iconBg: 'bg-blue-50 text-blue-600', border: 'border-blue-200 hover:border-blue-400' },
+  { to: 'alumni', icon: Award, label: 'Alumni', desc: 'Graduate records & engagement', iconBg: 'bg-purple-50 text-purple-600', border: 'border-purple-200 hover:border-purple-400' },
 ];
 
 const ROLE_ROUTE: Record<string, string> = {
@@ -120,6 +131,27 @@ function PeopleHome() {
         })}
       </div>
 
+      {/* Exit & Alumni tiles */}
+      <h3 className="text-lg font-semibold text-navy mb-3">Exit & Alumni</h3>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        {EXIT_CARDS.map(card => {
+          const Icon = card.icon;
+          return (
+            <button
+              key={card.to}
+              onClick={() => navigate(card.to)}
+              className={`bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all ${card.border}`}
+            >
+              <div className={`inline-flex p-2.5 rounded-lg mb-3 ${card.iconBg}`}>
+                <Icon size={22} />
+              </div>
+              <div className="font-semibold text-navy-dark text-sm">{card.label}</div>
+              <p className="text-xs text-gray-500 mt-1">{card.desc}</p>
+            </button>
+          );
+        })}
+      </div>
+
       {/* All Persons list */}
       <div className="bg-white rounded-xl border shadow-sm">
         <div className="flex items-center justify-between px-5 py-4 border-b">
@@ -201,6 +233,10 @@ export default function People() {
         <Route path="staff/:id/edit" element={<StaffFormPage />} />
         <Route path="parents" element={<ParentsPage />} />
         <Route path="organizations" element={<OrganizationsPage />} />
+        <Route path="exit-requests" element={<ExitRequestsPage />} />
+        <Route path="clearance" element={<ClearancePage />} />
+        <Route path="exit-documents" element={<ExitDocumentsPage />} />
+        <Route path="alumni" element={<AlumniPage />} />
       </Routes>
     </SubPageWrapper>
   );

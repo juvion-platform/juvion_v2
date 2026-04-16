@@ -56,3 +56,32 @@ export const getOrganization = (id: string) => api.get(`${BASE}/organizations/${
 export const createOrganization = (data: any) => api.post(`${BASE}/organizations`, data).then(r => r.data);
 export const updateOrganization = (id: string, data: any) => api.put(`${BASE}/organizations/${id}`, data).then(r => r.data);
 export const deleteOrganization = (id: string) => api.delete(`${BASE}/organizations/${id}`).then(r => r.data);
+
+// ── Exit Requests (W10) ─────────────────────────────────
+export const listExitRequests = (page = 1, limit = 20, status?: string) =>
+  api.get(`${BASE}/exit-requests`, { params: { page, limit, status } }).then(r => r.data);
+export const getExitRequest = (id: string) => api.get(`${BASE}/exit-requests/${id}`).then(r => r.data);
+export const submitExitRequest = (studentId: string, data: any) =>
+  api.post(`${BASE}/students/${studentId}/exit-request`, data).then(r => r.data);
+export const approveExitRequest = (id: string, data: any) => api.put(`${BASE}/exit-requests/${id}/approve`, data).then(r => r.data);
+export const rejectExitRequest = (id: string, data: any) => api.put(`${BASE}/exit-requests/${id}/reject`, data).then(r => r.data);
+export const cancelExitRequest = (id: string) => api.put(`${BASE}/exit-requests/${id}/cancel`).then(r => r.data);
+
+// ── Clearance Workflows (W10) ───────────────────────────
+export const listClearanceWorkflows = (page = 1, limit = 20, status?: string) =>
+  api.get(`${BASE}/clearance-workflows`, { params: { page, limit, status } }).then(r => r.data);
+export const getClearanceWorkflow = (id: string) => api.get(`${BASE}/clearance-workflows/${id}`).then(r => r.data);
+export const initiateClearance = (data: any) => api.post(`${BASE}/clearance-workflows`, data).then(r => r.data);
+
+// ── Document Templates & Exit Documents (W10) ───────────
+export const listDocumentTemplates = (page = 1, limit = 20, type?: string) =>
+  api.get(`${BASE}/document-templates`, { params: { page, limit, type } }).then(r => r.data);
+export const getDocumentTemplate = (id: string) => api.get(`${BASE}/document-templates/${id}`).then(r => r.data);
+export const createDocumentTemplate = (data: any) => api.post(`${BASE}/document-templates`, data).then(r => r.data);
+export const generateDocument = (data: any) => api.post(`${BASE}/documents/generate`, data).then(r => r.data);
+
+// ── Alumni (W10) ────────────────────────────────────────
+export const listAlumni = (page = 1, limit = 20, programmeId?: string) =>
+  api.get(`${BASE}/alumni`, { params: { page, limit, programmeId } }).then(r => r.data);
+export const getAlumni = (id: string) => api.get(`${BASE}/alumni/${id}`).then(r => r.data);
+export const createAlumniRecord = (data: any) => api.post(`${BASE}/alumni`, data).then(r => r.data);

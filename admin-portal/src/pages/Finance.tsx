@@ -2,7 +2,7 @@ import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getFinanceStats } from '../services/finance';
 import { getStats as getPeopleStats } from '../services/people';
-import { ArrowLeft, Landmark, CreditCard, GraduationCap, HandCoins, RotateCcw, Gavel, FileText, Wallet, Receipt, BookOpen, Users, ShieldAlert, CircleCheckBig, Layers, Settings2, ArrowRightLeft, FileCheck, AlertTriangle, Lock } from 'lucide-react';
+import { ArrowLeft, Landmark, CreditCard, GraduationCap, HandCoins, RotateCcw, Gavel, FileText, Wallet, Receipt, BookOpen, Users, ShieldAlert, CircleCheckBig, Layers, Settings2, ArrowRightLeft, FileCheck, AlertTriangle, Lock, ShieldCheck, FileSpreadsheet, Handshake, CalendarClock, Scale, Ban } from 'lucide-react';
 
 import FeeStructuresPage from './finance/FeeStructuresPage';
 import StudentFeeAccountsPage from './finance/StudentFeeAccountsPage';
@@ -24,6 +24,12 @@ import PaymentTransactionsPage from './finance/PaymentTransactionsPage';
 import ReceiptsPage from './finance/ReceiptsPage';
 import DefaulterRecordsPage from './finance/DefaulterRecordsPage';
 import FinancialHoldsPage from './finance/FinancialHoldsPage';
+import ScholarshipEligibilityPage from './finance/ScholarshipEligibilityPage';
+import ScholarshipClaimsPage from './finance/ScholarshipClaimsPage';
+import FeeAgreementsPage from './finance/FeeAgreementsPage';
+import PaymentPlansPage from './finance/PaymentPlansPage';
+import ReconciliationEntriesPage from './finance/ReconciliationEntriesPage';
+import BounceRecordsPage from './finance/BounceRecordsPage';
 
 function FinanceHome() {
   const navigate = useNavigate();
@@ -191,6 +197,30 @@ function FinanceHome() {
           );
         })}
       </div>
+
+      {/* Scholarship & Reconciliation */}
+      <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3 mt-8">Scholarship & Reconciliation</h3>
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        {[
+          { to: 'scholarship-eligibility', icon: ShieldCheck, label: 'Scholarship Eligibility', desc: 'Student eligibility checks', iconBg: 'bg-emerald-50 text-emerald-600', border: 'border-emerald-200 hover:border-emerald-400', statKey: null },
+          { to: 'scholarship-claims', icon: FileSpreadsheet, label: 'Scholarship Claims', desc: 'Claim submission & tracking', iconBg: 'bg-purple-50 text-purple-600', border: 'border-purple-200 hover:border-purple-400', statKey: null },
+          { to: 'fee-agreements', icon: Handshake, label: 'Fee Agreements', desc: 'Negotiated fee contracts', iconBg: 'bg-blue-50 text-blue-600', border: 'border-blue-200 hover:border-blue-400', statKey: null },
+          { to: 'payment-plans', icon: CalendarClock, label: 'Payment Plans', desc: 'Installment schedules', iconBg: 'bg-teal-50 text-teal-600', border: 'border-teal-200 hover:border-teal-400', statKey: null },
+          { to: 'reconciliation-entries', icon: Scale, label: 'Reconciliation', desc: 'Bank statement matching', iconBg: 'bg-indigo-50 text-indigo-600', border: 'border-indigo-200 hover:border-indigo-400', statKey: null },
+          { to: 'bounce-records', icon: Ban, label: 'Bounce Records', desc: 'Cheque/payment bounces', iconBg: 'bg-red-50 text-red-600', border: 'border-red-200 hover:border-red-400', statKey: null },
+        ].map(card => {
+          const Icon = card.icon;
+          const count = card.statKey && stats ? (stats as any)[card.statKey] : '—';
+          return (
+            <button key={card.to} onClick={() => navigate(card.to)} className={`bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all ${card.border}`}>
+              <div className={`inline-flex p-2.5 rounded-lg mb-3 ${card.iconBg}`}><Icon size={22} /></div>
+              <div className="text-2xl font-bold text-navy mb-1">{count}</div>
+              <div className="font-semibold text-navy-dark text-sm">{card.label}</div>
+              <p className="text-xs text-gray-500 mt-1">{card.desc}</p>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -238,6 +268,12 @@ export default function Finance() {
         <Route path="receipts" element={<ReceiptsPage />} />
         <Route path="defaulter-records" element={<DefaulterRecordsPage />} />
         <Route path="financial-holds" element={<FinancialHoldsPage />} />
+        <Route path="scholarship-eligibility" element={<ScholarshipEligibilityPage />} />
+        <Route path="scholarship-claims" element={<ScholarshipClaimsPage />} />
+        <Route path="fee-agreements" element={<FeeAgreementsPage />} />
+        <Route path="payment-plans" element={<PaymentPlansPage />} />
+        <Route path="reconciliation-entries" element={<ReconciliationEntriesPage />} />
+        <Route path="bounce-records" element={<BounceRecordsPage />} />
       </Routes>
     </SubPageWrapper>
   );
