@@ -9,6 +9,8 @@ import { Admission } from '../../models/admissions/Admission';
 import { paginate } from '../../shared/pagination';
 import { createAuditLog } from '../../shared/audit';
 import { AppError } from '../../middleware/errorHandler';
+import { uploadFile } from '../../shared/upload/s3';
+import { generateThumbnail, optimizePhoto } from '../../shared/upload/thumbnail';
 import { AuthScope } from '../../shared/rbac/types';
 import { applyAuthScope } from '../../shared/rbac/apply-scope';
 
@@ -272,10 +274,60 @@ export async function getAdmission(collegeId: string, id: string) {
 }
 
 export async function createAdmission(collegeId: string, data: any, performedBy: string) {
+  // Enforce mandatory photo before enrollment
+  const applicant = await Applicant.findOne({ _id: data.applicantId, collegeId });
+  if (!applicant) throw new AppError(404, 'Applicant not found');
+  if (!applicant.photo) {
+    throw new AppError(400, 'Photo is mandatory for enrollment. Please upload the applicant photo before proceeding.');
+  }
+
   const doc = await Admission.create({ ...data, collegeId });
   // Update applicant status to enrolled
   await Applicant.findByIdAndUpdate(data.applicantId, { status: 'enrolled' });
   await createAuditLog({ collegeId, entityType: 'Admission', entityId: String(doc._id), entityName: `Admission`, action: 'create', changes: [], performedBy });
   return doc;
+}
+
+// ─── Applicant Photo Upload ─────────────────────────────
+
+export async function uploadApplicantPhoto(
+  collegeId: string,
+  applicantId: string,
+  file: { buffer: Buffer; mimetype: string },
+  performedBy: string,
+) {
+  const applicant = await Applicant.findOne({ _id: applicantId, collegeId });
+  if (!applicant) throw new AppError(404, 'Applicant not found');
+
+  // Store under applicants folder (will be copied to student folder upon enrollment)
+  const folder = `colleges/${collegeId}/applicants/${applicantId}`;
+  const photoKey = `${folder}/photo.jpg`;
+  const thumbKey = `${folder}/photo_thumb.jpg`;
+
+  const [optimized, thumbnail] = await Promise.all([
+    optimizePhoto(file.buffer),
+    generateThumbnail(file.buffer),
+  ]);
+
+  const [photoUrl, thumbnailUrl] = await Promise.all([
+    uploadFile(photoKey, optimized, 'image/jpeg'),
+    uploadFile(thumbKey, thumbnail, 'image/jpeg'),
+  ]);
+
+  await Applicant.findByIdAndUpdate(applicantId, {
+    $set: { photo: photoUrl, photoThumbnail: thumbnailUrl },
+  });
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'Applicant',
+    entityId: applicantId,
+    entityName: applicant.name,
+    action: 'update',
+    changes: [{ field: 'photo', displayName: 'Photo', oldValue: null, newValue: photoUrl }],
+    performedBy,
+  });
+
+  return { photoUrl, thumbnailUrl };
 }
 

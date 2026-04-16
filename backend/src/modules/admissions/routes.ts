@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { authenticate } from '../../middleware/authenticate';
 import { authorize } from '../../middleware/authorize';
 import { validate } from '../../middleware/validate';
+import { uploadPhoto } from '../../middleware/upload';
 import * as ctrl from './controller';
 import {
   createInquirySchema, updateInquirySchema,
@@ -31,6 +32,7 @@ router.get('/applicants', authorize('admissions', 'read'), ctrl.listApplicants);
 router.get('/applicants/:id', authorize('admissions', 'read'), ctrl.getApplicant);
 router.post('/applicants', authorize('admissions', 'create'), validate(createApplicantSchema), ctrl.createApplicant);
 router.put('/applicants/:id', authorize('admissions', 'update'), validate(updateApplicantSchema), ctrl.updateApplicant);
+router.post('/applicants/:id/photo', authorize('admissions', 'update'), uploadPhoto, ctrl.uploadApplicantPhoto);
 
 // Entrance Exam Scores
 router.get('/exam-scores', authorize('admissions', 'read'), ctrl.listExamScores);

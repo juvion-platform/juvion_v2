@@ -79,6 +79,14 @@ export const listEnrollments = (page = 1, limit = 20) =>
 export const createEnrollment = (data: any) =>
   api.post(`${BASE}/enrollments`, data).then(r => r.data);
 
+export const uploadApplicantPhoto = (applicantId: string, file: File) => {
+  const form = new FormData();
+  form.append('photo', file);
+  return api.post(`${BASE}/applicants/${applicantId}/photo`, form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }).then(r => r.data);
+};
+
 // ─── Workflow ──────────────────────────────────────────
 export const getWorkflowStats = () =>
   api.get(`${WORKFLOW_BASE}/stats`).then(r => r.data);

@@ -132,6 +132,23 @@ export async function createAdmission(req: AuthRequest, res: Response, next: Nex
   try { res.status(201).json(await svc.createAdmission(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
 }
 
+// ─── Applicant Photo Upload ──────────────────────────────────
+export async function uploadApplicantPhoto(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    if (!req.file) {
+      res.status(400).json({ error: 'No photo file provided. Use multipart/form-data with field "photo".' });
+      return;
+    }
+    const result = await svc.uploadApplicantPhoto(
+      req.collegeId!,
+      req.params.id as string,
+      { buffer: req.file.buffer, mimetype: req.file.mimetype },
+      who(req),
+    );
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
 // ─── Dashboard ───────────────────────────────────────────────
 export async function dashboardStats(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await svc.getDashboardStats(req.collegeId!)); } catch (e) { next(e); }

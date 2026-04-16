@@ -73,6 +73,8 @@ export interface IApplicant extends Document {
   nriVisaValidity?: Date;
   scholarshipEligible?: boolean;
   scholarshipScheme?: string;
+  photo?: string;
+  photoThumbnail?: string;
 }
 
 const schema = new Schema<IApplicant>({
@@ -152,6 +154,8 @@ const schema = new Schema<IApplicant>({
   nriVisaValidity: Date,
   scholarshipEligible: { type: Boolean, default: false },
   scholarshipScheme: String,
+  photo: String,
+  photoThumbnail: String,
 }, { timestamps: true });
 
 schema.index({ collegeId: 1, applicationNumber: 1 }, { unique: true });
