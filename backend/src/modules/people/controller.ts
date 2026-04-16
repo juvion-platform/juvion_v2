@@ -250,3 +250,21 @@ export async function listAlumniCtrl(req: AuthRequest, res: Response, next: Next
     res.json(await exitService.listAlumni(req.collegeId!, +page!, +limit!, programmeId));
   } catch (e) { next(e); }
 }
+
+// ═══ Student Photo Upload ════════════════════════════════
+
+export async function uploadStudentPhoto(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    if (!req.file) {
+      res.status(400).json({ error: 'No photo file provided. Use multipart/form-data with field "photo".' });
+      return;
+    }
+    const result = await svc.uploadStudentPhoto(
+      req.collegeId!,
+      req.params.id as string,
+      { buffer: req.file.buffer, mimetype: req.file.mimetype },
+      req.user?.name || 'System',
+    );
+    res.json(result);
+  } catch (e) { next(e); }
+}

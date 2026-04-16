@@ -17,6 +17,7 @@ export interface IPerson extends Document {
     relationship?: string;
   };
   photo?: string;
+  photoThumbnail?: string;
   biometricEnrolled?: boolean;
   // W01 intake enhancements
   nationality?: string;
@@ -41,6 +42,7 @@ const schema = new Schema<IPerson>({
     relationship: String,
   },
   photo: String,
+  photoThumbnail: String,
   biometricEnrolled: { type: Boolean, default: false },
   // W01 intake enhancements
   nationality: String,

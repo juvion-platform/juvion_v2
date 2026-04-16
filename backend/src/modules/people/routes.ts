@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { authenticate } from '../../middleware/authenticate';
 import { authorize } from '../../middleware/authorize';
 import { validate } from '../../middleware/validate';
+import { uploadPhoto } from '../../middleware/upload';
 import * as ctrl from './controller';
 import {
   createPersonSchema, updatePersonSchema,
@@ -37,6 +38,7 @@ router.get('/students/:id', authorize('people', 'read'), ctrl.getStudent);
 router.post('/students', authorize('people', 'create'), validate(createStudentSchema), ctrl.createStudent);
 router.put('/students/:id', authorize('people', 'update'), validate(updateStudentSchema), ctrl.updateStudent);
 router.delete('/students/:id', authorize('people', 'delete'), ctrl.deleteStudent);
+router.post('/students/:id/photo', authorize('people', 'update'), uploadPhoto, ctrl.uploadStudentPhoto);
 
 // Faculty
 router.get('/faculty', authorize('people', 'read'), ctrl.listFaculty);

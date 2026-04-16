@@ -17,6 +17,13 @@ export const getStudent = (id: string) => api.get(`${BASE}/students/${id}`).then
 export const createStudent = (data: any) => api.post(`${BASE}/students`, data).then(r => r.data);
 export const updateStudent = (id: string, data: any) => api.put(`${BASE}/students/${id}`, data).then(r => r.data);
 export const deleteStudent = (id: string) => api.delete(`${BASE}/students/${id}`).then(r => r.data);
+export const uploadStudentPhoto = (studentId: string, file: File) => {
+  const form = new FormData();
+  form.append('photo', file);
+  return api.post(`${BASE}/students/${studentId}/photo`, form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }).then(r => r.data);
+};
 
 // ── Faculty ──────────────────────────────────────────
 export const listFaculty = (page = 1, limit = 20, status?: string, search?: string) =>

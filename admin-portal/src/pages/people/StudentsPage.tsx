@@ -43,6 +43,14 @@ export default function StudentsPage() {
   });
 
   const columns = [
+    { key: 'avatar', label: '', render: (r: any) => {
+      const thumb = r.person?.photoThumbnail || r.personId?.photoThumbnail;
+      const name = r.person?.name || r.personId?.name || '';
+      const initial = name.charAt(0)?.toUpperCase() || '?';
+      return thumb
+        ? <img src={thumb} alt={name} className="w-8 h-8 rounded-full object-cover" />
+        : <div className="w-8 h-8 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center text-xs font-bold">{initial}</div>;
+    }},
     { key: 'name', label: 'Name', render: (r: any) => (r.person?.name || r.personId?.name || '—') },
     { key: 'phone', label: 'Phone', render: (r: any) => (r.person?.phone || r.personId?.phone || '—') },
     { key: 'rollNumber', label: 'Roll No', render: (r: any) => r.rollNumber || '—' },

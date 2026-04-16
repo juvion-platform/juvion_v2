@@ -1,6 +1,8 @@
 import mongoose from 'mongoose';
 import { Person } from '../../models/people/Person';
 import { Student } from '../../models/people/Student';
+import { uploadFile, getStudentFolder } from '../../shared/upload/s3';
+import { generateThumbnail, optimizePhoto } from '../../shared/upload/thumbnail';
 import { Faculty } from '../../models/people/Faculty';
 import { Staff } from '../../models/people/Staff';
 import { Parent } from '../../models/people/Parent';
@@ -633,4 +635,49 @@ export async function deleteOrganization(collegeId: string, id: string, performe
   if (!doc) throw new AppError(404, 'Organization not found');
   await createAuditLog({ collegeId, entityType: 'Organization', entityId: id, entityName: doc.name, action: 'delete', changes: [], performedBy });
   return { deleted: true };
+}
+
+// ═══ Student Photo Upload ════════════════════════════════
+
+export async function uploadStudentPhoto(
+  collegeId: string,
+  studentId: string,
+  file: { buffer: Buffer; mimetype: string },
+  performedBy: string,
+) {
+  const student = await Student.findOne({ _id: studentId, collegeId });
+  if (!student) throw new AppError(404, 'Student not found');
+
+  const folder = getStudentFolder(collegeId, studentId);
+  const photoKey = `${folder}/photo.jpg`;
+  const thumbKey = `${folder}/photo_thumb.jpg`;
+
+  // Process images
+  const [optimized, thumbnail] = await Promise.all([
+    optimizePhoto(file.buffer),
+    generateThumbnail(file.buffer),
+  ]);
+
+  // Upload both to S3
+  const [photoUrl, thumbnailUrl] = await Promise.all([
+    uploadFile(photoKey, optimized, 'image/jpeg'),
+    uploadFile(thumbKey, thumbnail, 'image/jpeg'),
+  ]);
+
+  // Update Person record
+  await Person.findByIdAndUpdate(student.personId, {
+    $set: { photo: photoUrl, photoThumbnail: thumbnailUrl },
+  });
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'Student',
+    entityId: studentId,
+    entityName: 'Photo',
+    action: 'update',
+    changes: [{ field: 'photo', displayName: 'Photo', oldValue: null, newValue: photoUrl }],
+    performedBy,
+  });
+
+  return { photoUrl, thumbnailUrl };
 }

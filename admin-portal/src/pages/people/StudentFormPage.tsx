@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getStudent, createStudent, listParents, updateStudent } from '../../services/people';
+import { getStudent, createStudent, listParents, updateStudent, uploadStudentPhoto } from '../../services/people';
 import { listRegulations, listProgrammes, listBranches, listBatches } from '../../services/academics';
-import { ArrowLeft, Save, Loader2 } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, Camera, Check } from 'lucide-react';
 
 const STATUSES = ['prospective', 'active', 'year_back', 'detained', 'graduated', 'exited', 'alumni'] as const;
 const QUOTAS = ['convener', 'management', 'nri'] as const;
@@ -152,6 +152,33 @@ export default function StudentFormPage() {
   const saving = createMut.isPending || updateMut.isPending;
   const error = createMut.error || updateMut.error;
 
+  // Photo upload
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const photoMut = useMutation({
+    mutationFn: (file: File) => uploadStudentPhoto(id!, file),
+    onSuccess: (data) => {
+      setPhotoPreview(data.photoUrl);
+      qc.invalidateQueries({ queryKey: ['student', id] });
+      qc.invalidateQueries({ queryKey: ['students'] });
+    },
+  });
+
+  useEffect(() => {
+    if (existing) {
+      const p = existing.person || existing.personId || {};
+      if (p.photo) setPhotoPreview(p.photo);
+    }
+  }, [existing]);
+
+  function handlePhotoSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Show local preview immediately
+    setPhotoPreview(URL.createObjectURL(file));
+    photoMut.mutate(file);
+  }
+
   if (isEdit && loadingExisting) {
     return <div className="flex items-center justify-center py-20"><Loader2 size={24} className="animate-spin text-gray-400" /></div>;
   }
@@ -183,6 +210,46 @@ export default function StudentFormPage() {
       )}
 
       <form id="student-form" onSubmit={handleSubmit} className="space-y-6">
+        {/* Photo Upload */}
+        {isEdit && (
+          <section className="bg-white rounded-xl border shadow-sm">
+            <div className="px-5 py-4 border-b bg-navy/[0.03] rounded-t-xl">
+              <h3 className="font-semibold text-navy-dark">Student Photo</h3>
+              <p className="text-xs text-gray-500 mt-0.5">Upload a passport-size photo (JPEG, PNG, WebP — max 5 MB)</p>
+            </div>
+            <div className="p-5 flex items-center gap-6">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={photoMut.isPending}
+                className="relative group w-[120px] h-[120px] rounded-full border-2 border-dashed border-gray-300 hover:border-primary-400 flex items-center justify-center overflow-hidden bg-gray-50 transition-colors flex-shrink-0"
+              >
+                {photoPreview ? (
+                  <img src={photoPreview} alt="Student" className="w-full h-full object-cover rounded-full" />
+                ) : (
+                  <span className="text-3xl font-bold text-gray-300">{form.name?.charAt(0)?.toUpperCase() || '?'}</span>
+                )}
+                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
+                  {photoMut.isPending ? (
+                    <Loader2 size={24} className="animate-spin text-white" />
+                  ) : (
+                    <Camera size={24} className="text-white" />
+                  )}
+                </div>
+              </button>
+              <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={handlePhotoSelect} className="hidden" />
+              <div className="text-sm">
+                {photoMut.isPending && <p className="text-primary-600 flex items-center gap-1"><Loader2 size={14} className="animate-spin" /> Uploading & generating thumbnail...</p>}
+                {photoMut.isSuccess && <p className="text-emerald-600 flex items-center gap-1"><Check size={14} /> Photo uploaded successfully</p>}
+                {photoMut.isError && <p className="text-red-600">Upload failed: {(photoMut.error as any)?.response?.data?.error || 'Something went wrong'}</p>}
+                {!photoMut.isPending && !photoMut.isSuccess && !photoMut.isError && (
+                  <p className="text-gray-500">Click the avatar to upload a photo. A thumbnail will be auto-generated for the listing page.</p>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* Personal Information */}
         <section className="bg-white rounded-xl border shadow-sm">
           <div className="px-5 py-4 border-b bg-navy/[0.03] rounded-t-xl">
