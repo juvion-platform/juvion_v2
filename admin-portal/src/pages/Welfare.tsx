@@ -1,7 +1,7 @@
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getWelfareStats } from '../services/welfare';
-import { ArrowLeft, Building2, DoorOpen, BedDouble, UserCheck, Utensils, MessageSquare, Bus, MapPin, Heart, Stethoscope, Brain, AlertTriangle, ShieldAlert, FileWarning, Shield, Users } from 'lucide-react';
+import { ArrowLeft, Building2, DoorOpen, BedDouble, UserCheck, Utensils, MessageSquare, Bus, MapPin, Heart, Stethoscope, Brain, AlertTriangle, ShieldAlert, FileWarning, Shield, Users, UserPlus, CalendarCheck, Flag, Send, Scale, TrendingDown } from 'lucide-react';
 
 import HostelBlocksPage from './welfare/HostelBlocksPage';
 import HostelRoomsPage from './welfare/HostelRoomsPage';
@@ -19,6 +19,12 @@ import AntiRaggingComplaintsPage from './welfare/AntiRaggingComplaintsPage';
 import StudentGrievancesPage from './welfare/StudentGrievancesPage';
 import InsuranceClaimsPage from './welfare/InsuranceClaimsPage';
 import ParentMeetingsPage from './welfare/ParentMeetingsPage';
+import MentorAssignmentsPage from './welfare/MentorAssignmentsPage';
+import MentorSessionsPage from './welfare/MentorSessionsPage';
+import MentorConcernsPage from './welfare/MentorConcernsPage';
+import CounsellingReferralsPage from './welfare/CounsellingReferralsPage';
+import ICCComplaintsPage from './welfare/ICCComplaintsPage';
+import DropoutRiskAlertsPage from './welfare/DropoutRiskAlertsPage';
 
 function WelfareHome() {
   const navigate = useNavigate();
@@ -173,6 +179,30 @@ function WelfareHome() {
           );
         })}
       </div>
+
+      {/* Mentoring & Risk */}
+      <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3 mt-8">Mentoring & Risk</h3>
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+        {[
+          { to: 'mentor-assignments', icon: UserPlus, label: 'Mentor Assignments', desc: 'Mentor-mentee pairing', iconBg: 'bg-indigo-50 text-indigo-600', border: 'border-indigo-200 hover:border-indigo-400', statKey: 'mentorAssignments' },
+          { to: 'mentor-sessions', icon: CalendarCheck, label: 'Mentor Sessions', desc: 'Session logs & notes', iconBg: 'bg-blue-50 text-blue-600', border: 'border-blue-200 hover:border-blue-400', statKey: 'mentorSessions' },
+          { to: 'mentor-concerns', icon: Flag, label: 'Mentor Concerns', desc: 'Flagged concerns', iconBg: 'bg-amber-50 text-amber-600', border: 'border-amber-200 hover:border-amber-400', statKey: 'mentorConcerns' },
+          { to: 'counselling-referrals', icon: Send, label: 'Counselling Referrals', desc: 'Referral tracking', iconBg: 'bg-purple-50 text-purple-600', border: 'border-purple-200 hover:border-purple-400', statKey: 'counsellingReferrals' },
+          { to: 'icc-complaints', icon: Scale, label: 'ICC Complaints', desc: 'ICC complaint management', iconBg: 'bg-red-50 text-red-600', border: 'border-red-200 hover:border-red-400', statKey: 'iccComplaints' },
+          { to: 'dropout-risk-alerts', icon: TrendingDown, label: 'Dropout Risk', desc: 'At-risk student alerts', iconBg: 'bg-rose-50 text-rose-600', border: 'border-rose-200 hover:border-rose-400', statKey: 'dropoutRiskAlerts' },
+        ].map(card => {
+          const Icon = card.icon;
+          const count = stats ? (stats as any)[card.statKey] : '\u2014';
+          return (
+            <button key={card.to} onClick={() => navigate(card.to)} className={`bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all ${card.border}`}>
+              <div className={`inline-flex p-2.5 rounded-lg mb-3 ${card.iconBg}`}><Icon size={22} /></div>
+              <div className="text-2xl font-bold text-navy mb-1">{count}</div>
+              <div className="font-semibold text-navy-dark text-sm">{card.label}</div>
+              <p className="text-xs text-gray-500 mt-1">{card.desc}</p>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -216,6 +246,12 @@ export default function Welfare() {
         <Route path="student-grievances" element={<StudentGrievancesPage />} />
         <Route path="insurance-claims" element={<InsuranceClaimsPage />} />
         <Route path="parent-meetings" element={<ParentMeetingsPage />} />
+        <Route path="mentor-assignments" element={<MentorAssignmentsPage />} />
+        <Route path="mentor-sessions" element={<MentorSessionsPage />} />
+        <Route path="mentor-concerns" element={<MentorConcernsPage />} />
+        <Route path="counselling-referrals" element={<CounsellingReferralsPage />} />
+        <Route path="icc-complaints" element={<ICCComplaintsPage />} />
+        <Route path="dropout-risk-alerts" element={<DropoutRiskAlertsPage />} />
       </Routes>
     </SubPageWrapper>
   );

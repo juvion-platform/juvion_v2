@@ -196,3 +196,75 @@ export const updateParentMeeting = (id: string, data: any) =>
   api.put(`${BASE}/parent-meetings/${id}`, data).then(r => r.data);
 export const deleteParentMeeting = (id: string) =>
   api.delete(`${BASE}/parent-meetings/${id}`).then(r => r.data);
+
+// ─── Mentor Assignments ──────────────────────────────────
+export const listMentorAssignments = (page = 1, limit = 20, status?: string) =>
+  api.get(`${BASE}/mentor-assignments`, { params: { page, limit, status } }).then(r => r.data);
+export const getMentorAssignment = (id: string) =>
+  api.get(`${BASE}/mentor-assignments/${id}`).then(r => r.data);
+export const createMentorAssignment = (data: any) =>
+  api.post(`${BASE}/mentor-assignments`, data).then(r => r.data);
+export const updateMentorAssignment = (id: string, data: any) =>
+  api.put(`${BASE}/mentor-assignments/${id}`, data).then(r => r.data);
+export const deleteMentorAssignment = (id: string) =>
+  api.delete(`${BASE}/mentor-assignments/${id}`).then(r => r.data);
+
+// ─── Mentor Sessions ─────────────────────────────────────
+export const listMentorSessions = (page = 1, limit = 20) =>
+  api.get(`${BASE}/mentor-sessions`, { params: { page, limit } }).then(r => r.data);
+export const getMentorSession = (id: string) =>
+  api.get(`${BASE}/mentor-sessions/${id}`).then(r => r.data);
+export const createMentorSession = (data: any) =>
+  api.post(`${BASE}/mentor-sessions`, data).then(r => r.data);
+export const updateMentorSession = (id: string, data: any) =>
+  api.put(`${BASE}/mentor-sessions/${id}`, data).then(r => r.data);
+export const deleteMentorSession = (id: string) =>
+  api.delete(`${BASE}/mentor-sessions/${id}`).then(r => r.data);
+
+// ─── Mentor Concerns ─────────────────────────────────────
+export const listMentorConcerns = (page = 1, limit = 20, status?: string) =>
+  api.get(`${BASE}/mentor-concerns`, { params: { page, limit, status } }).then(r => r.data);
+export const getMentorConcern = (id: string) =>
+  api.get(`${BASE}/mentor-concerns/${id}`).then(r => r.data);
+export const createMentorConcern = (data: any) =>
+  api.post(`${BASE}/mentor-concerns`, data).then(r => r.data);
+export const updateMentorConcern = (id: string, data: any) =>
+  api.put(`${BASE}/mentor-concerns/${id}`, data).then(r => r.data);
+export const deleteMentorConcern = (id: string) =>
+  api.delete(`${BASE}/mentor-concerns/${id}`).then(r => r.data);
+
+// ─── Counselling Referrals ───────────────────────────────
+export const listCounsellingReferrals = (page = 1, limit = 20, status?: string) =>
+  api.get(`${BASE}/counselling-referrals`, { params: { page, limit, status } }).then(r => r.data);
+export const getCounsellingReferral = (id: string) =>
+  api.get(`${BASE}/counselling-referrals/${id}`).then(r => r.data);
+export const createCounsellingReferral = (data: any) =>
+  api.post(`${BASE}/counselling-referrals`, data).then(r => r.data);
+export const updateCounsellingReferral = (id: string, data: any) =>
+  api.put(`${BASE}/counselling-referrals/${id}`, data).then(r => r.data);
+export const deleteCounsellingReferral = (id: string) =>
+  api.delete(`${BASE}/counselling-referrals/${id}`).then(r => r.data);
+
+// ─── ICC Complaints ──────────────────────────────────────
+export const listICCComplaints = (page = 1, limit = 20, status?: string) =>
+  api.get(`${BASE}/icc-complaints`, { params: { page, limit, status } }).then(r => r.data);
+export const getICCComplaint = (id: string) =>
+  api.get(`${BASE}/icc-complaints/${id}`).then(r => r.data);
+export const createICCComplaint = (data: any) =>
+  api.post(`${BASE}/icc-complaints`, data).then(r => r.data);
+export const updateICCComplaint = (id: string, data: any) =>
+  api.put(`${BASE}/icc-complaints/${id}`, data).then(r => r.data);
+export const deleteICCComplaint = (id: string) =>
+  api.delete(`${BASE}/icc-complaints/${id}`).then(r => r.data);
+
+// ─── Dropout Risk Alerts ─────────────────────────────────
+export const listDropoutRiskAlerts = (page = 1, limit = 20, status?: string) =>
+  api.get(`${BASE}/dropout-risk-alerts`, { params: { page, limit, status } }).then(r => r.data);
+export const getDropoutRiskAlert = (id: string) =>
+  api.get(`${BASE}/dropout-risk-alerts/${id}`).then(r => r.data);
+export const createDropoutRiskAlert = (data: any) =>
+  api.post(`${BASE}/dropout-risk-alerts`, data).then(r => r.data);
+export const updateDropoutRiskAlert = (id: string, data: any) =>
+  api.put(`${BASE}/dropout-risk-alerts/${id}`, data).then(r => r.data);
+export const deleteDropoutRiskAlert = (id: string) =>
+  api.delete(`${BASE}/dropout-risk-alerts/${id}`).then(r => r.data);

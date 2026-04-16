@@ -1,7 +1,7 @@
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getPlacementStats } from '../services/placement';
-import { ArrowLeft, Calendar, Building2, Briefcase, ClipboardList, Layers, Award, Trophy, BookOpen, GraduationCap, Dumbbell, Users, UserCheck, Lightbulb, Contact, CalendarDays, BarChart3, FileText } from 'lucide-react';
+import { ArrowLeft, Calendar, Building2, Briefcase, ClipboardList, Layers, Award, Trophy, BookOpen, GraduationCap, Dumbbell, Users, UserCheck, Lightbulb, Contact, CalendarDays, BarChart3, FileText, Target, FileCheck, UserCircle, Wrench, ShieldBan, LogOut } from 'lucide-react';
 
 import PlacementSeasonsPage from './placement/PlacementSeasonsPage';
 import CompaniesPage from './placement/CompaniesPage';
@@ -20,6 +20,12 @@ import EntrepreneurProfilesPage from './placement/EntrepreneurProfilesPage';
 import AlumniProfilesPage from './placement/AlumniProfilesPage';
 import AlumniEventsPage from './placement/AlumniEventsPage';
 import PlacementReportsPage from './placement/PlacementReportsPage';
+import PlacementDrivesPage from './placement/PlacementDrivesPage';
+import DriveApplicationsPage from './placement/DriveApplicationsPage';
+import CareerProfilesPage from './placement/CareerProfilesPage';
+import SkillRecordsPage from './placement/SkillRecordsPage';
+import PlacementBarsPage from './placement/PlacementBarsPage';
+import OptOutRecordsPage from './placement/OptOutRecordsPage';
 
 function PlacementHome() {
   const navigate = useNavigate();
@@ -177,9 +183,32 @@ function PlacementHome() {
 
       {/* Reports */}
       <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Reports</h3>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {[
           { to: 'reports', icon: BarChart3, label: 'Reports', desc: 'Placement analytics', iconBg: 'bg-slate-50 text-slate-600', border: 'border-slate-200 hover:border-slate-400', statKey: null },
+        ].map(card => {
+          const Icon = card.icon;
+          return (
+            <button key={card.to} onClick={() => navigate(card.to)} className={`bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all ${card.border}`}>
+              <div className={`inline-flex p-2.5 rounded-lg mb-3 ${card.iconBg}`}><Icon size={22} /></div>
+              <div className="text-2xl font-bold text-navy mb-1">--</div>
+              <div className="font-semibold text-navy-dark text-sm">{card.label}</div>
+              <p className="text-xs text-gray-500 mt-1">{card.desc}</p>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Drive Management & Student Profiles */}
+      <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Drive Management & Student Profiles</h3>
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+        {[
+          { to: 'drives', icon: Target, label: 'Placement Drives', desc: 'Campus drive scheduling', iconBg: 'bg-indigo-50 text-indigo-600', border: 'border-indigo-200 hover:border-indigo-400', statKey: null },
+          { to: 'drive-applications', icon: FileCheck, label: 'Drive Applications', desc: 'Student drive applications', iconBg: 'bg-cyan-50 text-cyan-600', border: 'border-cyan-200 hover:border-cyan-400', statKey: null },
+          { to: 'career-profiles', icon: UserCircle, label: 'Career Profiles', desc: 'Student career preferences', iconBg: 'bg-violet-50 text-violet-600', border: 'border-violet-200 hover:border-violet-400', statKey: null },
+          { to: 'skill-records', icon: Wrench, label: 'Skill Records', desc: 'Skills & assessments', iconBg: 'bg-teal-50 text-teal-600', border: 'border-teal-200 hover:border-teal-400', statKey: null },
+          { to: 'placement-bars', icon: ShieldBan, label: 'Placement Bars', desc: 'Barred students', iconBg: 'bg-red-50 text-red-600', border: 'border-red-200 hover:border-red-400', statKey: null },
+          { to: 'opt-outs', icon: LogOut, label: 'Opt-Out Records', desc: 'Placement opt-outs', iconBg: 'bg-orange-50 text-orange-600', border: 'border-orange-200 hover:border-orange-400', statKey: null },
         ].map(card => {
           const Icon = card.icon;
           return (
@@ -236,6 +265,12 @@ export default function Placement() {
         <Route path="alumni-profiles" element={<AlumniProfilesPage />} />
         <Route path="alumni-events" element={<AlumniEventsPage />} />
         <Route path="reports" element={<PlacementReportsPage />} />
+        <Route path="drives" element={<PlacementDrivesPage />} />
+        <Route path="drive-applications" element={<DriveApplicationsPage />} />
+        <Route path="career-profiles" element={<CareerProfilesPage />} />
+        <Route path="skill-records" element={<SkillRecordsPage />} />
+        <Route path="placement-bars" element={<PlacementBarsPage />} />
+        <Route path="opt-outs" element={<OptOutRecordsPage />} />
       </Routes>
     </SubPageWrapper>
   );

@@ -178,3 +178,63 @@ export const createPlacementReport = (data: any) =>
   api.post(`${BASE}/reports`, data).then(r => r.data);
 export const deletePlacementReport = (id: string) =>
   api.delete(`${BASE}/reports/${id}`).then(r => r.data);
+
+// ─── Placement Drives ────────────────────────────────────
+export const listPlacementDrives = (page = 1, limit = 20) =>
+  api.get(`${BASE}/drives`, { params: { page, limit } }).then(r => r.data);
+export const createPlacementDrive = (data: any) =>
+  api.post(`${BASE}/drives`, data).then(r => r.data);
+export const updatePlacementDrive = (id: string, data: any) =>
+  api.put(`${BASE}/drives/${id}`, data).then(r => r.data);
+export const deletePlacementDrive = (id: string) =>
+  api.delete(`${BASE}/drives/${id}`).then(r => r.data);
+
+// ─── Drive Applications ──────────────────────────────────
+export const listDriveApplications = (page = 1, limit = 20) =>
+  api.get(`${BASE}/drive-applications`, { params: { page, limit } }).then(r => r.data);
+export const createDriveApplication = (data: any) =>
+  api.post(`${BASE}/drive-applications`, data).then(r => r.data);
+export const updateDriveApplication = (id: string, data: any) =>
+  api.put(`${BASE}/drive-applications/${id}`, data).then(r => r.data);
+export const deleteDriveApplication = (id: string) =>
+  api.delete(`${BASE}/drive-applications/${id}`).then(r => r.data);
+
+// ─── Career Profiles ─────────────────────────────────────
+export const listCareerProfiles = (page = 1, limit = 20) =>
+  api.get(`${BASE}/career-profiles`, { params: { page, limit } }).then(r => r.data);
+export const createCareerProfile = (data: any) =>
+  api.post(`${BASE}/career-profiles`, data).then(r => r.data);
+export const updateCareerProfile = (id: string, data: any) =>
+  api.put(`${BASE}/career-profiles/${id}`, data).then(r => r.data);
+export const deleteCareerProfile = (id: string) =>
+  api.delete(`${BASE}/career-profiles/${id}`).then(r => r.data);
+
+// ─── Skill Records ───────────────────────────────────────
+export const listSkillRecords = (page = 1, limit = 20) =>
+  api.get(`${BASE}/skill-records`, { params: { page, limit } }).then(r => r.data);
+export const createSkillRecord = (data: any) =>
+  api.post(`${BASE}/skill-records`, data).then(r => r.data);
+export const updateSkillRecord = (id: string, data: any) =>
+  api.put(`${BASE}/skill-records/${id}`, data).then(r => r.data);
+export const deleteSkillRecord = (id: string) =>
+  api.delete(`${BASE}/skill-records/${id}`).then(r => r.data);
+
+// ─── Placement Bars ──────────────────────────────────────
+export const listPlacementBars = (page = 1, limit = 20) =>
+  api.get(`${BASE}/placement-bars`, { params: { page, limit } }).then(r => r.data);
+export const createPlacementBar = (data: any) =>
+  api.post(`${BASE}/placement-bars`, data).then(r => r.data);
+export const updatePlacementBar = (id: string, data: any) =>
+  api.put(`${BASE}/placement-bars/${id}`, data).then(r => r.data);
+export const deletePlacementBar = (id: string) =>
+  api.delete(`${BASE}/placement-bars/${id}`).then(r => r.data);
+
+// ─── Opt-Out Records ─────────────────────────────────────
+export const listOptOutRecords = (page = 1, limit = 20) =>
+  api.get(`${BASE}/opt-outs`, { params: { page, limit } }).then(r => r.data);
+export const createOptOutRecord = (data: any) =>
+  api.post(`${BASE}/opt-outs`, data).then(r => r.data);
+export const updateOptOutRecord = (id: string, data: any) =>
+  api.put(`${BASE}/opt-outs/${id}`, data).then(r => r.data);
+export const deleteOptOutRecord = (id: string) =>
+  api.delete(`${BASE}/opt-outs/${id}`).then(r => r.data);
