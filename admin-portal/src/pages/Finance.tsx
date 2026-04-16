@@ -2,7 +2,7 @@ import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getFinanceStats } from '../services/finance';
 import { getStats as getPeopleStats } from '../services/people';
-import { ArrowLeft, Landmark, CreditCard, GraduationCap, HandCoins, RotateCcw, Gavel, FileText, Wallet, Receipt, BookOpen, Users, ShieldAlert, CircleCheckBig } from 'lucide-react';
+import { ArrowLeft, Landmark, CreditCard, GraduationCap, HandCoins, RotateCcw, Gavel, FileText, Wallet, Receipt, BookOpen, Users, ShieldAlert, CircleCheckBig, Layers, Settings2, ArrowRightLeft, FileCheck, AlertTriangle, Lock } from 'lucide-react';
 
 import FeeStructuresPage from './finance/FeeStructuresPage';
 import StudentFeeAccountsPage from './finance/StudentFeeAccountsPage';
@@ -18,6 +18,12 @@ import InvoicesPage from './finance/InvoicesPage';
 import FinePenaltiesPage from './finance/FinePenaltiesPage';
 import FeeRemindersPage from './finance/FeeRemindersPage';
 import LedgerPage from './finance/LedgerPage';
+import FeeComponentsPage from './finance/FeeComponentsPage';
+import FeeComponentRulesPage from './finance/FeeComponentRulesPage';
+import PaymentTransactionsPage from './finance/PaymentTransactionsPage';
+import ReceiptsPage from './finance/ReceiptsPage';
+import DefaulterRecordsPage from './finance/DefaulterRecordsPage';
+import FinancialHoldsPage from './finance/FinancialHoldsPage';
 
 function FinanceHome() {
   const navigate = useNavigate();
@@ -161,6 +167,30 @@ function FinanceHome() {
           );
         })}
       </div>
+
+      {/* Fee Configuration & Collections */}
+      <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3 mt-8">Fee Configuration & Collections</h3>
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        {[
+          { to: 'fee-components', icon: Layers, label: 'Fee Components', desc: 'Tuition, hostel, transport fees', iconBg: 'bg-violet-50 text-violet-600', border: 'border-violet-200 hover:border-violet-400', statKey: null },
+          { to: 'fee-component-rules', icon: Settings2, label: 'Fee Rules', desc: 'Conditional fee logic', iconBg: 'bg-fuchsia-50 text-fuchsia-600', border: 'border-fuchsia-200 hover:border-fuchsia-400', statKey: null },
+          { to: 'payment-transactions', icon: ArrowRightLeft, label: 'Payment Transactions', desc: 'Transaction records', iconBg: 'bg-green-50 text-green-600', border: 'border-green-200 hover:border-green-400', statKey: null },
+          { to: 'receipts', icon: FileCheck, label: 'Receipts', desc: 'Payment receipts & reissue', iconBg: 'bg-sky-50 text-sky-600', border: 'border-sky-200 hover:border-sky-400', statKey: null },
+          { to: 'defaulter-records', icon: AlertTriangle, label: 'Defaulter Records', desc: 'Fee defaulter tracking', iconBg: 'bg-red-50 text-red-600', border: 'border-red-200 hover:border-red-400', statKey: null },
+          { to: 'financial-holds', icon: Lock, label: 'Financial Holds', desc: 'Registration & exam holds', iconBg: 'bg-rose-50 text-rose-600', border: 'border-rose-200 hover:border-rose-400', statKey: null },
+        ].map(card => {
+          const Icon = card.icon;
+          const count = card.statKey && stats ? (stats as any)[card.statKey] : '—';
+          return (
+            <button key={card.to} onClick={() => navigate(card.to)} className={`bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all ${card.border}`}>
+              <div className={`inline-flex p-2.5 rounded-lg mb-3 ${card.iconBg}`}><Icon size={22} /></div>
+              <div className="text-2xl font-bold text-navy mb-1">{count}</div>
+              <div className="font-semibold text-navy-dark text-sm">{card.label}</div>
+              <p className="text-xs text-gray-500 mt-1">{card.desc}</p>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -202,6 +232,12 @@ export default function Finance() {
         <Route path="invoices" element={<InvoicesPage />} />
         <Route path="fines" element={<FinePenaltiesPage />} />
         <Route path="ledger" element={<LedgerPage />} />
+        <Route path="fee-components" element={<FeeComponentsPage />} />
+        <Route path="fee-component-rules" element={<FeeComponentRulesPage />} />
+        <Route path="payment-transactions" element={<PaymentTransactionsPage />} />
+        <Route path="receipts" element={<ReceiptsPage />} />
+        <Route path="defaulter-records" element={<DefaulterRecordsPage />} />
+        <Route path="financial-holds" element={<FinancialHoldsPage />} />
       </Routes>
     </SubPageWrapper>
   );

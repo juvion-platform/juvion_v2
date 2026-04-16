@@ -178,3 +178,63 @@ export const createFinancialReport = (data: any) =>
   api.post(`${BASE}/reports`, data).then(r => r.data);
 export const deleteFinancialReport = (id: string) =>
   api.delete(`${BASE}/reports/${id}`).then(r => r.data);
+
+// ─── Fee Components ──────────────────────────────────────
+export const listFeeComponents = (page = 1, limit = 20) =>
+  api.get(`${BASE}/fee-components`, { params: { page, limit } }).then(r => r.data);
+export const createFeeComponent = (data: any) =>
+  api.post(`${BASE}/fee-components`, data).then(r => r.data);
+export const updateFeeComponent = (id: string, data: any) =>
+  api.put(`${BASE}/fee-components/${id}`, data).then(r => r.data);
+export const deleteFeeComponent = (id: string) =>
+  api.delete(`${BASE}/fee-components/${id}`).then(r => r.data);
+
+// ─── Fee Component Rules ─────────────────────────────────
+export const listFeeComponentRules = (page = 1, limit = 20) =>
+  api.get(`${BASE}/fee-component-rules`, { params: { page, limit } }).then(r => r.data);
+export const createFeeComponentRule = (data: any) =>
+  api.post(`${BASE}/fee-component-rules`, data).then(r => r.data);
+export const updateFeeComponentRule = (id: string, data: any) =>
+  api.put(`${BASE}/fee-component-rules/${id}`, data).then(r => r.data);
+export const deleteFeeComponentRule = (id: string) =>
+  api.delete(`${BASE}/fee-component-rules/${id}`).then(r => r.data);
+
+// ─── Payment Transactions ────────────────────────────────
+export const listPaymentTransactions = (page = 1, limit = 20) =>
+  api.get(`${BASE}/payment-transactions`, { params: { page, limit } }).then(r => r.data);
+export const createPaymentTransaction = (data: any) =>
+  api.post(`${BASE}/payment-transactions`, data).then(r => r.data);
+export const updatePaymentTransaction = (id: string, data: any) =>
+  api.put(`${BASE}/payment-transactions/${id}`, data).then(r => r.data);
+export const deletePaymentTransaction = (id: string) =>
+  api.delete(`${BASE}/payment-transactions/${id}`).then(r => r.data);
+
+// ─── Receipts ────────────────────────────────────────────
+export const listReceipts = (page = 1, limit = 20) =>
+  api.get(`${BASE}/receipts`, { params: { page, limit } }).then(r => r.data);
+export const createReceipt = (data: any) =>
+  api.post(`${BASE}/receipts`, data).then(r => r.data);
+export const updateReceipt = (id: string, data: any) =>
+  api.put(`${BASE}/receipts/${id}`, data).then(r => r.data);
+export const deleteReceipt = (id: string) =>
+  api.delete(`${BASE}/receipts/${id}`).then(r => r.data);
+
+// ─── Defaulter Records ──────────────────────────────────
+export const listDefaulterRecords = (page = 1, limit = 20) =>
+  api.get(`${BASE}/defaulter-records`, { params: { page, limit } }).then(r => r.data);
+export const createDefaulterRecord = (data: any) =>
+  api.post(`${BASE}/defaulter-records`, data).then(r => r.data);
+export const updateDefaulterRecord = (id: string, data: any) =>
+  api.put(`${BASE}/defaulter-records/${id}`, data).then(r => r.data);
+export const deleteDefaulterRecord = (id: string) =>
+  api.delete(`${BASE}/defaulter-records/${id}`).then(r => r.data);
+
+// ─── Financial Holds ─────────────────────────────────────
+export const listFinancialHolds = (page = 1, limit = 20) =>
+  api.get(`${BASE}/financial-holds`, { params: { page, limit } }).then(r => r.data);
+export const createFinancialHold = (data: any) =>
+  api.post(`${BASE}/financial-holds`, data).then(r => r.data);
+export const updateFinancialHold = (id: string, data: any) =>
+  api.put(`${BASE}/financial-holds/${id}`, data).then(r => r.data);
+export const deleteFinancialHold = (id: string) =>
+  api.delete(`${BASE}/financial-holds/${id}`).then(r => r.data);
