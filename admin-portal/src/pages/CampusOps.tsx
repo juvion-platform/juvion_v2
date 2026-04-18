@@ -12,6 +12,8 @@ import {
   DoorClosed, Globe, Newspaper,
 } from 'lucide-react';
 
+import AllocationProposalsPage from './campus/AllocationProposalsPage';
+import MyCampusServicesPage from './campus/MyCampusServicesPage';
 import BuildingsPage from './campus-ops/BuildingsPage';
 import RoomsPage from './campus-ops/RoomsPage';
 import RoomBookingsPage from './campus-ops/RoomBookingsPage';
@@ -269,6 +271,9 @@ export default function CampusOps() {
     <SubPageWrapper>
       <Routes>
         <Route index element={<CampusOpsHome />} />
+        {/* Optional Allotment (T16/T17/T18) */}
+        <Route path="allocation-proposals" element={<AllocationProposalsPage />} />
+        <Route path="my-services" element={<MyCampusServicesPage />} />
         {/* Campus Infrastructure */}
         <Route path="buildings" element={<BuildingsPage />} />
         <Route path="rooms" element={<RoomsPage />} />

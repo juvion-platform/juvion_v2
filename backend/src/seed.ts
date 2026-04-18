@@ -800,19 +800,27 @@ async function seed() {
   console.log('Curriculum Maps created');
 
   // --- Hostel Allocations ---
+  // Retrofitted with propose/respond metadata so new-schema invariants hold:
+  // every post-accept allocation carries proposedAt/respondedAt/respondedBy.
+  const hostelAllocDate = new Date('2024-07-10');
   await HostelAllocation.create([
-    { collegeId: CID, studentId: students[0]._id, roomId: hostelRooms[0]._id, academicYearId: ay2024._id, allocatedDate: new Date('2024-07-10'), status: 'active' },
-    { collegeId: CID, studentId: students[2]._id, roomId: hostelRooms[1]._id, academicYearId: ay2024._id, allocatedDate: new Date('2024-07-10'), status: 'active' },
-    { collegeId: CID, studentId: students[4]._id, roomId: hostelRooms[2]._id, academicYearId: ay2024._id, allocatedDate: new Date('2024-07-10'), status: 'active' },
-    { collegeId: CID, studentId: students[1]._id, roomId: hostelRooms[3]._id, academicYearId: ay2024._id, allocatedDate: new Date('2024-07-10'), status: 'active' },
+    { collegeId: CID, studentId: students[0]._id, roomId: hostelRooms[0]._id, academicYearId: ay2024._id, allocatedDate: hostelAllocDate, status: 'active', proposedAt: hostelAllocDate, respondedAt: hostelAllocDate, respondedBy: students[0]._id, allocationMethod: 'admin_proposed' },
+    { collegeId: CID, studentId: students[2]._id, roomId: hostelRooms[1]._id, academicYearId: ay2024._id, allocatedDate: hostelAllocDate, status: 'active', proposedAt: hostelAllocDate, respondedAt: hostelAllocDate, respondedBy: students[2]._id, allocationMethod: 'admin_proposed' },
+    { collegeId: CID, studentId: students[4]._id, roomId: hostelRooms[2]._id, academicYearId: ay2024._id, allocatedDate: hostelAllocDate, status: 'active', proposedAt: hostelAllocDate, respondedAt: hostelAllocDate, respondedBy: students[4]._id, allocationMethod: 'admin_proposed' },
+    { collegeId: CID, studentId: students[1]._id, roomId: hostelRooms[3]._id, academicYearId: ay2024._id, allocatedDate: hostelAllocDate, status: 'active', proposedAt: hostelAllocDate, respondedAt: hostelAllocDate, respondedBy: students[1]._id, allocationMethod: 'admin_proposed' },
+    // One proposed (pending) so the student portal has something to accept/decline in dev:
+    { collegeId: CID, studentId: students[5]._id, roomId: hostelRooms[0]._id, academicYearId: ay2024._id, status: 'proposed', proposedAt: new Date(), ttlDays: 7, expiresAt: new Date(Date.now() + 7 * 86400_000), allocationMethod: 'admin_proposed' },
   ]);
   console.log('Hostel Allocations created');
 
   // --- Transport Allocations ---
+  const transportAllocDate = new Date('2024-07-10');
   await TransportAllocation.create([
-    { collegeId: CID, studentId: students[3]._id, routeId: routes[0]._id, stopName: 'Kukatpally Bus Stand', academicYearId: ay2024._id, status: 'active' },
-    { collegeId: CID, studentId: students[5]._id, routeId: routes[1]._id, stopName: 'Dilsukhnagar Bus Stand', academicYearId: ay2024._id, status: 'active' },
-    { collegeId: CID, studentId: students[6]._id, routeId: routes[2]._id, stopName: 'Secunderabad Station', academicYearId: ay2024._id, status: 'active' },
+    { collegeId: CID, studentId: students[3]._id, routeId: routes[0]._id, stopName: 'Kukatpally Bus Stand', academicYearId: ay2024._id, status: 'active', proposedAt: transportAllocDate, respondedAt: transportAllocDate, respondedBy: students[3]._id, feeTriggered: true, allocationType: 'admin_proposed' },
+    { collegeId: CID, studentId: students[5]._id, routeId: routes[1]._id, stopName: 'Dilsukhnagar Bus Stand', academicYearId: ay2024._id, status: 'active', proposedAt: transportAllocDate, respondedAt: transportAllocDate, respondedBy: students[5]._id, feeTriggered: true, allocationType: 'admin_proposed' },
+    { collegeId: CID, studentId: students[6]._id, routeId: routes[2]._id, stopName: 'Secunderabad Station', academicYearId: ay2024._id, status: 'active', proposedAt: transportAllocDate, respondedAt: transportAllocDate, respondedBy: students[6]._id, feeTriggered: true, allocationType: 'admin_proposed' },
+    // One proposed to exercise the student portal flow:
+    { collegeId: CID, studentId: students[0]._id, routeId: routes[0]._id, stopName: 'Kukatpally Bus Stand', academicYearId: ay2024._id, status: 'proposed', proposedAt: new Date(), ttlDays: 7, expiresAt: new Date(Date.now() + 7 * 86400_000), allocationType: 'admin_proposed' },
   ]);
   console.log('Transport Allocations created');
 

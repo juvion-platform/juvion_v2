@@ -656,4 +656,43 @@ router.post('/provision/:studentId', authorize('campus', 'create'), validate(pro
 router.get('/compliance/evidence', authorize('campus', 'read'), ctrl.getComplianceEvidenceCtrl);
 router.get('/governance/metrics', authorize('campus', 'read'), ctrl.getGovernanceMetricsCtrl);
 
+// ═══════════════════════════════════════════════════════════
+// OPTIONAL-ALLOTMENT: HOSTEL + TRANSPORT PROPOSAL LIFECYCLE
+// (T8 hostel admin, T9 transport admin, T10 student actions)
+// SubDomain-scoped so warden can't act on transport and vice versa.
+// ═══════════════════════════════════════════════════════════
+import * as allocCtrl from './allocation-controller';
+import {
+  proposeHostelSchema, proposeTransportSchema,
+  withdrawSchema, declineSchema, vacateRequestSchema,
+  approveVacateSchema, rejectVacateSchema,
+  promoteSchema, acceptSchema,
+} from './allocation-validation';
+
+// T8 — hostel admin actions (warden / super-admin)
+router.post('/hostel/allocations/propose', authorize('campus', 'create', { subDomain: 'hostel' }), validate(proposeHostelSchema), allocCtrl.proposeHostel);
+router.post('/hostel/allocations/:id/withdraw', authorize('campus', 'update', { subDomain: 'hostel' }), validate(withdrawSchema), allocCtrl.withdrawHostel);
+router.post('/hostel/allocations/:id/promote', authorize('campus', 'update', { subDomain: 'hostel' }), validate(promoteSchema), allocCtrl.promoteHostel);
+router.post('/hostel/allocations/:id/approve-vacate', authorize('campus', 'update', { subDomain: 'hostel' }), validate(approveVacateSchema), allocCtrl.approveVacateHostel);
+router.post('/hostel/allocations/:id/reject-vacate', authorize('campus', 'update', { subDomain: 'hostel' }), validate(rejectVacateSchema), allocCtrl.rejectVacateHostel);
+
+// T9 — transport admin actions (transport officer / super-admin)
+router.post('/transport/allocations/propose', authorize('campus', 'create', { subDomain: 'transport' }), validate(proposeTransportSchema), allocCtrl.proposeTransport);
+router.post('/transport/allocations/:id/withdraw', authorize('campus', 'update', { subDomain: 'transport' }), validate(withdrawSchema), allocCtrl.withdrawTransport);
+router.post('/transport/allocations/:id/promote', authorize('campus', 'update', { subDomain: 'transport' }), validate(promoteSchema), allocCtrl.promoteTransport);
+router.post('/transport/allocations/:id/approve-vacate', authorize('campus', 'update', { subDomain: 'transport' }), validate(approveVacateSchema), allocCtrl.approveCancelTransport);
+router.post('/transport/allocations/:id/reject-vacate', authorize('campus', 'update', { subDomain: 'transport' }), validate(rejectVacateSchema), allocCtrl.rejectCancelTransport);
+
+// T10 — student actions (on own allocation). RBAC: student + selfOnly.
+router.post('/hostel/allocations/:id/accept', authorize('campus', 'update', { subDomain: 'hostel-allocation' }), validate(acceptSchema), allocCtrl.acceptHostel);
+router.post('/hostel/allocations/:id/decline', authorize('campus', 'update', { subDomain: 'hostel-allocation' }), validate(declineSchema), allocCtrl.declineHostel);
+router.post('/hostel/allocations/:id/request-vacate', authorize('campus', 'update', { subDomain: 'hostel-allocation' }), validate(vacateRequestSchema), allocCtrl.requestVacateHostel);
+router.post('/transport/allocations/:id/accept', authorize('campus', 'update', { subDomain: 'transport-allocation' }), validate(acceptSchema), allocCtrl.acceptTransport);
+router.post('/transport/allocations/:id/decline', authorize('campus', 'update', { subDomain: 'transport-allocation' }), validate(declineSchema), allocCtrl.declineTransport);
+router.post('/transport/allocations/:id/request-vacate', authorize('campus', 'update', { subDomain: 'transport-allocation' }), validate(vacateRequestSchema), allocCtrl.requestCancelTransport);
+
+// Student-scoped list endpoints
+router.get('/hostel/allocations/mine', authorize('campus', 'read'), allocCtrl.listMyHostelAllocations);
+router.get('/transport/allocations/mine', authorize('campus', 'read'), allocCtrl.listMyTransportAllocations);
+
 export default router;
