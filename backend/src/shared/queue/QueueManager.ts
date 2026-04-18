@@ -119,4 +119,7 @@ export const QUEUE_NAMES = {
   WHATSAPP: 'platform:whatsapp',
   SMS: 'platform:sms',
   EMAIL: 'platform:email',
+
+  // Campus ops
+  CAMPUS_PROPOSAL_EXPIRY: 'campus:proposal-expiry',
 } as const;

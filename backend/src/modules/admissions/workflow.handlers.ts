@@ -33,6 +33,9 @@ import { HostelBlock } from '../../models/welfare/HostelBlock';
 import { HostelRoom } from '../../models/welfare/HostelRoom';
 import { TransportAllocation } from '../../models/welfare/TransportAllocation';
 import { TransportRoute } from '../../models/welfare/TransportRoute';
+import { proposeHostelAllocation } from '../campus-ops/hostel-allocation-service';
+import { proposeTransportAllocation } from '../campus-ops/transport-allocation-service';
+import { isOptionalAllotmentEnabled } from '../../config/features';
 import { JuviAction } from '../../models/juvi/JuviAction';
 import { JuviConversation } from '../../models/juvi/JuviConversation';
 import { JuviMessage } from '../../models/juvi/JuviMessage';
@@ -1164,43 +1167,71 @@ registerWorkflowStepHandler('W01', 'provision_m08', async ({ instance, result, c
   const transportRequired = result.transportRequired === true;
   const preferredStopName = typeof result.preferredStopName === 'string' ? result.preferredStopName.trim() : undefined;
 
+  // ── OPTIONAL-ALLOTMENT FLAG GATE ──
+  // When the flag is on (feature enabled), admission creates a `proposed`
+  // allocation instead of an active one; the student must accept from their
+  // portal. When off, legacy auto-allocate path runs for backwards compat.
+  const optionalAllotmentEnabled = isOptionalAllotmentEnabled();
+
   let hostelStatus: 'completed' | 'failed' | 'skipped' = hostelRequired ? 'failed' : 'skipped';
   let hostelAllocation: any = null;
   let hostelRoom: any = null;
   if (hostelRequired && academicYearId) {
+    // Match any live allocation (new flow adds 'proposed', 'waitlisted', 'vacate_requested')
     hostelAllocation = await HostelAllocation.findOne({
       collegeId: instance.collegeId,
       studentId: student._id,
       academicYearId,
-      status: 'active',
+      status: { $in: ['proposed', 'waitlisted', 'active', 'vacate_requested'] },
     });
 
     if (!hostelAllocation) {
       hostelRoom = await resolveHostelRoom(instance, applicant.gender);
       if (hostelRoom) {
-        hostelAllocation = await HostelAllocation.create({
-          collegeId: instance.collegeId,
-          studentId: student._id,
-          roomId: hostelRoom._id,
-          academicYearId,
-          allocatedDate: new Date(),
-          status: 'active',
-        });
+        if (optionalAllotmentEnabled) {
+          // NEW PATH: create a proposal via the service (handles audit,
+          // notification, TTL, expiry, and idempotency).
+          try {
+            hostelAllocation = await proposeHostelAllocation(
+              String(instance.collegeId),
+              {
+                studentId: String(student._id),
+                roomId: String(hostelRoom._id),
+                academicYearId: String(academicYearId),
+              },
+              completedBy,
+            );
+          } catch (err) {
+            // Capacity-full (with no forceWaitlist) surfaces here; leave the
+            // step marked 'failed' and let the admin re-try via the campus portal.
+            console.warn('[workflow] hostel proposal failed:', (err as Error).message);
+          }
+        } else {
+          // LEGACY PATH: direct active allocation.
+          hostelAllocation = await HostelAllocation.create({
+            collegeId: instance.collegeId,
+            studentId: student._id,
+            roomId: hostelRoom._id,
+            academicYearId,
+            allocatedDate: new Date(),
+            status: 'active',
+          });
 
-        const nextOccupancy = Math.min((hostelRoom.occupancy || 0) + 1, hostelRoom.capacity || 0);
-        hostelRoom.occupancy = nextOccupancy;
-        hostelRoom.status = nextOccupancy >= (hostelRoom.capacity || 0) ? 'full' : 'available';
-        await hostelRoom.save();
+          const nextOccupancy = Math.min((hostelRoom.occupancy || 0) + 1, hostelRoom.capacity || 0);
+          hostelRoom.occupancy = nextOccupancy;
+          hostelRoom.status = nextOccupancy >= (hostelRoom.capacity || 0) ? 'full' : 'available';
+          await hostelRoom.save();
 
-        await createAuditLog({
-          collegeId: String(instance.collegeId),
-          entityType: 'HostelAllocation',
-          entityId: String(hostelAllocation._id),
-          entityName: String(hostelRoom.roomNumber),
-          action: 'create',
-          changes: [],
-          performedBy: completedBy,
-        });
+          await createAuditLog({
+            collegeId: String(instance.collegeId),
+            entityType: 'HostelAllocation',
+            entityId: String(hostelAllocation._id),
+            entityName: String(hostelRoom.roomNumber),
+            action: 'create',
+            changes: [],
+            performedBy: completedBy,
+          });
+        }
       }
     } else {
       hostelRoom = await HostelRoom.findOne({ _id: hostelAllocation.roomId, collegeId: instance.collegeId });
@@ -1217,31 +1248,50 @@ registerWorkflowStepHandler('W01', 'provision_m08', async ({ instance, result, c
       collegeId: instance.collegeId,
       studentId: student._id,
       academicYearId,
-      status: 'active',
+      status: { $in: ['proposed', 'waitlisted', 'active', 'vacate_requested'] },
     });
 
     if (!transportAllocation) {
       transportRoute = await resolveTransportRoute(instance, applicant, academicYearId, preferredStopName);
       const stopName = transportRoute ? pickTransportStopName(transportRoute, preferredStopName) : undefined;
       if (transportRoute && stopName) {
-        transportAllocation = await TransportAllocation.create({
-          collegeId: instance.collegeId,
-          studentId: student._id,
-          routeId: transportRoute._id,
-          stopName,
-          academicYearId,
-          status: 'active',
-        });
+        if (optionalAllotmentEnabled) {
+          // NEW PATH
+          try {
+            transportAllocation = await proposeTransportAllocation(
+              String(instance.collegeId),
+              {
+                studentId: String(student._id),
+                routeId: String(transportRoute._id),
+                stopName,
+                academicYearId: String(academicYearId),
+              },
+              completedBy,
+            );
+          } catch (err) {
+            console.warn('[workflow] transport proposal failed:', (err as Error).message);
+          }
+        } else {
+          // LEGACY PATH
+          transportAllocation = await TransportAllocation.create({
+            collegeId: instance.collegeId,
+            studentId: student._id,
+            routeId: transportRoute._id,
+            stopName,
+            academicYearId,
+            status: 'active',
+          });
 
-        await createAuditLog({
-          collegeId: String(instance.collegeId),
-          entityType: 'TransportAllocation',
-          entityId: String(transportAllocation._id),
-          entityName: stopName,
-          action: 'create',
-          changes: [],
-          performedBy: completedBy,
-        });
+          await createAuditLog({
+            collegeId: String(instance.collegeId),
+            entityType: 'TransportAllocation',
+            entityId: String(transportAllocation._id),
+            entityName: stopName,
+            action: 'create',
+            changes: [],
+            performedBy: completedBy,
+          });
+        }
       }
     } else {
       transportRoute = await TransportRoute.findOne({ _id: transportAllocation.routeId, collegeId: instance.collegeId });

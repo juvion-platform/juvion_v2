@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
-    "test:all": "vitest run && vitest run --config vitest.e2e.config.ts"
+    "test:all": "vitest run && vitest run --config vitest.e2e.config.ts",
+    "migrate:optional-allotment": "ts-node -r dotenv/config src/migrations/2026-04-optional-allotment.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

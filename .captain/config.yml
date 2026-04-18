@@ -1,0 +1,12 @@
+project: juvion_v2
+captain_spec_version: 1
+contract_version: 1
+test_runners:
+  typescript: vitest
+features:
+  - name: optional-hostel-transport-allotment
+    status: complete
+    phase: 4
+    tasks_total: 20
+    tasks_ready: 0
+    tasks_done: 20
