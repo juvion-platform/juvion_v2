@@ -1,4 +1,4 @@
-import { Schema, model, Document } from 'mongoose';
+import { Schema, model, Document, Types } from 'mongoose';
 
 /**
  * CampusConfig — per-college operational configuration for the M08 Campus Ops
@@ -10,7 +10,7 @@ import { Schema, model, Document } from 'mongoose';
  * allocation proposal before it auto-expires.
  */
 export interface ICampusConfig extends Document {
-  collegeId: Schema.Types.ObjectId;
+  collegeId: Types.ObjectId;
   hostel: {
     allocationAlgorithm: string;
     preferenceWeight: number;

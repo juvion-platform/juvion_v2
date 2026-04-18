@@ -140,13 +140,24 @@ export async function checkCapacity(
 // ─────────────────────────────────────────────────────────────
 
 /**
- * Structural shape of an allocation document for transition purposes. Using
- * `any` for the document instance avoids friction between `Schema.Types.ObjectId`
- * in the model interfaces and `mongoose.Types.ObjectId` at runtime; we only
- * care about a stable set of fields.
+ * Minimal structural contract the transition recorder needs from an
+ * allocation document. Fields are typed permissively enough to accept any
+ * Mongoose-loaded HostelAllocation/TransportAllocation document without
+ * callers having to cast — Mongoose's internal `Document._id` and
+ * `bson.ObjectId` aren't literally the same TS type as `Types.ObjectId`
+ * even though they're the same at runtime, so we describe what we need
+ * rather than restate the full type.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type AllocationDocLike = any;
+type ObjectIdLike = any;
+
+export interface AllocationDocLike {
+  _id: ObjectIdLike;
+  studentId: ObjectIdLike;
+  academicYearId: ObjectIdLike;
+  status: string;
+  save: (opts?: { session?: ClientSession | null }) => Promise<unknown>;
+}
 
 export interface RecordTransitionParams {
   flow: AllocationFlow;
@@ -154,7 +165,7 @@ export interface RecordTransitionParams {
   allocation: AllocationDocLike;
   fromStatus: string;
   toStatus: string;
-  action: string; // 'propose' | 'accept' | 'decline' | 'withdraw' | 'expire' | 'waitlist_promote' | 'vacate_request' | 'vacate_approve' | 'vacate_reject'
+  action: import('../../shared/types').AuditAction;
   performedBy: string;
   reason?: string;
   notifyStudent?: boolean;
@@ -179,7 +190,8 @@ export async function recordTransition(params: RecordTransitionParams): Promise<
     await allocation.save({ session });
   }
 
-  // Audit log
+  // Audit log — use the semantic action name (propose/accept/expire/...)
+  // now that AuditAction supports it, not a faked 'update'.
   await AuditLog.create(
     [{
       collegeId,
@@ -187,7 +199,7 @@ export async function recordTransition(params: RecordTransitionParams): Promise<
       entityId: String(allocation._id),
       entityName: `${flow}-${String(allocation._id).slice(-6)}`,
       studentId: allocation.studentId,
-      action: 'update',
+      action,
       changes: [{
         field: 'status',
         displayName: 'Status',
@@ -248,11 +260,6 @@ export async function recordTransition(params: RecordTransitionParams): Promise<
     await maybeCreateFeeLineItem(flow, collegeId, allocation, session);
   }
 
-  // Action label is intentionally just stored in the audit log's change
-  // record (via `action: 'update'` + the `fromStatus/toStatus` change). A
-  // fuller audit model with action type would be a future refinement;
-  // today's AuditLog action enum is limited to create/update/delete.
-  void action;
 }
 
 // A fixed sentinel ObjectId used when a non-user actor (scheduled jobs,
