@@ -164,7 +164,10 @@ const maintenanceSchema = new Schema(
 
 const schema = new Schema<ICampusConfig>(
   {
-    collegeId: { type: Schema.Types.ObjectId, required: true, index: true },
+    // No field-level index here; the unique compound index below (and only that)
+    // defines the collegeId index, which avoids the Mongoose "duplicate schema
+    // index" warning that the earlier dual definition produced.
+    collegeId: { type: Schema.Types.ObjectId, required: true },
     hostel: { type: hostelSchema, default: () => ({}) },
     mess: { type: messSchema, default: () => ({}) },
     transport: { type: transportSchema, default: () => ({}) },
