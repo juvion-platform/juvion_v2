@@ -31,11 +31,27 @@ app.use(cors({
   credentials: true,
 }));
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
-app.use(express.json({ limit: '10mb' }));
+// Capture rawBody alongside parsed JSON so webhook HMAC verification can
+// hash the exact byte sequence the sender signed. ~10MB overhead cap per
+// request; same as the JSON limit so no new memory ceiling introduced.
+app.use(express.json({
+  limit: '10mb',
+  verify: (req, _res, buf) => {
+    (req as unknown as { rawBody?: Buffer }).rawBody = buf;
+  },
+}));
 
 // JWT secret validation in production
 if (process.env.NODE_ENV === 'production' && (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'dev-secret')) {
   console.error('FATAL: JWT_SECRET must be set to a secure value in production');
+  process.exit(1);
+}
+
+// Payment webhook secret validation in production — webhooks are rejected
+// without it, so this fails loudly at startup rather than silently breaking
+// real payment flows.
+if (process.env.NODE_ENV === 'production' && !process.env.PAYMENT_WEBHOOK_SECRET) {
+  console.error('FATAL: PAYMENT_WEBHOOK_SECRET must be set in production');
   process.exit(1);
 }
 

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { authenticate } from '../../middleware/authenticate';
 import { authorize } from '../../middleware/authorize';
 import { validate } from '../../middleware/validate';
+import { verifyPaymentWebhookSignature } from '../../middleware/webhookSignature';
 import * as ctrl from './controller';
 import {
   createFeeStructureSchema, updateFeeStructureSchema,
@@ -162,7 +163,17 @@ router.put('/fee-line-items/:id', authorize('finance', 'update'), validate(updat
 router.delete('/fee-line-items/:id', authorize('finance', 'delete'), ctrl.deleteFeeLineItem);
 
 // ═══ W03: Payment Gateway Webhook ════════════════════════════
-router.post('/payments/gateway-webhook', validate(processGatewayWebhookSchema), ctrl.processGatewayWebhook);
+// Unauthenticated (gateways don't hold our JWT) but gated by HMAC
+// signature verification. `verifyPaymentWebhookSignature` runs AFTER
+// `validate` so the body is parsed + validated before signature check;
+// the middleware reads `orderId` from the validated body and resolves
+// `req.collegeId` from the matching PaymentGatewayLog.
+router.post(
+  '/payments/gateway-webhook',
+  validate(processGatewayWebhookSchema),
+  verifyPaymentWebhookSignature,
+  ctrl.processGatewayWebhook,
+);
 
 // ═══ W03: Payment Collection ═════════════════════════════════
 router.post('/payments/counter', authorize('finance', 'create'), validate(recordCounterPaymentSchema), ctrl.recordCounterPayment);
