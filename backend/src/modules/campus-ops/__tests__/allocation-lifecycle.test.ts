@@ -255,6 +255,43 @@ describe('recordTransition', () => {
     expect(notifs[0]!.channel).toBe('app');
   });
 
+  it('does NOT emit email-channel notifications when FEATURE_EMAIL_NOTIFICATIONS is off', async () => {
+    delete process.env.FEATURE_EMAIL_NOTIFICATIONS;
+    const cid = String(collegeId());
+    const { allocation } = await seedHostelProposed(cid);
+    await recordTransition({
+      flow: 'hostel', collegeId: cid, allocation,
+      fromStatus: 'proposed', toStatus: 'active', action: 'accept',
+      performedBy: String(new mongoose.Types.ObjectId()),
+      notifyStudent: true, notifyAdmin: true,
+    });
+    const emails = await Notification.find({ collegeId: cid, channel: 'email' });
+    expect(emails.length).toBe(0);
+  });
+
+  it('emits parallel email-channel notifications when FEATURE_EMAIL_NOTIFICATIONS=true', async () => {
+    process.env.FEATURE_EMAIL_NOTIFICATIONS = 'true';
+    try {
+      const cid = String(collegeId());
+      const { allocation } = await seedHostelProposed(cid);
+      await recordTransition({
+        flow: 'hostel', collegeId: cid, allocation,
+        fromStatus: 'proposed', toStatus: 'active', action: 'accept',
+        performedBy: String(new mongoose.Types.ObjectId()),
+        notifyStudent: true, notifyAdmin: true,
+      });
+      const appNotifs = await Notification.find({ collegeId: cid, channel: 'app' });
+      const emailNotifs = await Notification.find({ collegeId: cid, channel: 'email' });
+      // One each for student + admin, per channel.
+      expect(appNotifs.length).toBe(2);
+      expect(emailNotifs.length).toBe(2);
+      // Email records are staged, not sent — an SMTP worker handles delivery.
+      expect(emailNotifs.every((n) => n.status === 'scheduled')).toBe(true);
+    } finally {
+      delete process.env.FEATURE_EMAIL_NOTIFICATIONS;
+    }
+  });
+
   it('creates a FeeLineItem when triggerFee=true (no FeeStructure → amount 0)', async () => {
     const cid = String(collegeId());
     const { allocation } = await seedHostelProposed(cid);

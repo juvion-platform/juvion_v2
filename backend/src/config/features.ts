@@ -26,16 +26,35 @@ export function isOptionalAllotmentEnabled(): boolean {
 }
 
 /**
+ * Email-channel notifications for allocation lifecycle events.
+ *
+ * When enabled, `allocation-lifecycle.recordTransition` produces an
+ * additional `Notification { channel: 'email' }` record alongside the
+ * standard in-app one. A downstream SMTP worker (not part of this
+ * feature) is expected to consume `channel: 'email'` records from the
+ * `Notification` collection and deliver them. Until that worker exists,
+ * turning this flag on causes email-channel records to accumulate
+ * harmlessly — they're valid `Notification` documents.
+ */
+export function isEmailNotificationsEnabled(): boolean {
+  return process.env.FEATURE_EMAIL_NOTIFICATIONS === FLAG_ON;
+}
+
+/**
  * Typed accessor for all feature flags. Use as `features.optionalAllotmentProposals`
  * at call sites that prefer field-style access over function calls. The getter
  * ensures the value stays in sync with the live env var.
  */
 export interface Features {
   readonly optionalAllotmentProposals: boolean;
+  readonly emailNotifications: boolean;
 }
 
 export const features: Features = {
   get optionalAllotmentProposals(): boolean {
     return isOptionalAllotmentEnabled();
+  },
+  get emailNotifications(): boolean {
+    return isEmailNotificationsEnabled();
   },
 };
