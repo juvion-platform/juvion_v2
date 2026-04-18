@@ -32,6 +32,7 @@ import { AuditLog } from '../../shared/audit';
 import { Notification } from '../../models/communication/Notification';
 import { FeeLineItem } from '../../models/finance/FeeLineItem';
 import { FeeStructure } from '../../models/finance/FeeStructure';
+import { isEmailNotificationsEnabled } from '../../config/features';
 
 export type AllocationFlow = 'hostel' | 'transport';
 
@@ -220,39 +221,46 @@ export async function recordTransition(params: RecordTransitionParams): Promise<
   // (the expiry worker) pass 'system'. Use a sentinel ObjectId for system.
   const sentBy = resolveSentBy(performedBy);
 
+  const title = `${serviceName} allocation ${toStatus}`;
+  const baseType = toStatus === 'expired' || toStatus === 'withdrawn' ? 'alert' : 'info';
+  const emitEmailChannel = isEmailNotificationsEnabled();
+
   if (notifyStudent) {
-    await Notification.create(
-      [{
-        collegeId,
-        title: `${serviceName} allocation ${toStatus}`,
-        message: messageBody,
-        type: toStatus === 'expired' || toStatus === 'withdrawn' ? 'alert' : 'info',
-        targetAudience: 'individual',
-        targetIds: [allocation.studentId],
-        channel: 'app',
-        sentBy,
-        status: 'sent',
-        sentAt: new Date(),
-      }],
-      { session },
-    );
+    const records: Record<string, unknown>[] = [
+      {
+        collegeId, title, message: messageBody, type: baseType,
+        targetAudience: 'individual', targetIds: [allocation.studentId],
+        channel: 'app', sentBy, status: 'sent', sentAt: new Date(),
+      },
+    ];
+    if (emitEmailChannel) {
+      // Parallel email-channel record. Status is 'scheduled' — the yet-to-be-built
+      // SMTP worker will transition it to 'sent' on successful delivery.
+      records.push({
+        collegeId, title, message: messageBody, type: baseType,
+        targetAudience: 'individual', targetIds: [allocation.studentId],
+        channel: 'email', sentBy, status: 'scheduled', scheduledAt: new Date(),
+      });
+    }
+    await Notification.create(records, { session });
   }
 
   if (notifyAdmin) {
-    await Notification.create(
-      [{
-        collegeId,
-        title: `${serviceName} allocation ${toStatus}`,
-        message: messageBody,
-        type: 'info',
-        targetAudience: 'staff',
-        channel: 'app',
-        sentBy,
-        status: 'sent',
-        sentAt: new Date(),
-      }],
-      { session },
-    );
+    const records: Record<string, unknown>[] = [
+      {
+        collegeId, title, message: messageBody, type: 'info',
+        targetAudience: 'staff', channel: 'app',
+        sentBy, status: 'sent', sentAt: new Date(),
+      },
+    ];
+    if (emitEmailChannel) {
+      records.push({
+        collegeId, title, message: messageBody, type: 'info',
+        targetAudience: 'staff', channel: 'email',
+        sentBy, status: 'scheduled', scheduledAt: new Date(),
+      });
+    }
+    await Notification.create(records, { session });
   }
 
   // Fee trigger: only on transitions that result in an active allocation
