@@ -12,6 +12,8 @@ import * as hostel from './hostel-allocation-service';
 import * as transport from './transport-allocation-service';
 import { HostelAllocation } from '../../models/welfare/HostelAllocation';
 import { TransportAllocation } from '../../models/welfare/TransportAllocation';
+import { User } from '../../models/User';
+import { Student } from '../../models/people/Student';
 
 // ── Utilities ──
 
@@ -26,15 +28,25 @@ function requirePerformedBy(req: AuthRequest): string {
 }
 
 /**
- * Student-role actions must resolve a studentId. For this feature, the
- * student's personId (on the User → Person link) is the natural key; in
- * v1 we take it from `req.user.id` as a simplification and defer the
- * fuller Student-lookup to a later refactor — services only use it for
- * ownership comparison (stringified).
+ * Resolve the caller's Student _id from the JWT.
+ *
+ * The JWT carries the User._id, but allocations are keyed on Student._id.
+ * The chain is User.personId → Person._id → Student.personId (same
+ * Person._id) → Student._id, so we hop User → Student via personId.
+ *
+ * Fails 403 if the caller isn't linked to a Student in this college —
+ * which is the correct outcome for non-student roles hitting a student-only
+ * endpoint.
  */
-function requireStudentId(req: AuthRequest): string {
+async function resolveStudentId(req: AuthRequest): Promise<string> {
   if (!req.user?.id) throw new AppError(401, 'Not authenticated');
-  return req.user.id;
+  if (!req.collegeId) throw new AppError(400, 'College ID required');
+  const user = await User.findById(req.user.id).select('personId').lean();
+  if (!user?.personId) throw new AppError(403, 'User not linked to a student');
+  const student = await Student.findOne({ personId: user.personId, collegeId: req.collegeId })
+    .select('_id').lean();
+  if (!student) throw new AppError(403, 'Student record not found for user');
+  return String(student._id);
 }
 
 function requireId(req: AuthRequest): string {
@@ -138,7 +150,7 @@ export async function rejectCancelTransport(req: AuthRequest, res: Response, nex
 export async function acceptHostel(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const id = requireId(req);
-    const alloc = await hostel.acceptHostelProposal(requireCollegeId(req), id, requireStudentId(req));
+    const alloc = await hostel.acceptHostelProposal(requireCollegeId(req), id, await resolveStudentId(req));
     res.json({ allocation: alloc });
   } catch (e) { next(e); }
 }
@@ -146,7 +158,7 @@ export async function acceptHostel(req: AuthRequest, res: Response, next: NextFu
 export async function declineHostel(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const id = requireId(req);
-    const alloc = await hostel.declineHostelProposal(requireCollegeId(req), id, requireStudentId(req), req.body.reason);
+    const alloc = await hostel.declineHostelProposal(requireCollegeId(req), id, await resolveStudentId(req), req.body.reason);
     res.json({ allocation: alloc });
   } catch (e) { next(e); }
 }
@@ -154,7 +166,7 @@ export async function declineHostel(req: AuthRequest, res: Response, next: NextF
 export async function requestVacateHostel(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const id = requireId(req);
-    const alloc = await hostel.requestVacateHostel(requireCollegeId(req), id, requireStudentId(req), req.body.reason);
+    const alloc = await hostel.requestVacateHostel(requireCollegeId(req), id, await resolveStudentId(req), req.body.reason);
     res.json({ allocation: alloc });
   } catch (e) { next(e); }
 }
@@ -162,7 +174,7 @@ export async function requestVacateHostel(req: AuthRequest, res: Response, next:
 export async function acceptTransport(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const id = requireId(req);
-    const alloc = await transport.acceptTransportProposal(requireCollegeId(req), id, requireStudentId(req));
+    const alloc = await transport.acceptTransportProposal(requireCollegeId(req), id, await resolveStudentId(req));
     res.json({ allocation: alloc });
   } catch (e) { next(e); }
 }
@@ -170,7 +182,7 @@ export async function acceptTransport(req: AuthRequest, res: Response, next: Nex
 export async function declineTransport(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const id = requireId(req);
-    const alloc = await transport.declineTransportProposal(requireCollegeId(req), id, requireStudentId(req), req.body.reason);
+    const alloc = await transport.declineTransportProposal(requireCollegeId(req), id, await resolveStudentId(req), req.body.reason);
     res.json({ allocation: alloc });
   } catch (e) { next(e); }
 }
@@ -178,7 +190,7 @@ export async function declineTransport(req: AuthRequest, res: Response, next: Ne
 export async function requestCancelTransport(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const id = requireId(req);
-    const alloc = await transport.requestCancelTransport(requireCollegeId(req), id, requireStudentId(req), req.body.reason);
+    const alloc = await transport.requestCancelTransport(requireCollegeId(req), id, await resolveStudentId(req), req.body.reason);
     res.json({ allocation: alloc });
   } catch (e) { next(e); }
 }
@@ -188,7 +200,7 @@ export async function requestCancelTransport(req: AuthRequest, res: Response, ne
 export async function listMyHostelAllocations(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const collegeId = requireCollegeId(req);
-    const studentId = requireStudentId(req);
+    const studentId = await resolveStudentId(req);
     const items = await HostelAllocation.find({ collegeId, studentId }).sort({ createdAt: -1 });
     const pendingCount = items.filter((a) => a.status === 'proposed').length;
     const activeCount = items.filter((a) => a.status === 'active').length;
@@ -199,7 +211,7 @@ export async function listMyHostelAllocations(req: AuthRequest, res: Response, n
 export async function listMyTransportAllocations(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const collegeId = requireCollegeId(req);
-    const studentId = requireStudentId(req);
+    const studentId = await resolveStudentId(req);
     const items = await TransportAllocation.find({ collegeId, studentId }).sort({ createdAt: -1 });
     const pendingCount = items.filter((a) => a.status === 'proposed').length;
     const activeCount = items.filter((a) => a.status === 'active').length;
