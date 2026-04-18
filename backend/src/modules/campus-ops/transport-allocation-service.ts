@@ -302,8 +302,10 @@ async function loadTransport(collegeId: string, allocationId: string) {
   return allocation;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function assertStudentOwnership(allocation: any, studentId: string) {
+function assertStudentOwnership(
+  allocation: { studentId: mongoose.Types.ObjectId | unknown },
+  studentId: string,
+) {
   if (String(allocation.studentId) !== String(studentId)) {
     throw new AppError(403, 'You can only act on your own allocation');
   }

@@ -1,4 +1,4 @@
-import { Schema, model, Document } from 'mongoose';
+import { Schema, model, Document, Types } from 'mongoose';
 
 /**
  * TransportAllocation — tracks the lifecycle of a student's transport assignment.
@@ -9,30 +9,33 @@ import { Schema, model, Document } from 'mongoose';
  *
  * Terminal vacate state is `cancelled` (not `vacated`) — preserves existing
  * semantic where transport is cancelled, not "vacated" like a room.
+ *
+ * Interface typing: fields use `Types.ObjectId` (the runtime class) for TS
+ * alignment — see HostelAllocation.ts for the rationale.
  */
 export interface ITransportAllocation extends Document {
-  collegeId: Schema.Types.ObjectId;
-  studentId: Schema.Types.ObjectId;
-  routeId: Schema.Types.ObjectId;
+  collegeId: Types.ObjectId;
+  studentId: Types.ObjectId;
+  routeId: Types.ObjectId;
   stopName: string;
-  academicYearId: Schema.Types.ObjectId;
+  academicYearId: Types.ObjectId;
   status: string;
-  stopId?: Schema.Types.ObjectId;
+  stopId?: Types.ObjectId;
   boardingPoint?: string;
   allocationType?: string;
   feeTriggered: boolean;
 
   // Propose/accept lifecycle metadata (optional-allotment feature)
-  proposedBy?: Schema.Types.ObjectId;
+  proposedBy?: Types.ObjectId;
   proposedAt?: Date;
   respondedAt?: Date;
-  respondedBy?: Schema.Types.ObjectId;
+  respondedBy?: Types.ObjectId;
   ttlDays?: number;
   expiresAt?: Date;
   withdrawReason?: string;
   declineReason?: string;
   vacateRequestedAt?: Date;
-  vacateApprovedBy?: Schema.Types.ObjectId;
+  vacateApprovedBy?: Types.ObjectId;
   waitlistPosition?: number;
 }
 

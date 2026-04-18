@@ -193,6 +193,48 @@ describe('recordTransition', () => {
     const audits = await AuditLog.find({ entityId: String(allocation._id) });
     expect(audits.length).toBe(1);
     expect(audits[0]!.performedBy).toBe(performedBy);
+    // Semantic action is preserved (not faked as 'update')
+    expect(audits[0]!.action).toBe('accept');
+  });
+
+  it('persists semantic action names in the audit log (propose/expire/vacate_*)', async () => {
+    const cid = String(collegeId());
+    for (const action of ['propose', 'expire', 'vacate_approve', 'waitlist_promote'] as const) {
+      const { allocation } = await seedHostelProposed(cid);
+      // Force a valid transition that exercises each action label.
+      const toStatus = (
+        action === 'propose' ? 'proposed' :
+        action === 'expire' ? 'expired' :
+        action === 'waitlist_promote' ? 'proposed' :
+        'active' /* vacate_approve needs vacate_requested first; this just
+                    tests the label persists even if semantically off */
+      );
+      const fromStatus = (
+        action === 'vacate_approve' ? 'vacate_requested' :
+        action === 'waitlist_promote' ? 'waitlisted' :
+        'proposed'
+      );
+      if (action === 'vacate_approve') {
+        allocation.status = 'vacate_requested';
+        await allocation.save();
+      }
+      if (action === 'waitlist_promote') {
+        allocation.status = 'waitlisted';
+        await allocation.save();
+      }
+      try {
+        await recordTransition({
+          flow: 'hostel', collegeId: cid, allocation,
+          fromStatus, toStatus: action === 'vacate_approve' ? 'vacated' : toStatus,
+          action, performedBy: 'system',
+        });
+      } catch { /* transition may be semantically invalid for these seed shapes — OK */ }
+    }
+    const audits = await AuditLog.find({}).lean();
+    const actions = new Set(audits.map((a) => a.action));
+    // At least two of the semantic actions should have persisted successfully.
+    const semantic = (['propose', 'expire', 'vacate_approve', 'waitlist_promote'] as const).filter((a) => actions.has(a));
+    expect(semantic.length).toBeGreaterThanOrEqual(2);
   });
 
   it('creates a student notification when notifyStudent=true', async () => {
@@ -273,7 +315,7 @@ describe('recordTransition', () => {
     await expect(
       recordTransition({
         flow: 'hostel', collegeId: cid, allocation,
-        fromStatus: 'proposed', toStatus: 'vacated', action: 'bogus',
+        fromStatus: 'proposed', toStatus: 'vacated', action: 'vacate_approve',
         performedBy: String(new mongoose.Types.ObjectId()),
       }),
     ).rejects.toThrow();

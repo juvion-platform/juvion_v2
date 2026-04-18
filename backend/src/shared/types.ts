@@ -14,12 +14,43 @@ export interface PaginatedResult<T> {
   pages: number;
 }
 
+/**
+ * Audit action. The three legacy CRUD values (`create`, `update`, `delete`)
+ * remain the most common. Semantic actions are additive — domains with
+ * lifecycle semantics (allocation propose/accept/vacate, workflow
+ * transitions, approvals) can log the state-transition name directly
+ * rather than overloading `update`. This makes audit queries and UI
+ * rendering far easier downstream (e.g. "show me everyone who accepted
+ * their hostel proposal last month").
+ */
+export type AuditAction =
+  // CRUD primitives (legacy; always accepted)
+  | 'create'
+  | 'update'
+  | 'delete'
+  // Allocation lifecycle (optional-hostel-transport-allotment)
+  | 'propose'
+  | 'accept'
+  | 'decline'
+  | 'withdraw'
+  | 'expire'
+  | 'waitlist_promote'
+  | 'vacate_request'
+  | 'vacate_approve'
+  | 'vacate_reject'
+  // Approval / review flows (forward-compat; safe to use where relevant)
+  | 'approve'
+  | 'reject'
+  | 'submit'
+  | 'publish'
+  | 'archive';
+
 export interface AuditEntry {
   collegeId: string;
   entityType: string;
   entityId: string;
   entityName: string;
-  action: 'create' | 'update' | 'delete';
+  action: AuditAction;
   changes: FieldChange[];
   performedBy: string;
   studentId?: string;
