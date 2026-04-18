@@ -1753,6 +1753,10 @@ export async function processGatewayWebhook(
   gatewayLog.status = 'success';
   gatewayLog.gatewayResponse = gatewayResponse;
   gatewayLog.completedAt = new Date();
+  // Signature verification happens upstream in the route middleware
+  // (`verifyPaymentWebhookSignature`). If that middleware didn't pass,
+  // this service would never be reached — so this value reflects a
+  // confirmed HMAC check, not a self-attestation.
   gatewayLog.signatureVerified = true;
   gatewayLog.webhookReceivedAt = new Date();
   await gatewayLog.save();
