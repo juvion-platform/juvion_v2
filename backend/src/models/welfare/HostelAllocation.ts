@@ -1,4 +1,5 @@
 import { Schema, model, Document } from 'mongoose';
+
 /**
  * HostelAllocation — tracks the lifecycle of a student's hostel assignment.
  *
@@ -30,7 +31,7 @@ export interface IHostelAllocation extends Document {
   allocationMethod?: string;
   waitlistPosition?: number;
 
-  // Propose/accept lifecycle metadata (optional-allotment feature)
+  // ── Propose/accept lifecycle metadata (optional-allotment feature) ──
   proposedBy?: Schema.Types.ObjectId;
   proposedAt?: Date;
   respondedAt?: Date;
@@ -41,10 +42,13 @@ export interface IHostelAllocation extends Document {
   declineReason?: string;
   vacateRequestedAt?: Date;
   vacateApprovedBy?: Schema.Types.ObjectId;
+
+  // ── Clearance-at-vacate fields (populated on vacate approval) ──
+  clearanceStatus?: string;
+  clearanceNotes?: string;
+  damageCharges?: number;
+  depositRefund?: number;
 }
-
-
-export interface IHostelAllocation extends Document { collegeId: Schema.Types.ObjectId; studentId: Schema.Types.ObjectId; roomId: Schema.Types.ObjectId; bedId?: Schema.Types.ObjectId; academicYearId: Schema.Types.ObjectId; allocatedDate: Date; vacatedDate?: Date; status: string; allocationType: string; matchScore?: number; preferences: { blockPreference?: string; floorPreference?: number; roomTypePreference?: string; roommatePreference?: Schema.Types.ObjectId }; specialNeeds: { accessibility?: boolean; medical?: string }; allocationMethod?: string; waitlistPosition?: number; clearanceStatus?: string; clearanceNotes?: string; damageCharges?: number; depositRefund?: number; }
 
 const schema = new Schema<IHostelAllocation>({
   collegeId: { type: Schema.Types.ObjectId, required: true, index: true },
@@ -85,6 +89,7 @@ const schema = new Schema<IHostelAllocation>({
     enum: ['ai_recommended', 'manual_override', 'waitlist', 'admin_proposed'],
   },
   waitlistPosition: Number,
+
   // ── Propose/accept lifecycle metadata ──
   proposedBy: { type: Schema.Types.ObjectId, ref: 'Person' },
   proposedAt: { type: Date, default: Date.now },
@@ -96,6 +101,8 @@ const schema = new Schema<IHostelAllocation>({
   declineReason: String,
   vacateRequestedAt: Date,
   vacateApprovedBy: { type: Schema.Types.ObjectId, ref: 'Person' },
+
+  // ── Clearance-at-vacate fields ──
   clearanceStatus: { type: String, enum: ['pending', 'cleared', 'waived'] },
   clearanceNotes: String,
   damageCharges: Number,
