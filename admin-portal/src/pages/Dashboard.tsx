@@ -5,6 +5,7 @@ import {
   BookOpenCheck, Banknote, Briefcase, ShieldCheck, Landmark, Megaphone, Lightbulb,
 } from 'lucide-react';
 import StatCard from '../components/ui/StatCard';
+import PendingProposalsWidget from '../components/PendingProposalsWidget';
 
 import { getStats as getPeopleStats } from '../services/people';
 import { getStats as getAdmissionsStats } from '../services/admissions';
@@ -42,6 +43,11 @@ export default function Dashboard() {
   return (
     <div>
       <h2 className="text-2xl font-bold text-navy mb-6">Dashboard</h2>
+
+      {/* ── Student-facing: pending campus service proposals (self-hiding when zero) ── */}
+      <div className="mb-6">
+        <PendingProposalsWidget />
+      </div>
 
       {/* ── Top KPI Row ──────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
