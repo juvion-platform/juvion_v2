@@ -1,0 +1,5 @@
+import { Schema, model, Document } from 'mongoose';
+export interface ISubmissionArtifact extends Document { collegeId: Schema.Types.ObjectId; reportId: Schema.Types.ObjectId; artifactType: string; fileName: string; fileUrl?: string; fileSize?: number; checksum?: string; generatedAt: Date; generatedBy: Schema.Types.ObjectId; status: string; }
+const schema = new Schema<ISubmissionArtifact>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, reportId: { type: Schema.Types.ObjectId, ref: 'AccreditationReport', required: true }, artifactType: { type: String, enum: ['pdf', 'excel', 'zip', 'portal_submission'], required: true }, fileName: { type: String, required: true }, fileUrl: String, fileSize: Number, checksum: String, generatedAt: { type: Date, default: Date.now }, generatedBy: { type: Schema.Types.ObjectId, ref: 'Person', required: true }, status: { type: String, enum: ['generating', 'ready', 'submitted', 'failed'], default: 'generating' } }, { timestamps: true });
+schema.index({ collegeId: 1, reportId: 1 });
+export const SubmissionArtifact = model<ISubmissionArtifact>('SubmissionArtifact', schema);

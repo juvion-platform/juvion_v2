@@ -20,6 +20,7 @@ const Compliance = lazy(() => import('./pages/Compliance'));
 const Governance = lazy(() => import('./pages/Governance'));
 const Platform = lazy(() => import('./pages/Platform'));
 const Juvi = lazy(() => import('./pages/Juvi'));
+const MasterData = lazy(() => import('./pages/MasterData'));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const token = useAuthStore((s) => s.token);
@@ -82,6 +83,7 @@ export default function App() {
         <Route path="/governance/*" element={renderLazyPage(<Governance />)} />
         <Route path="/platform/*" element={renderLazyPage(<Platform />)} />
         <Route path="/juvi/*" element={renderLazyPage(<Juvi />)} />
+        <Route path="/master-data/*" element={renderLazyPage(<MasterData />)} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

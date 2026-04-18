@@ -102,3 +102,19 @@ export const createOrganizationSchema = z.object({
   status: z.enum(['prospect', 'active', 'inactive']).optional(),
 });
 export const updateOrganizationSchema = createOrganizationSchema.partial();
+
+// ═══ W10 Exit Workflow Schemas ═══════════════════════════════
+export const submitExitRequestSchema = z.object({ studentId: z.string().min(1), exitType: z.enum(['withdrawal', 'transfer', 'expulsion', 'dropout_formalization']), reason: z.string().min(1), reasonCategory: z.enum(['personal', 'financial', 'academic', 'transfer', 'family', 'health', 'disciplinary', 'other']), reasonDetails: z.string().optional(), requestedBy: z.string().min(1), destinationInstitution: z.string().optional(), destinationUniversity: z.string().optional(), disciplinaryCaseId: z.string().optional(), dropoutRiskAlertId: z.string().optional(), outreachExhausted: z.boolean().optional() });
+export const approveExitRequestSchema = z.object({ approvedBy: z.string().min(1), notes: z.string().optional() });
+export const rejectExitRequestSchema = z.object({ notes: z.string().min(1) });
+export const transitionStudentSchema = z.object({ status: z.string().min(1) });
+export const initiateClearanceSchema = z.object({ studentId: z.string().min(1), exitType: z.enum(['graduation', 'withdrawal', 'expulsion', 'dropout', 'transfer']), initiatedBy: z.string().min(1), urgency: z.enum(['standard', 'urgent']).optional() });
+export const completeClearanceItemSchema = z.object({ completedBy: z.string().min(1) });
+export const waiveClearanceItemSchema = z.object({ waiverReason: z.string().min(1), waiverApprovedBy: z.string().min(1) });
+export const logEscalationSchema = z.object({ clearanceItemId: z.string().min(1), clearanceWorkflowId: z.string().min(1), level: z.enum(['reminder', 'hod', 'principal']), escalatedTo: z.string().min(1), reason: z.string().min(1), slaPercentage: z.number() });
+export const createDocumentTemplateSchema_wf = z.object({ type: z.enum(['transcript', 'provisional_certificate', 'degree_certificate', 'transfer_certificate', 'migration_certificate', 'no_dues_certificate', 'character_certificate', 'bonafide', 'study_certificate']), name: z.string().min(1), version: z.string().min(1), templateUrl: z.string().optional(), placeholders: z.array(z.string()).optional(), signatureSlots: z.array(z.object({ role: z.string(), position: z.string() })).optional(), regulationId: z.string().optional(), universityFormat: z.string().optional() });
+export const generateDocumentSchema = z.object({ studentId: z.string().min(1), templateId: z.string().optional(), type: z.enum(['transcript', 'provisional_certificate', 'degree_certificate', 'transfer_certificate', 'migration_certificate', 'no_dues_certificate', 'character_certificate', 'bonafide', 'study_certificate']), title: z.string().min(1), exitRequestId: z.string().optional() });
+export const signDocumentSchema = z.object({ role: z.string().min(1), signedBy: z.string().min(1), signatureType: z.string().optional() });
+export const issueDocumentSchema = z.object({ serialNumber: z.string().optional() });
+export const revokeDocumentSchema = z.object({ reason: z.string().min(1) });
+export const createAlumniRecordSchema = z.object({ personId: z.string().min(1), studentId: z.string().min(1), programmeId: z.string().min(1), branchId: z.string().min(1), batchId: z.string().optional(), regulationId: z.string().optional(), graduationDate: z.string().min(1), degreeAwarded: z.string().min(1), finalCgpa: z.number(), classObtained: z.enum(['first_class_distinction', 'first_class', 'second_class', 'pass']) });

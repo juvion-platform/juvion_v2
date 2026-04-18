@@ -1,0 +1,5 @@
+import { Schema, model, Document } from 'mongoose';
+export interface IBudgetLineItem extends Document { collegeId: Schema.Types.ObjectId; budgetId: Schema.Types.ObjectId; category: string; description: string; estimatedAmount: number; approvedAmount?: number; actualAmount: number; status: string; transactionRefs: string[]; }
+const schema = new Schema<IBudgetLineItem>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, budgetId: { type: Schema.Types.ObjectId, ref: 'ActivityBudget', required: true }, category: { type: String, required: true }, description: { type: String, required: true }, estimatedAmount: { type: Number, required: true }, approvedAmount: Number, actualAmount: { type: Number, default: 0 }, status: { type: String, enum: ['estimated', 'approved', 'spent', 'reconciled'], default: 'estimated' }, transactionRefs: [String] }, { timestamps: true });
+schema.index({ collegeId: 1, budgetId: 1 });
+export const BudgetLineItem = model<IBudgetLineItem>('BudgetLineItem', schema);

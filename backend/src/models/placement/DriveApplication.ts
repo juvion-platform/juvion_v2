@@ -1,0 +1,6 @@
+import { Schema, model, Document } from 'mongoose';
+export interface IDriveApplication extends Document { collegeId: Schema.Types.ObjectId; driveId: Schema.Types.ObjectId; jobPostingId: Schema.Types.ObjectId; studentId: Schema.Types.ObjectId; status: string; matchScore?: number; matchConfidence?: string; resumeUrl?: string; consentTimestamp: Date; withdrawalReason?: string; appliedAt: Date; }
+const schema = new Schema<IDriveApplication>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, driveId: { type: Schema.Types.ObjectId, ref: 'PlacementDrive', required: true }, jobPostingId: { type: Schema.Types.ObjectId, ref: 'JobPosting', required: true }, studentId: { type: Schema.Types.ObjectId, ref: 'Student', required: true }, status: { type: String, enum: ['applied', 'shortlisted', 'not_selected', 'offered', 'withdrawn', 'no_show'], default: 'applied' }, matchScore: Number, matchConfidence: { type: String, enum: ['high', 'medium', 'low'] }, resumeUrl: String, consentTimestamp: { type: Date, required: true }, withdrawalReason: String, appliedAt: { type: Date, default: Date.now } }, { timestamps: true });
+schema.index({ collegeId: 1, driveId: 1, studentId: 1 }, { unique: true });
+schema.index({ collegeId: 1, studentId: 1 });
+export const DriveApplication = model<IDriveApplication>('DriveApplication', schema);

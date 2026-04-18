@@ -21,6 +21,9 @@ export interface IAdmissionOffer extends Document {
   declineReason?: string;
   remindersSent?: number;
   lastReminderAt?: Date;
+  // W01 intake enhancements
+  paymentDeadline?: Date;
+  gracePeriodEnd?: Date;
 }
 
 const schema = new Schema<IAdmissionOffer>({
@@ -44,6 +47,9 @@ const schema = new Schema<IAdmissionOffer>({
   declineReason: String,
   remindersSent: { type: Number, default: 0 },
   lastReminderAt: Date,
+  // W01 intake enhancements
+  paymentDeadline: Date,
+  gracePeriodEnd: Date,
 }, { timestamps: true });
 
 

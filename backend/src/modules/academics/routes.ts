@@ -77,6 +77,20 @@ import {
   generateTranscriptSchema,
   dispatchAcademicNotificationsSchema,
   submitResultsToJNTUSchema,
+  optimizeElectivesSchema,
+  submitCondonationSchema,
+  resolveCondonationSchema,
+  bulkExternalMarksSchema,
+  validateMarksSchema,
+  computeResultsSchema,
+  publishResultsSchema,
+  promoteStudentsSchema,
+  registerBacklogSchema,
+  submitRevaluationSchema,
+  generateSeatingPlanSchema,
+  assignInvigilationSchema,
+  aggregatePOAttainmentSchema,
+  createAttainmentRunSchema,
 } from './validation';
 
 const router = Router();
@@ -439,5 +453,55 @@ router.post('/notifications/dispatch', authorize('academics', 'create'), validat
 // ═══ W02 Phase 3: JNTU Integration Stubs ════════════════════════
 router.post('/jntu/submit-results', authorize('academics', 'create'), validate(submitResultsToJNTUSchema), ctrl.submitResultsToJNTU);
 router.post('/jntu/fetch-regulations', authorize('academics', 'create'), ctrl.fetchJNTURegulations);
+
+// ═══ W02 Academic Delivery Routes ═══════════════════════════
+
+// ── Curriculum & Scheduling ────────────────────────────────
+router.post('/curriculum/instantiate', authorize('academics', 'create'), validate(instantiateCurriculumSchema), ctrl.instantiateCurriculumCtrl);
+router.post('/sections/form', authorize('academics', 'create'), validate(formSectionsSchema), ctrl.formSectionsCtrl);
+router.put('/offerings/:id/assign-faculty', authorize('academics', 'update'), validate(assignFacultySchema), ctrl.assignFacultyCtrl);
+router.post('/elective-allocations/optimize', authorize('academics', 'create'), validate(optimizeElectivesSchema), ctrl.optimizeElectivesCtrl);
+router.post('/elective-allocations/finalize', authorize('academics', 'update'), validate(optimizeElectivesSchema), ctrl.finalizeElectivesCtrl);
+router.get('/timetables/:id/conflicts', authorize('academics', 'read'), ctrl.detectConflictsCtrl);
+
+// ── Attendance ─────────────────────────────────────────────
+router.post('/attendance/compute-summary', authorize('academics', 'read'), ctrl.computeAttendanceSummaryCtrl);
+router.get('/attendance/check-threshold', authorize('academics', 'read'), ctrl.checkAttendanceThresholdCtrl);
+router.post('/attendance-alerts/generate', authorize('academics', 'create'), ctrl.generateAttendanceAlertsCtrl);
+router.post('/condonation-requests', authorize('academics', 'create'), validate(submitCondonationSchema), ctrl.submitCondonationCtrl);
+router.put('/condonation-requests/:id/resolve', authorize('academics', 'update'), validate(resolveCondonationSchema), ctrl.resolveCondonationCtrl);
+
+// ── CIE & Marks ────────────────────────────────────────────
+router.post('/internal-assessments/compute-cie', authorize('academics', 'update'), ctrl.computeCIECtrl);
+router.post('/internal-assessments/compute-batch-cie', authorize('academics', 'update'), ctrl.computeBatchCIECtrl);
+router.post('/external-marks/bulk', authorize('academics', 'create'), validate(bulkExternalMarksSchema), ctrl.bulkEnterExternalMarksCtrl);
+router.post('/external-marks/validate', authorize('academics', 'update'), validate(validateMarksSchema), ctrl.validateExternalMarksCtrl);
+
+// ── Results & Promotion ────────────────────────────────────
+router.post('/results/compute', authorize('academics', 'create'), validate(computeResultsSchema), ctrl.computeResultsCtrl);
+router.post('/results/publish', authorize('academics', 'update'), validate(publishResultsSchema), ctrl.publishResultsCtrl);
+router.post('/results/promote', authorize('academics', 'update'), validate(promoteStudentsSchema), ctrl.promoteStudentsCtrl);
+router.post('/backlogs', authorize('academics', 'create'), validate(registerBacklogSchema), ctrl.registerBacklogCtrl);
+router.put('/backlogs/:id/clear', authorize('academics', 'update'), validate(clearBacklogSchema), ctrl.clearBacklogCtrl);
+router.post('/revaluation-requests', authorize('academics', 'create'), validate(submitRevaluationSchema), ctrl.submitRevaluationCtrl);
+
+// ── Exam Management ────────────────────────────────────────
+router.post('/exam-registrations/check-eligibility', authorize('academics', 'read'), ctrl.checkHallTicketEligibilityCtrl);
+router.post('/hall-tickets/generate', authorize('academics', 'create'), validate(generateHallTicketsSchema), ctrl.generateHallTicketsCtrl);
+router.post('/exam-schedules/:id/seating-plan', authorize('academics', 'create'), validate(generateSeatingPlanSchema), ctrl.generateSeatingPlanCtrl);
+router.post('/exam-schedules/:id/invigilation', authorize('academics', 'create'), validate(assignInvigilationSchema), ctrl.assignInvigilationCtrl);
+
+// ── OBE ────────────────────────────────────────────────────
+router.post('/obe/compute-co-attainment', authorize('academics', 'create'), validate(computeCOAttainmentSchema), ctrl.computeCOAttainmentCtrl);
+router.post('/obe/aggregate-po-attainment', authorize('academics', 'create'), validate(aggregatePOAttainmentSchema), ctrl.aggregatePOAttainmentCtrl);
+router.post('/obe/programme-health', authorize('academics', 'create'), validate(computeProgrammeHealthSchema), ctrl.computeProgrammeHealthCtrl);
+router.post('/obe/attainment-runs', authorize('academics', 'create'), validate(createAttainmentRunSchema), ctrl.createAttainmentRunCtrl);
+
+// ── Academic Reads ─────────────────────────────────────────
+router.get('/students/:id/attendance-report', authorize('academics', 'read'), ctrl.getStudentAttendanceReportCtrl);
+router.get('/students/:id/academic-summary', authorize('academics', 'read'), ctrl.getStudentAcademicSummaryCtrl);
+router.get('/offerings/:id/delivery-progress', authorize('academics', 'read'), ctrl.getCourseDeliveryProgressCtrl);
+router.get('/exam-calendar', authorize('academics', 'read'), ctrl.getExamCalendarCtrl);
+router.get('/enrollment-count', authorize('academics', 'read'), ctrl.getSemesterEnrollmentCountCtrl);
 
 export default router;

@@ -48,6 +48,7 @@ import {
   createDisciplinaryOutcomeSchema, updateDisciplinaryOutcomeSchema,
   generatePayrollExtractSchema, attendanceComplianceSchema,
   createPayrollDataExtractSchema, updatePayrollDataExtractSchema,
+  createDesignationSchema, updateDesignationSchema,
 } from './validation';
 
 const router = Router();
@@ -387,5 +388,12 @@ router.get('/payroll-extracts/:id', authorize('hr', 'read'), ctrl.getPayrollData
 router.post('/payroll-extracts', authorize('hr', 'create'), validate(createPayrollDataExtractSchema), ctrl.createPayrollDataExtractCtrl);
 router.put('/payroll-extracts/:id', authorize('hr', 'update'), validate(updatePayrollDataExtractSchema), ctrl.updatePayrollDataExtract);
 router.delete('/payroll-extracts/:id', authorize('hr', 'delete'), ctrl.deletePayrollDataExtract);
+
+// Designations
+router.get('/designations', authorize('hr', 'read'), ctrl.listDesignations);
+router.get('/designations/:id', authorize('hr', 'read'), ctrl.getDesignation);
+router.post('/designations', authorize('hr', 'create'), validate(createDesignationSchema), ctrl.createDesignation);
+router.put('/designations/:id', authorize('hr', 'update'), validate(updateDesignationSchema), ctrl.updateDesignation);
+router.delete('/designations/:id', authorize('hr', 'delete'), ctrl.deleteDesignation);
 
 export default router;

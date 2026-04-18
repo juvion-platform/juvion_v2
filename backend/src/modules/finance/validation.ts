@@ -734,3 +734,38 @@ export const submitTSEPassClaimsSchema = z.object({
 export const triggerReminderSequenceSchema = z.object({
   defaulterRecordId: z.string().min(1),
 });
+
+// ═══ W03 Fee Lifecycle Schemas ══════════════════════════════
+export const cloneFeeStructureSchema_wf = z.object({ priorYearId: z.string().min(1), newAcademicYearId: z.string().min(1), inflationRate: z.number().optional() });
+export const approveFeeStructureSchema = z.object({ approvedBy: z.string().min(1) });
+export const evaluateFeeRulesSchema_wf = z.object({ programmeId: z.string().min(1), quota: z.string().min(1), category: z.string().optional(), isHosteler: z.boolean().optional(), transportRequired: z.boolean().optional() });
+export const generateSemesterInvoiceSchema = z.object({ studentId: z.string().min(1), semesterId: z.string().min(1), feeStructureInstanceId: z.string().min(1) });
+export const generateBatchInvoicesSchema = z.object({ semesterId: z.string().min(1), academicYearId: z.string().min(1), feeStructureInstanceId: z.string().min(1) });
+export const generateExamFeeInvoiceSchema = z.object({ studentId: z.string().min(1), semesterId: z.string().min(1), examType: z.string().min(1) });
+export const adjustInvoiceSchema_wf = z.object({ reason: z.string().min(1), adjustments: z.array(z.object({ lineItemId: z.string(), newAmount: z.number() })).min(1) });
+export const disputeInvoiceSchema_wf = z.object({ reason: z.string().min(1) });
+export const writeOffInvoiceSchema_wf = z.object({ reason: z.string().min(1), approvedBy: z.string().min(1) });
+export const recordOnlinePaymentSchema = z.object({ invoiceId: z.string().min(1), amount: z.number().min(0), gatewayTransactionId: z.string().min(1), gatewayName: z.string().min(1), paymentMode: z.string().min(1) });
+export const recordCounterPaymentSchema_wf = z.object({ studentId: z.string().min(1), invoiceId: z.string().min(1), amount: z.number().min(0), mode: z.enum(['cash', 'dd', 'cheque']), ddNumber: z.string().optional(), ddBank: z.string().optional(), ddDate: z.string().optional() });
+export const importBankStatementSchema_wf = z.object({ entries: z.array(z.object({ reference: z.string(), amount: z.number(), date: z.string(), narration: z.string() })).min(1) });
+export const matchPaymentSchema = z.object({ invoiceId: z.string().min(1) });
+export const handleBounceSchema = z.object({ reason: z.string().min(1) });
+export const cancelReceiptSchema_wf = z.object({ reason: z.string().min(1) });
+export const runReconciliationSchema = z.object({ periodFrom: z.string().min(1), periodTo: z.string().min(1) });
+export const resolveDiscrepancySchema = z.object({ resolution: z.string().min(1), resolvedBy: z.string().min(1) });
+export const requestRefundSchema = z.object({ invoiceId: z.string().min(1), studentId: z.string().min(1), amount: z.number().min(0), reason: z.string().min(1), sourceType: z.string().min(1) });
+export const approveRefundSchema_wf = z.object({ approvedBy: z.string().min(1) });
+export const verifyScholarshipSchema = z.object({ studentId: z.string().min(1), schemeCode: z.string().min(1) });
+export const submitClaimBatchSchema = z.object({ eligibilityIds: z.array(z.string()).min(1) });
+export const processDisbursementSchema = z.object({ amount: z.number().min(0), bankReference: z.string().min(1) });
+export const applyHardshipConcessionSchema = z.object({ studentId: z.string().min(1), amount: z.number().min(0), reason: z.string().min(1), feeComponentId: z.string().optional(), approvedBy: z.string().min(1) });
+export const applyMeritScholarshipSchema = z.object({ studentId: z.string().min(1), amount: z.number().min(0), academicYearId: z.string().min(1) });
+export const renewScholarshipSchema = z.object({ studentId: z.string().min(1), newAcademicYearId: z.string().min(1) });
+export const identifyDefaultersSchema_wf = z.object({ asOfDate: z.string().optional() });
+export const escalateDefaulterSchema = z.object({ stage: z.string().min(1) });
+export const referToWelfareSchema_wf = z.object({ distressScore: z.number(), signals: z.record(z.any()).optional() });
+export const applyHoldSchema = z.object({ studentId: z.string().min(1), holdType: z.string().min(1), reason: z.string().min(1), appliedBy: z.string().min(1) });
+export const releaseHoldSchema = z.object({ releasedBy: z.string().min(1), reason: z.string().min(1) });
+export const scheduleVendorPaymentSchema = z.object({ paymentRequestId: z.string().min(1), scheduledDate: z.string().min(1), approvedBy: z.string().min(1) });
+export const confirmVendorPaymentSchema = z.object({ bankReference: z.string().min(1) });
+export const generateRevenueReportSchema = z.object({ academicYearId: z.string().min(1) });

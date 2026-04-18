@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../../middleware/authenticate';
 import * as wfSvc from './workflow.service';
+import * as intakeService from './intake-service';
 import * as engine from '../../shared/workflow/WorkflowEngine';
 
 const who = (req: AuthRequest) => req.user?.name || 'System';
@@ -223,4 +224,129 @@ export async function listMyTasks(req: AuthRequest, res: Response, next: NextFun
 
 export async function getWorkflowStats(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await wfSvc.getWorkflowStats(req.collegeId!)); } catch (e) { next(e); }
+}
+
+// ═══ W01 Business Logic Controllers ═══════════════════════
+
+// ── Merit List ─────────────────────────────────────────────
+
+export async function listMeritListsCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page = '1', limit = '20', allotmentRoundId } = req.query as any;
+    res.json(await intakeService.listMeritLists(req.collegeId!, +page, +limit, allotmentRoundId));
+  } catch (e) { next(e); }
+}
+
+export async function getMeritListCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await intakeService.getMeritList(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }
+}
+
+export async function generateMeritListCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await intakeService.generateMeritList(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+
+export async function publishMeritListCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await intakeService.publishMeritList(req.collegeId!, req.params.id as string, who(req))); } catch (e) { next(e); }
+}
+
+// ── Allotment ──────────────────────────────────────────────
+
+export async function executeAllotmentRoundCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await intakeService.executeAllotmentRound(req.collegeId!, req.params.id as string, who(req))); } catch (e) { next(e); }
+}
+
+export async function publishAllotmentResultsCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await intakeService.publishAllotmentResults(req.collegeId!, req.params.id as string, who(req))); } catch (e) { next(e); }
+}
+
+export async function promoteFromWaitlistCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await intakeService.promoteFromWaitlist(req.collegeId!, req.params.id as string, who(req))); } catch (e) { next(e); }
+}
+
+// ── Offer Lifecycle ────────────────────────────────────────
+
+export async function acceptOfferCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await intakeService.acceptOffer(req.collegeId!, req.params.id as string, who(req))); } catch (e) { next(e); }
+}
+
+export async function rejectOfferCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await intakeService.rejectOffer(req.collegeId!, req.params.id as string, who(req))); } catch (e) { next(e); }
+}
+
+export async function handleOfferExpiryCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await intakeService.handleOfferExpiry(req.collegeId!, req.params.id as string, who(req))); } catch (e) { next(e); }
+}
+
+// ── Cancellation ───────────────────────────────────────────
+
+export async function approveCancellationCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await intakeService.approveCancellation(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
+}
+
+export async function executeCancellationCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await intakeService.executeCancellation(req.collegeId!, req.params.id as string, who(req))); } catch (e) { next(e); }
+}
+
+export async function calculateRefundCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await intakeService.calculateRefund(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }
+}
+
+// ── Import ─────────────────────────────────────────────────
+
+export async function executeImportBatchCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await intakeService.executeImportBatch(req.collegeId!, req.params.id as string, who(req))); } catch (e) { next(e); }
+}
+
+// ── Eligibility ────────────────────────────────────────────
+
+export async function checkLateralEligibilityCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await intakeService.checkLateralEligibility(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }
+}
+
+export async function checkNRIEligibilityCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await intakeService.checkNRIEligibility(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }
+}
+
+export async function checkScholarshipEligibilityCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await intakeService.checkScholarshipEligibility(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }
+}
+
+// ── Documents ──────────────────────────────────────────────
+
+export async function uploadDocumentCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await intakeService.uploadDocument(req.collegeId!, req.params.applicantId as string, req.body, who(req))); } catch (e) { next(e); }
+}
+
+export async function triggerOCRCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await intakeService.triggerOCR(req.collegeId!, req.params.applicantId as string, who(req))); } catch (e) { next(e); }
+}
+
+// ── Convener ───────────────────────────────────────────────
+
+export async function getReportingTrackerCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { academicYearId } = req.query as any;
+    res.json(await intakeService.getReportingTracker(req.collegeId!, academicYearId));
+  } catch (e) { next(e); }
+}
+
+export async function recordStudentReportingCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await intakeService.recordStudentReporting(req.collegeId!, req.params.id as string, who(req))); } catch (e) { next(e); }
+}
+
+// ── Spot Round ─────────────────────────────────────────────
+
+export async function listSpotRoundsCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page = '1', limit = '20' } = req.query as any;
+    res.json(await intakeService.listSpotRounds(req.collegeId!, +page, +limit));
+  } catch (e) { next(e); }
+}
+
+export async function createSpotRoundCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await intakeService.createSpotRound(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+
+export async function updateSpotRoundCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await intakeService.updateSpotRound(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
 }

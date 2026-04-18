@@ -1,0 +1,6 @@
+import { Schema, model, Document } from 'mongoose';
+export interface IPortfolio extends Document { collegeId: Schema.Types.ObjectId; studentId: Schema.Types.ObjectId; status: string; completenessScore: number; lastCuratedDate?: Date; publishedDate?: Date; snapshotDate?: Date; snapshotData?: unknown; sections: { key: string; displayOrder: number; isVisible: boolean }[]; gapAnalysis?: { missingAreas: string[]; recommendations: string[]; peerComparison?: string }; }
+const schema = new Schema<IPortfolio>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, studentId: { type: Schema.Types.ObjectId, ref: 'Student', required: true }, status: { type: String, enum: ['draft', 'published', 'archived'], default: 'draft' }, completenessScore: { type: Number, default: 0 }, lastCuratedDate: Date, publishedDate: Date, snapshotDate: Date, snapshotData: Schema.Types.Mixed, sections: [{ key: { type: String, required: true }, displayOrder: { type: Number, required: true }, isVisible: { type: Boolean, default: true } }], gapAnalysis: { missingAreas: [String], recommendations: [String], peerComparison: String } }, { timestamps: true });
+schema.index({ collegeId: 1, studentId: 1 }, { unique: true });
+schema.index({ collegeId: 1, status: 1 });
+export const Portfolio = model<IPortfolio>('Portfolio', schema);

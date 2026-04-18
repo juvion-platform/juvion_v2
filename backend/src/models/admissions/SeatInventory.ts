@@ -26,6 +26,8 @@ export interface ISeatInventory extends Document {
   // Status
   status: string;  // 'draft' | 'published' | 'frozen'
   lastUpdatedBy: string;
+  // W01 intake enhancements
+  categoryWiseSplit?: { sc: number; st: number; obc: number; ews: number; general: number };
 }
 
 const schema = new Schema<ISeatInventory>({
@@ -54,6 +56,14 @@ const schema = new Schema<ISeatInventory>({
   // Status
   status: { type: String, enum: ['draft', 'published', 'frozen'], default: 'draft' },
   lastUpdatedBy: { type: String, required: true },
+  // W01 intake enhancements
+  categoryWiseSplit: {
+    sc: { type: Number, default: 0 },
+    st: { type: Number, default: 0 },
+    obc: { type: Number, default: 0 },
+    ews: { type: Number, default: 0 },
+    general: { type: Number, default: 0 },
+  },
 }, { timestamps: true });
 
 // Recalculate computed fields before save

@@ -99,6 +99,39 @@ import {
   initiateGatewayPaymentSchema,
   submitTSEPassClaimsSchema,
   triggerReminderSequenceSchema,
+  cloneFeeStructureSchema_wf,
+  approveFeeStructureSchema,
+  evaluateFeeRulesSchema_wf,
+  generateSemesterInvoiceSchema,
+  generateBatchInvoicesSchema,
+  generateExamFeeInvoiceSchema,
+  adjustInvoiceSchema_wf,
+  disputeInvoiceSchema_wf,
+  writeOffInvoiceSchema_wf,
+  recordOnlinePaymentSchema,
+  recordCounterPaymentSchema_wf,
+  importBankStatementSchema_wf,
+  matchPaymentSchema,
+  handleBounceSchema,
+  cancelReceiptSchema_wf,
+  runReconciliationSchema,
+  resolveDiscrepancySchema,
+  requestRefundSchema,
+  approveRefundSchema_wf,
+  verifyScholarshipSchema,
+  submitClaimBatchSchema,
+  processDisbursementSchema,
+  applyHardshipConcessionSchema,
+  applyMeritScholarshipSchema,
+  renewScholarshipSchema,
+  identifyDefaultersSchema_wf,
+  escalateDefaulterSchema,
+  referToWelfareSchema_wf,
+  applyHoldSchema,
+  releaseHoldSchema,
+  scheduleVendorPaymentSchema,
+  confirmVendorPaymentSchema,
+  generateRevenueReportSchema,
 } from './validation';
 
 const router = Router();
@@ -427,5 +460,69 @@ router.get('/policies/fee', authenticate, ctrl.feePolicy);
 router.post('/gateway/initiate', authenticate, validate(initiateGatewayPaymentSchema), ctrl.initiateGatewayPayment);
 router.post('/ts-epass/submit', authenticate, validate(submitTSEPassClaimsSchema), ctrl.submitTSEPassClaims);
 router.post('/reminders/trigger', authenticate, validate(triggerReminderSequenceSchema), ctrl.triggerReminderSequence);
+
+// ═══ W03 Fee Lifecycle Routes ═══════════════════════════════
+
+// ── Fee Configuration ──────────────────────────────────────
+router.post('/fee-structures/clone', authorize('finance', 'create'), validate(cloneFeeStructureSchema_wf), ctrl.cloneFeeStructureCtrl);
+router.post('/fee-structures/:id/submit', authorize('finance', 'update'), ctrl.submitFeeStructureCtrl);
+router.post('/fee-structures/:id/approve', authorize('finance', 'update'), validate(approveFeeStructureSchema), ctrl.approveFeeStructureCtrl);
+router.post('/fee-component-rules/evaluate', authorize('finance', 'read'), validate(evaluateFeeRulesSchema_wf), ctrl.evaluateFeeRulesCtrl);
+
+// ── Invoice Generation ─────────────────────────────────────
+router.post('/invoices/semester', authorize('finance', 'create'), validate(generateSemesterInvoiceSchema), ctrl.generateSemesterInvoiceCtrl);
+router.post('/invoices/batch/semester', authorize('finance', 'create'), validate(generateBatchInvoicesSchema), ctrl.generateBatchInvoicesCtrl);
+router.post('/invoices/exam', authorize('finance', 'create'), validate(generateExamFeeInvoiceSchema), ctrl.generateExamFeeInvoiceCtrl);
+router.post('/invoices/:id/adjust', authorize('finance', 'update'), validate(adjustInvoiceSchema_wf), ctrl.adjustInvoiceCtrl);
+router.post('/invoices/:id/dispute', authorize('finance', 'update'), validate(disputeInvoiceSchema_wf), ctrl.disputeInvoiceCtrl);
+router.post('/invoices/:id/write-off', authorize('finance', 'update'), validate(writeOffInvoiceSchema_wf), ctrl.writeOffInvoiceCtrl);
+
+// ── Payment Processing ─────────────────────────────────────
+router.post('/payments/online', authorize('finance', 'create'), validate(recordOnlinePaymentSchema), ctrl.recordOnlinePaymentCtrl);
+router.post('/payments/counter', authorize('finance', 'create'), validate(recordCounterPaymentSchema_wf), ctrl.recordCounterPaymentCtrl);
+router.post('/payments/bank-import', authorize('finance', 'create'), validate(importBankStatementSchema_wf), ctrl.importBankStatementCtrl);
+router.post('/payments/:id/match', authorize('finance', 'update'), validate(matchPaymentSchema), ctrl.matchPaymentCtrl);
+router.get('/payments/:id/duplicate-check', authorize('finance', 'read'), ctrl.detectDuplicateCtrl);
+router.post('/payments/:id/bounce', authorize('finance', 'update'), validate(handleBounceSchema), ctrl.handleBounceCtrl);
+
+// ── Receipts ───────────────────────────────────────────────
+router.post('/receipts/generate', authorize('finance', 'create'), ctrl.generateReceiptCtrl);
+router.post('/receipts/:id/cancel', authorize('finance', 'update'), validate(cancelReceiptSchema_wf), ctrl.cancelReceiptCtrl);
+router.post('/receipts/:id/reissue', authorize('finance', 'create'), ctrl.reissueReceiptCtrl);
+
+// ── Reconciliation ─────────────────────────────────────────
+router.post('/reconciliation/run', authorize('finance', 'create'), validate(runReconciliationSchema), ctrl.runReconciliationCtrl);
+router.put('/reconciliation-entries/:id/resolve', authorize('finance', 'update'), validate(resolveDiscrepancySchema), ctrl.resolveDiscrepancyCtrl);
+
+// ── Refunds ────────────────────────────────────────────────
+router.post('/refunds/request', authorize('finance', 'create'), validate(requestRefundSchema), ctrl.requestRefundCtrl);
+router.post('/refunds/:id/approve', authorize('finance', 'update'), validate(approveRefundSchema_wf), ctrl.approveRefundCtrl);
+router.post('/refunds/:id/process', authorize('finance', 'update'), ctrl.processRefundCtrl);
+
+// ── Scholarships & Concessions ─────────────────────────────
+router.post('/scholarships/eligibility/verify', authorize('finance', 'create'), validate(verifyScholarshipSchema), ctrl.verifyScholarshipEligibilityCtrl);
+router.post('/scholarship-claims/submit-batch', authorize('finance', 'create'), validate(submitClaimBatchSchema), ctrl.submitClaimBatchCtrl);
+router.post('/scholarship-claims/:id/disburse', authorize('finance', 'update'), validate(processDisbursementSchema), ctrl.processDisbursementCtrl);
+router.post('/concessions/hardship', authorize('finance', 'create'), validate(applyHardshipConcessionSchema), ctrl.applyHardshipConcessionCtrl);
+router.post('/concessions/merit', authorize('finance', 'create'), validate(applyMeritScholarshipSchema), ctrl.applyMeritScholarshipCtrl);
+router.post('/scholarships/eligibility/renew', authorize('finance', 'create'), validate(renewScholarshipSchema), ctrl.renewScholarshipCtrl);
+
+// ── Defaulter Management ───────────────────────────────────
+router.post('/defaulters/identify', authorize('finance', 'create'), validate(identifyDefaultersSchema_wf), ctrl.identifyDefaultersCtrl);
+router.post('/defaulters/:id/escalate', authorize('finance', 'update'), validate(escalateDefaulterSchema), ctrl.escalateDefaulterCtrl);
+router.get('/defaulters/:id/distress-score', authorize('finance', 'read'), ctrl.computeDistressCtrl);
+router.post('/defaulters/:id/refer-welfare', authorize('finance', 'create'), validate(referToWelfareSchema_wf), ctrl.referToWelfareCtrl);
+router.post('/holds', authorize('finance', 'create'), validate(applyHoldSchema), ctrl.applyHoldCtrl);
+router.post('/holds/:id/release', authorize('finance', 'update'), validate(releaseHoldSchema), ctrl.releaseHoldCtrl);
+
+// ── Financial Clearance ────────────────────────────────────
+router.get('/clearance/:studentId', authorize('finance', 'read'), ctrl.checkFinancialClearanceCtrl);
+
+// ── Vendor Payments ────────────────────────────────────────
+router.post('/vendor-payments/schedule', authorize('finance', 'create'), validate(scheduleVendorPaymentSchema), ctrl.scheduleVendorPaymentCtrl);
+router.post('/vendor-payments/:id/confirm', authorize('finance', 'update'), validate(confirmVendorPaymentSchema), ctrl.confirmVendorPaymentCtrl);
+
+// ── Revenue Reports ────────────────────────────────────────
+router.post('/revenue-reports', authorize('finance', 'create'), validate(generateRevenueReportSchema), ctrl.generateRevenueReportCtrl);
 
 export default router;

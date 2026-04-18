@@ -1,0 +1,6 @@
+import { Schema, model, Document } from 'mongoose';
+export interface IAwardInstance extends Document { collegeId: Schema.Types.ObjectId; awardId: Schema.Types.ObjectId; studentId: Schema.Types.ObjectId; academicYearId: Schema.Types.ObjectId; nominatedBy: Schema.Types.ObjectId; status: string; conferredDate?: Date; certificateId?: Schema.Types.ObjectId; justification?: string; approvedBy?: Schema.Types.ObjectId; }
+const schema = new Schema<IAwardInstance>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, awardId: { type: Schema.Types.ObjectId, ref: 'Award', required: true }, studentId: { type: Schema.Types.ObjectId, ref: 'Student', required: true }, academicYearId: { type: Schema.Types.ObjectId, ref: 'AcademicYear', required: true }, nominatedBy: { type: Schema.Types.ObjectId, ref: 'Person', required: true }, status: { type: String, enum: ['nominated', 'shortlisted', 'approved', 'conferred', 'declined'], default: 'nominated' }, conferredDate: Date, certificateId: { type: Schema.Types.ObjectId, ref: 'Certificate' }, justification: String, approvedBy: { type: Schema.Types.ObjectId, ref: 'Person' } }, { timestamps: true });
+schema.index({ collegeId: 1, awardId: 1, academicYearId: 1 });
+schema.index({ collegeId: 1, studentId: 1 });
+export const AwardInstance = model<IAwardInstance>('AwardInstance', schema);

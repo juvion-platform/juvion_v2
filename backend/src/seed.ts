@@ -4,21 +4,46 @@ import { connectDB } from './config/db';
 import {
   // People
   Person, Student, Faculty, Staff, Parent,
+  ExitRequest, DocumentTemplate, ExitDocument, Alumni,
   // Academic Structure
   AcademicYear, Regulation, Department, Programme, Branch, Batch, Section, Semester,
+  LabBatch,
   // Academic Ops
   Course, CourseOffering, CurriculumMap,
+  Enrollment, AttendanceSession, AttendanceRecord, InternalAssessment, InternalMark,
+  ExamSchedule, ExamRegistration, ExternalMark, GradeCard, SemesterResult,
+  ElectiveAllocation, LessonPlan, CourseFeedback, Timetable, TimetableSlot,
+  Assignment, Submission, Quiz, QuizAttempt, Backlog, RevaluationRequest,
+  HallTicket, SeatingPlan, InvigilationRoster, PromotionDecision,
+  AttendanceSummary, AttendanceAlert, CondonationRequest,
+  COAttainmentRecord, POAttainmentRecord, ProgrammeHealthMetrics, AttainmentRun,
+  QualityReport, ProgramOutcome, CourseOutcome, CourseMaterial, LateralCreditMapping,
   // Finance
   FeeStructure, FeeLineItem, StudentFeeAccount, Invoice, Payment, Budget, Expense,
   Scholarship, ScholarshipAllocation, Concession,
+  FeeStructureInstance, FeeComponent, FeeComponentRule, FeeAgreement, PaymentPlan,
+  InvoiceLineItem, PaymentTransaction, Receipt, ReconciliationEntry,
+  BounceRecord, OverpaymentRecord, ScholarshipEligibility, ScholarshipClaim,
+  ScholarshipReceivable, ScholarshipCredit, DefaulterRecord, EscalationAction,
+  FinancialHold, WelfareReferral as FinWelfareReferral, PaymentRequest, VendorPayment,
+  RevenueReconciliationReport, PaymentGatewayLog, FinancialLedger, FinancialReport, FinePenalty,
   // HR
   Employee, LeaveType, LeaveBalance, LeaveApplication, PayStructure, Payroll,
   Training, Recruitment, Appraisal, Qualification, Publication, ResearchProject,
+  HiringRequisition, SelectionCommittee, AppointmentOrder, JobApplication,
+  OnDuty, DisciplinaryCase, DisciplinaryOutcome, Promotion, FDPRecord, FDPComplianceSummary,
+  TrainingParticipant, EmployeeAttendance, AttendanceAnomaly, AttendanceMonthlySummary,
+  PayrollDataExtract, ExitProcess, SeparationRequest, ExitClearance, FinalSettlement,
+  HandoverRecord, FacultyWorkload, DutyLog, Designation,
   // Placement
   Company, PlacementSeason, JobPosting, InternshipPosting, PlacementTraining,
   PlacementRegistration, PlacementRound, InternshipApplication, TrainingAttendance,
   MockInterview, HigherStudiesApplication, EntrepreneurProfile, AlumniProfile, AlumniEvent,
   RoundResult, PlacementOffer, PlacementReport,
+  CareerProfile, CompanyEngagementLog, CompanyProgrammeAffinity, PlacementDrive,
+  DriveApplication, InterviewSchedule, RecruiterAccount, RecruiterActivityLog,
+  PlacementReadinessScore, SkillRecord, PlacementBar, OptOutRecord,
+  AlumniCareerRecord, AlumniCareer, AlumniEngagement, MentorMatch,
   // Welfare
   HostelBlock, HostelRoom, HostelAllocation, HostelVisitorLog,
   TransportRoute, TransportAllocation,
@@ -26,14 +51,25 @@ import {
   HealthRecord, MedicalVisit, CounselingSession,
   AntiRaggingComplaint, StudentGrievance, CrisisAlert,
   InsuranceClaim, ParentMeeting,
+  GrievanceAssignment, SystemicPattern, ICCComplaint, ICCAnnualReport,
+  SCSTComplaint, GRCComplaint, MentorAssignment, MentorSession, MentorConcern,
+  CounsellingReferral, MisconductReport, RiskSignal, CCDThreshold, CCDIntervention,
+  DropoutRiskAlert, ExitInterview,
   // Campus
   Building, Room, RoomBooking, EmergencyContact,
   GatePass, SecurityIncident, Vehicle, VisitorEntry,
   Lab, CCTV, ParkingSlot, PowerBackup, GreenInitiative, WaterSupply,
+  Bed, HostelAppeal, HostelAttendance, HostelClearance, HostelLeave, HostelPenalty, HostelViolation,
+  MessFacility, MessSubscription, MessVendorContract, MealTransaction, QualityInspection, DietaryPreference,
+  LabSlotBooking, LabClearance, LabIncident, LabEquipment, EquipmentIssue, LabAccess,
+  RoomChangeRequest, FacilityUsageLog,
+  Driver, RouteStop, TransportContractor, TransportClearance,
+  CampusTransportAttendance, TripLog,
   // Facilities
   Vendor, Asset, AssetAllocation, MaintenanceRequest, MaintenanceSchedule,
   PurchaseOrder, StockItem, StockTransaction,
   ITAsset, NetworkInfra, Insurance, EnergyConsumption, WasteManagement, ConstructionProject,
+  AMCContract, MaintenanceAssignment, MaintenanceEscalation, MaintenanceWorkLog, VendorPerformance,
   // Library
   Book, BookIssue, BookReservation, LibraryMember, LibraryFine,
   LibraryGateEntry, EResource, EResourceAccess, PeriodicalSubscription,
@@ -42,18 +78,32 @@ import {
   SportsTeam, SportsTeamMember, NSSActivity, NSSParticipant,
   Mentoring, SkillCertification, LeadershipRole,
   StudentProject, CommunityProject,
+  Fest, Competition, Workshop, SDProgramme, Award, AwardInstance, Certificate,
+  ActivityBudget, BudgetLineItem as SDBudgetLineItem, Sponsorship, SponsorContact,
+  Portfolio, PortfolioEntry,
   // Governance
   Committee, CommitteeMeeting, GoverningBodyMember, Policy, StrategicGoal,
   // Compliance
   AccreditationBody, AccreditationCycle, ComplianceCriteria, RegulatoryFiling,
   AICTEApproval, AffiliationStatus, AuditFinding, IQACReport,
+  EvidenceType, EvidenceCollectionRule, CriterionEvidenceMapping, AssessmentRubric,
+  ReadinessScore, ReadinessSnapshot, GapRecord, AccreditationReport, ReportSection,
+  ReportTemplate, SubmissionArtifact, RemediationPlan, EvidenceRecord,
   // Communication
   Announcement, Circular, Notification, FeedbackSurvey, SurveyResponse,
   // Admissions
   Applicant, AdmissionOffer, Admission,
+  Inquiry, SeatInventory, AllotmentRound, AllotmentResult, Waitlist,
+  FeeNegotiation, AdmissionCancellation, LeadImportBatch, LeadInteraction,
+  MeritList, SpotRound,
+  // Workflow
+  ClearanceWorkflow, ClearanceItem, EscalationLog,
+  // Platform
+  InferenceLog, IntegrationLog,
   // Juvi
   JuviPersonaConfig, JuviKnowledgeBase, JuviConversation,
   JuviMessage, JuviAction, JuviInsight, JuviFeedback, JuviUsageMetric,
+  JuviNoticeCard, AckRecord, StudyRecommendation,
 } from './models';
 import { User } from './models/User';
 import { College } from './models/College';
@@ -225,6 +275,217 @@ async function seed() {
     JuviInsight.deleteMany({ collegeId: CID }),
     JuviFeedback.deleteMany({ collegeId: CID }),
     JuviUsageMetric.deleteMany({ collegeId: CID }),
+    // W01 Admissions workflow
+    Inquiry.deleteMany({ collegeId: CID }),
+    SeatInventory.deleteMany({ collegeId: CID }),
+    AllotmentRound.deleteMany({ collegeId: CID }),
+    AllotmentResult.deleteMany({ collegeId: CID }),
+    Waitlist.deleteMany({ collegeId: CID }),
+    FeeNegotiation.deleteMany({ collegeId: CID }),
+    AdmissionCancellation.deleteMany({ collegeId: CID }),
+    LeadImportBatch.deleteMany({ collegeId: CID }),
+    LeadInteraction.deleteMany({ collegeId: CID }),
+    MeritList.deleteMany({ collegeId: CID }),
+    SpotRound.deleteMany({ collegeId: CID }),
+    // W02 Academic delivery
+    Enrollment.deleteMany({ collegeId: CID }),
+    AttendanceSession.deleteMany({ collegeId: CID }),
+    AttendanceRecord.deleteMany({ collegeId: CID }),
+    InternalAssessment.deleteMany({ collegeId: CID }),
+    InternalMark.deleteMany({ collegeId: CID }),
+    ExamSchedule.deleteMany({ collegeId: CID }),
+    ExamRegistration.deleteMany({ collegeId: CID }),
+    ExternalMark.deleteMany({ collegeId: CID }),
+    GradeCard.deleteMany({ collegeId: CID }),
+    SemesterResult.deleteMany({ collegeId: CID }),
+    ElectiveAllocation.deleteMany({ collegeId: CID }),
+    LessonPlan.deleteMany({ collegeId: CID }),
+    CourseFeedback.deleteMany({ collegeId: CID }),
+    Timetable.deleteMany({ collegeId: CID }),
+    TimetableSlot.deleteMany({ collegeId: CID }),
+    Assignment.deleteMany({ collegeId: CID }),
+    Submission.deleteMany({ collegeId: CID }),
+    Quiz.deleteMany({ collegeId: CID }),
+    QuizAttempt.deleteMany({ collegeId: CID }),
+    Backlog.deleteMany({ collegeId: CID }),
+    RevaluationRequest.deleteMany({ collegeId: CID }),
+    HallTicket.deleteMany({ collegeId: CID }),
+    SeatingPlan.deleteMany({ collegeId: CID }),
+    InvigilationRoster.deleteMany({ collegeId: CID }),
+    PromotionDecision.deleteMany({ collegeId: CID }),
+    AttendanceSummary.deleteMany({ collegeId: CID }),
+    AttendanceAlert.deleteMany({ collegeId: CID }),
+    CondonationRequest.deleteMany({ collegeId: CID }),
+    COAttainmentRecord.deleteMany({ collegeId: CID }),
+    POAttainmentRecord.deleteMany({ collegeId: CID }),
+    ProgrammeHealthMetrics.deleteMany({ collegeId: CID }),
+    AttainmentRun.deleteMany({ collegeId: CID }),
+    QualityReport.deleteMany({ collegeId: CID }),
+    ProgramOutcome.deleteMany({ collegeId: CID }),
+    CourseOutcome.deleteMany({ collegeId: CID }),
+    CourseMaterial.deleteMany({ collegeId: CID }),
+    LateralCreditMapping.deleteMany({ collegeId: CID }),
+    LabBatch.deleteMany({ collegeId: CID }),
+    // W03 Finance workflow
+    FeeStructureInstance.deleteMany({ collegeId: CID }),
+    FeeComponent.deleteMany({ collegeId: CID }),
+    FeeComponentRule.deleteMany({ collegeId: CID }),
+    FeeAgreement.deleteMany({ collegeId: CID }),
+    PaymentPlan.deleteMany({ collegeId: CID }),
+    InvoiceLineItem.deleteMany({ collegeId: CID }),
+    PaymentTransaction.deleteMany({ collegeId: CID }),
+    Receipt.deleteMany({ collegeId: CID }),
+    ReconciliationEntry.deleteMany({ collegeId: CID }),
+    BounceRecord.deleteMany({ collegeId: CID }),
+    OverpaymentRecord.deleteMany({ collegeId: CID }),
+    ScholarshipEligibility.deleteMany({ collegeId: CID }),
+    ScholarshipClaim.deleteMany({ collegeId: CID }),
+    ScholarshipReceivable.deleteMany({ collegeId: CID }),
+    ScholarshipCredit.deleteMany({ collegeId: CID }),
+    DefaulterRecord.deleteMany({ collegeId: CID }),
+    EscalationAction.deleteMany({ collegeId: CID }),
+    FinancialHold.deleteMany({ collegeId: CID }),
+    FinWelfareReferral.deleteMany({ collegeId: CID }),
+    PaymentRequest.deleteMany({ collegeId: CID }),
+    VendorPayment.deleteMany({ collegeId: CID }),
+    RevenueReconciliationReport.deleteMany({ collegeId: CID }),
+    PaymentGatewayLog.deleteMany({ collegeId: CID }),
+    FinancialLedger.deleteMany({ collegeId: CID }),
+    FinancialReport.deleteMany({ collegeId: CID }),
+    FinePenalty.deleteMany({ collegeId: CID }),
+    // W05 HR workflow
+    HiringRequisition.deleteMany({ collegeId: CID }),
+    SelectionCommittee.deleteMany({ collegeId: CID }),
+    AppointmentOrder.deleteMany({ collegeId: CID }),
+    JobApplication.deleteMany({ collegeId: CID }),
+    OnDuty.deleteMany({ collegeId: CID }),
+    DisciplinaryCase.deleteMany({ collegeId: CID }),
+    DisciplinaryOutcome.deleteMany({ collegeId: CID }),
+    Promotion.deleteMany({ collegeId: CID }),
+    FDPRecord.deleteMany({ collegeId: CID }),
+    FDPComplianceSummary.deleteMany({ collegeId: CID }),
+    TrainingParticipant.deleteMany({ collegeId: CID }),
+    EmployeeAttendance.deleteMany({ collegeId: CID }),
+    AttendanceAnomaly.deleteMany({ collegeId: CID }),
+    AttendanceMonthlySummary.deleteMany({ collegeId: CID }),
+    PayrollDataExtract.deleteMany({ collegeId: CID }),
+    ExitProcess.deleteMany({ collegeId: CID }),
+    SeparationRequest.deleteMany({ collegeId: CID }),
+    ExitClearance.deleteMany({ collegeId: CID }),
+    FinalSettlement.deleteMany({ collegeId: CID }),
+    HandoverRecord.deleteMany({ collegeId: CID }),
+    FacultyWorkload.deleteMany({ collegeId: CID }),
+    DutyLog.deleteMany({ collegeId: CID }),
+    Designation.deleteMany({ collegeId: CID }),
+    // W04 Placement workflow
+    CareerProfile.deleteMany({ collegeId: CID }),
+    CompanyEngagementLog.deleteMany({ collegeId: CID }),
+    CompanyProgrammeAffinity.deleteMany({ collegeId: CID }),
+    PlacementDrive.deleteMany({ collegeId: CID }),
+    DriveApplication.deleteMany({ collegeId: CID }),
+    InterviewSchedule.deleteMany({ collegeId: CID }),
+    RecruiterAccount.deleteMany({ collegeId: CID }),
+    RecruiterActivityLog.deleteMany({ collegeId: CID }),
+    PlacementReadinessScore.deleteMany({ collegeId: CID }),
+    SkillRecord.deleteMany({ collegeId: CID }),
+    PlacementBar.deleteMany({ collegeId: CID }),
+    OptOutRecord.deleteMany({ collegeId: CID }),
+    AlumniCareerRecord.deleteMany({ collegeId: CID }),
+    AlumniCareer.deleteMany({ collegeId: CID }),
+    AlumniEngagement.deleteMany({ collegeId: CID }),
+    MentorMatch.deleteMany({ collegeId: CID }),
+    // W06 Welfare workflow
+    GrievanceAssignment.deleteMany({ collegeId: CID }),
+    SystemicPattern.deleteMany({ collegeId: CID }),
+    ICCComplaint.deleteMany({ collegeId: CID }),
+    ICCAnnualReport.deleteMany({ collegeId: CID }),
+    SCSTComplaint.deleteMany({ collegeId: CID }),
+    GRCComplaint.deleteMany({ collegeId: CID }),
+    MentorAssignment.deleteMany({ collegeId: CID }),
+    MentorSession.deleteMany({ collegeId: CID }),
+    MentorConcern.deleteMany({ collegeId: CID }),
+    CounsellingReferral.deleteMany({ collegeId: CID }),
+    MisconductReport.deleteMany({ collegeId: CID }),
+    RiskSignal.deleteMany({ collegeId: CID }),
+    CCDThreshold.deleteMany({ collegeId: CID }),
+    CCDIntervention.deleteMany({ collegeId: CID }),
+    DropoutRiskAlert.deleteMany({ collegeId: CID }),
+    ExitInterview.deleteMany({ collegeId: CID }),
+    // W08 Campus ops
+    Bed.deleteMany({ collegeId: CID }),
+    HostelAppeal.deleteMany({ collegeId: CID }),
+    HostelAttendance.deleteMany({ collegeId: CID }),
+    HostelClearance.deleteMany({ collegeId: CID }),
+    HostelLeave.deleteMany({ collegeId: CID }),
+    HostelPenalty.deleteMany({ collegeId: CID }),
+    HostelViolation.deleteMany({ collegeId: CID }),
+    MessFacility.deleteMany({ collegeId: CID }),
+    MessSubscription.deleteMany({ collegeId: CID }),
+    MessVendorContract.deleteMany({ collegeId: CID }),
+    MealTransaction.deleteMany({ collegeId: CID }),
+    QualityInspection.deleteMany({ collegeId: CID }),
+    DietaryPreference.deleteMany({ collegeId: CID }),
+    LabSlotBooking.deleteMany({ collegeId: CID }),
+    LabClearance.deleteMany({ collegeId: CID }),
+    LabIncident.deleteMany({ collegeId: CID }),
+    LabEquipment.deleteMany({ collegeId: CID }),
+    EquipmentIssue.deleteMany({ collegeId: CID }),
+    LabAccess.deleteMany({ collegeId: CID }),
+    RoomChangeRequest.deleteMany({ collegeId: CID }),
+    FacilityUsageLog.deleteMany({ collegeId: CID }),
+    Driver.deleteMany({ collegeId: CID }),
+    RouteStop.deleteMany({ collegeId: CID }),
+    TransportContractor.deleteMany({ collegeId: CID }),
+    TransportClearance.deleteMany({ collegeId: CID }),
+    CampusTransportAttendance.deleteMany({ collegeId: CID }),
+    TripLog.deleteMany({ collegeId: CID }),
+    AMCContract.deleteMany({ collegeId: CID }),
+    MaintenanceAssignment.deleteMany({ collegeId: CID }),
+    MaintenanceEscalation.deleteMany({ collegeId: CID }),
+    MaintenanceWorkLog.deleteMany({ collegeId: CID }),
+    VendorPerformance.deleteMany({ collegeId: CID }),
+    // W09 Student Dev
+    Fest.deleteMany({ collegeId: CID }),
+    Competition.deleteMany({ collegeId: CID }),
+    Workshop.deleteMany({ collegeId: CID }),
+    SDProgramme.deleteMany({ collegeId: CID }),
+    Award.deleteMany({ collegeId: CID }),
+    AwardInstance.deleteMany({ collegeId: CID }),
+    Certificate.deleteMany({ collegeId: CID }),
+    ActivityBudget.deleteMany({ collegeId: CID }),
+    SDBudgetLineItem.deleteMany({ collegeId: CID }),
+    Sponsorship.deleteMany({ collegeId: CID }),
+    SponsorContact.deleteMany({ collegeId: CID }),
+    Portfolio.deleteMany({ collegeId: CID }),
+    PortfolioEntry.deleteMany({ collegeId: CID }),
+    // W07 Compliance
+    EvidenceType.deleteMany({ collegeId: CID }),
+    EvidenceCollectionRule.deleteMany({ collegeId: CID }),
+    CriterionEvidenceMapping.deleteMany({ collegeId: CID }),
+    AssessmentRubric.deleteMany({ collegeId: CID }),
+    ReadinessScore.deleteMany({ collegeId: CID }),
+    ReadinessSnapshot.deleteMany({ collegeId: CID }),
+    GapRecord.deleteMany({ collegeId: CID }),
+    AccreditationReport.deleteMany({ collegeId: CID }),
+    ReportSection.deleteMany({ collegeId: CID }),
+    ReportTemplate.deleteMany({ collegeId: CID }),
+    SubmissionArtifact.deleteMany({ collegeId: CID }),
+    RemediationPlan.deleteMany({ collegeId: CID }),
+    EvidenceRecord.deleteMany({ collegeId: CID }),
+    // W10 Exit/Alumni
+    ClearanceWorkflow.deleteMany({ collegeId: CID }),
+    ClearanceItem.deleteMany({ collegeId: CID }),
+    EscalationLog.deleteMany({ collegeId: CID }),
+    ExitRequest.deleteMany({ collegeId: CID }),
+    DocumentTemplate.deleteMany({ collegeId: CID }),
+    ExitDocument.deleteMany({ collegeId: CID }),
+    Alumni.deleteMany({ collegeId: CID }),
+    // Platform / Juvi additions
+    InferenceLog.deleteMany({ collegeId: CID }),
+    IntegrationLog.deleteMany({ collegeId: CID }),
+    JuviNoticeCard.deleteMany({ collegeId: CID }),
+    AckRecord.deleteMany({ collegeId: CID }),
+    StudyRecommendation.deleteMany({ collegeId: CID }),
   ]);
   console.log('Cleared existing data');
 
@@ -525,6 +786,17 @@ async function seed() {
   // Set reporting relationships
   await Employee.updateOne({ _id: employees[3]._id }, { reportingToId: employees[0]._id });
   console.log('Employees created');
+
+  // --- Designations ---
+  await Designation.create([
+    { collegeId: CID, code: 'PROF', name: 'Professor', category: 'teaching', level: 1, isActive: true },
+    { collegeId: CID, code: 'ASSOC-PROF', name: 'Associate Professor', category: 'teaching', level: 2, isActive: true },
+    { collegeId: CID, code: 'ASST-PROF', name: 'Assistant Professor', category: 'teaching', level: 3, isActive: true },
+    { collegeId: CID, code: 'LAB-TECH', name: 'Lab Technician', category: 'non_teaching', level: 5, isActive: true },
+    { collegeId: CID, code: 'AO', name: 'Administrative Officer', category: 'administrative', level: 4, isActive: true },
+    { collegeId: CID, code: 'REG', name: 'Registrar', category: 'administrative', level: 1, isActive: true },
+  ]);
+  console.log('Designations created');
 
   // --- Rooms ---
   const rooms = await Room.create([
@@ -857,7 +1129,7 @@ async function seed() {
     { collegeId: CID, invoiceNumber: 'INV-2024-001', studentId: students[0]._id, type: 'fee', items: [{ description: 'Tuition Fee - Sem 5', amount: 150000 }, { description: 'Development Fee', amount: 25000 }], totalAmount: 175000, dueDate: new Date('2024-08-15'), status: 'paid', issuedDate: new Date('2024-07-15') },
     { collegeId: CID, invoiceNumber: 'INV-2024-002', studentId: students[1]._id, type: 'fee', items: [{ description: 'Tuition Fee - Sem 5', amount: 150000 }, { description: 'Development Fee', amount: 25000 }], totalAmount: 175000, dueDate: new Date('2024-08-15'), status: 'overdue', issuedDate: new Date('2024-07-15') },
     { collegeId: CID, invoiceNumber: 'INV-2024-003', studentId: students[3]._id, type: 'hostel', items: [{ description: 'Hostel Fee - AY 2024-25', amount: 50000 }], totalAmount: 50000, dueDate: new Date('2024-08-15'), status: 'paid', issuedDate: new Date('2024-07-15') },
-    { collegeId: CID, invoiceNumber: 'INV-2024-004', studentId: students[5]._id, type: 'transport', items: [{ description: 'Transport Fee - AY 2024-25', amount: 30000 }], totalAmount: 30000, dueDate: new Date('2024-09-01'), status: 'issued', issuedDate: new Date('2024-08-01') },
+    { collegeId: CID, invoiceNumber: 'INV-2024-004', studentId: students[5]._id, type: 'transport', items: [{ description: 'Transport Fee - AY 2024-25', amount: 30000 }], totalAmount: 30000, dueDate: new Date('2024-09-01'), status: 'sent', issuedDate: new Date('2024-08-01') },
   ]);
   console.log('Invoices created');
 
@@ -889,7 +1161,7 @@ async function seed() {
 
   // --- Placement Seasons ---
   const [placementSeason2024, placementSeason2025] = await PlacementSeason.create([
-    { collegeId: CID, academicYearId: ay2023._id, name: 'Campus Placements 2023-24', startDate: new Date('2023-09-01'), endDate: new Date('2024-05-31'), status: 'completed' },
+    { collegeId: CID, academicYearId: ay2023._id, name: 'Campus Placements 2023-24', startDate: new Date('2023-09-01'), endDate: new Date('2024-05-31'), status: 'closed' },
     { collegeId: CID, academicYearId: ay2024._id, name: 'Campus Placements 2024-25', startDate: new Date('2024-09-01'), endDate: new Date('2025-05-31'), status: 'active' },
   ]);
   console.log('Placement Seasons created');
@@ -1578,7 +1850,7 @@ async function seed() {
 
   // --- Anti-Ragging Complaint ---
   await AntiRaggingComplaint.create([
-    { collegeId: CID, isAnonymous: true, accusedIds: [students[6]._id], description: 'Senior students forcing juniors to run errands in hostel', incidentDate: new Date('2025-02-10'), severity: 'minor', status: 'action_taken', committeeRemarks: 'Investigated. Verbal warning issued to accused.', actionTaken: 'Warning letter placed in record. Counseling mandated.' },
+    { collegeId: CID, isAnonymous: true, accusedIds: [students[6]._id], description: 'Senior students forcing juniors to run errands in hostel', incidentDate: new Date('2025-02-10'), severity: 'minor', status: 'decision_issued', committeeRemarks: 'Investigated. Verbal warning issued to accused.', actionTaken: 'Warning letter placed in record. Counseling mandated.' },
   ]);
   console.log('Anti-Ragging Complaints created');
 
@@ -1763,7 +2035,7 @@ async function seed() {
   await PlacementOffer.create([
     { collegeId: CID, jobPostingId: jobPostings[0]._id, studentId: students[8]._id, companyId: companies[0]._id, packageLpa: 7, offerDate: new Date('2024-03-15'), joiningDate: new Date('2024-07-15'), status: 'accepted' },
     { collegeId: CID, jobPostingId: jobPostings[0]._id, studentId: students[9]._id, companyId: companies[0]._id, packageLpa: 7, offerDate: new Date('2024-03-15'), joiningDate: new Date('2024-07-15'), status: 'accepted' },
-    { collegeId: CID, jobPostingId: jobPostings[2]._id, studentId: students[0]._id, companyId: companies[3]._id, packageLpa: 18, offerDate: new Date('2025-04-20'), status: 'offered' },
+    { collegeId: CID, jobPostingId: jobPostings[2]._id, studentId: students[0]._id, companyId: companies[3]._id, packageLpa: 18, offerDate: new Date('2025-04-20'), status: 'extended' },
   ]);
   console.log('Placement Offers created');
 
@@ -1850,6 +2122,1037 @@ async function seed() {
     { collegeId: CID, date: new Date('2025-03-20'), personaType: 'student', totalConversations: 52, totalMessages: 210, totalTokens: 29000, avgResponseTime: 1.1, satisfactionScore: 4.3, topIntents: [{ intent: 'fee_query', count: 30 }, { intent: 'placement_query', count: 22 }, { intent: 'hostel_query', count: 8 }] },
   ]);
   console.log('Juvi Usage Metrics created');
+
+  // ========================================================================
+  // W01-W10 WORKFLOW SEED DATA
+  // ========================================================================
+
+  // ---------- 1. Configuration entities ----------
+
+  const evidenceTypes = await EvidenceType.create([
+    { collegeId: CID, name: 'CO Attainment Data', code: 'ET-CO', sourceModule: 'M03', category: 'academic', collectionMethod: 'event_driven', requiredComponents: ['co_values', 'threshold'], applicableBodies: ['nba'], isActive: true },
+    { collegeId: CID, name: 'Faculty Qualification Metrics', code: 'ET-FQ', sourceModule: 'M05', category: 'faculty', collectionMethod: 'periodic_sync', requiredComponents: ['phd_count', 'publications'], applicableBodies: ['naac', 'nba'], isActive: true },
+    { collegeId: CID, name: 'Student Feedback Summary', code: 'ET-SF', sourceModule: 'M03', category: 'academic', collectionMethod: 'periodic_sync', requiredComponents: ['avg_rating', 'response_rate'], applicableBodies: ['naac'], isActive: true },
+  ]);
+  console.log('EvidenceTypes created');
+
+  const documentTemplates = await DocumentTemplate.create([
+    { collegeId: CID, type: 'transfer_certificate', name: 'Transfer Certificate - R22', version: '1.0', regulationId: regR22._id, signatories: [{ role: 'Principal', position: 'Head of Institution' }], isActive: true },
+    { collegeId: CID, type: 'provisional_certificate', name: 'Provisional Degree Certificate', version: '1.0', signatories: [{ role: 'Principal', position: 'Head of Institution' }, { role: 'Controller of Examinations', position: 'COE' }], isActive: true },
+  ]);
+  console.log('DocumentTemplates created');
+
+  const ccdThresholds = await CCDThreshold.create([
+    { collegeId: CID, name: 'Critical Risk', priority: 'P1', scoreThreshold: 80, requiredActions: ['mentor_outreach', 'counselling_referral', 'parent_contact'], slaHours: 24, isActive: true },
+    { collegeId: CID, name: 'High Risk', priority: 'P2', scoreThreshold: 60, requiredActions: ['mentor_outreach'], slaHours: 72, isActive: true },
+    { collegeId: CID, name: 'Watch', priority: 'P3', scoreThreshold: 40, requiredActions: ['mentor_outreach'], slaHours: 168, isActive: true },
+  ]);
+  console.log('CCDThresholds created');
+
+  const reportTemplates = await ReportTemplate.create([
+    { collegeId: CID, bodyId: accNBA._id, reportType: 'nba_sar', version: '2024', sections: [
+      { sectionNumber: 1, title: 'Vision, Mission, PEOs', sectionType: 'narrative', description: 'Institution and programme vision, mission' },
+      { sectionNumber: 2, title: 'Programme Curriculum', sectionType: 'mixed', description: 'Curriculum design and teaching-learning' },
+      { sectionNumber: 3, title: 'CO-PO Attainment', sectionType: 'data_table', description: 'Course outcome and programme outcome attainment data' },
+    ], isActive: true },
+    { collegeId: CID, bodyId: accNAAC._id, reportType: 'naac_ssr', version: '2024', sections: [
+      { sectionNumber: 1, title: 'Curricular Aspects', sectionType: 'narrative' },
+      { sectionNumber: 2, title: 'Teaching-Learning and Evaluation', sectionType: 'mixed' },
+      { sectionNumber: 3, title: 'Research, Innovation and Extension', sectionType: 'data_table' },
+    ], isActive: true },
+  ]);
+  console.log('ReportTemplates created');
+
+  const messFacilities = await MessFacility.create([
+    { collegeId: CID, name: 'Boys Hostel Mess', blockId: hostelBoys._id, operationModel: 'outsourced', billingModel: 'coupon', coordinatorId: staffMembers[0]._id, capacity: 200, isActive: true },
+    { collegeId: CID, name: 'Girls Hostel Mess', blockId: hostelGirls._id, operationModel: 'in_house', billingModel: 'fixed_fee', coordinatorId: staffMembers[1]._id, capacity: 120, isActive: true },
+  ]);
+  console.log('MessFacilities created');
+
+  // ---------- 2. Admissions workflow ----------
+
+  const inquiries = await Inquiry.create([
+    { collegeId: CID, academicYearId: ay2024._id, name: 'Rajesh Kiran', phone: '9876500040', email: 'rajesh.k@gmail.com', gender: 'male', interStream: 'MPC', source: 'website', status: 'converted', leadGrade: 'hot', branchPreference: 'CSE', convertedToApplicantId: applicants[0]._id },
+    { collegeId: CID, academicYearId: ay2024._id, name: 'Mounika Reddy', phone: '9876500041', email: 'mounika.r@gmail.com', gender: 'female', interStream: 'MPC', source: 'education_fair', status: 'follow_up', leadGrade: 'warm', branchPreference: 'ECE' },
+    { collegeId: CID, academicYearId: ay2024._id, name: 'Pavan Kumar', phone: '9876500042', email: 'pavan.k@gmail.com', gender: 'male', interStream: 'MPC', source: 'referral', status: 'interested', leadGrade: 'hot', branchPreference: 'CSE' },
+  ]);
+  console.log('Inquiries created');
+
+  const leadImportBatches = await LeadImportBatch.create([
+    { collegeId: CID, academicYearId: ay2024._id, source: 'eamcet', fileName: 'eamcet_2024_round1.csv', status: 'completed', totalRecords: 500, processedRecords: 500, successCount: 485, failedCount: 10, duplicateCount: 5, importedBy: 'admin@jit.edu.in', startedAt: new Date('2024-06-20T10:00:00'), completedAt: new Date('2024-06-20T10:15:00') },
+    { collegeId: CID, academicYearId: ay2024._id, source: 'manual_csv', fileName: 'walk_in_leads_july.csv', status: 'completed', totalRecords: 50, processedRecords: 50, successCount: 48, failedCount: 2, duplicateCount: 0, importedBy: 'admin@jit.edu.in', startedAt: new Date('2024-07-05T09:00:00'), completedAt: new Date('2024-07-05T09:02:00') },
+  ]);
+  console.log('LeadImportBatches created');
+
+  await LeadInteraction.create([
+    { collegeId: CID, inquiryId: inquiries[1]._id, type: 'phone_call', direction: 'outbound', channel: 'manual', summary: 'Called to follow up on education fair inquiry. Student interested in ECE.', outcome: 'callback_requested', durationMinutes: 5, performedBy: 'admin@jit.edu.in', aiGenerated: false, completedAt: new Date('2024-06-22T11:00:00') },
+    { collegeId: CID, inquiryId: inquiries[2]._id, type: 'whatsapp', direction: 'outbound', channel: 'automated', summary: 'Sent admission brochure and fee details via WhatsApp', outcome: 'interested', performedBy: 'system', aiGenerated: true, completedAt: new Date('2024-06-25T14:00:00') },
+  ]);
+  console.log('LeadInteractions created');
+
+  const seatInventories = await SeatInventory.create([
+    { collegeId: CID, academicYearId: ay2024._id, programmeId: progBTech._id, branchId: brCSE._id, sanctionedIntake: 180, convenerSeats: 126, managementSeats: 36, nriSeats: 9, spotSeats: 9, lateralEntrySeats: 0, convenerFilled: 120, managementFilled: 30, nriFilled: 5, spotFilled: 3, lateralFilled: 0, status: 'published', lastUpdatedBy: 'admin@jit.edu.in', categoryWiseSplit: { sc: 27, st: 14, obc: 47, ews: 18, general: 74 } },
+    { collegeId: CID, academicYearId: ay2024._id, programmeId: progBTech._id, branchId: brECE._id, sanctionedIntake: 120, convenerSeats: 84, managementSeats: 24, nriSeats: 6, spotSeats: 6, lateralEntrySeats: 0, convenerFilled: 78, managementFilled: 20, nriFilled: 3, spotFilled: 2, lateralFilled: 0, status: 'published', lastUpdatedBy: 'admin@jit.edu.in' },
+  ]);
+  console.log('SeatInventories created');
+
+  const allotmentRounds = await AllotmentRound.create([
+    { collegeId: CID, academicYearId: ay2024._id, roundNumber: 1, name: 'Management Round 1', type: 'management', status: 'closed', criteria: { sortBy: 'merit_score', programmeIds: [progBTech._id], branchIds: [brCSE._id, brECE._id] }, applicationDeadline: new Date('2024-06-30'), publishDate: new Date('2024-07-05'), acceptanceDeadline: new Date('2024-07-15'), totalApplicants: 120, allottedCount: 54, waitlistedCount: 20, conductedBy: 'Admissions Office' },
+  ]);
+  console.log('AllotmentRounds created');
+
+  const meritLists = await MeritList.create([
+    { collegeId: CID, allotmentRoundId: allotmentRounds[0]._id, academicYearId: ay2024._id, programmeId: progBTech._id, branchId: brCSE._id, quota: 'management', criteria: { sortBy: 'inter_percentage', tieBreaker: 'tenth_percentage' }, version: 1, publishDate: new Date('2024-07-05'), status: 'published', totalCandidates: 80, generatedBy: persons[24]._id },
+  ]);
+  console.log('MeritLists created');
+
+  const allotmentResults = await AllotmentResult.create([
+    { collegeId: CID, allotmentRoundId: allotmentRounds[0]._id, applicantId: applicants[2]._id, meritRank: 1, meritScore: 88, allottedProgrammeId: progBTech._id, allottedBranchId: brCSE._id, preferenceNumber: 1, status: 'allotted' },
+    { collegeId: CID, allotmentRoundId: allotmentRounds[0]._id, applicantId: applicants[5]._id, meritRank: 15, meritScore: 75, allottedProgrammeId: progBTech._id, allottedBranchId: brCIVIL._id, preferenceNumber: 2, status: 'waitlisted' },
+  ]);
+  console.log('AllotmentResults created');
+
+  await Waitlist.create([
+    { collegeId: CID, academicYearId: ay2024._id, applicantId: applicants[5]._id, programmeId: progBTech._id, branchId: brCSE._id, allotmentRoundId: allotmentRounds[0]._id, waitlistPosition: 1, meritScore: 75, quota: 'management', status: 'waiting', expiresAt: new Date('2024-07-25') },
+  ]);
+  console.log('Waitlists created');
+
+  await FeeNegotiation.create([
+    { collegeId: CID, applicantId: applicants[2]._id, offerId: (await AdmissionOffer.findOne({ applicantId: applicants[2]._id }))!._id, originalFee: 315000, requestedWaiver: 50000, requestedReason: 'Single parent family with limited income', aiRecommendedWaiver: 30000, aiConfidence: 0.72, aiReason: 'Income documentation suggests moderate hardship', approvedWaiver: 30000, finalFee: 285000, approvedBy: 'Principal', approvalLevel: 'leadership', status: 'approved', negotiatedBy: 'admin@jit.edu.in', resolvedAt: new Date('2024-07-08') },
+  ]);
+  console.log('FeeNegotiations created');
+
+  await AdmissionCancellation.create([
+    { collegeId: CID, applicantId: applicants[3]._id, cancellationType: 'pre_enrolment', reason: 'Got seat in NIT through JoSAA counselling', reasonCategory: 'student_request', reversals: [], seatReleased: true, waitlistPromotionTriggered: true, requestedBy: 'applicant', approvedBy: 'Admissions Office', approvalLevel: 'staff', status: 'completed', completedAt: new Date('2024-07-20') },
+  ]);
+  console.log('AdmissionCancellations created');
+
+  await SpotRound.create([
+    { collegeId: CID, academicYearId: ay2024._id, name: 'Spot Admission Round 1', startDate: new Date('2024-08-10'), endDate: new Date('2024-08-15'), eligibilityCriteria: 'MPC with 60% aggregate, valid EAMCET rank', maxSeats: 18, filledSeats: 12, status: 'closed', approvedBy: persons[24]._id },
+  ]);
+  console.log('SpotRounds created');
+
+  // ---------- 3. Academic delivery ----------
+
+  const enrollments = await Enrollment.create([
+    { collegeId: CID, studentId: students[0]._id, courseOfferingId: courseOfferings[0]._id, semesterId: sem2_24._id, status: 'enrolled' },
+    { collegeId: CID, studentId: students[0]._id, courseOfferingId: courseOfferings[1]._id, semesterId: sem2_24._id, status: 'enrolled' },
+    { collegeId: CID, studentId: students[1]._id, courseOfferingId: courseOfferings[0]._id, semesterId: sem2_24._id, status: 'enrolled' },
+    { collegeId: CID, studentId: students[7]._id, courseOfferingId: courseOfferings[1]._id, semesterId: sem2_24._id, status: 'enrolled' },
+    { collegeId: CID, studentId: students[2]._id, courseOfferingId: courseOfferings[4]._id, semesterId: sem2_24._id, status: 'enrolled' },
+  ]);
+  console.log('Enrollments created');
+
+  const timetables = await Timetable.create([
+    { collegeId: CID, semesterId: sem2_24._id, sectionId: sections[0]._id, version: 1, status: 'published', effectiveFrom: new Date('2025-01-10') },
+    { collegeId: CID, semesterId: sem2_24._id, sectionId: sections[2]._id, version: 1, status: 'published', effectiveFrom: new Date('2025-01-10') },
+  ]);
+  console.log('Timetables created');
+
+  await TimetableSlot.create([
+    { collegeId: CID, timetableId: timetables[0]._id, day: 'monday', period: 1, startTime: '09:00', endTime: '10:00', courseOfferingId: courseOfferings[0]._id, roomId: rooms[0]._id, slotType: 'lecture' },
+    { collegeId: CID, timetableId: timetables[0]._id, day: 'monday', period: 2, startTime: '10:00', endTime: '11:00', courseOfferingId: courseOfferings[1]._id, roomId: rooms[0]._id, slotType: 'lecture' },
+    { collegeId: CID, timetableId: timetables[0]._id, day: 'tuesday', period: 1, startTime: '09:00', endTime: '10:00', courseOfferingId: courseOfferings[0]._id, roomId: rooms[0]._id, slotType: 'lecture' },
+    { collegeId: CID, timetableId: timetables[0]._id, day: 'wednesday', period: 3, startTime: '11:00', endTime: '13:00', courseOfferingId: courseOfferings[3]._id, roomId: rooms[2]._id, slotType: 'lab' },
+    { collegeId: CID, timetableId: timetables[1]._id, day: 'monday', period: 1, startTime: '09:00', endTime: '10:00', courseOfferingId: courseOfferings[4]._id, roomId: rooms[6]._id, slotType: 'lecture' },
+  ]);
+  console.log('TimetableSlots created');
+
+  const attendanceSessions = await AttendanceSession.create([
+    { collegeId: CID, courseOfferingId: courseOfferings[0]._id, date: new Date('2025-03-10'), period: 1, facultyId: faculties[0]._id, status: 'closed', totalPresent: 50, totalAbsent: 5 },
+    { collegeId: CID, courseOfferingId: courseOfferings[1]._id, date: new Date('2025-03-10'), period: 2, facultyId: faculties[3]._id, status: 'closed', totalPresent: 52, totalAbsent: 6 },
+    { collegeId: CID, courseOfferingId: courseOfferings[0]._id, date: new Date('2025-03-11'), period: 1, facultyId: faculties[0]._id, status: 'closed', totalPresent: 48, totalAbsent: 7 },
+  ]);
+  console.log('AttendanceSessions created');
+
+  await AttendanceRecord.create([
+    { collegeId: CID, sessionId: attendanceSessions[0]._id, studentId: students[0]._id, status: 'present', markedBy: persons[10]._id },
+    { collegeId: CID, sessionId: attendanceSessions[0]._id, studentId: students[1]._id, status: 'present', markedBy: persons[10]._id },
+    { collegeId: CID, sessionId: attendanceSessions[1]._id, studentId: students[0]._id, status: 'present', markedBy: persons[13]._id },
+    { collegeId: CID, sessionId: attendanceSessions[1]._id, studentId: students[7]._id, status: 'absent', markedBy: persons[13]._id },
+    { collegeId: CID, sessionId: attendanceSessions[2]._id, studentId: students[0]._id, status: 'late', markedBy: persons[10]._id },
+    { collegeId: CID, sessionId: attendanceSessions[2]._id, studentId: students[1]._id, status: 'absent', markedBy: persons[10]._id },
+  ]);
+  console.log('AttendanceRecords created');
+
+  const internalAssessments = await InternalAssessment.create([
+    { collegeId: CID, courseOfferingId: courseOfferings[0]._id, name: 'Mid-1 Exam - Compiler Design', type: 'mid1', maxMarks: 30, weightage: 15, date: new Date('2025-02-20'), status: 'finalized', coMappings: [{ coCode: 'CO1', weight: 0.5 }, { coCode: 'CO2', weight: 0.5 }] },
+    { collegeId: CID, courseOfferingId: courseOfferings[1]._id, name: 'Mid-1 Exam - Machine Learning', type: 'mid1', maxMarks: 30, weightage: 15, date: new Date('2025-02-21'), status: 'marks_entered', coMappings: [{ coCode: 'CO1', weight: 0.6 }, { coCode: 'CO2', weight: 0.4 }] },
+    { collegeId: CID, courseOfferingId: courseOfferings[0]._id, name: 'Assignment 1 - Lexer Implementation', type: 'assignment', maxMarks: 20, weightage: 5, date: new Date('2025-03-01'), status: 'conducted' },
+  ]);
+  console.log('InternalAssessments created');
+
+  await InternalMark.create([
+    { collegeId: CID, assessmentId: internalAssessments[0]._id, studentId: students[0]._id, marksObtained: 26 },
+    { collegeId: CID, assessmentId: internalAssessments[0]._id, studentId: students[1]._id, marksObtained: 22 },
+    { collegeId: CID, assessmentId: internalAssessments[1]._id, studentId: students[0]._id, marksObtained: 28 },
+    { collegeId: CID, assessmentId: internalAssessments[1]._id, studentId: students[7]._id, marksObtained: 24 },
+  ]);
+  console.log('InternalMarks created');
+
+  await LessonPlan.create([
+    { collegeId: CID, courseOfferingId: courseOfferings[0]._id, weekNumber: 1, topic: 'Introduction to Compilers - Phases of Compilation', teachingMethod: 'lecture', status: 'completed' },
+    { collegeId: CID, courseOfferingId: courseOfferings[0]._id, weekNumber: 2, topic: 'Lexical Analysis - Regular Expressions and Finite Automata', teachingMethod: 'lecture', status: 'completed' },
+    { collegeId: CID, courseOfferingId: courseOfferings[0]._id, weekNumber: 3, topic: 'Syntax Analysis - Context Free Grammars', teachingMethod: 'lecture', status: 'planned' },
+    { collegeId: CID, courseOfferingId: courseOfferings[1]._id, weekNumber: 1, topic: 'Introduction to ML - Supervised vs Unsupervised Learning', teachingMethod: 'lecture', status: 'completed' },
+  ]);
+  console.log('LessonPlans created');
+
+  await CourseMaterial.create([
+    { collegeId: CID, courseOfferingId: courseOfferings[0]._id, title: 'Compiler Design - Unit 1 Notes', type: 'lecture_notes', fileUrl: '/materials/cs501/unit1_notes.pdf', uploadedBy: persons[10]._id, isPublished: true },
+    { collegeId: CID, courseOfferingId: courseOfferings[1]._id, title: 'ML Lab Manual - Python Exercises', type: 'lab_manual', fileUrl: '/materials/cs502/lab_manual.pdf', uploadedBy: persons[13]._id, isPublished: true },
+  ]);
+  console.log('CourseMaterials created');
+
+  const assignments = await Assignment.create([
+    { collegeId: CID, courseOfferingId: courseOfferings[0]._id, assessmentId: internalAssessments[2]._id, title: 'Implement a Lexer for Mini-C', description: 'Build a lexical analyzer using Python/C that tokenizes a subset of C language', maxMarks: 20, dueDate: new Date('2025-03-15'), status: 'published', coMappings: [{ coCode: 'CO1', weight: 1.0 }], createdBy: persons[10]._id },
+    { collegeId: CID, courseOfferingId: courseOfferings[1]._id, title: 'Linear Regression from Scratch', description: 'Implement linear regression without using sklearn. Use only numpy.', maxMarks: 15, dueDate: new Date('2025-03-20'), status: 'published', coMappings: [{ coCode: 'CO2', weight: 1.0 }], createdBy: persons[13]._id },
+  ]);
+  console.log('Assignments created');
+
+  await Submission.create([
+    { collegeId: CID, assignmentId: assignments[0]._id, studentId: students[0]._id, submittedAt: new Date('2025-03-14'), fileUrl: '/submissions/aarav_lexer.zip', marks: 18, gradedBy: persons[10]._id, status: 'graded', feedback: 'Excellent work. Clean code.' },
+    { collegeId: CID, assignmentId: assignments[0]._id, studentId: students[1]._id, submittedAt: new Date('2025-03-16'), fileUrl: '/submissions/priya_lexer.zip', status: 'late', isLate: true },
+    { collegeId: CID, assignmentId: assignments[1]._id, studentId: students[0]._id, submittedAt: new Date('2025-03-19'), fileUrl: '/submissions/aarav_linreg.py', marks: 14, gradedBy: persons[13]._id, status: 'graded' },
+  ]);
+  console.log('Submissions created');
+
+  const quizzes = await Quiz.create([
+    { collegeId: CID, courseOfferingId: courseOfferings[0]._id, title: 'Quiz 1 - Lexical Analysis', maxMarks: 10, duration: 15, startTime: new Date('2025-03-05T10:00:00'), endTime: new Date('2025-03-05T10:15:00'), status: 'closed', questions: [
+      { questionText: 'What is the output of a lexer?', type: 'mcq', options: ['Tokens', 'Parse Tree', 'AST', 'Machine Code'], correctAnswer: 'Tokens', marks: 5 },
+      { questionText: 'Regular expressions can describe context-free languages', type: 'true_false', options: ['True', 'False'], correctAnswer: 'False', marks: 5 },
+    ], shuffleQuestions: true, showResults: true, createdBy: persons[10]._id },
+  ]);
+  console.log('Quizzes created');
+
+  await QuizAttempt.create([
+    { collegeId: CID, quizId: quizzes[0]._id, studentId: students[0]._id, startedAt: new Date('2025-03-05T10:00:00'), submittedAt: new Date('2025-03-05T10:08:00'), answers: [{ questionIndex: 0, answer: 'Tokens', isCorrect: true }, { questionIndex: 1, answer: 'False', isCorrect: true }], totalMarks: 10, autoGraded: true, status: 'graded' },
+    { collegeId: CID, quizId: quizzes[0]._id, studentId: students[1]._id, startedAt: new Date('2025-03-05T10:01:00'), submittedAt: new Date('2025-03-05T10:12:00'), answers: [{ questionIndex: 0, answer: 'Tokens', isCorrect: true }, { questionIndex: 1, answer: 'True', isCorrect: false }], totalMarks: 5, autoGraded: true, status: 'graded' },
+  ]);
+  console.log('QuizAttempts created');
+
+  const examSchedules = await ExamSchedule.create([
+    { collegeId: CID, semesterId: sem2_24._id, courseId: courses[0]._id, examType: 'regular', date: new Date('2025-05-05'), startTime: '10:00', endTime: '13:00', venue: 'Main Block', status: 'scheduled' },
+    { collegeId: CID, semesterId: sem2_24._id, courseId: courses[1]._id, examType: 'regular', date: new Date('2025-05-08'), startTime: '10:00', endTime: '13:00', venue: 'Main Block', status: 'scheduled' },
+    { collegeId: CID, semesterId: sem2_24._id, courseId: courses[4]._id, examType: 'regular', date: new Date('2025-05-10'), startTime: '10:00', endTime: '13:00', venue: 'Science Block', status: 'scheduled' },
+  ]);
+  console.log('ExamSchedules created');
+
+  const examRegistrations = await ExamRegistration.create([
+    { collegeId: CID, studentId: students[0]._id, courseOfferingId: courseOfferings[0]._id, semesterId: sem2_24._id, examType: 'regular', isEligible: true, status: 'approved', hallTicketNumber: 'HT-2025-CS501-001', feeClearanceStatus: 'cleared', attendanceClearance: true },
+    { collegeId: CID, studentId: students[0]._id, courseOfferingId: courseOfferings[1]._id, semesterId: sem2_24._id, examType: 'regular', isEligible: true, status: 'approved', hallTicketNumber: 'HT-2025-CS502-001', feeClearanceStatus: 'cleared', attendanceClearance: true },
+    { collegeId: CID, studentId: students[1]._id, courseOfferingId: courseOfferings[0]._id, semesterId: sem2_24._id, examType: 'regular', isEligible: true, status: 'approved', hallTicketNumber: 'HT-2025-CS501-002', feeClearanceStatus: 'cleared', attendanceClearance: true },
+  ]);
+  console.log('ExamRegistrations created');
+
+  await ExternalMark.create([
+    { collegeId: CID, studentId: students[0]._id, courseId: courses[0]._id, semesterId: sem1_24._id, examType: 'regular', maxMarks: 70, marksObtained: 62, result: 'pass' },
+    { collegeId: CID, studentId: students[1]._id, courseId: courses[0]._id, semesterId: sem1_24._id, examType: 'regular', maxMarks: 70, marksObtained: 45, result: 'pass' },
+    { collegeId: CID, studentId: students[0]._id, courseId: courses[1]._id, semesterId: sem1_24._id, examType: 'regular', maxMarks: 70, marksObtained: 65, result: 'pass' },
+  ]);
+  console.log('ExternalMarks created');
+
+  await GradeCard.create([
+    { collegeId: CID, studentId: students[0]._id, semesterId: sem1_24._id, courseId: courses[0]._id, internalMarks: 26, externalMarks: 62, totalMarks: 88, grade: 'A+', gradePoints: 9, credits: 4, result: 'pass' },
+    { collegeId: CID, studentId: students[0]._id, semesterId: sem1_24._id, courseId: courses[1]._id, internalMarks: 28, externalMarks: 65, totalMarks: 93, grade: 'O', gradePoints: 10, credits: 4, result: 'pass' },
+    { collegeId: CID, studentId: students[1]._id, semesterId: sem1_24._id, courseId: courses[0]._id, internalMarks: 22, externalMarks: 45, totalMarks: 67, grade: 'B', gradePoints: 7, credits: 4, result: 'pass' },
+  ]);
+  console.log('GradeCards created');
+
+  await SemesterResult.create([
+    { collegeId: CID, studentId: students[0]._id, semesterId: sem1_24._id, sgpa: 9.2, cgpa: 8.8, totalCreditsEarned: 22, totalCreditsRegistered: 22, backlogs: 0, result: 'pass', promotionStatus: 'promoted', status: 'published', publishedAt: new Date('2025-01-15') },
+    { collegeId: CID, studentId: students[1]._id, semesterId: sem1_24._id, sgpa: 7.5, cgpa: 7.2, totalCreditsEarned: 22, totalCreditsRegistered: 22, backlogs: 0, result: 'pass', promotionStatus: 'promoted', status: 'published', publishedAt: new Date('2025-01-15') },
+  ]);
+  console.log('SemesterResults created');
+
+  await HallTicket.create([
+    { collegeId: CID, studentId: students[0]._id, semesterId: sem2_24._id, hallTicketNumber: 'HT-2025-SEM6-22B01A0501', examType: 'regular', courses: [{ courseId: courses[0]._id, examDate: new Date('2025-05-05') }, { courseId: courses[1]._id, examDate: new Date('2025-05-08') }], eligibilityStatus: 'eligible', issuedDate: new Date('2025-04-20'), status: 'issued' },
+    { collegeId: CID, studentId: students[1]._id, semesterId: sem2_24._id, hallTicketNumber: 'HT-2025-SEM6-22B01A0502', examType: 'regular', courses: [{ courseId: courses[0]._id, examDate: new Date('2025-05-05') }], eligibilityStatus: 'eligible', issuedDate: new Date('2025-04-20'), status: 'issued' },
+  ]);
+  console.log('HallTickets created');
+
+  await Backlog.create([
+    { collegeId: CID, studentId: students[5]._id, courseId: courses[2]._id, semesterId: sem1_24._id, originalExamType: 'regular', attempts: 1, currentStatus: 'registered_for_supplementary' },
+  ]);
+  console.log('Backlogs created');
+
+  await AttendanceSummary.create([
+    { collegeId: CID, studentId: students[0]._id, courseOfferingId: courseOfferings[0]._id, semesterId: sem2_24._id, totalClasses: 40, attended: 37, percentage: 92.5, category: 'safe' },
+    { collegeId: CID, studentId: students[1]._id, courseOfferingId: courseOfferings[0]._id, semesterId: sem2_24._id, totalClasses: 40, attended: 28, percentage: 70, category: 'at_risk', projectedFinal: 68 },
+    { collegeId: CID, studentId: students[7]._id, courseOfferingId: courseOfferings[1]._id, semesterId: sem2_24._id, totalClasses: 38, attended: 34, percentage: 89.5, category: 'safe' },
+  ]);
+  console.log('AttendanceSummaries created');
+
+  await AttendanceAlert.create([
+    { collegeId: CID, studentId: students[1]._id, courseOfferingId: courseOfferings[0]._id, semesterId: sem2_24._id, alertType: 'at_risk', attendancePercent: 70, threshold: 75, message: 'Attendance in Compiler Design is 70%, below 75% threshold. Risk of detention.', isNotified: true, notifiedAt: new Date('2025-03-12') },
+  ]);
+  console.log('AttendanceAlerts created');
+
+  await CondonationRequest.create([
+    { collegeId: CID, studentId: students[1]._id, courseOfferingId: courseOfferings[0]._id, semesterId: sem2_24._id, reason: 'medical', description: 'Was hospitalized for viral fever from Feb 25 to Mar 3. Medical certificate attached.', classesRequested: 8, supportingDocs: ['/docs/priya_medical_cert.pdf'], status: 'approved', reviewedBy: persons[10]._id },
+  ]);
+  console.log('CondonationRequests created');
+
+  const courseOutcomes = await CourseOutcome.create([
+    { collegeId: CID, courseId: courses[0]._id, code: 'CS501-CO1', description: 'Design and implement a lexical analyzer for a given language', bloomLevel: 'apply' },
+    { collegeId: CID, courseId: courses[0]._id, code: 'CS501-CO2', description: 'Construct parse trees using top-down and bottom-up parsing', bloomLevel: 'analyze' },
+    { collegeId: CID, courseId: courses[1]._id, code: 'CS502-CO1', description: 'Apply supervised learning algorithms to classification and regression', bloomLevel: 'apply' },
+    { collegeId: CID, courseId: courses[1]._id, code: 'CS502-CO2', description: 'Evaluate model performance using cross-validation and metrics', bloomLevel: 'evaluate' },
+  ]);
+  console.log('CourseOutcomes created');
+
+  const programOutcomes = await ProgramOutcome.create([
+    { collegeId: CID, programmeId: progBTech._id, code: 'PO1', description: 'Engineering Knowledge - Apply knowledge of mathematics, science, and engineering fundamentals' },
+    { collegeId: CID, programmeId: progBTech._id, code: 'PO2', description: 'Problem Analysis - Identify, formulate, and analyze complex engineering problems' },
+    { collegeId: CID, programmeId: progBTech._id, code: 'PO3', description: 'Design/Development of Solutions - Design solutions for complex engineering problems' },
+  ]);
+  console.log('ProgramOutcomes created');
+
+  await COAttainmentRecord.create([
+    { collegeId: CID, courseOfferingId: courseOfferings[0]._id, semesterId: sem1_24._id, coCode: 'CS501-CO1', directAttainment: 72, indirectAttainment: 78, overallAttainment: 73.8, attainmentLevel: 2, threshold: 60, studentsAboveThreshold: 42, totalStudents: 55 },
+    { collegeId: CID, courseOfferingId: courseOfferings[0]._id, semesterId: sem1_24._id, coCode: 'CS501-CO2', directAttainment: 65, indirectAttainment: 70, overallAttainment: 66.5, attainmentLevel: 2, threshold: 60, studentsAboveThreshold: 38, totalStudents: 55 },
+  ]);
+  console.log('COAttainmentRecords created');
+
+  await POAttainmentRecord.create([
+    { collegeId: CID, programmeId: progBTech._id, semesterId: sem1_24._id, poCode: 'PO1', attainment: 71.5, attainmentLevel: 2, contributingCOs: [{ coCode: 'CS501-CO1', courseOfferingId: courseOfferings[0]._id, coAttainment: 73.8, mappingLevel: 3 }] },
+  ]);
+  console.log('POAttainmentRecords created');
+
+  await ProgrammeHealthMetrics.create([
+    { collegeId: CID, programmeId: progBTech._id, semesterId: sem1_24._id, passRate: 92, avgCGPA: 7.8, backlogRatio: 0.08, attendanceAvg: 82, coAttainmentAvg: 70.2, poAttainmentAvg: 71.5, syllabusCompletion: 95, feedbackAvg: 4.1 },
+  ]);
+  console.log('ProgrammeHealthMetrics created');
+
+  await PromotionDecision.create([
+    { collegeId: CID, studentId: students[0]._id, academicYearId: ay2024._id, fromYear: 3, toYear: 4, decision: 'promoted', totalBacklogs: 0, cgpa: 8.8, approvedBy: persons[24]._id },
+    { collegeId: CID, studentId: students[8]._id, academicYearId: ay2023._id, fromYear: 4, toYear: 4, decision: 'graduated', totalBacklogs: 0, cgpa: 7.5, approvedBy: persons[24]._id },
+  ]);
+  console.log('PromotionDecisions created');
+
+  await CourseFeedback.create([
+    { collegeId: CID, courseOfferingId: courseOfferings[0]._id, studentId: students[0]._id, overallRating: 4.5, categories: { contentQuality: 5, teachingEffectiveness: 4, labRelevance: 4, assessmentFairness: 5 }, comments: 'Excellent teaching. Very clear explanations.' },
+    { collegeId: CID, courseOfferingId: courseOfferings[1]._id, studentId: students[0]._id, overallRating: 4.0, categories: { contentQuality: 4, teachingEffectiveness: 4, labRelevance: 4, assessmentFairness: 4 }, comments: 'Good course. More hands-on projects needed.' },
+  ]);
+  console.log('CourseFeedbacks created');
+
+  await ElectiveAllocation.create([
+    { collegeId: CID, studentId: students[0]._id, semesterId: sem2_24._id, electiveGroup: 'Open Elective 1', courseId: courses[7]._id, preference: 1, status: 'finalized' },
+  ]);
+  console.log('ElectiveAllocations created');
+
+  await SeatingPlan.create([
+    { collegeId: CID, examScheduleId: examSchedules[0]._id, roomId: rooms[0]._id, roomName: 'MB-101', capacity: 30, seats: [{ seatNumber: 'A1', studentId: students[0]._id, examRegistrationId: examRegistrations[0]._id }, { seatNumber: 'A2', studentId: students[1]._id, examRegistrationId: examRegistrations[2]._id }], status: 'draft', generatedBy: persons[17]._id },
+  ]);
+  console.log('SeatingPlans created');
+
+  await InvigilationRoster.create([
+    { collegeId: CID, examScheduleId: examSchedules[0]._id, assignments: [{ facultyId: faculties[2]._id, roomName: 'MB-101', role: 'chief' }, { facultyId: faculties[5]._id, roomName: 'MB-102', role: 'assistant' }], status: 'draft', generatedBy: persons[17]._id },
+  ]);
+  console.log('InvigilationRosters created');
+
+  await RevaluationRequest.create([
+    { collegeId: CID, studentId: students[1]._id, courseId: courses[0]._id, semesterId: sem1_24._id, examType: 'regular', originalMarks: 45, reason: 'Expected higher marks based on preparation. Request re-evaluation.', feePaid: true, submittedAt: new Date('2025-02-01'), status: 'forwarded_to_university' },
+  ]);
+  console.log('RevaluationRequests created');
+
+  await AttainmentRun.create([
+    { collegeId: CID, semesterId: sem1_24._id, runType: 'co', status: 'completed', triggeredBy: persons[10]._id, startedAt: new Date('2025-01-20T10:00:00'), completedAt: new Date('2025-01-20T10:05:00'), recordsProcessed: 330 },
+  ]);
+  console.log('AttainmentRuns created');
+
+  await LateralCreditMapping.create([
+    { collegeId: CID, regulationId: regR22._id, diplomaProgramme: 'Diploma in Computer Engineering', degreeProgrammeId: progBTech._id, mappings: [{ diplomaSubject: 'Programming in C', degreeCourseId: courses[8]._id, credits: 4, equivalence: 'exact' }, { diplomaSubject: 'Digital Electronics', degreeCourseId: courses[9]._id, credits: 3, equivalence: 'partial' }], exemptions: [{ courseId: courses[8]._id, reason: 'Covered in diploma curriculum' }], totalCreditsGranted: 7, isActive: true },
+  ]);
+  console.log('LateralCreditMappings created');
+
+  // ---------- 4. Finance workflow ----------
+
+  const feeStructureInstances = await FeeStructureInstance.create([
+    { collegeId: CID, academicYearId: ay2024._id, programmeId: progBTech._id, branchId: brCSE._id, quota: 'convener', status: 'active', totalAmount: 205000, approvedBy: persons[24]._id, approvedAt: new Date('2024-06-15') },
+    { collegeId: CID, academicYearId: ay2024._id, programmeId: progBTech._id, branchId: brCSE._id, quota: 'management', status: 'active', totalAmount: 315000, approvedBy: persons[24]._id, approvedAt: new Date('2024-06-15') },
+  ]);
+  console.log('FeeStructureInstances created');
+
+  const feeComponents = await FeeComponent.create([
+    { collegeId: CID, feeStructureInstanceId: feeStructureInstances[0]._id, name: 'Tuition Fee', amount: 150000, isRefundable: false, componentType: 'tuition', isConditional: false },
+    { collegeId: CID, feeStructureInstanceId: feeStructureInstances[0]._id, name: 'Development Fee', amount: 25000, isRefundable: false, componentType: 'development', isConditional: false },
+    { collegeId: CID, feeStructureInstanceId: feeStructureInstances[0]._id, name: 'Lab Fee', amount: 15000, isRefundable: false, componentType: 'lab', isConditional: false },
+    { collegeId: CID, feeStructureInstanceId: feeStructureInstances[0]._id, name: 'Caution Deposit', amount: 10000, isRefundable: true, componentType: 'caution_deposit', isConditional: false },
+  ]);
+  console.log('FeeComponents created');
+
+  await FeeComponentRule.create([
+    { collegeId: CID, feeComponentId: feeComponents[2]._id, conditionType: 'lab_programme', conditionValue: 'CSE', operator: 'equals', status: 'configured' },
+  ]);
+  console.log('FeeComponentRules created');
+
+  await InvoiceLineItem.create([
+    { collegeId: CID, invoiceId: invoices[0]._id, feeComponentId: feeComponents[0]._id, description: 'Tuition Fee - Sem 5', grossAmount: 150000, scholarshipAllocated: 0, concessionApplied: 0, netAmount: 150000, status: 'active' },
+    { collegeId: CID, invoiceId: invoices[0]._id, feeComponentId: feeComponents[1]._id, description: 'Development Fee', grossAmount: 25000, scholarshipAllocated: 0, concessionApplied: 0, netAmount: 25000, status: 'active' },
+  ]);
+  console.log('InvoiceLineItems created');
+
+  const paymentTransactions = await PaymentTransaction.create([
+    { collegeId: CID, studentId: students[0]._id, invoiceId: invoices[0]._id, amount: 175000, channel: 'gateway', paymentMode: 'online', transactionRef: 'TXN-RZP-20240810-001', reconciliationStatus: 'matched', gatewayOrderId: 'order_RZP_001', paymentDate: new Date('2024-08-10') },
+    { collegeId: CID, studentId: students[1]._id, invoiceId: invoices[1]._id, amount: 100000, channel: 'upi', paymentMode: 'UPI', transactionRef: 'TXN-UPI-20240820-001', reconciliationStatus: 'matched', paymentDate: new Date('2024-08-20') },
+  ]);
+  console.log('PaymentTransactions created');
+
+  const receipts = await Receipt.create([
+    { collegeId: CID, receiptNumber: 'RCPT-2024-0001', paymentTransactionId: paymentTransactions[0]._id, studentId: students[0]._id, amount: 175000, issuedDate: new Date('2024-08-10'), channel: 'email', status: 'issued' },
+    { collegeId: CID, receiptNumber: 'RCPT-2024-0002', paymentTransactionId: paymentTransactions[1]._id, studentId: students[1]._id, amount: 100000, issuedDate: new Date('2024-08-20'), channel: 'email', status: 'issued' },
+  ]);
+  console.log('Receipts created');
+
+  await FeeAgreement.create([
+    { collegeId: CID, studentId: students[0]._id, feeStructureInstanceId: feeStructureInstances[0]._id, negotiatedTotal: 205000, baseTotal: 205000, waiverAmount: 0, approvalAuthority: 'Admissions Office', validityPeriodYears: 4, status: 'active' },
+  ]);
+  console.log('FeeAgreements created');
+
+  await PaymentPlan.create([
+    { collegeId: CID, studentId: students[1]._id, invoiceId: invoices[1]._id, totalAmount: 175000, installments: [{ dueDate: new Date('2024-08-15'), amount: 100000, status: 'paid' }, { dueDate: new Date('2024-11-15'), amount: 75000, status: 'overdue' }], status: 'active' },
+  ]);
+  console.log('PaymentPlans created');
+
+  const scholarshipEligibilities = await ScholarshipEligibility.create([
+    { collegeId: CID, studentId: students[3]._id, schemeCode: 'TS-SC-SCHOLAR', academicYearId: ay2024._id, status: 'eligible', verificationMethod: 'auto', verifiedAt: new Date('2024-08-01'), documentsStatus: 'complete' },
+  ]);
+  console.log('ScholarshipEligibilities created');
+
+  const scholarshipClaims = await ScholarshipClaim.create([
+    { collegeId: CID, scholarshipEligibilityId: scholarshipEligibilities[0]._id, studentId: students[3]._id, schemeCode: 'TS-SC-SCHOLAR', academicYearId: ay2024._id, claimAmount: 50000, portalReference: 'TSSC-2024-12345', status: 'approved', submittedAt: new Date('2024-09-15') },
+  ]);
+  console.log('ScholarshipClaims created');
+
+  const scholarshipReceivables = await ScholarshipReceivable.create([
+    { collegeId: CID, scholarshipClaimId: scholarshipClaims[0]._id, studentId: students[3]._id, expectedAmount: 50000, expectedDisbursementDate: new Date('2024-12-01'), status: 'disbursed', disbursedAmount: 50000, disbursedAt: new Date('2024-12-15') },
+  ]);
+  console.log('ScholarshipReceivables created');
+
+  await ScholarshipCredit.create([
+    { collegeId: CID, scholarshipReceivableId: scholarshipReceivables[0]._id, studentId: students[3]._id, invoiceId: invoices[2]._id, amount: 50000, appliedAt: new Date('2024-12-16') },
+  ]);
+  console.log('ScholarshipCredits created');
+
+  const defaulterRecords = await DefaulterRecord.create([
+    { collegeId: CID, studentId: students[1]._id, invoiceId: invoices[1]._id, overdueAmount: 75000, daysOverdue: 120, escalationStage: 'stage_2', welfareReferralStatus: 'none', distressSignals: [], resolutionDate: undefined },
+  ]);
+  console.log('DefaulterRecords created');
+
+  await EscalationAction.create([
+    { collegeId: CID, defaulterRecordId: defaulterRecords[0]._id, actionType: 'sms_reminder', status: 'executed', executedAt: new Date('2024-11-15'), outcome: 'No response from student', notes: 'SMS sent to student and parent' },
+    { collegeId: CID, defaulterRecordId: defaulterRecords[0]._id, actionType: 'whatsapp_parent', status: 'executed', executedAt: new Date('2024-12-01'), outcome: 'Parent acknowledged, promised to pay by Jan' },
+  ]);
+  console.log('EscalationActions created');
+
+  await FinancialHold.create([
+    { collegeId: CID, studentId: students[1]._id, defaulterRecordId: defaulterRecords[0]._id, holdType: 'exam_debarment', status: 'active', effectiveDate: new Date('2025-01-15'), approvedBy: persons[24]._id, reason: 'Fee overdue > 90 days' },
+  ]);
+  console.log('FinancialHolds created');
+
+  await FinancialLedger.create([
+    { collegeId: CID, entryDate: new Date('2024-08-10'), entryType: 'income', category: 'Tuition Fee', description: 'Fee payment - Aarav Sharma - Sem 5', debit: 0, credit: 175000, balance: 175000, accountCategory: 'tuition_revenue', studentId: students[0]._id },
+    { collegeId: CID, entryDate: new Date('2024-08-20'), entryType: 'income', category: 'Tuition Fee', description: 'Partial fee payment - Priya Reddy', debit: 0, credit: 100000, balance: 275000, accountCategory: 'tuition_revenue', studentId: students[1]._id },
+  ]);
+  console.log('FinancialLedger entries created');
+
+  await FinePenalty.create([
+    { collegeId: CID, studentId: students[1]._id, type: 'late_fee', reason: 'Late payment penalty - Sem 5 fee overdue', amount: 2000, dueDate: new Date('2025-01-31'), paidAmount: 0, status: 'pending', imposedBy: persons[17]._id },
+  ]);
+  console.log('FinePenalties created');
+
+  await PaymentGatewayLog.create([
+    { collegeId: CID, studentId: students[0]._id, orderId: 'order_RZP_001', gateway: 'razorpay', amount: 175000, currency: 'INR', status: 'success', initiatedAt: new Date('2024-08-10T09:30:00'), completedAt: new Date('2024-08-10T09:32:00'), invoiceId: invoices[0]._id, signatureVerified: true, webhookReceivedAt: new Date('2024-08-10T09:33:00'), idempotencyKey: 'idem_RZP_001' },
+  ]);
+  console.log('PaymentGatewayLogs created');
+
+  await ReconciliationEntry.create([
+    { collegeId: CID, paymentTransactionId: paymentTransactions[0]._id, bankStatementRef: 'HDFC-STM-20240810-123', matchedAmount: 175000, status: 'matched' },
+  ]);
+  console.log('ReconciliationEntries created');
+
+  await RevenueReconciliationReport.create([
+    { collegeId: CID, academicYearId: ay2024._id, periodStart: new Date('2024-07-01'), periodEnd: new Date('2025-03-31'), totalInvoiced: 18500000, totalCollected: 15200000, scholarshipOffsets: 500000, concessionsGranted: 300000, writeOffs: 50000, outstandingReceivables: 2450000, budgetAmount: 20000000, budgetVariance: -1500000, budgetVariancePercent: -7.5, status: 'draft', generatedAt: new Date('2025-03-31') },
+  ]);
+  console.log('RevenueReconciliationReports created');
+
+  // ---------- 5. HR workflow ----------
+
+  const hiringReqs = await HiringRequisition.create([
+    { collegeId: CID, departmentId: deptCSE._id, positionType: 'faculty', designation: 'Assistant Professor', vacancies: 3, justification: 'Increasing student intake demands additional faculty for AI/ML specialization', justificationType: 'new', headcountAtRequest: 4, withinSanctionedStrength: true, approvalChain: [{ level: 1, approverId: String(employees[0]._id), status: 'approved' }], currentApproverLevel: 1, status: 'approved', approvedBy: persons[24]._id, requestedBy: String(persons[10]._id) },
+  ]);
+  console.log('HiringRequisitions created');
+
+  await SelectionCommittee.create([
+    { collegeId: CID, requisitionId: hiringReqs[0]._id, committeeType: 'aicte_faculty', members: [{ personId: String(persons[24]._id), role: 'Chairperson' }, { personId: String(persons[10]._id), role: 'Subject Expert' }, { personId: String(persons[12]._id), role: 'External Expert', isExternal: true }], status: 'active', constitutedAt: new Date('2025-03-01') },
+  ]);
+  console.log('SelectionCommittees created');
+
+  await JobApplication.create([
+    { collegeId: CID, recruitmentId: (await Recruitment.findOne({ position: /CSE/ }))!._id, applicantName: 'Dr. Keerthi Varma', email: 'keerthi.varma@gmail.com', phone: '9876500050', resumeUrl: '/resumes/keerthi_varma.pdf', qualificationDetails: { degree: 'Ph.D', specialization: 'NLP', university: 'IIT Madras' }, status: 'shortlisted', appliedAt: new Date('2025-03-10') },
+    { collegeId: CID, recruitmentId: (await Recruitment.findOne({ position: /CSE/ }))!._id, applicantName: 'Dr. Anil Raju', email: 'anil.raju@outlook.com', phone: '9876500051', qualificationDetails: { degree: 'Ph.D', specialization: 'Cybersecurity', university: 'JNTU Hyderabad' }, status: 'applied', appliedAt: new Date('2025-03-15') },
+  ]);
+  console.log('JobApplications created');
+
+  await EmployeeAttendance.create([
+    { collegeId: CID, employeeId: employees[0]._id, date: new Date('2025-03-10'), checkIn: new Date('2025-03-10T08:55:00'), checkOut: new Date('2025-03-10T17:10:00'), status: 'present', source: 'biometric' },
+    { collegeId: CID, employeeId: employees[0]._id, date: new Date('2025-03-11'), checkIn: new Date('2025-03-11T09:20:00'), checkOut: new Date('2025-03-11T17:05:00'), status: 'present', source: 'biometric', lateMinutes: 20 },
+    { collegeId: CID, employeeId: employees[1]._id, date: new Date('2025-03-10'), checkIn: new Date('2025-03-10T09:00:00'), checkOut: new Date('2025-03-10T13:00:00'), status: 'half_day', source: 'biometric' },
+  ]);
+  console.log('EmployeeAttendances created');
+
+  await AttendanceMonthlySummary.create([
+    { collegeId: CID, employeeId: employees[0]._id, month: 2, year: 2025, totalPresent: 22, totalAbsent: 0, totalLate: 3, totalHalfDay: 0, totalOnDuty: 1, totalLeave: 1, totalHoliday: 4, lopDays: 0, isLocked: true },
+    { collegeId: CID, employeeId: employees[1]._id, month: 2, year: 2025, totalPresent: 19, totalAbsent: 1, totalLate: 1, totalHalfDay: 1, totalOnDuty: 0, totalLeave: 2, totalHoliday: 4, lopDays: 0, isLocked: true },
+  ]);
+  console.log('AttendanceMonthlySummaries created');
+
+  await OnDuty.create([
+    { collegeId: CID, employeeId: employees[0]._id, fromDate: new Date('2025-02-25'), toDate: new Date('2025-02-25'), purpose: 'Attended IEEE conference at IIT Hyderabad', status: 'approved', approvedBy: persons[24]._id },
+  ]);
+  console.log('OnDuty records created');
+
+  await FDPRecord.create([
+    { collegeId: CID, facultyId: employees[0]._id, activityType: 'fdp', title: 'Outcome-Based Education FDP', organiser: 'IUCEE', startDate: new Date('2025-01-06'), endDate: new Date('2025-01-10'), hours: 30, certificateUrl: '/certs/ramesh_obe_fdp.pdf', verificationStatus: 'verified', verifiedBy: employees[4]._id, complianceYear: 2024 },
+    { collegeId: CID, facultyId: employees[1]._id, activityType: 'workshop', title: 'Advanced VLSI Workshop', organiser: 'IIT Bombay', startDate: new Date('2025-02-10'), endDate: new Date('2025-02-12'), hours: 18, verificationStatus: 'pending', complianceYear: 2024 },
+  ]);
+  console.log('FDPRecords created');
+
+  await FDPComplianceSummary.create([
+    { collegeId: CID, facultyId: employees[0]._id, academicYearId: ay2024._id, cadre: 'professor', requiredHours: 40, completedHours: 30, gap: 10, complianceStatus: 'partial', lastComputedAt: new Date('2025-03-15') },
+    { collegeId: CID, facultyId: employees[1]._id, academicYearId: ay2024._id, cadre: 'associate_professor', requiredHours: 40, completedHours: 18, gap: 22, complianceStatus: 'non_compliant', lastComputedAt: new Date('2025-03-15') },
+  ]);
+  console.log('FDPComplianceSummaries created');
+
+  await TrainingParticipant.create([
+    { collegeId: CID, trainingId: hrTrainings[0]._id, employeeId: employees[0]._id, status: 'attended', certificateIssued: true, feedback: 'Very informative. Excellent resource persons.' },
+    { collegeId: CID, trainingId: hrTrainings[0]._id, employeeId: employees[3]._id, status: 'attended', certificateIssued: true },
+    { collegeId: CID, trainingId: hrTrainings[1]._id, employeeId: employees[1]._id, status: 'attended', certificateIssued: false },
+  ]);
+  console.log('TrainingParticipants created');
+
+  await FacultyWorkload.create([
+    { collegeId: CID, facultyId: faculties[0]._id, semesterId: sem2_24._id, academicYearId: ay2024._id, courses: [{ courseOfferingId: courseOfferings[0]._id, credits: 4, contactHours: 4 }, { courseOfferingId: courseOfferings[2]._id, credits: 3, contactHours: 3 }], totalCredits: 7, totalContactHours: 7, maxCredits: 24, maxContactHours: 20, status: 'under_limit' },
+    { collegeId: CID, facultyId: faculties[3]._id, semesterId: sem2_24._id, academicYearId: ay2024._id, courses: [{ courseOfferingId: courseOfferings[1]._id, credits: 4, contactHours: 5 }, { courseOfferingId: courseOfferings[3]._id, credits: 2, contactHours: 3 }], totalCredits: 6, totalContactHours: 8, maxCredits: 24, maxContactHours: 20, status: 'under_limit' },
+  ]);
+  console.log('FacultyWorkloads created');
+
+  await DutyLog.create([
+    { collegeId: CID, facultyId: faculties[2]._id, dutyType: 'invigilation', examScheduleId: examSchedules[0]._id, date: new Date('2025-05-05'), startTime: '09:45', endTime: '13:15', status: 'assigned' },
+  ]);
+  console.log('DutyLogs created');
+
+  // ---------- 6. Placement workflow ----------
+
+  await CompanyEngagementLog.create([
+    { collegeId: CID, companyId: companies[0]._id, placementSeasonId: placementSeason2025._id, type: 'onboarding', outcome: 'positive', notes: 'TCS confirmed campus drive for April 2025. 15 positions for CSE/ECE.', actorId: persons[10]._id },
+    { collegeId: CID, companyId: companies[2]._id, placementSeasonId: placementSeason2025._id, type: 'outreach', outcome: 'interested', notes: 'Google India expressed interest in visiting JIT for SDE roles.', actorId: persons[10]._id },
+  ]);
+  console.log('CompanyEngagementLogs created');
+
+  await CompanyProgrammeAffinity.create([
+    { collegeId: CID, companyId: companies[0]._id, programmeId: progBTech._id, placementSeasonId: placementSeason2024._id, historicalHires: 25, avgCtcLpa: 7, conversionRate: 0.65, programmeFitScore: 85 },
+    { collegeId: CID, companyId: companies[2]._id, programmeId: progBTech._id, placementSeasonId: placementSeason2024._id, historicalHires: 2, avgCtcLpa: 24, conversionRate: 0.15, programmeFitScore: 72 },
+  ]);
+  console.log('CompanyProgrammeAffinities created');
+
+  const placementDrives = await PlacementDrive.create([
+    { collegeId: CID, placementSeasonId: placementSeason2025._id, companyId: companies[0]._id, jobPostingId: jobPostings[0]._id, type: 'on_campus', status: 'applications_open', applicationWindow: { openDate: new Date('2025-03-15'), closeDate: new Date('2025-03-25') }, driveDate: new Date('2025-04-05'), venue: 'Main Block', applicationCount: 85, shortlistedCount: 0, offeredCount: 0 },
+  ]);
+  console.log('PlacementDrives created');
+
+  await DriveApplication.create([
+    { collegeId: CID, driveId: placementDrives[0]._id, jobPostingId: jobPostings[0]._id, studentId: students[0]._id, status: 'applied', matchScore: 88, matchConfidence: 'high', consentTimestamp: new Date('2025-03-20'), appliedAt: new Date('2025-03-20') },
+    { collegeId: CID, driveId: placementDrives[0]._id, jobPostingId: jobPostings[0]._id, studentId: students[7]._id, status: 'applied', matchScore: 72, matchConfidence: 'medium', consentTimestamp: new Date('2025-03-21'), appliedAt: new Date('2025-03-21') },
+  ]);
+  console.log('DriveApplications created');
+
+  await InterviewSchedule.create([
+    { collegeId: CID, driveId: placementDrives[0]._id, studentId: students[0]._id, slotStart: new Date('2025-04-06T10:00:00'), slotEnd: new Date('2025-04-06T10:30:00'), venue: 'Conference Room AB-101', panelInfo: 'TCS Panel - Mr. Anil Mehta', status: 'scheduled' },
+  ]);
+  console.log('InterviewSchedules created');
+
+  await CareerProfile.create([
+    { collegeId: CID, studentId: students[0]._id, placementSeasonId: placementSeason2025._id, status: 'complete', academicSummary: { cgpa: 8.8, activeBacklogs: 0, programme: 'B.Tech', branch: 'CSE', regulation: 'R22', lastResultSemester: 5 }, careerPreferences: { targetRoles: ['SDE', 'Data Scientist'], preferredLocations: ['Hyderabad', 'Bangalore'], expectedCtcLpa: 15, willingToRelocate: true }, profileCompletenessScore: 92 },
+    { collegeId: CID, studentId: students[7]._id, placementSeasonId: placementSeason2025._id, status: 'complete', academicSummary: { cgpa: 7.8, activeBacklogs: 0, programme: 'B.Tech', branch: 'CSE', regulation: 'R22', lastResultSemester: 5 }, careerPreferences: { targetRoles: ['Full Stack Developer'], preferredLocations: ['Hyderabad'], expectedCtcLpa: 8, willingToRelocate: false }, profileCompletenessScore: 78 },
+  ]);
+  console.log('CareerProfiles created');
+
+  await PlacementReadinessScore.create([
+    { collegeId: CID, studentId: students[0]._id, placementSeasonId: placementSeason2025._id, overallScore: 88, category: 'ready', componentScores: { academic: 92, aptitude: 85, technical: 90, softSkills: 82 }, computedAt: new Date('2025-03-15') },
+    { collegeId: CID, studentId: students[7]._id, placementSeasonId: placementSeason2025._id, overallScore: 65, category: 'needs_improvement', componentScores: { academic: 78, aptitude: 60, technical: 65, softSkills: 55 }, computedAt: new Date('2025-03-15') },
+  ]);
+  console.log('PlacementReadinessScores created');
+
+  await SkillRecord.create([
+    { collegeId: CID, studentId: students[0]._id, skillName: 'Python', category: 'technical', proficiencyLevel: 4, source: 'certification', verificationStatus: 'verified', lastAssessedAt: new Date('2025-01-15') },
+    { collegeId: CID, studentId: students[0]._id, skillName: 'Data Structures', category: 'technical', proficiencyLevel: 5, source: 'assessment', verificationStatus: 'verified', lastAssessedAt: new Date('2025-02-01') },
+    { collegeId: CID, studentId: students[7]._id, skillName: 'Java', category: 'technical', proficiencyLevel: 3, source: 'self_reported', verificationStatus: 'unverified' },
+  ]);
+  console.log('SkillRecords created');
+
+  await OptOutRecord.create([
+    { collegeId: CID, studentId: students[4]._id, placementSeasonId: placementSeason2025._id, reason: 'higher_education', details: 'Preparing for GATE. Planning M.Tech at IIT Hyderabad.', status: 'active', recordedBy: persons[10]._id, consentTimestamp: new Date('2025-03-01') },
+  ]);
+  console.log('OptOutRecords created');
+
+  await AlumniCareerRecord.create([
+    { collegeId: CID, personId: persons[8]._id, alumniProfileId: (await AlumniProfile.findOne({ personId: persons[8]._id }))!._id, careerStatus: 'employed', currentCompany: 'Infosys Limited', currentDesignation: 'Systems Engineer', currentLocation: 'Pune', updateSource: 'system_seeded', lastUpdated: new Date('2025-01-15') },
+  ]);
+  console.log('AlumniCareerRecords created');
+
+  // ---------- 7. Welfare workflow ----------
+
+  const mentorAssignments = await MentorAssignment.create([
+    { collegeId: CID, mentorId: faculties[0]._id, studentId: students[0]._id, academicYearId: ay2024._id, assignedBy: persons[24]._id, status: 'active' },
+    { collegeId: CID, mentorId: faculties[0]._id, studentId: students[7]._id, academicYearId: ay2024._id, assignedBy: persons[24]._id, status: 'active' },
+    { collegeId: CID, mentorId: faculties[1]._id, studentId: students[2]._id, academicYearId: ay2024._id, assignedBy: persons[24]._id, status: 'active' },
+    { collegeId: CID, mentorId: faculties[3]._id, studentId: students[3]._id, academicYearId: ay2024._id, assignedBy: persons[24]._id, status: 'active' },
+  ]);
+  console.log('MentorAssignments created');
+
+  await MentorSession.create([
+    { collegeId: CID, assignmentId: mentorAssignments[0]._id, mentorId: faculties[0]._id, studentId: students[0]._id, sessionDate: new Date('2025-02-15'), mode: 'in_person', topic: 'Career planning and placement preparation', notes: 'Student preparing for Amazon SDE. Advised on system design.', actions: 'Recommended mock interview practice', concernType: 'academic' },
+    { collegeId: CID, assignmentId: mentorAssignments[3]._id, mentorId: faculties[3]._id, studentId: students[3]._id, sessionDate: new Date('2025-03-01'), mode: 'in_person', topic: 'Financial difficulties affecting attendance', notes: 'Student struggling with fee payment. Family facing hardship.', actions: 'Referred to financial aid office', concernType: 'financial', referralType: 'financial_aid' },
+  ]);
+  console.log('MentorSessions created');
+
+  await MentorConcern.create([
+    { collegeId: CID, mentorId: faculties[3]._id, studentId: students[3]._id, concernType: 'financial', description: 'Student has pending fees and is worried about examination eligibility', severity: 'high', status: 'escalated', escalatedTo: persons[24]._id, raisedAt: new Date('2025-03-02') },
+  ]);
+  console.log('MentorConcerns created');
+
+  await CounsellingReferral.create([
+    { collegeId: CID, studentId: students[3]._id, referredBy: faculties[3]._id, referralSource: 'mentor', triggeringCaseType: 'academic', reason: 'Student showing signs of stress due to financial difficulties and academic pressure', urgency: 'high', status: 'in_progress', followUpStatus: 'on_track' },
+  ]);
+  console.log('CounsellingReferrals created');
+
+  await GrievanceAssignment.create([
+    { collegeId: CID, grievanceId: (await StudentGrievance.findOne({ subject: /dinner/ }))!._id, assignedTo: persons[15]._id, assignedBy: 'GRC System', assignedAt: new Date('2025-03-16'), priority: 'medium', slaDeadline: new Date('2025-03-23'), status: 'accepted' },
+  ]);
+  console.log('GrievanceAssignments created');
+
+  await SystemicPattern.create([
+    { collegeId: CID, detectedAt: new Date('2025-03-15'), category: 'mess', pattern: 'Recurring complaints about dinner quality in Boys Hostel - 12 grievances in last 30 days', frequency: 12, severity: 'medium', affectedCount: 45, departmentId: deptCSE._id, status: 'reviewed', reviewNotes: 'Mess committee meeting scheduled to address vendor performance' },
+  ]);
+  console.log('SystemicPatterns created');
+
+  await ICCComplaint.create([
+    { collegeId: CID, complainantId: persons[5]._id, respondentId: persons[6]._id, respondentType: 'student', description: 'Inappropriate comments made during lab session', incidentDate: new Date('2025-02-20'), filedDate: new Date('2025-02-22'), deadlineDate: new Date('2025-05-22'), status: 'preliminary_assessment', committeeId: committees[0]._id },
+  ]);
+  console.log('ICCComplaints created');
+
+  await SCSTComplaint.create([
+    { collegeId: CID, complainantId: persons[3]._id, respondentId: persons[6]._id, description: 'Alleged caste-based discrimination in project team formation', incidentDate: new Date('2025-03-05'), casteCategory: 'SC', status: 'investigating', committeeId: committees[2]._id },
+  ]);
+  console.log('SCSTComplaints created');
+
+  await GRCComplaint.create([
+    { collegeId: CID, complainantId: persons[1]._id, description: 'Unresolved hostel room maintenance request pending for over 2 months', filedDate: new Date('2025-03-10'), hearingDeadline: new Date('2025-03-25'), decisionDeadline: new Date('2025-04-10'), status: 'filed', committeeId: committees[2]._id },
+  ]);
+  console.log('GRCComplaints created');
+
+  await MisconductReport.create([
+    { collegeId: CID, reportedBy: persons[14]._id, reporterRole: 'faculty', studentId: students[6]._id, category: 'behavioral', description: 'Disruptive behavior during workshop session. Refused to follow safety protocols.', incidentDate: new Date('2025-03-08'), location: 'MECH Workshop', status: 'preliminary_inquiry' },
+  ]);
+  console.log('MisconductReports created');
+
+  await RiskSignal.create([
+    { collegeId: CID, studentId: students[3]._id, source: 'M04', signalType: 'fee_default', baseWeight: 25, computedWeight: 25, receivedAt: new Date('2025-02-01'), expiresAt: new Date('2025-05-01'), status: 'active' },
+    { collegeId: CID, studentId: students[3]._id, source: 'M03', signalType: 'attendance_drop', baseWeight: 20, computedWeight: 18, receivedAt: new Date('2025-03-01'), expiresAt: new Date('2025-06-01'), status: 'active' },
+    { collegeId: CID, studentId: students[1]._id, source: 'M04', signalType: 'fee_default', baseWeight: 25, computedWeight: 22, receivedAt: new Date('2025-01-15'), expiresAt: new Date('2025-04-15'), status: 'active' },
+  ]);
+  console.log('RiskSignals created');
+
+  await DropoutRiskAlert.create([
+    { collegeId: CID, studentId: students[3]._id, riskScore: 65, priority: 'P2', contributingSignals: [{ source: 'M04', signalType: 'fee_default', description: 'Fee overdue > 90 days', weight: 25 }, { source: 'M03', signalType: 'attendance_drop', description: 'Attendance dropped to 68%', weight: 18 }], status: 'under_outreach', outreachAttempts: [{ date: new Date('2025-03-05'), method: 'Mentor meeting', contactedBy: persons[13]._id, outcome: 'Student cooperative, cited financial issues' }], assignedMentorId: faculties[3]._id },
+  ]);
+  console.log('DropoutRiskAlerts created');
+
+  await ICCAnnualReport.create([
+    { collegeId: CID, year: 2024, totalComplaints: 3, resolvedCount: 2, pendingCount: 1, actionsTaken: ['Awareness workshops conducted', 'Suggestion boxes installed'], status: 'submitted', submittedBy: persons[24]._id, submittedAt: new Date('2025-01-15') },
+  ]);
+  console.log('ICCAnnualReports created');
+
+  // ---------- 8. Campus ops ----------
+
+  const beds = await Bed.create([
+    { collegeId: CID, roomId: hostelRooms[0]._id, bedNumber: 'BA-101-A', status: 'allocated', allocatedTo: students[0]._id },
+    { collegeId: CID, roomId: hostelRooms[0]._id, bedNumber: 'BA-101-B', status: 'allocated', allocatedTo: students[2]._id },
+    { collegeId: CID, roomId: hostelRooms[0]._id, bedNumber: 'BA-101-C', status: 'available' },
+    { collegeId: CID, roomId: hostelRooms[3]._id, bedNumber: 'GB-101-A', status: 'allocated', allocatedTo: students[1]._id },
+  ]);
+  console.log('Beds created');
+
+  const drivers = await Driver.create([
+    { collegeId: CID, personId: staffMembers[2]._id, licenseNumber: 'TS-DL-2020-123456', licenseType: 'HMV', licenseExpiry: new Date('2027-06-30'), vehicleAssignment: vehicles[0]._id, isActive: true },
+  ]);
+  console.log('Drivers created');
+
+  const routeStops = await RouteStop.create([
+    { collegeId: CID, routeId: routes[0]._id, name: 'Kukatpally Bus Stand', sequence: 1, pickupTime: '07:30', dropTime: '17:30', latitude: 17.4947, longitude: 78.3996 },
+    { collegeId: CID, routeId: routes[0]._id, name: 'KPHB Colony', sequence: 2, pickupTime: '07:45', dropTime: '17:15' },
+    { collegeId: CID, routeId: routes[0]._id, name: 'Juvion Campus', sequence: 3, pickupTime: '08:30', dropTime: '16:30' },
+  ]);
+  console.log('RouteStops created');
+
+  await TransportContractor.create([
+    { collegeId: CID, vendorId: vendors[0]._id, contractNumber: 'TC-2024-001', vehicleIds: [vehicles[0]._id, vehicles[1]._id], startDate: new Date('2024-07-01'), endDate: new Date('2025-06-30'), monthlyRate: 250000, status: 'active' },
+  ]);
+  console.log('TransportContractors created');
+
+  await DietaryPreference.create([
+    { collegeId: CID, studentId: students[0]._id, dietType: 'non_veg', allergies: ['Dust'], specialRequirements: '' },
+    { collegeId: CID, studentId: students[1]._id, dietType: 'veg', allergies: [], specialRequirements: 'No onion/garlic on Fridays' },
+    { collegeId: CID, studentId: students[3]._id, dietType: 'egg', allergies: [] },
+  ]);
+  console.log('DietaryPreferences created');
+
+  await MessSubscription.create([
+    { collegeId: CID, studentId: students[0]._id, messFacilityId: messFacilities[0]._id, academicYearId: ay2024._id, plan: 'full', startDate: new Date('2024-07-15'), monthlyFee: 4000, status: 'active' },
+    { collegeId: CID, studentId: students[1]._id, messFacilityId: messFacilities[1]._id, academicYearId: ay2024._id, plan: 'full', startDate: new Date('2024-07-15'), monthlyFee: 3500, status: 'active' },
+  ]);
+  console.log('MessSubscriptions created');
+
+  await MessVendorContract.create([
+    { collegeId: CID, vendorId: vendors[2]._id, messFacilityId: messFacilities[0]._id, startDate: new Date('2024-07-01'), endDate: new Date('2025-06-30'), costPerMeal: 60, maxMealsPerDay: 600, status: 'active' },
+  ]);
+  console.log('MessVendorContracts created');
+
+  await MealTransaction.create([
+    { collegeId: CID, studentId: students[0]._id, messFacilityId: messFacilities[0]._id, date: new Date('2025-03-15'), mealType: 'lunch', transactionType: 'coupon_deduct', amount: 60, balance: 3940 },
+    { collegeId: CID, studentId: students[0]._id, messFacilityId: messFacilities[0]._id, date: new Date('2025-03-15'), mealType: 'dinner', transactionType: 'coupon_deduct', amount: 60, balance: 3880 },
+  ]);
+  console.log('MealTransactions created');
+
+  await QualityInspection.create([
+    { collegeId: CID, messFacilityId: messFacilities[0]._id, inspectedBy: staffMembers[0]._id, date: new Date('2025-03-10'), hygieneScore: 7, foodQualityScore: 6, complianceStatus: 'minor_issues', findings: 'Kitchen exhaust needs cleaning. Food temperature was adequate.', recommendations: 'Deep clean exhaust hoods by next week' },
+  ]);
+  console.log('QualityInspections created');
+
+  await HostelAttendance.create([
+    { collegeId: CID, studentId: students[0]._id, allocationId: (await HostelAllocation.findOne({ studentId: students[0]._id }))!._id, date: new Date('2025-03-15'), status: 'present', recordedBy: staffMembers[0]._id, method: 'manual' },
+    { collegeId: CID, studentId: students[0]._id, allocationId: (await HostelAllocation.findOne({ studentId: students[0]._id }))!._id, date: new Date('2025-03-16'), status: 'on_leave', recordedBy: staffMembers[0]._id, method: 'manual' },
+  ]);
+  console.log('HostelAttendances created');
+
+  await HostelLeave.create([
+    { collegeId: CID, studentId: students[0]._id, leaveType: 'home', startDate: new Date('2025-03-16'), endDate: new Date('2025-03-17'), destination: 'Home - Jubilee Hills, Hyderabad', guardianContact: '9876543229', reason: 'Weekend visit', approvedBy: staffMembers[0]._id, status: 'returned', actualReturn: new Date('2025-03-17T19:00:00') },
+  ]);
+  console.log('HostelLeaves created');
+
+  const hostelViolations = await HostelViolation.create([
+    { collegeId: CID, studentId: students[6]._id, reportedBy: staffMembers[0]._id, violationType: 'Late night entry after curfew', description: 'Returned to hostel at 11:30 PM, violating 10 PM curfew', severity: 'low', incidentDate: new Date('2025-03-12'), status: 'penalty_assigned' },
+  ]);
+  console.log('HostelViolations created');
+
+  const hostelPenalties = await HostelPenalty.create([
+    { collegeId: CID, violationId: hostelViolations[0]._id, studentId: students[6]._id, penaltyType: 'warning', description: 'First warning for curfew violation', effectiveDate: new Date('2025-03-13'), status: 'served', issuedBy: staffMembers[0]._id },
+  ]);
+  console.log('HostelPenalties created');
+
+  await HostelAppeal.create([
+    { collegeId: CID, penaltyId: hostelPenalties[0]._id, studentId: students[6]._id, grounds: 'Was returning from inter-college sports practice. Coach can confirm.', status: 'under_review', filedAt: new Date('2025-03-14') },
+  ]);
+  console.log('HostelAppeals created');
+
+  await HostelClearance.create([
+    { collegeId: CID, studentId: students[8]._id, allocationId: (await HostelAllocation.findOne({ studentId: students[0]._id }))!._id, noDuesStatus: true, keyReturned: true, roomCondition: 'good', status: 'cleared', clearedBy: staffMembers[0]._id, clearedAt: new Date('2024-06-15') },
+  ]);
+  console.log('HostelClearances created');
+
+  const labEquipments = await LabEquipment.create([
+    { collegeId: CID, labId: (await Lab.findOne({ name: /Programming/ }))!._id, name: 'HP ProDesk 400 Desktop', serialNumber: 'HP-PD400-CSE-001', manufacturer: 'HP', equipmentModel: 'ProDesk 400 G9', purchaseDate: new Date('2023-06-15'), purchaseCost: 55000, condition: 'good', status: 'active' },
+    { collegeId: CID, labId: (await Lab.findOne({ name: /DSP/ }))!._id, name: 'TI DSP Kit TMS320C6713', serialNumber: 'TI-DSP-ECE-001', manufacturer: 'Texas Instruments', equipmentModel: 'TMS320C6713', purchaseDate: new Date('2023-07-01'), purchaseCost: 35000, condition: 'good', lastMaintenance: new Date('2025-01-15'), status: 'active' },
+  ]);
+  console.log('LabEquipments created');
+
+  await LabSlotBooking.create([
+    { collegeId: CID, labId: (await Lab.findOne({ name: /Programming/ }))!._id, requesterId: staffMembers[0]._id, date: new Date('2025-03-25'), startTime: '14:00', endTime: '16:00', purpose: 'Extra ML lab session for placement preparation', attendeeCount: 25, approvalStatus: 'approved', approvedBy: staffMembers[0]._id, status: 'confirmed' },
+  ]);
+  console.log('LabSlotBookings created');
+
+  await LabIncident.create([
+    { collegeId: CID, labId: (await Lab.findOne({ name: /Circuits/ }))!._id, reportedBy: staffMembers[0]._id, incidentDate: new Date('2025-03-05'), type: 'damage', description: 'Breadboard kit damaged due to short circuit during experiment', severity: 'low', resolution: 'Damaged kit replaced from spare inventory', status: 'resolved' },
+  ]);
+  console.log('LabIncidents created');
+
+  await LabClearance.create([
+    { collegeId: CID, studentId: students[8]._id, outstandingEquipment: [], feesCleared: true, status: 'cleared', clearedAt: new Date('2024-06-10'), clearedBy: staffMembers[0]._id },
+  ]);
+  console.log('LabClearances created');
+
+  await EquipmentIssue.create([
+    { collegeId: CID, equipmentId: labEquipments[1]._id, issuedTo: students[2]._id, issuedBy: staffMembers[0]._id, issueDate: new Date('2025-03-10'), dueDate: new Date('2025-03-17'), conditionOnIssue: 'good', status: 'issued', remarks: 'Issued for mini-project work' },
+  ]);
+  console.log('EquipmentIssues created');
+
+  await LabAccess.create([
+    { collegeId: CID, studentId: students[0]._id, labId: (await Lab.findOne({ name: /Programming/ }))!._id, courseOfferingId: courseOfferings[3]._id, academicYearId: ay2024._id, status: 'active', grantedAt: new Date('2025-01-15') },
+  ]);
+  console.log('LabAccesses created');
+
+  await RoomChangeRequest.create([
+    { collegeId: CID, studentId: students[0]._id, currentRoomId: hostelRooms[0]._id, currentBedId: beds[0]._id, reason: 'Roommate has very different sleep schedule causing disturbance', reasonCategory: 'roommate_conflict', status: 'requested' },
+  ]);
+  console.log('RoomChangeRequests created');
+
+  await TransportClearance.create([
+    { collegeId: CID, studentId: students[8]._id, status: 'cleared', clearedBy: staffMembers[2]._id, clearedAt: new Date('2024-06-12'), remarks: 'No transport allocation - day scholar' },
+  ]);
+  console.log('TransportClearances created');
+
+  const tripLogs = await TripLog.create([
+    { collegeId: CID, routeId: routes[0]._id, vehicleId: vehicles[0]._id, driverId: drivers[0]._id, tripDate: new Date('2025-03-15'), tripType: 'morning', scheduledDeparture: new Date('2025-03-15T07:30:00'), actualDeparture: new Date('2025-03-15T07:32:00'), scheduledArrival: new Date('2025-03-15T08:30:00'), actualArrival: new Date('2025-03-15T08:28:00'), status: 'completed', passengerCount: 42 },
+  ]);
+  console.log('TripLogs created');
+
+  await CampusTransportAttendance.create([
+    { collegeId: CID, studentId: students[3]._id, tripLogId: tripLogs[0]._id, stopId: routeStops[0]._id, boardedAt: new Date('2025-03-15T07:30:00'), boardingType: 'pickup' },
+  ]);
+  console.log('CampusTransportAttendances created');
+
+  const amcContracts = await AMCContract.create([
+    { collegeId: CID, vendorId: vendors[1]._id, contractNumber: 'AMC-2024-001', facilityType: 'elevator', startDate: new Date('2024-04-01'), endDate: new Date('2025-03-31'), slaMetrics: { responseTimeHours: 4, resolutionTimeHours: 24, uptimePercent: 99 }, annualCost: 180000, status: 'active' },
+  ]);
+  console.log('AMCContracts created');
+
+  const maintenanceAssignments = await MaintenanceAssignment.create([
+    { collegeId: CID, requestId: (await MaintenanceRequest.findOne({ description: /tube lights/ }))!._id, assignedToType: 'in_house', assignedToId: staffMembers[0]._id, assignedToName: 'Ravi Teja', slaDeadline: new Date('2025-03-20'), startedAt: new Date('2025-03-16'), status: 'in_progress' },
+  ]);
+  console.log('MaintenanceAssignments created');
+
+  await MaintenanceEscalation.create([
+    { collegeId: CID, requestId: (await MaintenanceRequest.findOne({ description: /Water leaking/ }))!._id, escalationLevel: 1, reason: 'SLA deadline approaching - no assignment made', triggerType: 'sla_warning', status: 'active' },
+  ]);
+  console.log('MaintenanceEscalations created');
+
+  await MaintenanceWorkLog.create([
+    { collegeId: CID, assignmentId: maintenanceAssignments[0]._id, workDate: new Date('2025-03-16'), hoursSpent: 1.5, description: 'Replaced 2 tube lights in CSE Lab MB-201', materialsUsed: [{ name: 'LED Tube Light 40W', quantity: 2, cost: 800 }], cost: 800, loggedBy: 'Ravi Teja' },
+  ]);
+  console.log('MaintenanceWorkLogs created');
+
+  await VendorPerformance.create([
+    { collegeId: CID, vendorId: vendors[1]._id, period: '2025-Q1', requestsAssigned: 8, requestsCompleted: 7, avgResponseTimeHours: 3.5, avgResolutionTimeHours: 18, slaComplianceRate: 87.5, customerSatisfactionScore: 4.2, remarks: 'Good performance. One SLA breach due to parts delay.' },
+  ]);
+  console.log('VendorPerformances created');
+
+  // ---------- 9. Student Dev ----------
+
+  const fests = await Fest.create([
+    { collegeId: CID, name: 'Tarangini 2025', type: 'multi', academicYearId: ay2024._id, startDate: new Date('2025-04-10'), endDate: new Date('2025-04-12'), status: 'planning', proposedBy: persons[24]._id, approvedBy: persons[24]._id, approvalDate: new Date('2025-01-15'), description: 'Annual inter-college cultural and technical fest', estimatedBudget: 500000, estimatedAttendance: 2000, orgCommittee: [{ personId: persons[0]._id, role: 'Student Coordinator' }, { personId: persons[10]._id, role: 'Faculty Advisor' }] },
+  ]);
+  console.log('Fests created');
+
+  await Competition.create([
+    { collegeId: CID, name: 'CodeWars 2025', type: 'hackathon', parentType: 'fest', parentId: fests[0]._id, clubId: clubs[0]._id, departmentId: deptCSE._id, status: 'registration_open', startDate: new Date('2025-04-10'), endDate: new Date('2025-04-11'), venue: 'CSE Lab 1', maxParticipants: 50, teamSize: { min: 2, max: 4 }, coordinatorId: persons[0]._id, registrationDeadline: new Date('2025-04-08'), prizes: [{ rank: 1, description: 'Winner', amount: 10000 }, { rank: 2, description: 'Runner-up', amount: 5000 }] },
+    { collegeId: CID, name: 'RoboRace', type: 'other', parentType: 'fest', parentId: fests[0]._id, departmentId: deptMECH._id, status: 'proposed', startDate: new Date('2025-04-11'), endDate: new Date('2025-04-11'), venue: 'MECH Workshop', maxParticipants: 30, teamSize: { min: 3, max: 5 }, coordinatorId: persons[14]._id },
+  ]);
+  console.log('Competitions created');
+
+  await Workshop.create([
+    { collegeId: CID, name: 'Intro to Docker & Kubernetes', topic: 'DevOps', parentType: 'standalone', clubId: clubs[0]._id, departmentId: deptCSE._id, instructorId: persons[10]._id, status: 'completed', date: new Date('2025-03-25'), duration: 6, maxCapacity: 40, venue: 'CSE Lab 1', completionCriteria: 'Attend full session and complete hands-on exercise' },
+  ]);
+  console.log('Workshops created');
+
+  await SDProgramme.create([
+    { collegeId: CID, type: 'nss', name: 'NSS Unit 1 - JIT', academicYearId: ay2024._id, officerId: persons[15]._id, capacity: 100, enrolledCount: 85, status: 'active', startDate: new Date('2024-08-01'), endDate: new Date('2025-05-31'), description: 'National Service Scheme unit for community service and rural development' },
+  ]);
+  console.log('SDProgrammes created');
+
+  const awards = await Award.create([
+    { collegeId: CID, name: 'Best Student of the Year', category: 'academic', level: 'institution', description: 'Awarded to the student with highest CGPA and all-round performance', criteria: 'CGPA > 9.0, active in co-curriculars, no backlogs', isActive: true },
+    { collegeId: CID, name: 'Outstanding Sportsperson', category: 'sports', level: 'institution', description: 'Best sportsperson representing the college at state/national level', isActive: true },
+  ]);
+  console.log('Awards created');
+
+  await AwardInstance.create([
+    { collegeId: CID, awardId: awards[0]._id, studentId: students[0]._id, academicYearId: ay2024._id, nominatedBy: persons[10]._id, status: 'shortlisted', justification: 'CGPA 8.8, SIH winner, AWS certified, active club president' },
+  ]);
+  console.log('AwardInstances created');
+
+  await Certificate.create([
+    { collegeId: CID, type: 'participation', studentId: students[0]._id, sourceType: 'event', sourceId: events[0]._id, status: 'issued', issuedDate: new Date('2025-03-18'), signedBy: persons[24]._id, signatureDate: new Date('2025-03-18') },
+  ]);
+  console.log('Certificates created');
+
+  const sponsorContacts = await SponsorContact.create([
+    { collegeId: CID, name: 'Rajesh Mehta', company: 'TCS', designation: 'Campus Relations Manager', email: 'campus.hyd@tcs.com', phone: '04040001234', notes: 'Annual sponsor for tech events' },
+    { collegeId: CID, name: 'Priya Nair', company: 'Infosys', designation: 'CSR Head', email: 'csr@infosys.com', phone: '08040005678' },
+  ]);
+  console.log('SponsorContacts created');
+
+  await Sponsorship.create([
+    { collegeId: CID, eventType: 'fest', eventId: fests[0]._id, sponsorContactId: sponsorContacts[0]._id, type: 'cash', committedAmount: 50000, receivedAmount: 50000, deliverables: [{ description: 'Logo on event banners', status: 'delivered' }, { description: 'Stall space', status: 'pending' }], status: 'received', acknowledgmentDone: true },
+  ]);
+  console.log('Sponsorships created');
+
+  const activityBudgets = await ActivityBudget.create([
+    { collegeId: CID, entityType: 'fest', entityId: fests[0]._id, academicYearId: ay2024._id, requestedBy: persons[0]._id, requestedAmount: 500000, approvedAmount: 450000, utilisedAmount: 120000, status: 'active', approvedBy: persons[24]._id, approvalDate: new Date('2025-02-01'), justification: 'Annual cultural & technical fest with 2000+ footfall' },
+  ]);
+  console.log('ActivityBudgets created');
+
+  await SDBudgetLineItem.create([
+    { collegeId: CID, budgetId: activityBudgets[0]._id, category: 'Venue & Logistics', description: 'Stage setup, sound system, lighting', estimatedAmount: 150000, approvedAmount: 140000, actualAmount: 80000, status: 'approved' },
+    { collegeId: CID, budgetId: activityBudgets[0]._id, category: 'Prizes', description: 'Cash prizes for all competitions', estimatedAmount: 100000, approvedAmount: 100000, actualAmount: 40000, status: 'approved' },
+    { collegeId: CID, budgetId: activityBudgets[0]._id, category: 'Catering', description: 'Food for organizers and judges', estimatedAmount: 80000, approvedAmount: 70000, status: 'estimated' },
+  ]);
+  console.log('SDBudgetLineItems created');
+
+  const portfolios = await Portfolio.create([
+    { collegeId: CID, studentId: students[0]._id, status: 'published', completenessScore: 85, lastCuratedDate: new Date('2025-03-15'), publishedDate: new Date('2025-03-15'), sections: [{ key: 'achievements', displayOrder: 1, isVisible: true }, { key: 'projects', displayOrder: 2, isVisible: true }, { key: 'certifications', displayOrder: 3, isVisible: true }], gapAnalysis: { missingAreas: ['Research publications'], recommendations: ['Submit a paper to a conference'], peerComparison: 'Above 90th percentile in technical skills' } },
+  ]);
+  console.log('Portfolios created');
+
+  await PortfolioEntry.create([
+    { collegeId: CID, portfolioId: portfolios[0]._id, sourceType: 'achievement', sourceId: (await Achievement.findOne({ studentId: students[0]._id }))!._id, section: 'achievements', title: 'Smart India Hackathon 2024 Winner', description: 'Won 1st prize in SIH 2024 Software Edition', skillTags: ['problem-solving', 'python', 'teamwork'], date: new Date('2024-12-15'), isFeatured: true, verificationStatus: 'verified', signalStrength: 'high' },
+    { collegeId: CID, portfolioId: portfolios[0]._id, sourceType: 'certification', section: 'certifications', title: 'AWS Certified Cloud Practitioner', description: 'Amazon Web Services cloud certification', skillTags: ['aws', 'cloud'], date: new Date('2024-11-15'), isFeatured: true, verificationStatus: 'verified', signalStrength: 'high' },
+  ]);
+  console.log('PortfolioEntries created');
+
+  // ---------- 10. Compliance ----------
+
+  await EvidenceCollectionRule.create([
+    { collegeId: CID, evidenceTypeId: evidenceTypes[0]._id, triggerEvent: 'attainment_run_completed', sourceQuery: { model: 'COAttainmentRecord', filter: { semesterId: '$current' } }, qualityThresholds: { minPresenceScore: 60, minCompletenessScore: 70, maxAgeDays: 180 }, isActive: true },
+    { collegeId: CID, evidenceTypeId: evidenceTypes[2]._id, syncSchedule: '0 0 1 * *', sourceQuery: { model: 'CourseFeedback', aggregate: 'avg_rating' }, qualityThresholds: { minPresenceScore: 50, minCompletenessScore: 60, maxAgeDays: 365 }, isActive: true },
+  ]);
+  console.log('EvidenceCollectionRules created');
+
+  const complianceCriteria = await ComplianceCriteria.find({ collegeId: CID });
+  await CriterionEvidenceMapping.create([
+    { collegeId: CID, criterionId: complianceCriteria[2]?._id || complianceCriteria[0]._id, evidenceTypeId: evidenceTypes[0]._id, contributionWeight: 70, isMandatory: true, notes: 'CO attainment data is mandatory for criterion 3', confirmedByHuman: true },
+  ]);
+  console.log('CriterionEvidenceMappings created');
+
+  await AssessmentRubric.create([
+    { collegeId: CID, criterionId: complianceCriteria[0]._id, bodyId: accNBA._id, gradeDescriptors: [{ grade: 'Level 3', minScore: 80, maxScore: 100, description: 'Exemplary attainment of outcomes' }, { grade: 'Level 2', minScore: 60, maxScore: 79, description: 'Adequate attainment' }, { grade: 'Level 1', minScore: 0, maxScore: 59, description: 'Below expectation' }], scoringMethod: 'quantitative', maxScore: 100, weightageInOverall: 20, version: '2024-v1', isActive: true },
+  ]);
+  console.log('AssessmentRubrics created');
+
+  await EvidenceRecord.create([
+    { collegeId: CID, accreditationCycleId: accCycles[1]._id, criterionCode: '3', evidenceType: 'co_attainment', evidenceTypeId: evidenceTypes[0]._id, title: 'CO Attainment - CS501 Compiler Design - Sem 1 2024-25', sourceModule: 'M03', sourceEntityType: 'COAttainmentRecord', academicYearId: ay2024._id, programmeId: progBTech._id, departmentId: deptCSE._id, data: { coCode: 'CS501-CO1', attainment: 73.8, level: 2 }, scores: { presence: 90, completeness: 85, recency: 95, quality: 80, composite: 87 }, semesterId: sem1_24._id, status: 'verified' },
+    { collegeId: CID, accreditationCycleId: accCycles[1]._id, criterionCode: '2', evidenceType: 'feedback', evidenceTypeId: evidenceTypes[2]._id, title: 'Course Feedback Summary - Even Sem 2024-25', sourceModule: 'M03', sourceEntityType: 'CourseFeedback', academicYearId: ay2024._id, data: { avgRating: 4.2, responseRate: 78 }, scores: { presence: 80, completeness: 70, recency: 90, quality: 75, composite: 78 }, status: 'collected' },
+  ]);
+  console.log('EvidenceRecords created');
+
+  await ReadinessScore.create([
+    { collegeId: CID, bodyId: accNBA._id, criterionId: complianceCriteria[0]._id, programmeId: progBTech._id, score: 75, maxPossibleScore: 100, evidenceCount: 8, evidenceWithGaps: 2, trend: 'improving', previousScore: 68, computedAt: new Date('2025-03-10'), status: 'current' },
+  ]);
+  console.log('ReadinessScores created');
+
+  await ReadinessSnapshot.create([
+    { collegeId: CID, bodyId: accNBA._id, programmeId: progBTech._id, snapshotDate: new Date('2025-03-10'), trigger: 'manual', overallScore: 72, criterionScores: [{ criterionId: complianceCriteria[0]._id, score: 75, maxScore: 100 }], predictedGrade: 'Tier I', confidence: 0.68, createdBy: persons[10]._id },
+  ]);
+  console.log('ReadinessSnapshots created');
+
+  await GapRecord.create([
+    { collegeId: CID, bodyId: accNBA._id, criterionId: complianceCriteria[2]?._id || complianceCriteria[0]._id, programmeId: progBTech._id, evidenceTypeId: evidenceTypes[0]._id, gapType: 'incomplete_evidence', severity: 'major', difficulty: 'moderate', description: 'CO-PO mapping document incomplete for 3 courses', recommendedAction: 'Complete CO-PO articulation matrix for all courses', deadlineUrgency: 'this_quarter', assignedTo: persons[10]._id, priority: 1, impactOnGrade: 'Could reduce criterion 3 score by 10 points', status: 'in_progress' },
+  ]);
+  console.log('GapRecords created');
+
+  const accReports = await AccreditationReport.create([
+    { collegeId: CID, bodyId: accNBA._id, accreditationCycleId: accCycles[1]._id, programmeId: progBTech._id, reportType: 'nba_sar', templateId: reportTemplates[0]._id, assessmentPeriod: { from: new Date('2022-07-01'), to: new Date('2025-06-30') }, completionPercentage: 35, internalMilestones: [{ name: 'Criterion 1 draft', dueDate: new Date('2025-04-30') }, { name: 'Full SAR review', dueDate: new Date('2025-06-30') }], status: 'drafting' },
+  ]);
+  console.log('AccreditationReports created');
+
+  await ReportSection.create([
+    { collegeId: CID, reportId: accReports[0]._id, criterionId: complianceCriteria[0]._id, sectionNumber: 1, title: 'Vision, Mission and PEOs', sectionType: 'narrative', content: 'Juvion Institute of Technology was established with the vision of providing quality engineering education...', generationMethod: 'ai_generated', assignedTo: persons[10]._id, version: 1, status: 'draft' },
+  ]);
+  console.log('ReportSections created');
+
+  await SubmissionArtifact.create([
+    { collegeId: CID, reportId: accReports[0]._id, artifactType: 'pdf', fileName: 'NBA_SAR_Draft_v1.pdf', fileUrl: '/reports/nba_sar_draft_v1.pdf', fileSize: 5242880, generatedBy: persons[10]._id, status: 'ready' },
+  ]);
+  console.log('SubmissionArtifacts created');
+
+  await RemediationPlan.create([
+    { collegeId: CID, bodyId: accNBA._id, accreditationCycleId: accCycles[1]._id, title: 'NBA SAR Gap Remediation Plan', targetCompletionDate: new Date('2025-06-30'), tasks: [{ description: 'Complete CO-PO articulation matrix', assignedTo: persons[10]._id, dueDate: new Date('2025-04-15'), priority: 'critical', progress: 40, status: 'in_progress' }, { description: 'Collect industry feedback for curriculum review', assignedTo: persons[14]._id, dueDate: new Date('2025-05-15'), priority: 'high', progress: 0, status: 'pending' }], overallProgress: 20, status: 'active', createdBy: persons[10]._id },
+  ]);
+  console.log('RemediationPlans created');
+
+  // ---------- 11. Exit/Alumni ----------
+
+  const clearanceWorkflows = await ClearanceWorkflow.create([
+    { collegeId: CID, studentId: students[8]._id, exitType: 'graduation', priority: 'standard', status: 'completed', initiatedBy: persons[24]._id, initiatedAt: new Date('2024-06-01'), completedAt: new Date('2024-06-20'), remarks: 'All clearances obtained for graduation' },
+  ]);
+  console.log('ClearanceWorkflows created');
+
+  const clearanceItems = await ClearanceItem.create([
+    { collegeId: CID, clearanceWorkflowId: clearanceWorkflows[0]._id, department: 'finance', assigneeRole: 'Accounts Officer', assigneeId: persons[17]._id, status: 'completed', slaHours: 72, slaDeadline: new Date('2024-06-04'), completedAt: new Date('2024-06-03'), completedBy: persons[17]._id, remarks: 'No dues' },
+    { collegeId: CID, clearanceWorkflowId: clearanceWorkflows[0]._id, department: 'library', assigneeRole: 'Librarian', status: 'completed', slaHours: 48, slaDeadline: new Date('2024-06-03'), completedAt: new Date('2024-06-02'), remarks: 'All books returned' },
+    { collegeId: CID, clearanceWorkflowId: clearanceWorkflows[0]._id, department: 'hostel', assigneeRole: 'Warden', assigneeId: persons[14]._id, status: 'completed', slaHours: 48, slaDeadline: new Date('2024-06-03'), completedAt: new Date('2024-06-02'), completedBy: persons[14]._id },
+  ]);
+  console.log('ClearanceItems created');
+
+  await EscalationLog.create([
+    { collegeId: CID, clearanceItemId: clearanceItems[1]._id, clearanceWorkflowId: clearanceWorkflows[0]._id, level: 'reminder', escalatedTo: persons[17]._id, reason: 'SLA at 80% - reminder sent', slaPercentage: 80, escalatedAt: new Date('2024-06-02T10:00:00') },
+  ]);
+  console.log('EscalationLogs created');
+
+  await ExitRequest.create([
+    { collegeId: CID, studentId: students[8]._id, exitType: 'withdrawal', reason: 'Completed degree requirements', reasonCategory: 'personal', requestedBy: persons[8]._id, clearanceWorkflowId: clearanceWorkflows[0]._id, status: 'completed', approvals: [{ approvedBy: persons[24]._id, approvedAt: new Date('2024-06-01') }] },
+  ]);
+  console.log('ExitRequests created');
+
+  await ExitDocument.create([
+    { collegeId: CID, studentId: students[8]._id, templateId: documentTemplates[0]._id, type: 'transfer_certificate', title: 'Transfer Certificate - Vikram Singh', generatedData: { studentName: 'Vikram Singh', rollNumber: '20B01A0501', programme: 'B.Tech CSE', graduationDate: '2024-06-15' }, signatures: [{ role: 'Principal', signedBy: persons[24]._id, signedAt: new Date('2024-06-20'), signatureType: 'digital' }], status: 'issued', issuedDate: new Date('2024-06-20') },
+  ]);
+  console.log('ExitDocuments created');
+
+  const alumni = await Alumni.create([
+    { collegeId: CID, personId: persons[8]._id, studentId: students[8]._id, programmeId: progBTech._id, branchId: brCSE._id, batchId: batch2020._id, regulationId: regR18._id, graduationDate: new Date('2024-06-15'), degreeAwarded: 'Bachelor of Technology', finalCgpa: 7.5, classObtained: 'first_class', convocationStatus: 'attended', engagementStatus: 'active', alumniProfileId: (await AlumniProfile.findOne({ personId: persons[8]._id }))!._id },
+    { collegeId: CID, personId: persons[9]._id, studentId: students[9]._id, programmeId: progBTech._id, branchId: brCSE._id, batchId: batch2020._id, regulationId: regR18._id, graduationDate: new Date('2024-06-15'), degreeAwarded: 'Bachelor of Technology', finalCgpa: 8.2, classObtained: 'first_class_distinction', convocationStatus: 'attended', engagementStatus: 'active', alumniProfileId: (await AlumniProfile.findOne({ personId: persons[9]._id }))!._id },
+  ]);
+  console.log('Alumni created');
+
+  await AlumniCareer.create([
+    { collegeId: CID, alumniId: alumni[0]._id, companyName: 'Infosys Limited', jobTitle: 'Systems Engineer', startDate: new Date('2024-07-15'), isCurrent: true, source: 'placement', verifiedBy: persons[10]._id },
+  ]);
+  console.log('AlumniCareers created');
+
+  await AlumniEngagement.create([
+    { collegeId: CID, alumniId: alumni[0]._id, type: 'career_tracking_invitation', channel: 'email', status: 'responded', sentAt: new Date('2025-01-15'), respondedAt: new Date('2025-01-18') },
+    { collegeId: CID, alumniId: alumni[1]._id, type: 'mentor_registration', channel: 'email', status: 'sent', sentAt: new Date('2025-02-01') },
+  ]);
+  console.log('AlumniEngagements created');
+
+  await MentorMatch.create([
+    { collegeId: CID, alumniId: alumni[0]._id, studentId: students[0]._id, matchScore: 82, matchReasons: ['Same branch (CSE)', 'Similar career interest (IT Services)', 'Alumni willing to mentor'], status: 'introduced', approvedBy: persons[10]._id },
+  ]);
+  console.log('MentorMatches created');
+
+  // ---------- 12. Platform/Juvi additions ----------
+
+  await InferenceLog.create([
+    { collegeId: CID, agentId: 'fee-negotiation-v1', agentName: 'Fee Negotiation Advisor', inputData: { applicantId: String(applicants[2]._id), income: 300000, category: 'OC' }, outputData: { recommendedWaiver: 30000, confidence: 0.72 }, status: 'success', triggeredBy: persons[17]._id, startedAt: new Date('2025-03-08T10:00:00'), completedAt: new Date('2025-03-08T10:01:00'), latencyMs: 1200, tokensUsed: 850 },
+    { collegeId: CID, agentId: 'dropout-risk-v1', agentName: 'Dropout Risk Predictor', inputData: { studentId: String(students[3]._id) }, outputData: { riskScore: 65, signals: ['fee_default', 'attendance_drop'] }, status: 'success', triggeredBy: persons[10]._id, startedAt: new Date('2025-03-10T14:00:00'), completedAt: new Date('2025-03-10T14:00:02'), latencyMs: 2100, tokensUsed: 1200 },
+  ]);
+  console.log('InferenceLogs created');
+
+  await IntegrationLog.create([
+    { collegeId: CID, provider: 'Razorpay', endpoint: '/v1/payments/capture', method: 'POST', requestBody: { orderId: 'order_RZP_001', amount: 17500000 }, responseBody: { status: 'captured', paymentId: 'pay_RZP_001' }, statusCode: 200, status: 'success', retryCount: 0, startedAt: new Date('2024-08-10T09:32:00'), completedAt: new Date('2024-08-10T09:32:01') },
+    { collegeId: CID, provider: 'TS-EAMCET Portal', endpoint: '/api/allotment/verify', method: 'GET', statusCode: 200, status: 'success', retryCount: 0, startedAt: new Date('2024-07-01T10:00:00'), completedAt: new Date('2024-07-01T10:00:03') },
+  ]);
+  console.log('IntegrationLogs created');
+
+  const noticeCards = await JuviNoticeCard.create([
+    { collegeId: CID, title: 'End Semester Exam Schedule Published', body: 'The exam schedule for Even Semester 2024-25 has been released. Check the exam portal for your hall ticket and seating arrangement.', noticeType: 'exam_schedule', targetAudience: 'all', semesterId: sem2_24._id, isActive: true, expiresAt: new Date('2025-05-30'), createdBy: persons[24]._id },
+    { collegeId: CID, title: 'Attendance Warning - Below 75%', body: 'Your attendance in one or more subjects is below 75%. Please improve your attendance immediately to avoid detention.', noticeType: 'attendance_warning', targetAudience: 'individual', targetIds: [students[1]._id], isActive: true, expiresAt: new Date('2025-04-30'), createdBy: persons[10]._id },
+  ]);
+  console.log('JuviNoticeCards created');
+
+  await AckRecord.create([
+    { collegeId: CID, noticeCardId: noticeCards[0]._id, studentId: students[0]._id, acknowledgedAt: new Date('2025-04-21T09:00:00'), channel: 'app' },
+    { collegeId: CID, noticeCardId: noticeCards[0]._id, studentId: students[7]._id, acknowledgedAt: new Date('2025-04-21T10:15:00'), channel: 'app' },
+  ]);
+  console.log('AckRecords created');
+
+  await StudyRecommendation.create([
+    { collegeId: CID, studentId: students[1]._id, semesterId: sem2_24._id, courseId: courses[0]._id, recommendationType: 'focus_area', title: 'Focus on Syntax Analysis', description: 'Your Mid-1 score in Compiler Design was below average. Spend extra time on Context Free Grammars and parsing techniques.', priority: 'high', basedOn: 'Internal assessment scores and attendance pattern', isRead: false },
+    { collegeId: CID, studentId: students[0]._id, semesterId: sem2_24._id, recommendationType: 'study_material', title: 'Advanced ML Resources', description: 'Based on your strong performance in ML, explore Andrew Ng Deep Learning Specialization for advanced topics.', priority: 'medium', basedOn: 'High quiz and assignment scores in CS502', isRead: true },
+  ]);
+  console.log('StudyRecommendations created');
 
   // ========================================================================
   // RBAC DEFAULT POLICIES

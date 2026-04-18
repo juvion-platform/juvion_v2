@@ -8,6 +8,16 @@ export { CounselingAllotment } from './admissions/CounselingAllotment';
 export { DocumentChecklist } from './admissions/DocumentChecklist';
 export { EntranceExamScore } from './admissions/EntranceExamScore';
 export { Inquiry } from './admissions/Inquiry';
+export { MeritList } from './admissions/MeritList';
+export { SpotRound } from './admissions/SpotRound';
+export { SeatInventory } from './admissions/SeatInventory';
+export { AllotmentRound } from './admissions/AllotmentRound';
+export { AllotmentResult } from './admissions/AllotmentResult';
+export { Waitlist } from './admissions/Waitlist';
+export { FeeNegotiation } from './admissions/FeeNegotiation';
+export { AdmissionCancellation } from './admissions/AdmissionCancellation';
+export { LeadImportBatch } from './admissions/LeadImportBatch';
+export { LeadInteraction } from './admissions/LeadInteraction';
 
 // === People ===
 export { AcademicHistory } from './people/AcademicHistory';
@@ -19,6 +29,10 @@ export { Person } from './people/Person';
 export { Staff } from './people/Staff';
 export { Student } from './people/Student';
 export { Transcript } from './people/Transcript';
+export { ExitRequest } from './people/ExitRequest';
+export { DocumentTemplate } from './people/DocumentTemplate';
+export { ExitDocument } from './people/ExitDocument';
+export { Alumni } from './people/Alumni';
 
 // === Academic Structure ===
 export { AcademicYear } from './academic-structure/AcademicYear';
@@ -54,9 +68,27 @@ export { POAttainmentRecord } from './academic-ops/POAttainmentRecord';
 export { ProgramOutcome } from './academic-ops/ProgramOutcome';
 export { ProgrammeHealthMetrics } from './academic-ops/ProgrammeHealthMetrics';
 export { QualityReport } from './academic-ops/QualityReport';
+export { LateralCreditMapping } from './academic-ops/LateralCreditMapping';
+export { CourseMaterial } from './academic-ops/CourseMaterial';
 export { SemesterResult } from './academic-ops/SemesterResult';
 export { Timetable } from './academic-ops/Timetable';
 export { TimetableSlot } from './academic-ops/TimetableSlot';
+export { Assignment } from './academic-ops/Assignment';
+export { Submission } from './academic-ops/Submission';
+export { Quiz } from './academic-ops/Quiz';
+export { QuizAttempt } from './academic-ops/QuizAttempt';
+export { Backlog } from './academic-ops/Backlog';
+export { RevaluationRequest } from './academic-ops/RevaluationRequest';
+export { HallTicket } from './academic-ops/HallTicket';
+export { SeatingPlan } from './academic-ops/SeatingPlan';
+export { InvigilationRoster } from './academic-ops/InvigilationRoster';
+export { PromotionDecision } from './academic-ops/PromotionDecision';
+export { AttendanceSummary } from './academic-ops/AttendanceSummary';
+export { AttendanceAlert } from './academic-ops/AttendanceAlert';
+export { CondonationRequest } from './academic-ops/CondonationRequest';
+
+// === Academic Structure (extra) ===
+export { LabBatch } from './academic-structure/LabBatch';
 
 // === Finance ===
 export { Budget } from './finance/Budget';
@@ -104,6 +136,7 @@ export { AppraisalCycle } from './hr/AppraisalCycle';
 export { AppointmentOrder } from './hr/AppointmentOrder';
 export { AttendanceAnomaly } from './hr/AttendanceAnomaly';
 export { AttendanceMonthlySummary } from './hr/AttendanceMonthlySummary';
+export { Designation } from './hr/Designation';
 export { DisciplinaryCase } from './hr/DisciplinaryCase';
 export { DisciplinaryOutcome } from './hr/DisciplinaryOutcome';
 export { Employee } from './hr/Employee';
@@ -133,6 +166,8 @@ export { SelectionCommittee } from './hr/SelectionCommittee';
 export { SeparationRequest } from './hr/SeparationRequest';
 export { Training } from './hr/Training';
 export { TrainingParticipant } from './hr/TrainingParticipant';
+export { FacultyWorkload } from './hr/FacultyWorkload';
+export { DutyLog } from './hr/DutyLog';
 
 // === Placement ===
 export { AlumniEvent } from './placement/AlumniEvent';
@@ -152,6 +187,22 @@ export { PlacementSeason } from './placement/PlacementSeason';
 export { PlacementTraining } from './placement/PlacementTraining';
 export { RoundResult } from './placement/RoundResult';
 export { TrainingAttendance } from './placement/TrainingAttendance';
+export { CareerProfile } from './placement/CareerProfile';
+export { CompanyEngagementLog } from './placement/CompanyEngagementLog';
+export { CompanyProgrammeAffinity } from './placement/CompanyProgrammeAffinity';
+export { PlacementDrive } from './placement/PlacementDrive';
+export { DriveApplication } from './placement/DriveApplication';
+export { InterviewSchedule } from './placement/InterviewSchedule';
+export { RecruiterAccount } from './placement/RecruiterAccount';
+export { RecruiterActivityLog } from './placement/RecruiterActivityLog';
+export { PlacementReadinessScore } from './placement/PlacementReadinessScore';
+export { SkillRecord } from './placement/SkillRecord';
+export { PlacementBar } from './placement/PlacementBar';
+export { OptOutRecord } from './placement/OptOutRecord';
+export { AlumniCareerRecord } from './placement/AlumniCareerRecord';
+export { AlumniCareer } from './placement/AlumniCareer';
+export { AlumniEngagement } from './placement/AlumniEngagement';
+export { MentorMatch } from './placement/MentorMatch';
 
 // === Welfare ===
 export { AntiRaggingComplaint } from './welfare/AntiRaggingComplaint';
@@ -170,6 +221,22 @@ export { ParentMeeting } from './welfare/ParentMeeting';
 export { StudentGrievance } from './welfare/StudentGrievance';
 export { TransportAllocation } from './welfare/TransportAllocation';
 export { TransportRoute } from './welfare/TransportRoute';
+export { GrievanceAssignment } from './welfare/GrievanceAssignment';
+export { SystemicPattern } from './welfare/SystemicPattern';
+export { ICCComplaint } from './welfare/ICCComplaint';
+export { ICCAnnualReport } from './welfare/ICCAnnualReport';
+export { SCSTComplaint } from './welfare/SCSTComplaint';
+export { GRCComplaint } from './welfare/GRCComplaint';
+export { MentorAssignment } from './welfare/MentorAssignment';
+export { MentorSession } from './welfare/MentorSession';
+export { MentorConcern } from './welfare/MentorConcern';
+export { CounsellingReferral } from './welfare/CounsellingReferral';
+export { MisconductReport } from './welfare/MisconductReport';
+export { RiskSignal } from './welfare/RiskSignal';
+export { CCDThreshold } from './welfare/CCDThreshold';
+export { CCDIntervention } from './welfare/CCDIntervention';
+export { DropoutRiskAlert } from './welfare/DropoutRiskAlert';
+export { ExitInterview } from './welfare/ExitInterview';
 
 // === Campus ===
 export { Bed } from './campus/Bed';
@@ -195,6 +262,7 @@ export { LabClearance } from './campus/LabClearance';
 export { LabEquipment } from './campus/LabEquipment';
 export { LabIncident } from './campus/LabIncident';
 export { LabSlotBooking } from './campus/LabSlotBooking';
+export { LabAccess } from './campus/LabAccess';
 export { MealTransaction } from './campus/MealTransaction';
 export { MessFacility } from './campus/MessFacility';
 export { MessSubscription } from './campus/MessSubscription';
@@ -263,6 +331,19 @@ export { SkillCertification } from './student-dev/SkillCertification';
 export { SportsTeam } from './student-dev/SportsTeam';
 export { SportsTeamMember } from './student-dev/SportsTeamMember';
 export { StudentProject } from './student-dev/StudentProject';
+export { Fest } from './student-dev/Fest';
+export { Competition } from './student-dev/Competition';
+export { Workshop } from './student-dev/Workshop';
+export { SDProgramme } from './student-dev/SDProgramme';
+export { Award } from './student-dev/Award';
+export { AwardInstance } from './student-dev/AwardInstance';
+export { Certificate } from './student-dev/Certificate';
+export { ActivityBudget } from './student-dev/ActivityBudget';
+export { BudgetLineItem } from './student-dev/BudgetLineItem';
+export { Sponsorship } from './student-dev/Sponsorship';
+export { SponsorContact } from './student-dev/SponsorContact';
+export { Portfolio } from './student-dev/Portfolio';
+export { PortfolioEntry } from './student-dev/PortfolioEntry';
 
 // === Governance ===
 export { Committee } from './governance/Committee';
@@ -285,6 +366,18 @@ export { IQACReport } from './compliance/IQACReport';
 export { LegalCase } from './compliance/LegalCase';
 export { RTIRequest } from './compliance/RTIRequest';
 export { RegulatoryFiling } from './compliance/RegulatoryFiling';
+export { EvidenceType } from './compliance/EvidenceType';
+export { EvidenceCollectionRule } from './compliance/EvidenceCollectionRule';
+export { CriterionEvidenceMapping } from './compliance/CriterionEvidenceMapping';
+export { AssessmentRubric } from './compliance/AssessmentRubric';
+export { ReadinessScore } from './compliance/ReadinessScore';
+export { ReadinessSnapshot } from './compliance/ReadinessSnapshot';
+export { GapRecord } from './compliance/GapRecord';
+export { AccreditationReport } from './compliance/AccreditationReport';
+export { ReportSection } from './compliance/ReportSection';
+export { ReportTemplate } from './compliance/ReportTemplate';
+export { SubmissionArtifact } from './compliance/SubmissionArtifact';
+export { RemediationPlan } from './compliance/RemediationPlan';
 
 // === Communication ===
 export { Announcement } from './communication/Announcement';
@@ -312,4 +405,9 @@ export { JuviNoticeCard } from './juvi/JuviNoticeCard';
 export { JuviPersonaConfig } from './juvi/JuviPersonaConfig';
 export { JuviUsageMetric } from './juvi/JuviUsageMetric';
 export { StudyRecommendation } from './juvi/StudyRecommendation';
+
+// === Workflow ===
+export { ClearanceWorkflow } from './workflow/ClearanceWorkflow';
+export { ClearanceItem } from './workflow/ClearanceItem';
+export { EscalationLog } from './workflow/EscalationLog';
 

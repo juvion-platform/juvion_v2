@@ -26,6 +26,9 @@ export interface IInquiry extends Document {
   workflowInstanceId?: Schema.Types.ObjectId;
   // Conversion
   convertedToApplicantId?: Schema.Types.ObjectId;
+  // W01 intake enhancements
+  aadhaarNumber?: string;
+  languagePreference?: string;
 }
 
 const schema = new Schema<IInquiry>({
@@ -69,6 +72,9 @@ const schema = new Schema<IInquiry>({
   workflowInstanceId: { type: Schema.Types.ObjectId, ref: 'WorkflowInstance' },
   // Conversion
   convertedToApplicantId: { type: Schema.Types.ObjectId, ref: 'Applicant' },
+  // W01 intake enhancements
+  aadhaarNumber: String,
+  languagePreference: String,
 }, { timestamps: true });
 
 schema.index({ collegeId: 1, status: 1 });

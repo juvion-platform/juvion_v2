@@ -10,6 +10,12 @@ import {
   createStaffSchema, updateStaffSchema,
   createParentSchema, updateParentSchema,
   createOrganizationSchema, updateOrganizationSchema,
+  // W10 exit workflow schemas
+  submitExitRequestSchema, approveExitRequestSchema, rejectExitRequestSchema,
+  transitionStudentSchema, initiateClearanceSchema,
+  completeClearanceItemSchema, waiveClearanceItemSchema, logEscalationSchema,
+  createDocumentTemplateSchema_wf, generateDocumentSchema, signDocumentSchema,
+  issueDocumentSchema, revokeDocumentSchema, createAlumniRecordSchema,
 } from './validation';
 
 const router = Router();
@@ -59,5 +65,45 @@ router.get('/organizations/:id', authorize('people', 'read'), ctrl.getOrganizati
 router.post('/organizations', authorize('people', 'create'), validate(createOrganizationSchema), ctrl.createOrganization);
 router.put('/organizations/:id', authorize('people', 'update'), validate(updateOrganizationSchema), ctrl.updateOrganization);
 router.delete('/organizations/:id', authorize('people', 'delete'), ctrl.deleteOrganization);
+
+// ═══ W10 Exit Workflow Routes ═══════════════════════════════
+
+// ── Exit Requests ──────────────────────────────────────────
+router.get('/students/:id/exit-summary', authorize('people', 'read'), ctrl.getExitSummaryCtrl);
+router.post('/students/:id/exit-request', authorize('people', 'create'), validate(submitExitRequestSchema), ctrl.submitExitRequestCtrl);
+router.get('/exit-requests', authorize('people', 'read'), ctrl.listExitRequestsCtrl);
+router.get('/exit-requests/:id', authorize('people', 'read'), ctrl.getExitRequestCtrl);
+router.put('/exit-requests/:id/approve', authorize('people', 'update'), validate(approveExitRequestSchema), ctrl.approveExitRequestCtrl);
+router.put('/exit-requests/:id/reject', authorize('people', 'update'), validate(rejectExitRequestSchema), ctrl.rejectExitRequestCtrl);
+router.put('/exit-requests/:id/cancel', authorize('people', 'update'), ctrl.cancelExitRequestCtrl);
+
+// ── Student Lifecycle ──────────────────────────────────────
+router.post('/students/:id/transition', authorize('people', 'update'), validate(transitionStudentSchema), ctrl.transitionStudentCtrl);
+router.post('/students/:id/check-graduation-eligibility', authorize('people', 'read'), ctrl.checkGraduationEligibilityCtrl);
+router.post('/students/:id/seal', authorize('people', 'update'), ctrl.sealStudentRecordCtrl);
+
+// ── Clearance ──────────────────────────────────────────────
+router.get('/clearance-dashboard', authorize('people', 'read'), ctrl.getClearanceDashboardCtrl);
+router.get('/clearance-items/pending', authorize('people', 'read'), ctrl.listPendingClearanceItemsCtrl);
+router.post('/clearance-workflows', authorize('people', 'create'), validate(initiateClearanceSchema), ctrl.initiateClearanceCtrl);
+router.get('/clearance-workflows', authorize('people', 'read'), ctrl.listClearanceWorkflowsCtrl);
+router.get('/clearance-workflows/:id', authorize('people', 'read'), ctrl.getClearanceWorkflowCtrl);
+router.put('/clearance-items/:id/complete', authorize('people', 'update'), validate(completeClearanceItemSchema), ctrl.completeClearanceItemCtrl);
+router.put('/clearance-items/:id/waive', authorize('people', 'update'), validate(waiveClearanceItemSchema), ctrl.waiveClearanceItemCtrl);
+router.post('/escalation-logs', authorize('people', 'create'), validate(logEscalationSchema), ctrl.logEscalationCtrl);
+
+// ── Documents ──────────────────────────────────────────────
+router.get('/document-templates', authorize('people', 'read'), ctrl.listDocumentTemplatesCtrl);
+router.get('/document-templates/:id', authorize('people', 'read'), ctrl.getDocumentTemplateCtrl);
+router.post('/document-templates', authorize('people', 'create'), validate(createDocumentTemplateSchema_wf), ctrl.createDocumentTemplateCtrl);
+router.post('/documents/generate', authorize('people', 'create'), validate(generateDocumentSchema), ctrl.generateDocumentCtrl);
+router.put('/documents/:id/sign', authorize('people', 'update'), validate(signDocumentSchema), ctrl.signDocumentCtrl);
+router.post('/documents/:id/issue', authorize('people', 'update'), validate(issueDocumentSchema), ctrl.issueDocumentCtrl);
+router.put('/documents/:id/revoke', authorize('people', 'update'), validate(revokeDocumentSchema), ctrl.revokeDocumentCtrl);
+
+// ── Alumni ─────────────────────────────────────────────────
+router.get('/alumni', authorize('people', 'read'), ctrl.listAlumniCtrl);
+router.get('/alumni/:id', authorize('people', 'read'), ctrl.getAlumniCtrl);
+router.post('/alumni', authorize('people', 'create'), validate(createAlumniRecordSchema), ctrl.createAlumniRecordCtrl);
 
 export default router;
