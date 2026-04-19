@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { EvidenceType } from '../../models/compliance/EvidenceType';
 import { EvidenceCollectionRule } from '../../models/compliance/EvidenceCollectionRule';
 import { EvidenceRecord } from '../../models/compliance/EvidenceRecord';
@@ -177,14 +178,17 @@ export async function syncModuleEvidence(collegeId: string, _sourceModule: strin
 }
 
 export async function getEvidenceStats(collegeId: string) {
+  // Mongoose doesn't auto-cast string → ObjectId inside .aggregate($match);
+  // wrap explicitly so the aggregations actually match documents.
+  const cidObj = new mongoose.Types.ObjectId(collegeId);
   const [totalRecords, byStatus, byModule] = await Promise.all([
     EvidenceRecord.countDocuments({ collegeId }),
     EvidenceRecord.aggregate([
-      { $match: { collegeId } },
+      { $match: { collegeId: cidObj } },
       { $group: { _id: '$status', count: { $sum: 1 } } },
     ]),
     EvidenceRecord.aggregate([
-      { $match: { collegeId } },
+      { $match: { collegeId: cidObj } },
       { $group: { _id: '$sourceModule', count: { $sum: 1 } } },
     ]),
   ]);

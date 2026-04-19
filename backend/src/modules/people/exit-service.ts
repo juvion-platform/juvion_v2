@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { Student } from '../../models/people/Student';
 import { ExitRequest } from '../../models/people/ExitRequest';
 import { ClearanceWorkflow } from '../../models/workflow/ClearanceWorkflow';
@@ -436,13 +437,16 @@ export async function listPendingClearanceItems(
 }
 
 export async function getClearanceDashboard(collegeId: string) {
+  // Mongoose doesn't auto-cast string → ObjectId inside .aggregate($match);
+  // wrap explicitly so the aggregations actually match documents.
+  const cidObj = new mongoose.Types.ObjectId(collegeId);
   const [workflowsByStatus, itemsByDeptStatus] = await Promise.all([
     ClearanceWorkflow.aggregate([
-      { $match: { collegeId } },
+      { $match: { collegeId: cidObj } },
       { $group: { _id: '$status', count: { $sum: 1 } } },
     ]),
     ClearanceItem.aggregate([
-      { $match: { collegeId } },
+      { $match: { collegeId: cidObj } },
       { $group: { _id: { department: '$department', status: '$status' }, count: { $sum: 1 } } },
     ]),
   ]);

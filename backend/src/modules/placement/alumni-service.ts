@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { AlumniCareerRecord } from '../../models/placement/AlumniCareerRecord';
 import { AlumniProfile } from '../../models/placement/AlumniProfile';
 import { AppError } from '../../middleware/errorHandler';
@@ -150,14 +151,17 @@ export async function markStaleRecords(collegeId: string, _performedBy: string) 
 }
 
 export async function getAlumniAnalytics(collegeId: string) {
+  // Mongoose doesn't auto-cast string → ObjectId inside .aggregate($match);
+  // wrap explicitly so the aggregations actually match documents.
+  const cidObj = new mongoose.Types.ObjectId(collegeId);
   const [statusBreakdown, staleAgg, topIndustries] = await Promise.all([
     AlumniCareerRecord.aggregate([
-      { $match: { collegeId } },
+      { $match: { collegeId: cidObj } },
       { $group: { _id: '$careerStatus', count: { $sum: 1 } } },
     ]),
     AlumniCareerRecord.countDocuments({ collegeId, isStale: true }),
     AlumniCareerRecord.aggregate([
-      { $match: { collegeId, industry: { $ne: null } } },
+      { $match: { collegeId: cidObj, industry: { $ne: null } } },
       { $group: { _id: '$industry', count: { $sum: 1 } } },
       { $sort: { count: -1 } },
       { $limit: 10 },
