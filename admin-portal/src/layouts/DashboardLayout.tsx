@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuthStore } from '../stores/authStore';
+import GlobalSearch from '../components/search/GlobalSearch';
 
 const NAV_ITEMS = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard', iconColor: 'text-sky-400', module: null },
@@ -141,7 +142,8 @@ export default function DashboardLayout() {
             {collegeName || 'College ERP'}
           </h1>
           <div className="relative flex items-center gap-3">
-            <span className="text-sm text-gray-500">{displayName}</span>
+            <GlobalSearch />
+            <span className="hidden md:inline text-sm text-gray-500">{displayName}</span>
             <button
               onClick={() => setProfileOpen(!profileOpen)}
               className="flex items-center gap-1"
