@@ -36,8 +36,9 @@ _High-impact, high-value. These are where most of the code risk lives._
 | # | Item | Priority | Status | Owner | PR | Notes |
 |---|------|----------|--------|-------|-----|-------|
 | P1-1 | Zod validation audit — classify 169 missing-validate POST/PUT routes | 21 | 🔴 | — | — | Phase (a): classify body-taking vs body-less. Phase (b): add schemas to body-taking routes. Phase (c): CI lint rule requiring `validate()` on POST/PUT except an explicit whitelist. |
-| P1-2 | Unit tests for `finance/service.ts` money-touching functions | 18 | 🔴 | — | — | Payments, refunds, fee line items, invoice reconciliation. Set CI coverage floor via `vitest --coverage` threshold (suggest 40% to start). |
+| P1-2 | Unit tests for `finance/service.ts` money-touching functions | 18 | 🟡 | — | #23, #24 | 42 tests shipped so far (createPayment, receipts, guardian gate, getStats, getReconciliationStatus, getRevenueDashboard, getDefaulterTrendAnalysis, writeOffInvoice, handleBounce). **7 aggregation bugs found + fixed** — all the same `$match: { collegeId }` pattern. Continued work: generateSemesterInvoice, createRefund, runReconciliation, matchPaymentToInvoice. |
 | P1-3 | `as any` cleanup, money-code first | 18 | 🔴 | — | — | Inventory: `finance/controller.ts` (25), `finance/service.ts` (15), `finance/fee-lifecycle-service.ts` (29), `fee-reminder-service.ts`. Target: cut by 50% in this sprint. |
+| P1-4 | **Cross-module aggregate-collegeId bug pattern sweep** | 20 | 🔴 | — | — | NEW from P1-2 work. Same `.aggregate({$match: {collegeId}})` string-casting bug exists in 7 more service files: welfare/icc-scst-grc-service, welfare/ment-couns-ccd-service, compliance/evid-crit-service, student-dev/org-service, people/exit-service, placement/alumni-service, placement/service. Each likely breaks its own dashboards. Write a codemod + tests per site. |
 
 **Exit criteria for Phase 1:**
 - All body-taking POST/PUT routes have Zod validation
