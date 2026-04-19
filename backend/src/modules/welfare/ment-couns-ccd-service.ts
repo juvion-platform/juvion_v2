@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { MentorAssignment } from '../../models/welfare/MentorAssignment';
 import { MentorSession } from '../../models/welfare/MentorSession';
 import { MentorConcern } from '../../models/welfare/MentorConcern';
@@ -300,15 +301,18 @@ export async function getMentorEngagementAnalytics(
     },
   ]);
 
+  // Mongoose doesn't auto-cast string → ObjectId inside .aggregate($match);
+  // wrap explicitly so the aggregations actually match documents.
+  const cidObj = new mongoose.Types.ObjectId(collegeId);
   const sessionsPerMentor = await MentorSession.aggregate([
-    { $match: { collegeId } },
+    { $match: { collegeId: cidObj } },
     { $group: { _id: '$mentorId', sessionCount: { $sum: 1 } } },
     { $group: { _id: null, avgSessions: { $avg: '$sessionCount' }, totalSessions: { $sum: '$sessionCount' } } },
     { $project: { _id: 0, avgSessions: { $round: ['$avgSessions', 1] }, totalSessions: 1 } },
   ]);
 
   const concernStats = await MentorConcern.aggregate([
-    { $match: { collegeId } },
+    { $match: { collegeId: cidObj } },
     { $group: { _id: '$status', count: { $sum: 1 } } },
   ]);
 
@@ -611,8 +615,11 @@ export async function getCounsellingReferral(collegeId: string, id: string) {
 }
 
 export async function getFollowUpDashboard(collegeId: string) {
+  // Mongoose doesn't auto-cast string → ObjectId inside .aggregate($match);
+  // wrap explicitly so the aggregation actually matches documents.
+  const cidObj = new mongoose.Types.ObjectId(collegeId);
   const stats = await CounsellingReferral.aggregate([
-    { $match: { collegeId, status: { $nin: ['completed', 'declined'] } } },
+    { $match: { collegeId: cidObj, status: { $nin: ['completed', 'declined'] } } },
     { $group: { _id: '$followUpStatus', count: { $sum: 1 } } },
   ]);
 
@@ -968,14 +975,17 @@ export async function getStudentRiskProfile(collegeId: string, studentId: string
 }
 
 export async function getCCDDashboard(collegeId: string) {
+  // Mongoose doesn't auto-cast string → ObjectId inside .aggregate($match);
+  // wrap explicitly so the aggregations actually match documents.
+  const cidObj = new mongoose.Types.ObjectId(collegeId);
   const [byPriority, unacknowledged, interventionOutcomes] = await Promise.all([
     CrisisAlert.aggregate([
-      { $match: { collegeId, status: { $nin: ['resolved', 'false_positive'] } } },
+      { $match: { collegeId: cidObj, status: { $nin: ['resolved', 'false_positive'] } } },
       { $group: { _id: '$priority', count: { $sum: 1 } } },
     ]),
     CrisisAlert.countDocuments({ collegeId, status: 'generated' }),
     CCDIntervention.aggregate([
-      { $match: { collegeId } },
+      { $match: { collegeId: cidObj } },
       { $group: { _id: '$followUpStatus', count: { $sum: 1 } } },
     ]),
   ]);

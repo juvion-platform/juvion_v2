@@ -18,7 +18,13 @@ let mongod: MongoMemoryServer | null = null;
 
 export async function setupMongo(): Promise<void> {
   if (mongod) return;
-  mongod = await MongoMemoryServer.create({ binary: { version: '7.0.0' } });
+  // Raise the per-instance launch timeout. Default is 10s which can be
+  // tight on the first run (binary download, spawn latency) or on
+  // loaded CI machines.
+  mongod = await MongoMemoryServer.create({
+    binary: { version: '7.0.0' },
+    instance: { launchTimeout: 60_000 },
+  });
   await mongoose.connect(mongod.getUri());
 }
 

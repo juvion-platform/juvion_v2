@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { ICCComplaint } from '../../models/welfare/ICCComplaint';
 import { ICCAnnualReport } from '../../models/welfare/ICCAnnualReport';
 import { SCSTComplaint } from '../../models/welfare/SCSTComplaint';
@@ -389,12 +390,15 @@ export async function generateICCAnnualReport(
   const yearStart = new Date(`${data.year}-01-01T00:00:00.000Z`);
   const yearEnd = new Date(`${data.year + 1}-01-01T00:00:00.000Z`);
 
+  // Mongoose doesn't auto-cast string → ObjectId inside .aggregate($match);
+  // wrap explicitly so the aggregation actually matches documents.
+  const cidObj = new mongoose.Types.ObjectId(collegeId);
   const [total, resolved, pending, avgAgg] = await Promise.all([
     ICCComplaint.countDocuments({ collegeId, filedDate: { $gte: yearStart, $lt: yearEnd } }),
     ICCComplaint.countDocuments({ collegeId, filedDate: { $gte: yearStart, $lt: yearEnd }, status: 'closed' }),
     ICCComplaint.countDocuments({ collegeId, filedDate: { $gte: yearStart, $lt: yearEnd }, status: { $ne: 'closed' } }),
     ICCComplaint.aggregate([
-      { $match: { collegeId, filedDate: { $gte: yearStart, $lt: yearEnd }, status: 'closed' } },
+      { $match: { collegeId: cidObj, filedDate: { $gte: yearStart, $lt: yearEnd }, status: 'closed' } },
       { $project: { resolutionDays: { $divide: [{ $subtract: ['$updatedAt', '$filedDate'] }, 1000 * 60 * 60 * 24] } } },
       { $group: { _id: null, avg: { $avg: '$resolutionDays' } } },
     ]),

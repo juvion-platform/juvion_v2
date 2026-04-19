@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { PlacementSeason } from '../../models/placement/PlacementSeason';
 import { Company } from '../../models/placement/Company';
 import { JobPosting } from '../../models/placement/JobPosting';
@@ -51,8 +52,16 @@ export async function getStats(collegeId: string) {
     PlacementOffer.countDocuments({ collegeId, status: 'accepted' }),
   ]);
 
+  // Mongoose `.aggregate()` does not auto-cast string → ObjectId like
+  // `.find()` does; wrap explicitly so $match actually matches documents.
+  const cidObj = new mongoose.Types.ObjectId(collegeId);
+  // Schema enum for PlacementOffer.status is
+  //   ['extended','accepted','rejected','revoked','reneged','lapsed','released']
+  // This filter previously referenced 'offered' which does NOT exist in the
+  // enum — the $in was effectively only matching 'accepted', dropping every
+  // still-open offer out of the average. Corrected to 'extended'.
   const [avgPkgAgg] = await PlacementOffer.aggregate([
-    { $match: { collegeId, status: { $in: ['offered', 'accepted'] } } },
+    { $match: { collegeId: cidObj, status: { $in: ['extended', 'accepted'] } } },
     { $group: { _id: null, avg: { $avg: '$packageLpa' }, max: { $max: '$packageLpa' } } },
   ]);
 

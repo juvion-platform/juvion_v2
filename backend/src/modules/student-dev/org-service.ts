@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { Club } from '../../models/student-dev/Club';
 import { ClubMembership } from '../../models/student-dev/ClubMembership';
 import { LeadershipRole } from '../../models/student-dev/LeadershipRole';
@@ -177,10 +178,12 @@ export async function getClubRecommendations(collegeId: string, _studentId: stri
     _id: { $nin: memberClubIds },
   }).lean();
 
-  // Get member counts for ranking
+  // Get member counts for ranking. Mongoose doesn't auto-cast string →
+  // ObjectId inside .aggregate($match), so wrap collegeId explicitly.
   const clubIds = clubs.map((c) => c._id);
+  const cidObj = new mongoose.Types.ObjectId(collegeId);
   const memberCounts = await ClubMembership.aggregate([
-    { $match: { collegeId, clubId: { $in: clubIds }, status: 'active' } },
+    { $match: { collegeId: cidObj, clubId: { $in: clubIds }, status: 'active' } },
     { $group: { _id: '$clubId', count: { $sum: 1 } } },
   ]);
 
