@@ -13,7 +13,7 @@ export default function CollegeSelector() {
   const displayName = user?.name || (() => {
     if (!token) return 'Super Admin';
     try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
+      const payload = JSON.parse(atob(token.split('.')[1] ?? ''));
       return payload.name || 'Super Admin';
     } catch { return 'Super Admin'; }
   })();

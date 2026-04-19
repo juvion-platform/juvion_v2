@@ -6,8 +6,6 @@ import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 
-const TYPE_OPTS = ['journal','magazine','newspaper'] as const;
-const FREQUENCY_OPTS = ['daily','weekly','fortnightly','monthly','quarterly','annually'] as const;
 const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none";
 const lbl = "block text-sm font-medium text-gray-700 mb-1";
 

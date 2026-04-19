@@ -30,7 +30,7 @@ export default function UsageMetricsPage() {
   function openEdit(row: any) {
     setEditing(row);
     setForm({
-      date: row.date ? new Date(row.date).toISOString().split('T')[0] : '',
+      date: row.date ? new Date(row.date).toISOString().split('T')[0] ?? '' : '',
       personaType: row.personaType || '',
       totalConversations: row.totalConversations != null ? String(row.totalConversations) : '',
       totalMessages: row.totalMessages != null ? String(row.totalMessages) : '',
