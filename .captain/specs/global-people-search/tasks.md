@@ -38,13 +38,13 @@
 | 2  | Backend `search-service.ts` + Person indexes + unit tests | Code | — | Done |
 | 3  | Search controller + route wiring | Code | 1, 2 | Done |
 | 4  | E2E integration tests (RBAC scoping, rate limit, PII negative-assertions) | Code | 3 | Done |
-| 5  | Frontend axios client (`services/search.ts`) + shared types | Code | 3 | Ready |
-| 6  | `useGlobalSearch` React Query hook (debounce + keyboard hotkey) | Code | 5 | Pending |
-| 7  | `SearchResultRow` + `SearchResultsDropdown` presentation components | Code | 5 | Pending |
-| 8  | `SearchOverlay` (Cmd+K modal, focus trap, keyboard nav) | Code | 6, 7 | Pending |
-| 9  | `GlobalSearch` header input + mount in DashboardLayout + Cmd+K hotkey + first-time tooltip | Code | 6, 7, 8 | Pending |
-| 10 | `/search` full-results page + route wiring in App.tsx | Code | 5 | Pending |
-| 11 | API reference + QA / deploy checklist | Doc | 3, 9, 10 | Pending |
+| 5  | Frontend axios client (`services/search.ts`) + shared types | Code | 3 | Done |
+| 6  | `useGlobalSearch` React Query hook (debounce + keyboard hotkey) | Code | 5 | Done |
+| 7  | `SearchResultRow` + `SearchResultsDropdown` presentation components | Code | 5 | Done |
+| 8  | `SearchOverlay` (Cmd+K modal, focus trap, keyboard nav) | Code | 6, 7 | Done |
+| 9  | `GlobalSearch` header input + mount in DashboardLayout + Cmd+K hotkey + first-time tooltip | Code | 6, 7, 8 | Done |
+| 10 | `/search` full-results page + route wiring in App.tsx | Code | 5 | Done |
+| 11 | API reference + QA / deploy checklist | Doc | 3, 9, 10 | Done |
 
 Front-loaded technical risks (from plan §7):
 - **R-3 scope correctness** — T2's acceptance criteria include the RBAC dedicated tests; this is the biggest correctness risk and gets covered early
