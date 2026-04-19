@@ -2059,13 +2059,16 @@ export async function runReconciliation(collegeId: string, performedBy: string) 
 }
 
 export async function getReconciliationStatus(collegeId: string) {
+  // Same Mongoose gotcha as getStats: aggregate() does not auto-cast
+  // collegeId from string → ObjectId. See comment in getStats for details.
+  const cidObj = new mongoose.Types.ObjectId(collegeId);
   const [txCounts, entryCounts] = await Promise.all([
     PaymentTransaction.aggregate([
-      { $match: { collegeId } },
+      { $match: { collegeId: cidObj } },
       { $group: { _id: '$reconciliationStatus', count: { $sum: 1 } } },
     ]),
     ReconciliationEntry.aggregate([
-      { $match: { collegeId } },
+      { $match: { collegeId: cidObj } },
       { $group: { _id: '$status', count: { $sum: 1 } } },
     ]),
   ]);
@@ -4158,7 +4161,9 @@ export async function receiveIndependentHardship(
 
 // W03-L2-056: Revenue dashboard
 export async function getRevenueDashboard(collegeId: string, academicYearId?: string) {
-  const invoiceFilter: Record<string, unknown> = { collegeId };
+  // Same Mongoose aggregate-casting gotcha as getStats.
+  const cidObj = new mongoose.Types.ObjectId(collegeId);
+  const invoiceFilter: Record<string, unknown> = { collegeId: cidObj };
   if (academicYearId) {
     const feeAgreements = await FeeAgreement.find({ collegeId, academicYearId }).select('_id').lean();
     const feeAgreementIds = feeAgreements.map(fa => fa._id);
@@ -4189,7 +4194,7 @@ export async function getRevenueDashboard(collegeId: string, academicYearId?: st
   const overdueRate = totalInvoiced > 0 ? Math.round((totalOverdue / totalInvoiced) * 10000) / 100 : 0;
 
   const channelAgg = await PaymentTransaction.aggregate([
-    { $match: { collegeId } },
+    { $match: { collegeId: cidObj } },
     { $group: { _id: '$channel', total: { $sum: '$amount' } } },
   ]);
   const receivedByChannel: Record<string, number> = {};
@@ -4199,7 +4204,7 @@ export async function getRevenueDashboard(collegeId: string, academicYearId?: st
   }
 
   const defaulterAgg = await DefaulterRecord.aggregate([
-    { $match: { collegeId } },
+    { $match: { collegeId: cidObj } },
     { $group: { _id: '$escalationStage', count: { $sum: 1 } } },
   ]);
   const defaultersByStage: Record<string, number> = {};
@@ -4211,7 +4216,7 @@ export async function getRevenueDashboard(collegeId: string, academicYearId?: st
   const activeHolds = await FinancialHold.countDocuments({ collegeId, holdStatus: 'active' });
 
   const receivableAgg = await ScholarshipReceivable.aggregate([
-    { $match: { collegeId } },
+    { $match: { collegeId: cidObj } },
     {
       $group: {
         _id: null,
@@ -4240,11 +4245,12 @@ export async function getRevenueDashboard(collegeId: string, academicYearId?: st
 
 // W03-L2-057: Defaulter trend analysis
 export async function getDefaulterTrendAnalysis(collegeId: string, months = 6) {
+  const cidObj = new mongoose.Types.ObjectId(collegeId);
   const now = new Date();
   const startDate = new Date(now.getFullYear(), now.getMonth() - months + 1, 1);
 
   const newDefaultersAgg = await DefaulterRecord.aggregate([
-    { $match: { collegeId, createdAt: { $gte: startDate } } },
+    { $match: { collegeId: cidObj, createdAt: { $gte: startDate } } },
     {
       $group: {
         _id: {
@@ -4260,7 +4266,7 @@ export async function getDefaulterTrendAnalysis(collegeId: string, months = 6) {
   const resolvedAgg = await DefaulterRecord.aggregate([
     {
       $match: {
-        collegeId,
+        collegeId: cidObj,
         resolutionDate: { $gte: startDate },
         escalationStage: { $in: ['resolved', 'exited_hardship', 'exited_write_off'] },
       },
