@@ -2,12 +2,9 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listWasteManagements, createWasteManagement, updateWasteManagement, deleteWasteManagement } from '../../services/campus-ops';
 import DataTable from '../../components/ui/DataTable';
-import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 
-const WASTETYPE_OPTS = ['dry','wet','e_waste','hazardous','biomedical'] as const;
-const DISPOSALMETHOD_OPTS = ['recycle','compost','incinerate','landfill','vendor_pickup'] as const;
 const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none";
 const lbl = "block text-sm font-medium text-gray-700 mb-1";
 

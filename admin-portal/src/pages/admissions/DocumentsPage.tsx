@@ -1,12 +1,9 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
-import { listDocumentChecklists, listApplicants } from '../../services/admissions';
+import { listDocumentChecklists} from '../../services/admissions';
 import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
-import { ExternalLink } from 'lucide-react';
 
-const manageLink = "inline-flex items-center gap-0.5 text-xs text-primary-500 hover:text-primary-700 font-medium ml-1";
 
 const STATUS_COLOR: Record<string, string> = { pending: 'warning', partial: 'info', complete: 'success', verified: 'success' };
 const STATUSES = ['pending', 'partial', 'complete', 'verified'] as const;

@@ -45,7 +45,7 @@ export default function DashboardLayout() {
   const displayName = user?.name || (() => {
     if (!token) return 'Admin';
     try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
+      const payload = JSON.parse(atob(token.split('.')[1] ?? ''));
       return payload.name || 'Admin';
     } catch { return 'Admin'; }
   })();

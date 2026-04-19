@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Building2, Plus, Search, Edit2, Trash2, ArrowLeft, Users } from 'lucide-react';
+import { Building2, Plus, Search, Edit2, Trash2, ArrowLeft} from 'lucide-react';
 import api from '../services/api';
 
 interface College {

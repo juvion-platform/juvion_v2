@@ -1,5 +1,4 @@
 import { Schema, model, Document } from 'mongoose';
 export interface IPowerBackup extends Document { collegeId: Schema.Types.ObjectId; name: string; type: string; capacity: string; location: string; fuelLevel?: number; lastServiceDate?: Date; nextServiceDate?: Date; status: string; }
 const schema = new Schema<IPowerBackup>({ collegeId: { type: Schema.Types.ObjectId, required: true, index: true }, name: { type: String, required: true }, type: { type: String, enum: ['generator', 'ups', 'solar', 'inverter'], required: true }, capacity: { type: String, required: true }, location: { type: String, required: true }, fuelLevel: Number, lastServiceDate: Date, nextServiceDate: Date, status: { type: String, enum: ['active', 'standby', 'maintenance', 'faulty'], default: 'active' } }, { timestamps: true });
-schema.index({ collegeId: 1 });
 export const PowerBackup = model<IPowerBackup>('PowerBackup', schema);

@@ -3,7 +3,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listEResourceAccesses, createEResourceAccess, updateEResourceAccess, deleteEResourceAccess, listEResources } from '../../services/campus-ops';
 import { listPersons } from '../../services/people';
 import DataTable from '../../components/ui/DataTable';
-import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
 import { Plus, Pencil, Trash2, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
