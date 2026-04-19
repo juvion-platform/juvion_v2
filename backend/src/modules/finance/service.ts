@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { FeeStructure } from '../../models/finance/FeeStructure';
 import { FeeStructureInstance } from '../../models/finance/FeeStructureInstance';
 import { FeeComponent } from '../../models/finance/FeeComponent';
@@ -81,13 +82,19 @@ export async function getStats(collegeId: string) {
     FeeLineItem.countDocuments({ collegeId, status: 'overdue' }),
   ]);
 
-  // Aggregate totals
+  // Aggregate totals.
+  //
+  // Mongoose's `.find()` auto-casts the `collegeId` string → ObjectId, but
+  // `.aggregate()` does NOT — a raw string passed into `$match` never
+  // matches a stored ObjectId. Wrap explicitly so these aggregations
+  // actually return data instead of silently returning 0.
+  const cidObj = new mongoose.Types.ObjectId(collegeId);
   const [collectionAgg] = await Payment.aggregate([
-    { $match: { collegeId, status: 'success' } },
+    { $match: { collegeId: cidObj, status: 'success' } },
     { $group: { _id: null, total: { $sum: '$amount' } } },
   ]);
   const [pendingAgg] = await FeeLineItem.aggregate([
-    { $match: { collegeId, status: { $in: ['pending', 'partial', 'overdue'] } } },
+    { $match: { collegeId: cidObj, status: { $in: ['pending', 'partial', 'overdue'] } } },
     { $group: { _id: null, total: { $sum: { $subtract: ['$amount', '$paidAmount'] } } } },
   ]);
 
