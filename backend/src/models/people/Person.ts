@@ -51,5 +51,11 @@ const schema = new Schema<IPerson>({
 schema.index({ collegeId: 1, aadhaar: 1 }, { unique: true, partialFilterExpression: { aadhaar: { $exists: true, $ne: null } } });
 schema.index({ collegeId: 1, phone: 1 });
 schema.index({ collegeId: 1, alternatePhone: 1 }, { sparse: true });
+// Indexes supporting the global people-search service (regex substring
+// queries on these three fields, scoped by collegeId). Regex queries only
+// use an index when they're anchored at the start; for substring-match
+// the index still prunes by collegeId and provides a good intersection.
+schema.index({ collegeId: 1, name: 1 });
+schema.index({ collegeId: 1, email: 1 });
 
 export const Person = model<IPerson>('Person', schema);

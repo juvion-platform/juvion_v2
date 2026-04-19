@@ -2,7 +2,10 @@ import { Router } from 'express';
 import { authenticate } from '../../middleware/authenticate';
 import { authorize } from '../../middleware/authorize';
 import { validate } from '../../middleware/validate';
+import { createUserRateLimit } from '../../middleware/rateLimitPerUser';
 import * as ctrl from './controller';
+import { searchPeopleController } from './search-controller';
+import { searchQuerySchema } from './search-validation';
 import {
   createPersonSchema, updatePersonSchema,
   createStudentSchema, updateStudentSchema,
@@ -20,6 +23,16 @@ import {
 
 const router = Router();
 router.use(authenticate);
+
+// Global people search — per-user rate-limited. Route is placed BEFORE
+// the `/persons/:id` pattern so "search" isn't captured as an ID.
+router.get(
+  '/search',
+  authorize('people', 'read'),
+  createUserRateLimit({ max: 60, windowMs: 60_000 }),
+  validate(searchQuerySchema, 'query'),
+  searchPeopleController,
+);
 
 // Dashboard
 router.get('/stats', authorize('people', 'read'), ctrl.dashboardStats);
