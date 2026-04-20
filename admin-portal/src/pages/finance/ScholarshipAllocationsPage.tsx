@@ -9,12 +9,22 @@ import Modal from '../../components/ui/Modal';
 import StudentFinanceReadinessCard from '../../components/StudentFinanceReadinessCard';
 import { ExternalLink, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { useViewEditMode } from '../../hooks/useViewEditMode';
 
 const STATUSES = ['applied', 'approved', 'disbursed', 'rejected'] as const;
 const STATUS_COLOR: Record<string, string> = { applied: 'default', approved: 'info', disbursed: 'success', rejected: 'danger' };
-const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none";
+const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default";
 const lbl = "block text-sm font-medium text-gray-700 mb-1";
 const manageLink = "inline-flex items-center gap-0.5 text-xs text-primary-500 hover:text-primary-700 font-medium ml-1";
+
+const emptyForm = {
+  scholarshipId: '',
+  studentId: '',
+  academicYearId: '',
+  amount: '',
+  status: 'applied',
+  disbursedDate: '',
+};
 
 export default function ScholarshipAllocationsPage() {
   const qc = useQueryClient();
@@ -23,15 +33,19 @@ export default function ScholarshipAllocationsPage() {
   const [scholarshipFilter, setScholarshipFilter] = useState(searchParams.get('scholarshipId') || '');
   const [studentFilter, setStudentFilter] = useState(searchParams.get('studentId') || '');
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<any>(null);
-  const [form, setForm] = useState({
-    scholarshipId: '',
-    studentId: '',
-    academicYearId: '',
-    amount: '',
-    status: 'applied',
-    disbursedDate: '',
+  const [form, setForm] = useState(emptyForm);
+
+  const vem = useViewEditMode<any>({
+    onOpenEntity: (row) => setForm({
+      scholarshipId: row.scholarshipId?._id || row.scholarshipId || '',
+      studentId: row.studentId?._id || row.studentId || '',
+      academicYearId: row.academicYearId?._id || row.academicYearId || '',
+      amount: row.amount != null ? String(row.amount) : '',
+      status: row.status || 'applied',
+      disbursedDate: row.disbursedDate ? row.disbursedDate.slice(0, 10) : '',
+    }),
+    onOpenCreate: () => setForm(emptyForm),
+    onClose: () => setForm(emptyForm),
   });
 
   const { data, isLoading } = useQuery({
@@ -44,7 +58,7 @@ export default function ScholarshipAllocationsPage() {
   const { data: selectedStudent, isFetching: studentReadinessLoading } = useQuery({
     queryKey: ['student-finance-readiness', form.studentId],
     queryFn: () => getStudent(form.studentId),
-    enabled: modalOpen && Boolean(form.studentId),
+    enabled: vem.isOpen && Boolean(form.studentId),
   });
 
   const scholarships = scholarshipsData?.items || [];
@@ -61,34 +75,10 @@ export default function ScholarshipAllocationsPage() {
     setSearchParams(params, { replace: true });
   }
 
-  const createMut = useMutation({ mutationFn: createScholarshipAllocation, onSuccess: () => { qc.invalidateQueries({ queryKey: ['scholarship-allocations'] }); closeModal(); } });
-  const updateMut = useMutation({ mutationFn: ({ id, data }: any) => updateScholarshipAllocation(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['scholarship-allocations'] }); closeModal(); } });
+  const createMut = useMutation({ mutationFn: createScholarshipAllocation, onSuccess: () => { qc.invalidateQueries({ queryKey: ['scholarship-allocations'] }); vem.close(); } });
+  const updateMut = useMutation({ mutationFn: ({ id, data }: any) => updateScholarshipAllocation(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['scholarship-allocations'] }); vem.close(); } });
   const quickUpdateMut = useMutation({ mutationFn: ({ id, data }: any) => updateScholarshipAllocation(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['scholarship-allocations'] }); } });
   const deleteMut = useMutation({ mutationFn: deleteScholarshipAllocation, onSuccess: () => { qc.invalidateQueries({ queryKey: ['scholarship-allocations'] }); } });
-
-  function openCreate() {
-    setEditing(null);
-    setForm({ scholarshipId: '', studentId: '', academicYearId: '', amount: '', status: 'applied', disbursedDate: '' });
-    setModalOpen(true);
-  }
-
-  function openEdit(row: any) {
-    setEditing(row);
-    setForm({
-      scholarshipId: row.scholarshipId?._id || row.scholarshipId || '',
-      studentId: row.studentId?._id || row.studentId || '',
-      academicYearId: row.academicYearId?._id || row.academicYearId || '',
-      amount: row.amount != null ? String(row.amount) : '',
-      status: row.status || 'applied',
-      disbursedDate: row.disbursedDate ? row.disbursedDate.slice(0, 10) : '',
-    });
-    setModalOpen(true);
-  }
-
-  function closeModal() {
-    setModalOpen(false);
-    setEditing(null);
-  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -101,9 +91,11 @@ export default function ScholarshipAllocationsPage() {
     };
     if (form.disbursedDate) payload.disbursedDate = form.disbursedDate;
 
-    if (editing) updateMut.mutate({ id: editing._id, data: payload });
+    if (vem.isEdit && vem.entity) updateMut.mutate({ id: vem.entity._id, data: payload });
     else createMut.mutate(payload);
   }
+
+  const saving = createMut.isPending || updateMut.isPending;
 
   function quickTransition(row: any, nextStatus: string) {
     const payload: any = { status: nextStatus };
@@ -141,7 +133,7 @@ export default function ScholarshipAllocationsPage() {
             </button>
           </>
         )}
-        <button onClick={(e) => { e.stopPropagation(); openEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
+        <button onClick={(e) => { e.stopPropagation(); vem.openForEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
         <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this scholarship allocation?')) deleteMut.mutate(r._id); }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
       </div>
     )},
@@ -151,7 +143,7 @@ export default function ScholarshipAllocationsPage() {
     <div>
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-xl font-bold text-navy">Scholarship Allocations</h2>
-        <button onClick={openCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700">
+        <button onClick={vem.openForCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700">
           <Plus size={16} className="text-white" /> New Allocation
         </button>
       </div>
@@ -194,6 +186,8 @@ export default function ScholarshipAllocationsPage() {
         columns={columns}
         data={data?.items || []}
         loading={isLoading}
+        rowKey={(r: any) => r._id}
+        onRowClick={vem.openForView}
         emptyState={
           <div className="space-y-2">
             <div className="font-medium text-slate-600">No scholarship allocations yet</div>
@@ -210,48 +204,58 @@ export default function ScholarshipAllocationsPage() {
         </div>
       )}
 
-      <Modal open={modalOpen} onClose={closeModal} title={editing ? 'Edit Scholarship Allocation' : 'New Scholarship Allocation'}>
+      <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('Scholarship Allocation')}>
         <form onSubmit={handleSubmit} className="space-y-4">
           {form.studentId && (
             <StudentFinanceReadinessCard student={selectedStudent} loading={financeReadinessPending} />
           )}
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className={lbl}>Scholarship * <Link to="/finance/scholarships" target="_blank" className={manageLink}>+ Manage <ExternalLink size={10} /></Link></label>
-              <select required value={form.scholarshipId} onChange={(e) => setForm((f) => ({ ...f, scholarshipId: e.target.value }))} className={inp}>
-                <option value="">Select scholarship</option>
-                {scholarships.map((item: any) => <option key={item._id} value={item._id}>{item.name}</option>)}
-              </select>
+          <fieldset disabled={vem.isView} className="border-0 p-0 m-0 space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className={lbl}>Scholarship * {!vem.isView && <Link to="/finance/scholarships" target="_blank" className={manageLink}>+ Manage <ExternalLink size={10} /></Link>}</label>
+                <select required value={form.scholarshipId} onChange={(e) => setForm((f) => ({ ...f, scholarshipId: e.target.value }))} className={inp}>
+                  <option value="">Select scholarship</option>
+                  {scholarships.map((item: any) => <option key={item._id} value={item._id}>{item.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={lbl}>Student * {!vem.isView && <Link to="/people" target="_blank" className={manageLink}>+ Manage <ExternalLink size={10} /></Link>}</label>
+                <select required value={form.studentId} onChange={(e) => setForm((f) => ({ ...f, studentId: e.target.value }))} className={inp}>
+                  <option value="">Select student</option>
+                  {students.map((item: any) => <option key={item._id} value={item._id}>{item.person?.name || item.rollNumber || item._id}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={lbl}>Academic Year * {!vem.isView && <Link to="/academics/academic-years" target="_blank" className={manageLink}>+ Manage <ExternalLink size={10} /></Link>}</label>
+                <select required value={form.academicYearId} onChange={(e) => setForm((f) => ({ ...f, academicYearId: e.target.value }))} className={inp}>
+                  <option value="">Select academic year</option>
+                  {academicYears.map((item: any) => <option key={item._id} value={item._id}>{item.label || item.code}</option>)}
+                </select>
+              </div>
+              <div><label className={lbl}>Amount *</label><input required type="number" min={0} value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} className={inp} /></div>
+              <div><label className={lbl}>Status *</label>
+                <select required value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))} className={inp}>
+                  {STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
+                </select>
+              </div>
+              <div><label className={lbl}>Disbursed Date</label><input type="date" value={form.disbursedDate} onChange={(e) => setForm((f) => ({ ...f, disbursedDate: e.target.value }))} className={inp} /></div>
             </div>
-            <div>
-              <label className={lbl}>Student * <Link to="/people" target="_blank" className={manageLink}>+ Manage <ExternalLink size={10} /></Link></label>
-              <select required value={form.studentId} onChange={(e) => setForm((f) => ({ ...f, studentId: e.target.value }))} className={inp}>
-                <option value="">Select student</option>
-                {students.map((item: any) => <option key={item._id} value={item._id}>{item.person?.name || item.rollNumber || item._id}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className={lbl}>Academic Year * <Link to="/academics/academic-years" target="_blank" className={manageLink}>+ Manage <ExternalLink size={10} /></Link></label>
-              <select required value={form.academicYearId} onChange={(e) => setForm((f) => ({ ...f, academicYearId: e.target.value }))} className={inp}>
-                <option value="">Select academic year</option>
-                {academicYears.map((item: any) => <option key={item._id} value={item._id}>{item.label || item.code}</option>)}
-              </select>
-            </div>
-            <div><label className={lbl}>Amount *</label><input required type="number" min={0} value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} className={inp} /></div>
-            <div><label className={lbl}>Status *</label>
-              <select required value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))} className={inp}>
-                {STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
-              </select>
-            </div>
-            <div><label className={lbl}>Disbursed Date</label><input type="date" value={form.disbursedDate} onChange={(e) => setForm((f) => ({ ...f, disbursedDate: e.target.value }))} className={inp} /></div>
-          </div>
+          </fieldset>
 
           <div className="flex justify-end gap-3 pt-2 border-t">
-            <button type="button" onClick={closeModal} className="px-4 py-2 border rounded-lg text-sm">Cancel</button>
-            <button type="submit" disabled={createMut.isPending || updateMut.isPending || (!editing && (financeBlocked || financeReadinessPending))} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
-              {createMut.isPending || updateMut.isPending ? 'Saving...' : financeReadinessPending ? 'Checking student...' : editing ? 'Update' : 'Create'}
+            <button type="button" onClick={vem.close} className="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50">
+              {vem.isView ? 'Close' : 'Cancel'}
             </button>
+            {vem.isView ? (
+              <button type="button" onClick={vem.switchToEdit} className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700">
+                <Pencil size={14} /> Edit
+              </button>
+            ) : (
+              <button type="submit" disabled={saving || (!vem.isEdit && (financeBlocked || financeReadinessPending))} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
+                {saving ? 'Saving…' : financeReadinessPending ? 'Checking student...' : vem.isEdit ? 'Update' : 'Create'}
+              </button>
+            )}
           </div>
         </form>
       </Modal>
