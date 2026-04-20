@@ -12,12 +12,13 @@ import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
 import { Plus, Pencil, Trash2, Shield } from 'lucide-react';
+import { useViewEditMode } from '../../hooks/useViewEditMode';
 
 const ROLES = ['super_admin', 'admin', 'principal', 'hod', 'faculty', 'staff', 'student', 'parent', '*'] as const;
 const MODULES = ['admissions', 'people', 'academics', 'finance', 'hr', 'welfare', 'placement', 'campus', 'student-dev', 'compliance', 'governance', 'platform', 'juvi', '*'] as const;
 const ACTIONS = ['read', 'create', 'update', 'delete', 'approve', '*'] as const;
 
-const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none';
+const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default';
 const lbl = 'block text-sm font-medium text-gray-700 mb-1';
 
 interface PolicyForm {
@@ -57,8 +58,6 @@ export default function RbacPolicies() {
   const [page, setPage] = useState(1);
   const [filterRole, setFilterRole] = useState('');
   const [filterModule, setFilterModule] = useState('');
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<RbacPolicy | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
 
   const { data, isLoading } = useQuery({
@@ -66,28 +65,8 @@ export default function RbacPolicies() {
     queryFn: () => listRbacPolicies(page, 50, filterRole || undefined, filterModule || undefined),
   });
 
-  const createMut = useMutation({
-    mutationFn: createRbacPolicy,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['rbac-policies'] }); closeModal(); },
-  });
-  const updateMut = useMutation({
-    mutationFn: ({ id, data: d }: { id: string; data: Partial<RbacPolicyInput> }) => updateRbacPolicy(id, d),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['rbac-policies'] }); closeModal(); },
-  });
-  const deleteMut = useMutation({
-    mutationFn: deleteRbacPolicy,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['rbac-policies'] }); },
-  });
-
-  function openCreate() {
-    setEditing(null);
-    setForm(EMPTY_FORM);
-    setModalOpen(true);
-  }
-
-  function openEdit(row: RbacPolicy) {
-    setEditing(row);
-    setForm({
+  const vem = useViewEditMode<RbacPolicy>({
+    onOpenEntity: (row) => setForm({
       role: row.role,
       personaType: row.personaType || '',
       module: row.module,
@@ -99,14 +78,23 @@ export default function RbacPolicies() {
       selfOnly: row.scope?.selfOnly || false,
       subDomain: row.scope?.subDomain || '',
       isActive: row.isActive,
-    });
-    setModalOpen(true);
-  }
+    }),
+    onOpenCreate: () => setForm(EMPTY_FORM),
+    onClose: () => setForm(EMPTY_FORM),
+  });
 
-  function closeModal() {
-    setModalOpen(false);
-    setEditing(null);
-  }
+  const createMut = useMutation({
+    mutationFn: createRbacPolicy,
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['rbac-policies'] }); vem.close(); },
+  });
+  const updateMut = useMutation({
+    mutationFn: ({ id, data: d }: { id: string; data: Partial<RbacPolicyInput> }) => updateRbacPolicy(id, d),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['rbac-policies'] }); vem.close(); },
+  });
+  const deleteMut = useMutation({
+    mutationFn: deleteRbacPolicy,
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['rbac-policies'] }); },
+  });
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -125,12 +113,14 @@ export default function RbacPolicies() {
         subDomain: form.subDomain || undefined,
       },
     };
-    if (editing) {
-      updateMut.mutate({ id: editing._id, data: payload });
+    if (vem.isEdit && vem.entity) {
+      updateMut.mutate({ id: vem.entity._id, data: payload });
     } else {
       createMut.mutate(payload);
     }
   }
+
+  const saving = createMut.isPending || updateMut.isPending;
 
   const columns = [
     {
@@ -192,7 +182,7 @@ export default function RbacPolicies() {
         return (
           <div className="flex gap-1">
             <button
-              onClick={(e) => { e.stopPropagation(); openEdit(r); }}
+              onClick={(e) => { e.stopPropagation(); vem.openForEdit(r); }}
               className="p-1 rounded hover:bg-amber-50"
               title="Edit"
             >
@@ -224,7 +214,7 @@ export default function RbacPolicies() {
           </div>
           <h2 className="text-xl font-bold text-navy">RBAC Policies</h2>
         </div>
-        <button onClick={openCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700">
+        <button onClick={vem.openForCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700">
           <Plus size={16} className="text-white" /> Create Override
         </button>
       </div>
@@ -250,7 +240,13 @@ export default function RbacPolicies() {
       </div>
 
       {/* Table */}
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} />
+      <DataTable
+        columns={columns}
+        data={data?.items || []}
+        loading={isLoading}
+        rowKey={(r: RbacPolicy) => r._id}
+        onRowClick={vem.openForView}
+      />
 
       {/* Pagination */}
       {data && data.pages > 1 && (
@@ -262,96 +258,102 @@ export default function RbacPolicies() {
       )}
 
       {/* Create/Edit Modal */}
-      <Modal open={modalOpen} onClose={closeModal} title={editing ? 'Edit Policy Override' : 'Create Policy Override'} widthClass="max-w-xl">
+      <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('RBAC Policy')} widthClass="max-w-xl">
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            {/* Role */}
-            <div>
-              <label className={lbl}>Role *</label>
-              <select required value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))} className={inp}>
-                {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-              </select>
-            </div>
-
-            {/* PersonaType */}
-            <div>
-              <label className={lbl}>Persona Type</label>
-              <input value={form.personaType} onChange={e => setForm(f => ({ ...f, personaType: e.target.value }))} placeholder="e.g. teaching_faculty" className={inp} />
-            </div>
-
-            {/* Module */}
-            <div>
-              <label className={lbl}>Module *</label>
-              <select required value={form.module} onChange={e => setForm(f => ({ ...f, module: e.target.value }))} className={inp}>
-                {MODULES.map(m => <option key={m} value={m}>{m}</option>)}
-              </select>
-            </div>
-
-            {/* Action */}
-            <div>
-              <label className={lbl}>Action *</label>
-              <select required value={form.action} onChange={e => setForm(f => ({ ...f, action: e.target.value }))} className={inp}>
-                {ACTIONS.map(a => <option key={a} value={a}>{a}</option>)}
-              </select>
-            </div>
-
-            {/* Effect */}
-            <div>
-              <label className={lbl}>Effect *</label>
-              <select required value={form.effect} onChange={e => setForm(f => ({ ...f, effect: e.target.value as 'allow' | 'deny' }))} className={inp}>
-                <option value="allow">allow</option>
-                <option value="deny">deny</option>
-              </select>
-            </div>
-
-            {/* Priority */}
-            <div>
-              <label className={lbl}>Priority *</label>
-              <input type="number" required min={1} max={999} value={form.priority} onChange={e => setForm(f => ({ ...f, priority: +e.target.value }))} className={inp} />
-            </div>
-
-            {/* Description */}
-            <div className="col-span-2">
-              <label className={lbl}>Description</label>
-              <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Optional description" className={inp} />
-            </div>
-          </div>
-
-          {/* Scope */}
-          <fieldset className="border border-gray-200 rounded-lg p-4">
-            <legend className="text-sm font-medium text-gray-700 px-1">Scope</legend>
+          <fieldset disabled={vem.isView} className="border-0 p-0 m-0 space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <div className="flex items-center gap-2">
-                <input type="checkbox" id="departmentOnly" checked={form.departmentOnly} onChange={e => setForm(f => ({ ...f, departmentOnly: e.target.checked }))} />
-                <label htmlFor="departmentOnly" className="text-sm text-gray-700">Department only</label>
+              {/* Role */}
+              <div>
+                <label className={lbl}>Role *</label>
+                <select required value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))} className={inp}>
+                  {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
               </div>
-              <div className="flex items-center gap-2">
-                <input type="checkbox" id="selfOnly" checked={form.selfOnly} onChange={e => setForm(f => ({ ...f, selfOnly: e.target.checked }))} />
-                <label htmlFor="selfOnly" className="text-sm text-gray-700">Self only</label>
+
+              {/* PersonaType */}
+              <div>
+                <label className={lbl}>Persona Type</label>
+                <input value={form.personaType} onChange={e => setForm(f => ({ ...f, personaType: e.target.value }))} placeholder="e.g. teaching_faculty" className={inp} />
               </div>
+
+              {/* Module */}
+              <div>
+                <label className={lbl}>Module *</label>
+                <select required value={form.module} onChange={e => setForm(f => ({ ...f, module: e.target.value }))} className={inp}>
+                  {MODULES.map(m => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
+
+              {/* Action */}
+              <div>
+                <label className={lbl}>Action *</label>
+                <select required value={form.action} onChange={e => setForm(f => ({ ...f, action: e.target.value }))} className={inp}>
+                  {ACTIONS.map(a => <option key={a} value={a}>{a}</option>)}
+                </select>
+              </div>
+
+              {/* Effect */}
+              <div>
+                <label className={lbl}>Effect *</label>
+                <select required value={form.effect} onChange={e => setForm(f => ({ ...f, effect: e.target.value as 'allow' | 'deny' }))} className={inp}>
+                  <option value="allow">allow</option>
+                  <option value="deny">deny</option>
+                </select>
+              </div>
+
+              {/* Priority */}
+              <div>
+                <label className={lbl}>Priority *</label>
+                <input type="number" required min={1} max={999} value={form.priority} onChange={e => setForm(f => ({ ...f, priority: +e.target.value }))} className={inp} />
+              </div>
+
+              {/* Description */}
               <div className="col-span-2">
-                <label className={lbl}>Sub-domain</label>
-                <input value={form.subDomain} onChange={e => setForm(f => ({ ...f, subDomain: e.target.value }))} placeholder="e.g. fee-collection" className={inp} />
+                <label className={lbl}>Description</label>
+                <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Optional description" className={inp} />
               </div>
+            </div>
+
+            {/* Scope */}
+            <fieldset className="border border-gray-200 rounded-lg p-4">
+              <legend className="text-sm font-medium text-gray-700 px-1">Scope</legend>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex items-center gap-2">
+                  <input type="checkbox" id="departmentOnly" checked={form.departmentOnly} onChange={e => setForm(f => ({ ...f, departmentOnly: e.target.checked }))} />
+                  <label htmlFor="departmentOnly" className="text-sm text-gray-700">Department only</label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input type="checkbox" id="selfOnly" checked={form.selfOnly} onChange={e => setForm(f => ({ ...f, selfOnly: e.target.checked }))} />
+                  <label htmlFor="selfOnly" className="text-sm text-gray-700">Self only</label>
+                </div>
+                <div className="col-span-2">
+                  <label className={lbl}>Sub-domain</label>
+                  <input value={form.subDomain} onChange={e => setForm(f => ({ ...f, subDomain: e.target.value }))} placeholder="e.g. fee-collection" className={inp} />
+                </div>
+              </div>
+            </fieldset>
+
+            {/* Active */}
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="isActive" checked={form.isActive} onChange={e => setForm(f => ({ ...f, isActive: e.target.checked }))} />
+              <label htmlFor="isActive" className="text-sm text-gray-700">Active</label>
             </div>
           </fieldset>
 
-          {/* Active */}
-          <div className="flex items-center gap-2">
-            <input type="checkbox" id="isActive" checked={form.isActive} onChange={e => setForm(f => ({ ...f, isActive: e.target.checked }))} />
-            <label htmlFor="isActive" className="text-sm text-gray-700">Active</label>
-          </div>
-
           {/* Footer */}
           <div className="flex justify-end gap-3 pt-2 border-t">
-            <button type="button" onClick={closeModal} className="px-4 py-2 border rounded-lg text-sm">Cancel</button>
-            <button
-              type="submit"
-              disabled={createMut.isPending || updateMut.isPending}
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50"
-            >
-              {createMut.isPending || updateMut.isPending ? 'Saving...' : editing ? 'Update' : 'Create'}
+            <button type="button" onClick={vem.close} className="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50">
+              {vem.isView ? 'Close' : 'Cancel'}
             </button>
+            {vem.isView ? (
+              <button type="button" onClick={vem.switchToEdit} className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700">
+                <Pencil size={14} /> Edit
+              </button>
+            ) : (
+              <button type="submit" disabled={saving} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
+                {saving ? 'Saving…' : vem.isEdit ? 'Update' : 'Create'}
+              </button>
+            )}
           </div>
         </form>
       </Modal>
