@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { listFaculty, deleteFaculty } from '../../services/people';
 import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
+import { useHighlightRow } from '../../hooks/useHighlightRow';
 import { Plus, Pencil, Trash2, Search } from 'lucide-react';
 
 const STATUS_COLOR: Record<string, string> = { active: 'success', on_leave: 'warning', separated: 'danger' };
@@ -20,6 +21,10 @@ export default function FacultyPage() {
     queryKey: ['faculty', page, filterStatus, search],
     queryFn: () => listFaculty(page, 20, filterStatus || undefined, search || undefined),
   });
+
+  // Consume ?highlight=<personId> from global-people-search: scrolls to + flashes
+  // the matching row once data is loaded.
+  const { highlightAttrs } = useHighlightRow({ ready: !isLoading && Boolean(data) });
 
   const deleteMut = useMutation({
     mutationFn: deleteFaculty,
@@ -74,7 +79,13 @@ export default function FacultyPage() {
         </div>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} />
+      <DataTable
+        columns={columns}
+        data={data?.items || []}
+        loading={isLoading}
+        rowKey={(r: any) => r._id}
+        rowProps={(r: any) => highlightAttrs(r.person?._id ?? r.personId?._id)}
+      />
 
       {data && data.pages > 1 && (
         <div className="flex items-center justify-center gap-2 mt-4">

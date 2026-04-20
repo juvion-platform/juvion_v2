@@ -24,3 +24,15 @@
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(26, 54, 93, 0.3);
 }
+
+/* Row-flash highlight — applied by useHighlightRow when a row matches the
+   `?highlight=<personId>` URL param passed from global-people-search. */
+@keyframes row-flash-kf {
+  0%   { background-color: rgba(252, 211, 77, 0.55); } /* amber-300 at 55% */
+  30%  { background-color: rgba(252, 211, 77, 0.55); }
+  100% { background-color: transparent; }
+}
+.row-flash,
+.row-flash > td {
+  animation: row-flash-kf 2.5s ease-out;
+}

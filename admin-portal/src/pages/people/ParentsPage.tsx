@@ -6,6 +6,7 @@ import DataTable from '../../components/ui/DataTable';
 import Modal from '../../components/ui/Modal';
 import Badge from '../../components/ui/Badge';
 import { createParent, deleteParent, listParents, listStudents, updateParent } from '../../services/people';
+import { useHighlightRow } from '../../hooks/useHighlightRow';
 
 const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none transition-colors';
 const lbl = 'block text-sm font-medium text-gray-700 mb-1';
@@ -55,6 +56,9 @@ export default function ParentsPage() {
     queryKey: ['parents', page, search],
     queryFn: () => listParents(page, 20, search || undefined),
   });
+
+  // Consume ?highlight=<personId> from global-people-search.
+  const { highlightAttrs } = useHighlightRow({ ready: !isLoading && Boolean(data) });
   const { data: studentsData } = useQuery({
     queryKey: ['students-ref', 'all'],
     queryFn: () => listStudents(1, 200),
@@ -210,7 +214,13 @@ export default function ParentsPage() {
         </div>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} />
+      <DataTable
+        columns={columns}
+        data={data?.items || []}
+        loading={isLoading}
+        rowKey={(r: any) => r._id}
+        rowProps={(r: any) => highlightAttrs(r.person?._id ?? r.personId?._id)}
+      />
 
       {data && data.pages > 1 && (
         <div className="flex items-center justify-center gap-2 mt-4">
