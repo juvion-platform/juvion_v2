@@ -7,6 +7,7 @@ import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
 import { Plus, Pencil, Trash2, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useHighlightRow } from '../../hooks/useHighlightRow';
 
 const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none";
 const lbl = "block text-sm font-medium text-gray-700 mb-1";
@@ -21,6 +22,9 @@ export default function AlumniProfilesPage() {
 
   const { data, isLoading } = useQuery({ queryKey: ['alumni-profiles', page], queryFn: () => listAlumniProfiles(page, 20) });
   const { data: persons } = useQuery({ queryKey: ['persons-all'], queryFn: () => listPersons(1, 200) });
+
+  // Consume ?highlight=<personId> from global-people-search.
+  const { highlightAttrs } = useHighlightRow({ ready: !isLoading && Boolean(data) });
 
   const createMut = useMutation({ mutationFn: createAlumniProfile, onSuccess: () => { qc.invalidateQueries({ queryKey: ['alumni-profiles'] }); closeModal(); } });
   const updateMut = useMutation({ mutationFn: ({ id, data }: any) => updateAlumniProfile(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['alumni-profiles'] }); closeModal(); } });
@@ -78,7 +82,15 @@ export default function AlumniProfilesPage() {
         <h2 className="text-xl font-bold text-navy">Alumni Profiles</h2>
         <button onClick={openCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700"><Plus size={16} className="text-white" /> New Profile</button>
       </div>
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} />
+      <DataTable
+        columns={columns}
+        data={data?.items || []}
+        loading={isLoading}
+        rowKey={(r: any) => r._id}
+        rowProps={(r: any) => highlightAttrs(
+          typeof r.personId === 'string' ? r.personId : r.personId?._id,
+        )}
+      />
       {data && data.pages > 1 && (
         <div className="flex items-center justify-center gap-2 mt-4">
           <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Prev</button>
