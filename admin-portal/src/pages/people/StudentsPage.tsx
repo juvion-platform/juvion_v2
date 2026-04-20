@@ -138,6 +138,7 @@ export default function StudentsPage() {
         columns={columns}
         data={data?.items || []}
         loading={isLoading}
+        onRowClick={(r: any) => navigate(`/people/students/${r._id}`)}
         rowKey={(r: any) => r._id}
         rowProps={(r: any) => highlightAttrs(r.person?._id ?? r.personId?._id)}
       />

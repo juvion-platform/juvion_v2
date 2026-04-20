@@ -82,6 +82,7 @@ export default function StaffPage() {
         columns={columns}
         data={data?.items || []}
         loading={isLoading}
+        onRowClick={(r: any) => navigate(`/people/staff/${r._id}`)}
         rowKey={(r: any) => r._id}
         rowProps={(r: any) => highlightAttrs(r.person?._id ?? r.personId?._id)}
       />

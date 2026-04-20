@@ -13,6 +13,10 @@ import FacultyFormPage from './people/FacultyFormPage';
 import StaffFormPage from './people/StaffFormPage';
 import ParentsPage from './people/ParentsPage';
 import OrganizationsPage from './people/OrganizationsPage';
+import StudentDetailPage from './people/StudentDetailPage';
+import FacultyDetailPage from './people/FacultyDetailPage';
+import StaffDetailPage from './people/StaffDetailPage';
+import ParentDetailPage from './people/ParentDetailPage';
 
 const CARDS = [
   { to: 'students', icon: GraduationCap, label: 'Students', desc: 'Student profiles & enrollment', iconBg: 'bg-primary-50 text-primary-600', border: 'border-primary-200 hover:border-primary-400', statKey: 'students' },
@@ -58,6 +62,21 @@ function PeopleHome() {
   function goToEdit(role: { type: string; recordId: string }) {
     const route = ROLE_ROUTE[role.type];
     if (route) navigate(`/people/${route}/${role.recordId}/edit`);
+  }
+
+  // Row click → detail page for the person's primary role. For multi-role
+  // people we pick the first role (ordering reflects server-side priority).
+  // Unlinked persons (no roles) and Organizations (no detail page yet) are
+  // silent no-ops; the pencil buttons in the actions column are still
+  // available for edit access in those cases.
+  function goToDetail(person: any) {
+    const primary = person.roles?.[0];
+    if (!primary) return;
+    const route = ROLE_ROUTE[primary.type];
+    if (!route) return;
+    // Organizations have no detail page yet; skip.
+    if (primary.type === 'Organization') return;
+    navigate(`/people/${route}/${primary.recordId}`);
   }
 
   const columns = [
@@ -138,7 +157,20 @@ function PeopleHome() {
           </div>
         </div>
 
-        <DataTable columns={columns} data={personsData?.items || []} loading={isLoading} />
+        <DataTable
+          columns={columns}
+          data={personsData?.items || []}
+          loading={isLoading}
+          rowKey={(r: any) => r._id}
+          onRowClick={goToDetail}
+          rowClickable={(r: any) => {
+            // Only show clickable affordance for people with a role that
+            // has a detail page. Unlinked persons and org-only rows are
+            // excluded so the hover/cursor state stays honest.
+            const primary = r.roles?.[0];
+            return Boolean(primary && primary.type !== 'Organization' && ROLE_ROUTE[primary.type]);
+          }}
+        />
 
         {personsData && personsData.pages > 1 && (
           <div className="flex items-center justify-between px-5 py-3 border-t">
@@ -190,16 +222,25 @@ export default function People() {
     <SubPageWrapper>
       <Routes>
         <Route index element={<PeopleHome />} />
+        {/* Students */}
         <Route path="students" element={<StudentsPage />} />
         <Route path="students/new" element={<StudentFormPage />} />
+        <Route path="students/:id" element={<StudentDetailPage />} />
         <Route path="students/:id/edit" element={<StudentFormPage />} />
+        {/* Faculty */}
         <Route path="faculty" element={<FacultyPage />} />
         <Route path="faculty/new" element={<FacultyFormPage />} />
+        <Route path="faculty/:id" element={<FacultyDetailPage />} />
         <Route path="faculty/:id/edit" element={<FacultyFormPage />} />
+        {/* Staff */}
         <Route path="staff" element={<StaffPage />} />
         <Route path="staff/new" element={<StaffFormPage />} />
+        <Route path="staff/:id" element={<StaffDetailPage />} />
         <Route path="staff/:id/edit" element={<StaffFormPage />} />
+        {/* Parents — detail has inline edit (no separate form route) */}
         <Route path="parents" element={<ParentsPage />} />
+        <Route path="parents/:id" element={<ParentDetailPage />} />
+        {/* Organizations */}
         <Route path="organizations" element={<OrganizationsPage />} />
       </Routes>
     </SubPageWrapper>

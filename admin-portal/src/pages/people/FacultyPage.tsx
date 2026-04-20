@@ -83,6 +83,7 @@ export default function FacultyPage() {
         columns={columns}
         data={data?.items || []}
         loading={isLoading}
+        onRowClick={(r: any) => navigate(`/people/faculty/${r._id}`)}
         rowKey={(r: any) => r._id}
         rowProps={(r: any) => highlightAttrs(r.person?._id ?? r.personId?._id)}
       />
