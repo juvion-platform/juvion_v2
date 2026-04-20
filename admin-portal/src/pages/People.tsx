@@ -13,6 +13,10 @@ import FacultyFormPage from './people/FacultyFormPage';
 import StaffFormPage from './people/StaffFormPage';
 import ParentsPage from './people/ParentsPage';
 import OrganizationsPage from './people/OrganizationsPage';
+import StudentDetailPage from './people/StudentDetailPage';
+import FacultyDetailPage from './people/FacultyDetailPage';
+import StaffDetailPage from './people/StaffDetailPage';
+import ParentDetailPage from './people/ParentDetailPage';
 
 const CARDS = [
   { to: 'students', icon: GraduationCap, label: 'Students', desc: 'Student profiles & enrollment', iconBg: 'bg-primary-50 text-primary-600', border: 'border-primary-200 hover:border-primary-400', statKey: 'students' },
@@ -190,16 +194,25 @@ export default function People() {
     <SubPageWrapper>
       <Routes>
         <Route index element={<PeopleHome />} />
+        {/* Students */}
         <Route path="students" element={<StudentsPage />} />
         <Route path="students/new" element={<StudentFormPage />} />
+        <Route path="students/:id" element={<StudentDetailPage />} />
         <Route path="students/:id/edit" element={<StudentFormPage />} />
+        {/* Faculty */}
         <Route path="faculty" element={<FacultyPage />} />
         <Route path="faculty/new" element={<FacultyFormPage />} />
+        <Route path="faculty/:id" element={<FacultyDetailPage />} />
         <Route path="faculty/:id/edit" element={<FacultyFormPage />} />
+        {/* Staff */}
         <Route path="staff" element={<StaffPage />} />
         <Route path="staff/new" element={<StaffFormPage />} />
+        <Route path="staff/:id" element={<StaffDetailPage />} />
         <Route path="staff/:id/edit" element={<StaffFormPage />} />
+        {/* Parents — detail has inline edit (no separate form route) */}
         <Route path="parents" element={<ParentsPage />} />
+        <Route path="parents/:id" element={<ParentDetailPage />} />
+        {/* Organizations */}
         <Route path="organizations" element={<OrganizationsPage />} />
       </Routes>
     </SubPageWrapper>

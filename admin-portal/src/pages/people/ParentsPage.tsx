@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Plus, Pencil, Search, Trash2 } from 'lucide-react';
 import DataTable from '../../components/ui/DataTable';
 import Modal from '../../components/ui/Modal';
@@ -46,6 +46,7 @@ const COMMUNICATION_PREFERENCES = ['call', 'sms', 'whatsapp', 'email'] as const;
 
 export default function ParentsPage() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
@@ -218,6 +219,7 @@ export default function ParentsPage() {
         columns={columns}
         data={data?.items || []}
         loading={isLoading}
+        onRowClick={(r: any) => navigate(`/people/parents/${r._id}`)}
         rowKey={(r: any) => r._id}
         rowProps={(r: any) => highlightAttrs(r.person?._id ?? r.personId?._id)}
       />
