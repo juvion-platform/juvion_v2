@@ -8,48 +8,24 @@ import Modal from '../../components/ui/Modal';
 import StudentFinanceReadinessCard from '../../components/StudentFinanceReadinessCard';
 import { Plus, Pencil, Trash2, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useViewEditMode } from '../../hooks/useViewEditMode';
 
 const REFUND_MODES = ['cash', 'cheque', 'online', 'neft'] as const;
 const STATUSES = ['requested', 'approved', 'processed', 'rejected'] as const;
 const STATUS_COLOR: Record<string, string> = { requested: 'default', approved: 'info', processed: 'success', rejected: 'danger' };
-const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none";
+const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default";
 const lbl = "block text-sm font-medium text-gray-700 mb-1";
 const manageLink = "inline-flex items-center gap-0.5 text-xs text-primary-500 hover:text-primary-700 font-medium ml-1";
+
+const emptyForm = { studentId: '', paymentId: '', amount: '', reason: '', refundMode: 'cash', status: 'requested', processedDate: '' };
 
 export default function RefundsPage() {
   const qc = useQueryClient();
   const [page, setPage] = useState(1);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<any>(null);
-  const [form, setForm] = useState({ studentId: '', paymentId: '', amount: '', reason: '', refundMode: 'cash', status: 'requested', processedDate: '' });
+  const [form, setForm] = useState(emptyForm);
 
-  const { data, isLoading } = useQuery({ queryKey: ['refunds', page], queryFn: () => listRefunds(page, 20) });
-  const { data: studentsData } = useQuery({ queryKey: ['students-lookup'], queryFn: () => listStudents(1, 100) });
-  const { data: paymentsData } = useQuery({ queryKey: ['payments-lookup'], queryFn: () => listPayments(1, 100) });
-  const { data: selectedStudent, isFetching: studentReadinessLoading } = useQuery({
-    queryKey: ['student-finance-readiness', form.studentId],
-    queryFn: () => getStudent(form.studentId),
-    enabled: modalOpen && Boolean(form.studentId),
-  });
-
-  const students: any[] = studentsData?.items || [];
-  const payments: any[] = paymentsData?.items || [];
-  const financeBlocked = useMemo(() => Boolean(form.studentId) && Boolean(selectedStudent) && !selectedStudent.feeResponsibleParentId, [form.studentId, selectedStudent]);
-  const financeReadinessPending = Boolean(form.studentId) && studentReadinessLoading;
-
-  const createMut = useMutation({ mutationFn: createRefund, onSuccess: () => { qc.invalidateQueries({ queryKey: ['refunds'] }); closeModal(); } });
-  const updateMut = useMutation({ mutationFn: ({ id, data }: any) => updateRefund(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['refunds'] }); closeModal(); } });
-  const quickUpdateMut = useMutation({ mutationFn: ({ id, data }: any) => updateRefund(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['refunds'] }); } });
-  const deleteMut = useMutation({ mutationFn: deleteRefund, onSuccess: () => { qc.invalidateQueries({ queryKey: ['refunds'] }); } });
-
-  function openCreate() {
-    setEditing(null);
-    setForm({ studentId: '', paymentId: '', amount: '', reason: '', refundMode: 'cash', status: 'requested', processedDate: '' });
-    setModalOpen(true);
-  }
-  function openEdit(row: any) {
-    setEditing(row);
-    setForm({
+  const vem = useViewEditMode<any>({
+    onOpenEntity: (row) => setForm({
       studentId: row.studentId?._id || row.studentId || '',
       paymentId: row.paymentId?._id || row.paymentId || '',
       amount: String(row.amount || ''),
@@ -57,19 +33,40 @@ export default function RefundsPage() {
       refundMode: row.refundMode || 'cash',
       status: row.status || 'requested',
       processedDate: row.processedDate ? row.processedDate.slice(0, 10) : '',
-    });
-    setModalOpen(true);
-  }
-  function closeModal() { setModalOpen(false); setEditing(null); }
+    }),
+    onOpenCreate: () => setForm(emptyForm),
+    onClose: () => setForm(emptyForm),
+  });
+
+  const { data, isLoading } = useQuery({ queryKey: ['refunds', page], queryFn: () => listRefunds(page, 20) });
+  const { data: studentsData } = useQuery({ queryKey: ['students-lookup'], queryFn: () => listStudents(1, 100) });
+  const { data: paymentsData } = useQuery({ queryKey: ['payments-lookup'], queryFn: () => listPayments(1, 100) });
+  const { data: selectedStudent, isFetching: studentReadinessLoading } = useQuery({
+    queryKey: ['student-finance-readiness', form.studentId],
+    queryFn: () => getStudent(form.studentId),
+    enabled: vem.isOpen && Boolean(form.studentId),
+  });
+
+  const students: any[] = studentsData?.items || [];
+  const payments: any[] = paymentsData?.items || [];
+  const financeBlocked = useMemo(() => Boolean(form.studentId) && Boolean(selectedStudent) && !selectedStudent.feeResponsibleParentId, [form.studentId, selectedStudent]);
+  const financeReadinessPending = Boolean(form.studentId) && studentReadinessLoading;
+
+  const createMut = useMutation({ mutationFn: createRefund, onSuccess: () => { qc.invalidateQueries({ queryKey: ['refunds'] }); vem.close(); } });
+  const updateMut = useMutation({ mutationFn: ({ id, data }: any) => updateRefund(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['refunds'] }); vem.close(); } });
+  const quickUpdateMut = useMutation({ mutationFn: ({ id, data }: any) => updateRefund(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['refunds'] }); } });
+  const deleteMut = useMutation({ mutationFn: deleteRefund, onSuccess: () => { qc.invalidateQueries({ queryKey: ['refunds'] }); } });
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const payload: any = { ...form, amount: Number(form.amount) };
     if (!payload.paymentId) delete payload.paymentId;
     if (!payload.processedDate) delete payload.processedDate;
-    if (editing) updateMut.mutate({ id: editing._id, data: payload });
+    if (vem.isEdit && vem.entity) updateMut.mutate({ id: vem.entity._id, data: payload });
     else createMut.mutate(payload);
   }
+
+  const saving = createMut.isPending || updateMut.isPending;
 
   function studentLabel(s: any) {
     return s.person?.name || s.rollNumber || s._id;
@@ -106,7 +103,7 @@ export default function RefundsPage() {
             Process
           </button>
         )}
-        <button onClick={(e) => { e.stopPropagation(); openEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
+        <button onClick={(e) => { e.stopPropagation(); vem.openForEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
         <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this refund?')) deleteMut.mutate(r._id); }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
       </div>
     )},
@@ -116,12 +113,18 @@ export default function RefundsPage() {
     <div>
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-xl font-bold text-navy">Refunds</h2>
-        <button onClick={openCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700">
+        <button onClick={vem.openForCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700">
           <Plus size={16} className="text-white" /> New Refund
         </button>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} />
+      <DataTable
+        columns={columns}
+        data={data?.items || []}
+        loading={isLoading}
+        rowKey={(r: any) => r._id}
+        onRowClick={vem.openForView}
+      />
 
       {data && data.pages > 1 && (
         <div className="flex items-center justify-center gap-2 mt-4">
@@ -131,46 +134,56 @@ export default function RefundsPage() {
         </div>
       )}
 
-      <Modal open={modalOpen} onClose={closeModal} title={editing ? 'Edit Refund' : 'New Refund'}>
+      <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('Refund')}>
         <form onSubmit={handleSubmit} className="space-y-4">
           {form.studentId && (
             <StudentFinanceReadinessCard student={selectedStudent} loading={financeReadinessPending} />
           )}
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className={lbl}>Student * <Link to="/people" target="_blank" className={manageLink}>+ Manage <ExternalLink size={10} /></Link></label>
-              <select required value={form.studentId} onChange={e => setForm(f => ({ ...f, studentId: e.target.value }))} className={inp}>
-                <option value="">Select student...</option>
-                {students.map((s: any) => <option key={s._id} value={s._id}>{studentLabel(s)}</option>)}
-              </select>
+          <fieldset disabled={vem.isView} className="border-0 p-0 m-0 space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className={lbl}>Student * {!vem.isView && <Link to="/people" target="_blank" className={manageLink}>+ Manage <ExternalLink size={10} /></Link>}</label>
+                <select required value={form.studentId} onChange={e => setForm(f => ({ ...f, studentId: e.target.value }))} className={inp}>
+                  <option value="">Select student...</option>
+                  {students.map((s: any) => <option key={s._id} value={s._id}>{studentLabel(s)}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={lbl}>Payment</label>
+                <select value={form.paymentId} onChange={e => setForm(f => ({ ...f, paymentId: e.target.value }))} className={inp}>
+                  <option value="">None</option>
+                  {payments.map((p: any) => <option key={p._id} value={p._id}>{p.receiptNumber + ' — ₹' + p.amount}</option>)}
+                </select>
+              </div>
+              <div><label className={lbl}>Amount *</label><input required type="number" min={0} value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} className={inp} /></div>
+              <div><label className={lbl}>Refund Mode *</label>
+                <select required value={form.refundMode} onChange={e => setForm(f => ({ ...f, refundMode: e.target.value }))} className={inp}>
+                  {REFUND_MODES.map(m => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
+              <div className="col-span-2"><label className={lbl}>Reason *</label><input required value={form.reason} onChange={e => setForm(f => ({ ...f, reason: e.target.value }))} className={inp} /></div>
+              <div><label className={lbl}>Status *</label>
+                <select required value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className={inp}>
+                  {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div><label className={lbl}>Processed Date</label><input type="date" value={form.processedDate} onChange={e => setForm(f => ({ ...f, processedDate: e.target.value }))} className={inp} /></div>
             </div>
-            <div>
-              <label className={lbl}>Payment</label>
-              <select value={form.paymentId} onChange={e => setForm(f => ({ ...f, paymentId: e.target.value }))} className={inp}>
-                <option value="">None</option>
-                {payments.map((p: any) => <option key={p._id} value={p._id}>{p.receiptNumber + ' — ₹' + p.amount}</option>)}
-              </select>
-            </div>
-            <div><label className={lbl}>Amount *</label><input required type="number" min={0} value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} className={inp} /></div>
-            <div><label className={lbl}>Refund Mode *</label>
-              <select required value={form.refundMode} onChange={e => setForm(f => ({ ...f, refundMode: e.target.value }))} className={inp}>
-                {REFUND_MODES.map(m => <option key={m} value={m}>{m}</option>)}
-              </select>
-            </div>
-            <div className="col-span-2"><label className={lbl}>Reason *</label><input required value={form.reason} onChange={e => setForm(f => ({ ...f, reason: e.target.value }))} className={inp} /></div>
-            <div><label className={lbl}>Status *</label>
-              <select required value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className={inp}>
-                {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-            <div><label className={lbl}>Processed Date</label><input type="date" value={form.processedDate} onChange={e => setForm(f => ({ ...f, processedDate: e.target.value }))} className={inp} /></div>
-          </div>
+          </fieldset>
           <div className="flex justify-end gap-3 pt-2 border-t">
-            <button type="button" onClick={closeModal} className="px-4 py-2 border rounded-lg text-sm">Cancel</button>
-            <button type="submit" disabled={createMut.isPending || updateMut.isPending || (!editing && (financeBlocked || financeReadinessPending))} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
-              {createMut.isPending || updateMut.isPending ? 'Saving...' : financeReadinessPending ? 'Checking student...' : editing ? 'Update' : 'Create'}
+            <button type="button" onClick={vem.close} className="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50">
+              {vem.isView ? 'Close' : 'Cancel'}
             </button>
+            {vem.isView ? (
+              <button type="button" onClick={vem.switchToEdit} className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700">
+                <Pencil size={14} /> Edit
+              </button>
+            ) : (
+              <button type="submit" disabled={saving || (!vem.isEdit && (financeBlocked || financeReadinessPending))} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
+                {saving ? 'Saving…' : financeReadinessPending ? 'Checking student...' : vem.isEdit ? 'Update' : 'Create'}
+              </button>
+            )}
           </div>
         </form>
       </Modal>

@@ -8,12 +8,15 @@ import Modal from '../../components/ui/Modal';
 import StudentFinanceReadinessCard from '../../components/StudentFinanceReadinessCard';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
+import { useViewEditMode } from '../../hooks/useViewEditMode';
 
 const TYPES = ['fee', 'hostel', 'transport', 'other'] as const;
 const STATUSES = ['draft', 'issued', 'paid', 'overdue', 'cancelled'] as const;
 const STATUS_COLOR: Record<string, string> = { draft: 'default', issued: 'info', paid: 'success', overdue: 'danger', cancelled: 'warning' };
-const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none";
+const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default";
 const lbl = "block text-sm font-medium text-gray-700 mb-1";
+
+const emptyForm = { invoiceNumber: '', studentId: '', type: 'fee', totalAmount: '', dueDate: '', status: 'draft', issuedDate: '' };
 
 export default function InvoicesPage() {
   const qc = useQueryClient();
@@ -21,9 +24,21 @@ export default function InvoicesPage() {
   const [page, setPage] = useState(1);
   const [studentFilter, setStudentFilter] = useState(searchParams.get('studentId') || '');
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<any>(null);
-  const [form, setForm] = useState({ invoiceNumber: '', studentId: '', type: 'fee', totalAmount: '', dueDate: '', status: 'draft', issuedDate: '' });
+  const [form, setForm] = useState(emptyForm);
+
+  const vem = useViewEditMode<any>({
+    onOpenEntity: (row) => setForm({
+      invoiceNumber: row.invoiceNumber || '',
+      studentId: row.studentId?._id || row.studentId || '',
+      type: row.type || 'fee',
+      totalAmount: String(row.totalAmount || ''),
+      dueDate: row.dueDate ? row.dueDate.slice(0, 10) : '',
+      status: row.status || 'draft',
+      issuedDate: row.issuedDate ? row.issuedDate.slice(0, 10) : '',
+    }),
+    onOpenCreate: () => setForm(emptyForm),
+    onClose: () => setForm(emptyForm),
+  });
 
   const { data, isLoading } = useQuery({
     queryKey: ['invoices', page, statusFilter, studentFilter],
@@ -33,7 +48,7 @@ export default function InvoicesPage() {
   const { data: selectedStudent, isFetching: studentReadinessLoading } = useQuery({
     queryKey: ['student-finance-readiness', form.studentId],
     queryFn: () => getStudent(form.studentId),
-    enabled: modalOpen && Boolean(form.studentId),
+    enabled: vem.isOpen && Boolean(form.studentId),
   });
 
   const students = studentsData?.items || [];
@@ -47,39 +62,21 @@ export default function InvoicesPage() {
     setSearchParams(params, { replace: true });
   }
 
-  const createMut = useMutation({ mutationFn: createInvoice, onSuccess: () => { qc.invalidateQueries({ queryKey: ['invoices'] }); closeModal(); } });
-  const updateMut = useMutation({ mutationFn: ({ id, data }: any) => updateInvoice(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['invoices'] }); closeModal(); } });
+  const createMut = useMutation({ mutationFn: createInvoice, onSuccess: () => { qc.invalidateQueries({ queryKey: ['invoices'] }); vem.close(); } });
+  const updateMut = useMutation({ mutationFn: ({ id, data }: any) => updateInvoice(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['invoices'] }); vem.close(); } });
   const quickUpdateMut = useMutation({ mutationFn: ({ id, data }: any) => updateInvoice(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['invoices'] }); } });
   const deleteMut = useMutation({ mutationFn: deleteInvoice, onSuccess: () => { qc.invalidateQueries({ queryKey: ['invoices'] }); } });
-
-  function openCreate() {
-    setEditing(null);
-    setForm({ invoiceNumber: '', studentId: '', type: 'fee', totalAmount: '', dueDate: '', status: 'draft', issuedDate: '' });
-    setModalOpen(true);
-  }
-  function openEdit(row: any) {
-    setEditing(row);
-    setForm({
-      invoiceNumber: row.invoiceNumber || '',
-      studentId: row.studentId?._id || row.studentId || '',
-      type: row.type || 'fee',
-      totalAmount: String(row.totalAmount || ''),
-      dueDate: row.dueDate ? row.dueDate.slice(0, 10) : '',
-      status: row.status || 'draft',
-      issuedDate: row.issuedDate ? row.issuedDate.slice(0, 10) : '',
-    });
-    setModalOpen(true);
-  }
-  function closeModal() { setModalOpen(false); setEditing(null); }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const payload: any = { ...form, totalAmount: Number(form.totalAmount) };
     if (!payload.studentId) delete payload.studentId;
     if (!payload.issuedDate) delete payload.issuedDate;
-    if (editing) updateMut.mutate({ id: editing._id, data: payload });
+    if (vem.isEdit && vem.entity) updateMut.mutate({ id: vem.entity._id, data: payload });
     else createMut.mutate(payload);
   }
+
+  const saving = createMut.isPending || updateMut.isPending;
 
   function quickTransition(row: any, nextStatus: string) {
     const payload: any = { status: nextStatus };
@@ -124,7 +121,7 @@ export default function InvoicesPage() {
             )}
           </>
         )}
-        <button onClick={(e) => { e.stopPropagation(); openEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
+        <button onClick={(e) => { e.stopPropagation(); vem.openForEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
         <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this invoice?')) deleteMut.mutate(r._id); }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
       </div>
     )},
@@ -134,7 +131,7 @@ export default function InvoicesPage() {
     <div>
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-xl font-bold text-navy">Invoices</h2>
-        <button onClick={openCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700">
+        <button onClick={vem.openForCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700">
           <Plus size={16} className="text-white" /> New Invoice
         </button>
       </div>
@@ -160,7 +157,13 @@ export default function InvoicesPage() {
         </select>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} />
+      <DataTable
+        columns={columns}
+        data={data?.items || []}
+        loading={isLoading}
+        rowKey={(r: any) => r._id}
+        onRowClick={vem.openForView}
+      />
 
       {data && data.pages > 1 && (
         <div className="flex items-center justify-center gap-2 mt-4">
@@ -170,39 +173,49 @@ export default function InvoicesPage() {
         </div>
       )}
 
-      <Modal open={modalOpen} onClose={closeModal} title={editing ? 'Edit Invoice' : 'New Invoice'}>
+      <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('Invoice')}>
         <form onSubmit={handleSubmit} className="space-y-4">
           {form.studentId && (
             <StudentFinanceReadinessCard student={selectedStudent} loading={financeReadinessPending} />
           )}
 
-          <div className="grid grid-cols-2 gap-4">
-            <div><label className={lbl}>Invoice Number *</label><input required value={form.invoiceNumber} onChange={e => setForm(f => ({ ...f, invoiceNumber: e.target.value }))} className={inp} /></div>
-            <div><label className={lbl}>Student</label>
-              <select value={form.studentId} onChange={e => setForm(f => ({ ...f, studentId: e.target.value }))} className={inp}>
-                <option value="">None</option>
-                {students.map((s: any) => <option key={s._id} value={s._id}>{studentLabel(s)}</option>)}
-              </select>
+          <fieldset disabled={vem.isView} className="border-0 p-0 m-0 space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div><label className={lbl}>Invoice Number *</label><input required value={form.invoiceNumber} onChange={e => setForm(f => ({ ...f, invoiceNumber: e.target.value }))} className={inp} /></div>
+              <div><label className={lbl}>Student</label>
+                <select value={form.studentId} onChange={e => setForm(f => ({ ...f, studentId: e.target.value }))} className={inp}>
+                  <option value="">None</option>
+                  {students.map((s: any) => <option key={s._id} value={s._id}>{studentLabel(s)}</option>)}
+                </select>
+              </div>
+              <div><label className={lbl}>Type *</label>
+                <select required value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} className={inp}>
+                  {TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div><label className={lbl}>Total Amount *</label><input required type="number" min={0} value={form.totalAmount} onChange={e => setForm(f => ({ ...f, totalAmount: e.target.value }))} className={inp} /></div>
+              <div><label className={lbl}>Due Date *</label><input required type="date" value={form.dueDate} onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))} className={inp} /></div>
+              <div><label className={lbl}>Status *</label>
+                <select required value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className={inp}>
+                  {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div><label className={lbl}>Issued Date</label><input type="date" value={form.issuedDate} onChange={e => setForm(f => ({ ...f, issuedDate: e.target.value }))} className={inp} /></div>
             </div>
-            <div><label className={lbl}>Type *</label>
-              <select required value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} className={inp}>
-                {TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </div>
-            <div><label className={lbl}>Total Amount *</label><input required type="number" min={0} value={form.totalAmount} onChange={e => setForm(f => ({ ...f, totalAmount: e.target.value }))} className={inp} /></div>
-            <div><label className={lbl}>Due Date *</label><input required type="date" value={form.dueDate} onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))} className={inp} /></div>
-            <div><label className={lbl}>Status *</label>
-              <select required value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className={inp}>
-                {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-            <div><label className={lbl}>Issued Date</label><input type="date" value={form.issuedDate} onChange={e => setForm(f => ({ ...f, issuedDate: e.target.value }))} className={inp} /></div>
-          </div>
+          </fieldset>
           <div className="flex justify-end gap-3 pt-2 border-t">
-            <button type="button" onClick={closeModal} className="px-4 py-2 border rounded-lg text-sm">Cancel</button>
-            <button type="submit" disabled={createMut.isPending || updateMut.isPending || (!editing && Boolean(form.studentId) && (financeBlocked || financeReadinessPending))} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
-              {createMut.isPending || updateMut.isPending ? 'Saving...' : financeReadinessPending ? 'Checking student...' : editing ? 'Update' : 'Create'}
+            <button type="button" onClick={vem.close} className="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50">
+              {vem.isView ? 'Close' : 'Cancel'}
             </button>
+            {vem.isView ? (
+              <button type="button" onClick={vem.switchToEdit} className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700">
+                <Pencil size={14} /> Edit
+              </button>
+            ) : (
+              <button type="submit" disabled={saving || (!vem.isEdit && Boolean(form.studentId) && (financeBlocked || financeReadinessPending))} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
+                {saving ? 'Saving…' : financeReadinessPending ? 'Checking student...' : vem.isEdit ? 'Update' : 'Create'}
+              </button>
+            )}
           </div>
         </form>
       </Modal>
