@@ -5,34 +5,25 @@ import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { useViewEditMode } from '../../hooks/useViewEditMode';
 
 const TYPES = ['anomaly', 'trend', 'prediction', 'recommendation', 'alert'] as const;
 const SEVERITIES = ['info', 'warning', 'critical'] as const;
 const STATUSES = ['new', 'seen', 'acted_upon', 'dismissed', 'expired'] as const;
-const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none";
+const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default";
 const lbl = "block text-sm font-medium text-gray-700 mb-1";
+
+const emptyForm = { type: 'recommendation' as string, module: '', title: '', description: '', severity: 'info' as string, targetPersonas: '', isActionable: false, actionSuggestion: '', status: 'new' as string };
 
 export default function InsightsPage() {
   const qc = useQueryClient();
   const [page, setPage] = useState(1);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<any>(null);
-  const [form, setForm] = useState({ type: 'recommendation' as string, module: '', title: '', description: '', severity: 'info' as string, targetPersonas: '', isActionable: false, actionSuggestion: '', status: 'new' as string });
+  const [form, setForm] = useState(emptyForm);
 
   const { data, isLoading } = useQuery({ queryKey: ['juvi-insights', page], queryFn: () => listInsights(page, 20) });
 
-  const createMut = useMutation({ mutationFn: createInsight, onSuccess: () => { qc.invalidateQueries({ queryKey: ['juvi-insights'] }); closeModal(); } });
-  const updateMut = useMutation({ mutationFn: ({ id, data }: any) => updateInsight(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['juvi-insights'] }); closeModal(); } });
-  const deleteMut = useMutation({ mutationFn: deleteInsight, onSuccess: () => { qc.invalidateQueries({ queryKey: ['juvi-insights'] }); } });
-
-  function openCreate() {
-    setEditing(null);
-    setForm({ type: 'recommendation', module: '', title: '', description: '', severity: 'info', targetPersonas: '', isActionable: false, actionSuggestion: '', status: 'new' });
-    setModalOpen(true);
-  }
-  function openEdit(row: any) {
-    setEditing(row);
-    setForm({
+  const vem = useViewEditMode<any>({
+    onOpenEntity: (row) => setForm({
       type: row.type || 'recommendation',
       module: row.module || '',
       title: row.title || '',
@@ -42,10 +33,14 @@ export default function InsightsPage() {
       isActionable: row.isActionable ?? false,
       actionSuggestion: row.actionSuggestion || '',
       status: row.status || 'new',
-    });
-    setModalOpen(true);
-  }
-  function closeModal() { setModalOpen(false); setEditing(null); }
+    }),
+    onOpenCreate: () => setForm(emptyForm),
+    onClose: () => setForm(emptyForm),
+  });
+
+  const createMut = useMutation({ mutationFn: createInsight, onSuccess: () => { qc.invalidateQueries({ queryKey: ['juvi-insights'] }); vem.close(); } });
+  const updateMut = useMutation({ mutationFn: ({ id, data }: any) => updateInsight(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['juvi-insights'] }); vem.close(); } });
+  const deleteMut = useMutation({ mutationFn: deleteInsight, onSuccess: () => { qc.invalidateQueries({ queryKey: ['juvi-insights'] }); } });
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -53,9 +48,11 @@ export default function InsightsPage() {
     payload.targetPersonas = form.targetPersonas ? form.targetPersonas.split(',').map(s => s.trim()).filter(Boolean) : [];
     if (!payload.description) delete payload.description;
     if (!payload.actionSuggestion) delete payload.actionSuggestion;
-    if (editing) updateMut.mutate({ id: editing._id, data: payload });
+    if (vem.isEdit && vem.entity) updateMut.mutate({ id: vem.entity._id, data: payload });
     else createMut.mutate(payload);
   }
+
+  const saving = createMut.isPending || updateMut.isPending;
 
   const severityVariant: Record<string, string> = { info: 'info', warning: 'warning', critical: 'danger' };
   const statusVariant: Record<string, string> = { new: 'info', seen: 'default', acted_upon: 'success', dismissed: 'warning', expired: 'default' };
@@ -70,7 +67,7 @@ export default function InsightsPage() {
     { key: 'generatedAt', label: 'Generated', render: (r: any) => r.generatedAt ? new Date(r.generatedAt).toLocaleString() : '—' },
     { key: 'actions', label: '', render: (r: any) => (
       <div className="flex gap-1">
-        <button onClick={(e) => { e.stopPropagation(); openEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
+        <button onClick={(e) => { e.stopPropagation(); vem.openForEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
         <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this insight?')) deleteMut.mutate(r._id); }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
       </div>
     )},
@@ -80,12 +77,12 @@ export default function InsightsPage() {
     <div>
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-xl font-bold text-navy">Insights</h2>
-        <button onClick={openCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700">
+        <button onClick={vem.openForCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700">
           <Plus size={16} className="text-white" /> New Insight
         </button>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} />
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
 
       {data && data.pages > 1 && (
         <div className="flex items-center justify-center gap-2 mt-4">
@@ -95,39 +92,49 @@ export default function InsightsPage() {
         </div>
       )}
 
-      <Modal open={modalOpen} onClose={closeModal} title={editing ? 'Edit Insight' : 'New Insight'}>
+      <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('Insight')}>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div><label className={lbl}>Title *</label><input required value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} className={inp} /></div>
-            <div><label className={lbl}>Type *</label>
-              <select required value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} className={inp}>
-                {TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
+          <fieldset disabled={vem.isView} className="border-0 p-0 m-0 space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div><label className={lbl}>Title *</label><input required value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} className={inp} /></div>
+              <div><label className={lbl}>Type *</label>
+                <select required value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} className={inp}>
+                  {TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div><label className={lbl}>Module *</label><input required value={form.module} onChange={e => setForm(f => ({ ...f, module: e.target.value }))} className={inp} /></div>
+              <div><label className={lbl}>Severity</label>
+                <select value={form.severity} onChange={e => setForm(f => ({ ...f, severity: e.target.value }))} className={inp}>
+                  {SEVERITIES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div className="col-span-2"><label className={lbl}>Description</label><textarea rows={3} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className={inp} /></div>
+              <div><label className={lbl}>Target Personas (comma-separated)</label><input value={form.targetPersonas} onChange={e => setForm(f => ({ ...f, targetPersonas: e.target.value }))} className={inp} placeholder="admin, faculty" /></div>
+              <div><label className={lbl}>Status</label>
+                <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className={inp}>
+                  {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div className="flex items-center gap-2 pt-6">
+                <input type="checkbox" id="insightActionable" checked={form.isActionable} onChange={e => setForm(f => ({ ...f, isActionable: e.target.checked }))} className="rounded" />
+                <label htmlFor="insightActionable" className="text-sm text-gray-700">Actionable</label>
+              </div>
+              <div><label className={lbl}>Action Suggestion</label><input value={form.actionSuggestion} onChange={e => setForm(f => ({ ...f, actionSuggestion: e.target.value }))} className={inp} /></div>
             </div>
-            <div><label className={lbl}>Module *</label><input required value={form.module} onChange={e => setForm(f => ({ ...f, module: e.target.value }))} className={inp} /></div>
-            <div><label className={lbl}>Severity</label>
-              <select value={form.severity} onChange={e => setForm(f => ({ ...f, severity: e.target.value }))} className={inp}>
-                {SEVERITIES.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-            <div className="col-span-2"><label className={lbl}>Description</label><textarea rows={3} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className={inp} /></div>
-            <div><label className={lbl}>Target Personas (comma-separated)</label><input value={form.targetPersonas} onChange={e => setForm(f => ({ ...f, targetPersonas: e.target.value }))} className={inp} placeholder="admin, faculty" /></div>
-            <div><label className={lbl}>Status</label>
-              <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className={inp}>
-                {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-            <div className="flex items-center gap-2 pt-6">
-              <input type="checkbox" id="insightActionable" checked={form.isActionable} onChange={e => setForm(f => ({ ...f, isActionable: e.target.checked }))} className="rounded" />
-              <label htmlFor="insightActionable" className="text-sm text-gray-700">Actionable</label>
-            </div>
-            <div><label className={lbl}>Action Suggestion</label><input value={form.actionSuggestion} onChange={e => setForm(f => ({ ...f, actionSuggestion: e.target.value }))} className={inp} /></div>
-          </div>
+          </fieldset>
           <div className="flex justify-end gap-3 pt-2 border-t">
-            <button type="button" onClick={closeModal} className="px-4 py-2 border rounded-lg text-sm">Cancel</button>
-            <button type="submit" disabled={createMut.isPending || updateMut.isPending} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
-              {createMut.isPending || updateMut.isPending ? 'Saving...' : editing ? 'Update' : 'Create'}
+            <button type="button" onClick={vem.close} className="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50">
+              {vem.isView ? 'Close' : 'Cancel'}
             </button>
+            {vem.isView ? (
+              <button type="button" onClick={vem.switchToEdit} className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700">
+                <Pencil size={14} /> Edit
+              </button>
+            ) : (
+              <button type="submit" disabled={saving} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
+                {saving ? 'Saving…' : vem.isEdit ? 'Update' : 'Create'}
+              </button>
+            )}
           </div>
         </form>
       </Modal>
