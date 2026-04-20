@@ -64,6 +64,21 @@ function PeopleHome() {
     if (route) navigate(`/people/${route}/${role.recordId}/edit`);
   }
 
+  // Row click → detail page for the person's primary role. For multi-role
+  // people we pick the first role (ordering reflects server-side priority).
+  // Unlinked persons (no roles) and Organizations (no detail page yet) are
+  // silent no-ops; the pencil buttons in the actions column are still
+  // available for edit access in those cases.
+  function goToDetail(person: any) {
+    const primary = person.roles?.[0];
+    if (!primary) return;
+    const route = ROLE_ROUTE[primary.type];
+    if (!route) return;
+    // Organizations have no detail page yet; skip.
+    if (primary.type === 'Organization') return;
+    navigate(`/people/${route}/${primary.recordId}`);
+  }
+
   const columns = [
     { key: 'name', label: 'Name', render: (r: any) => (
       <span className="font-medium text-navy">{r.name}</span>
@@ -142,7 +157,20 @@ function PeopleHome() {
           </div>
         </div>
 
-        <DataTable columns={columns} data={personsData?.items || []} loading={isLoading} />
+        <DataTable
+          columns={columns}
+          data={personsData?.items || []}
+          loading={isLoading}
+          rowKey={(r: any) => r._id}
+          onRowClick={goToDetail}
+          rowClickable={(r: any) => {
+            // Only show clickable affordance for people with a role that
+            // has a detail page. Unlinked persons and org-only rows are
+            // excluded so the hover/cursor state stays honest.
+            const primary = r.roles?.[0];
+            return Boolean(primary && primary.type !== 'Organization' && ROLE_ROUTE[primary.type]);
+          }}
+        />
 
         {personsData && personsData.pages > 1 && (
           <div className="flex items-center justify-between px-5 py-3 border-t">

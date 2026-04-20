@@ -17,10 +17,17 @@ interface Props<T> {
    * falls back to the array index (preserves old behavior).
    */
   rowKey?: (row: T, index: number) => string | number;
+  /**
+   * When `onRowClick` is set, this can selectively disable clickability on
+   * specific rows (e.g. unlinked Persons that have no detail page). Such
+   * rows render without the pointer cursor or hover tint — honest affordance.
+   * Defaults to true (every row clickable when onRowClick is set).
+   */
+  rowClickable?: (row: T, index: number) => boolean;
 }
 
 export default function DataTable<T extends Record<string, any>>({
-  columns, data, onRowClick, loading, emptyState, rowProps, rowKey,
+  columns, data, onRowClick, loading, emptyState, rowProps, rowKey, rowClickable,
 }: Props<T>) {
   if (loading) return <div className="text-center py-10 text-gray-400">Loading...</div>;
   return (
@@ -43,11 +50,35 @@ export default function DataTable<T extends Record<string, any>>({
           ) : data.map((row, i) => {
             const extra = rowProps ? rowProps(row, i) : undefined;
             const key = rowKey ? rowKey(row, i) : i;
+            // Clickable rows get:
+            //   - pointer cursor
+            //   - brand-tinted hover background (distinct from default neutral)
+            //   - subtle left accent on hover to reinforce "this is actionable"
+            //   - smooth transition so the affordance feels intentional, not a flash
+            //   - accessibility: role="button" + tabIndex so keyboard users can
+            //     Enter/Space to activate the row
+            const clickable = Boolean(onRowClick)
+              && (rowClickable ? rowClickable(row, i) : true);
+            const onKeyDown = clickable
+              ? (e: React.KeyboardEvent) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onRowClick?.(row);
+                  }
+                }
+              : undefined;
             return (
               <tr
                 key={key}
-                onClick={() => onRowClick?.(row)}
-                className={onRowClick ? 'cursor-pointer hover:bg-gray-50' : ''}
+                onClick={clickable ? () => onRowClick!(row) : undefined}
+                onKeyDown={onKeyDown}
+                role={clickable ? 'button' : undefined}
+                tabIndex={clickable ? 0 : undefined}
+                className={
+                  clickable
+                    ? 'cursor-pointer transition-colors duration-150 hover:bg-primary-50/70 focus:bg-primary-50/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-300 focus-visible:ring-inset border-l-2 border-transparent hover:border-primary-400'
+                    : ''
+                }
                 {...extra}
               >
                 {columns.map(col => (
