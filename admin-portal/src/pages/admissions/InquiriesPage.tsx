@@ -95,7 +95,13 @@ export default function InquiriesPage() {
         </div>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} />
+      <DataTable
+        columns={columns}
+        data={data?.items || []}
+        loading={isLoading}
+        rowKey={(r: any) => r._id}
+        onRowClick={(r: any) => openDetail(r)}
+      />
 
       {data && data.pages > 1 && (
         <div className="flex items-center justify-center gap-2 mt-4">
