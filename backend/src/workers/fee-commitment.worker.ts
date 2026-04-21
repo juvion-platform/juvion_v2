@@ -28,6 +28,7 @@
 
 import type { Job } from 'bullmq';
 import { addJob, registerQueue, QUEUE_NAMES } from '../shared/queue/QueueManager';
+import * as feeCommitmentSheetService from '../modules/finance/fee-commitment-sheet-service';
 
 /**
  * Payload shape for FEE_COMMITMENT jobs.
@@ -63,25 +64,33 @@ export const FEE_COMMITMENT_JOB_OPTS: {
 };
 
 /**
- * T4 skeleton handler. Logs the payload and resolves. T7 will replace
- * the body with the real PDF + Document-attach flow:
+ * T7 handler: renders the commitment sheet PDF via the fee-commitment-
+ * sheet-service and attaches it to the student's document set. On
+ * failure, we rethrow so BullMQ applies the retry policy defined in
+ * `FEE_COMMITMENT_JOB_OPTS`. The service itself flags the pin as
+ * `commitmentSheetStatus = 'failed'` before bubbling the error up.
  *
+ * Flow owned by `fee-commitment-sheet-service.generateSheet`:
  *   1. Load student, pin, fee-structure instance + components + rules.
- *   2. Render PDF via `PdfRenderer` (T3's utility).
- *   3. Attach PDF to M02 Documents via `createDocument(...)`.
+ *   2. Render PDF via `PdfRenderer` (T3).
+ *   3. Attach PDF via the M02-style createDocument seam.
  *   4. Update `Student.feePins[matching].commitmentSheetDocumentId`
  *      and `commitmentSheetStatus = 'generated'`.
- *   5. (Optional) enqueue a parent email via the EMAIL queue.
  */
 export async function feeCommitmentWorker(
   job: Job<FeeCommitmentJobData>,
 ): Promise<void> {
   const { studentId, pinId } = job.data;
-  console.log(
-    `[fee-commitment:skeleton] job=${job.id ?? '?'} studentId=${studentId} pinId=${pinId} — T7 will render + attach PDF here`,
-  );
-  // Intentionally no throw: the skeleton acks successfully so that any
-  // smoke-test enqueue during early integration doesn't trip retries.
+  try {
+    await feeCommitmentSheetService.generateSheet(studentId, pinId);
+  } catch (err) {
+    console.error(
+      `[fee-commitment] job=${job.id ?? '?'} studentId=${studentId} pinId=${pinId} failed`,
+      err,
+    );
+    // Rethrow to let BullMQ apply FEE_COMMITMENT_JOB_OPTS retries.
+    throw err;
+  }
 }
 
 /**
