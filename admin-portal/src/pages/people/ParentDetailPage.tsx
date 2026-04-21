@@ -208,6 +208,7 @@ export default function ParentDetailPage() {
         </div>
         {!editMode ? (
           <button
+            type="button"
             onClick={enterEdit}
             className="inline-flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700"
           >
