@@ -122,4 +122,7 @@ export const QUEUE_NAMES = {
 
   // Campus ops
   CAMPUS_PROPOSAL_EXPIRY: 'campus:proposal-expiry',
+
+  // Finance
+  FEE_COMMITMENT: 'finance:fee-commitment',
 } as const;

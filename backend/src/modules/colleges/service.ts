@@ -2,6 +2,7 @@ import { College } from '../../models/College';
 import { paginate } from '../../shared/pagination';
 import { createAuditLog } from '../../shared/audit';
 import { AppError } from '../../middleware/errorHandler';
+import { seedFeeComponentTemplateForCollege } from '../../scripts/seed-fee-component-template';
 
 export async function getStats() {
   const [total, active, inactive, suspended, byPlan] = await Promise.all([
@@ -46,6 +47,18 @@ export async function createCollege(data: any, who: string) {
     changes: [{ field: 'college', displayName: 'College', oldValue: null, newValue: doc.name }],
     performedBy: who,
   });
+  // Fee Configuration (T2) — auto-seed the canonical fee-component
+  // template so Finance Officers have a pre-populated scaffold when
+  // drafting their first FeeStructureInstance. Seed failure must NOT
+  // roll back the college: an admin can re-run the script manually
+  // later if needed.
+  try {
+    await seedFeeComponentTemplateForCollege(String(doc._id));
+  } catch (e) {
+    console.warn(
+      `[createCollege] fee-component template seed failed for collegeId=${String(doc._id)}: ${(e as Error).message}`,
+    );
+  }
   return doc;
 }
 
