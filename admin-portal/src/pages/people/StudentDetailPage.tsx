@@ -85,6 +85,7 @@ export default function StudentDetailPage() {
           </div>
         </div>
         <button
+          type="button"
           onClick={() => navigate(`/people/students/${id}/edit`)}
           className="inline-flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700"
         >
