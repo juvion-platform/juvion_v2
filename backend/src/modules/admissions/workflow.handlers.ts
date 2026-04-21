@@ -23,6 +23,7 @@ import { CurriculumMap } from '../../models/academic-ops/CurriculumMap';
 import { Enrollment } from '../../models/academic-ops/Enrollment';
 import { Invoice } from '../../models/finance/Invoice';
 import { FeeStructure } from '../../models/finance/FeeStructure';
+import { FeeStructureInstance } from '../../models/finance/FeeStructureInstance';
 import { StudentFeeAccount } from '../../models/finance/StudentFeeAccount';
 import { LibraryMember } from '../../models/library/LibraryMember';
 import { Person } from '../../models/people/Person';
@@ -43,6 +44,9 @@ import { JuviPersonaConfig } from '../../models/juvi/JuviPersonaConfig';
 import { User } from '../../models/User';
 import { createAuditLog } from '../../shared/audit';
 import { WorkflowStepHandlerContext, registerWorkflowStepHandler } from '../../shared/workflow/StepHandlers';
+import { AppError } from '../../middleware/errorHandler';
+import * as feePinService from '../finance/fee-pin-service';
+import { FeeStructureNotFoundError } from '../finance/fee-pin-service';
 import { convertInquiryToApplicant } from './service';
 import { createCancellation as createCancellationRecord, createFeeNegotiation as createFeeNegotiationRecord, resolveFeeNegotiation as resolveFeeNegotiationRecord } from './workflow.service';
 
@@ -1058,8 +1062,56 @@ registerWorkflowStepHandler('W01', 'provision_m04', async ({ instance, result, c
 
   const provisioningContext = await getProvisioningContext(instance, applicant, admission);
   const entryPoint = getEntryPoint(applicant.admissionType);
+  const resolvedAcademicYearId = getIdString(admission.academicYearId) || provisioningContext.academicYearId;
+
+  // ── Task 8: Pin year-of-study to an active FeeStructureInstance ─────
+  //
+  // HARD-FAIL contract: if no approved/active FeeStructureInstance matches
+  // this student's programme/branch/quota/category for the target academic
+  // year, admission finalization must abort and the freshly-provisioned
+  // Student must NOT remain (spec §AC Year-1 pin, §EC-1, tasks.md T8).
+  //
+  // Rollback note: the existing workflow has no transaction abstraction.
+  // We compensate by deleting the Student record created in provision_m02
+  // (the immediately preceding step) when pin resolution fails. This
+  // keeps the invariant: "admission with no active structure → student
+  // not persisted" (tasks.md T8 integration test #2).
+  try {
+    await feePinService.pinYear(String(student._id), entryPoint.studyYear, {
+      pinnedBy: 'system:admission',
+      reason: 'initial',
+      academicYearId: resolvedAcademicYearId,
+      enqueueCommitmentSheet: true,
+    });
+  } catch (err) {
+    await rollbackProvisionedStudent(instance, admission, student);
+    if (err instanceof FeeStructureNotFoundError) {
+      throw new AppError(
+        422,
+        `Admission cannot finalize: ${err.message} Please coordinate with Finance to publish the fee structure before retrying this admission.`,
+      );
+    }
+    throw err;
+  }
+
+  // ── SFA now reads from the just-created pin rather than the legacy
+  // `resolveFeeStructure` flow, so totals stay consistent with what's pinned.
+  const activePin = await feePinService.resolveActivePin(
+    String(student._id),
+    entryPoint.studyYear,
+  );
+  const pinnedInstance = activePin
+    ? await FeeStructureInstance.findOne({
+      _id: activePin.feeStructureInstanceId,
+      collegeId: instance.collegeId,
+    })
+    : null;
+
+  // Legacy FeeStructure (components + totals) is still needed for the
+  // invoice line-items below — the FeeStructureInstance model tracks
+  // only totals, not components. Resolve it for back-compat.
   const feeStructure = await resolveFeeStructure(instance, {
-    academicYearId: getIdString(admission.academicYearId) || provisioningContext.academicYearId,
+    academicYearId: resolvedAcademicYearId,
     programmeId: getIdString(student.programmeId) || provisioningContext.programmeId,
     branchId: getIdString(student.branchId) || provisioningContext.branchId,
     quota: normalizeStudentQuota(student.quota || applicant.quota),
@@ -1067,16 +1119,20 @@ registerWorkflowStepHandler('W01', 'provision_m04', async ({ instance, result, c
     year: entryPoint.studyYear,
   });
 
+  // Prefer the pinned-instance total for SFA (source of truth post-pin);
+  // fall back to legacy feeStructure total if the instance is missing.
+  const pinnedTotal = pinnedInstance?.totalAmount ?? feeStructure?.totalAmount ?? 0;
+
   let feeAccount = await StudentFeeAccount.findOne({ collegeId: instance.collegeId, studentId: student._id });
   if (!feeAccount) {
     feeAccount = await StudentFeeAccount.create({
       collegeId: instance.collegeId,
       studentId: student._id,
-      totalDue: feeStructure?.totalAmount || 0,
+      totalDue: pinnedTotal,
       totalPaid: 0,
       totalWaived: 0,
       totalRefunded: 0,
-      balance: feeStructure?.totalAmount || 0,
+      balance: pinnedTotal,
     });
     await createAuditLog({
       collegeId: String(instance.collegeId),
@@ -1087,9 +1143,9 @@ registerWorkflowStepHandler('W01', 'provision_m04', async ({ instance, result, c
       changes: [],
       performedBy: completedBy,
     });
-  } else if (feeStructure) {
-    feeAccount.totalDue = feeStructure.totalAmount;
-    feeAccount.balance = Math.max(feeStructure.totalAmount - feeAccount.totalPaid - feeAccount.totalWaived + feeAccount.totalRefunded, 0);
+  } else if (pinnedInstance || feeStructure) {
+    feeAccount.totalDue = pinnedTotal;
+    feeAccount.balance = Math.max(pinnedTotal - feeAccount.totalPaid - feeAccount.totalWaived + feeAccount.totalRefunded, 0);
     await feeAccount.save();
   }
 
@@ -2084,6 +2140,48 @@ async function findProvisionedStudent(instance: WorkflowStepHandlerContext['inst
     if (student) return student;
   }
   return Student.findOne({ collegeId: instance.collegeId, personId: person._id });
+}
+
+/**
+ * Compensating rollback used by provision_m04 when fee-pin resolution
+ * fails. The existing workflow lacks a transaction abstraction, so we
+ * undo the provision_m02 Student creation by deleting the record and
+ * clearing the linkage on Admission / WorkflowInstance metadata. The
+ * Person doc is preserved (it may be shared with other records).
+ *
+ * Contract (per tasks.md T8 AC): admission with NO matching active
+ * structure → provisioning fails AND student is NOT persisted.
+ */
+async function rollbackProvisionedStudent(
+  instance: WorkflowStepHandlerContext['instance'],
+  admission: any,
+  student: any,
+): Promise<void> {
+  try {
+    await Student.deleteOne({ _id: student._id, collegeId: instance.collegeId });
+  } catch (err) {
+    console.warn('[workflow] rollbackProvisionedStudent: student delete failed', err);
+  }
+
+  try {
+    if (admission.studentId && String(admission.studentId) === String(student._id)) {
+      admission.studentId = undefined;
+      await admission.save();
+    }
+  } catch (err) {
+    console.warn('[workflow] rollbackProvisionedStudent: admission unlink failed', err);
+  }
+
+  try {
+    if (instance.metadata && String(instance.metadata.studentId) === String(student._id)) {
+      const nextMeta = { ...instance.metadata };
+      delete nextMeta.studentId;
+      instance.metadata = nextMeta;
+      await instance.save();
+    }
+  } catch (err) {
+    console.warn('[workflow] rollbackProvisionedStudent: instance metadata clear failed', err);
+  }
 }
 
 function buildEnrollmentNumber(applicant: any) {
