@@ -28,6 +28,8 @@ import { Student } from '../../models/people/Student';
 import { Enrollment } from '../../models/academic-ops/Enrollment';
 import { FinePenalty } from '../../models/finance/FinePenalty';
 import * as feePinService from './fee-pin-service';
+import { resolveStudentYearOfStudy } from './resolve-year-of-study';
+import { Semester } from '../../models/academic-structure/Semester';
 import crypto from 'crypto';
 
 // ─── Helpers ──────────────────────────────────────────────
@@ -385,12 +387,39 @@ export async function generateSemesterInvoice(
   if (!student) throw new AppError(404, 'Student not found');
 
   // ── Pin-first resolution ──────────────────────────────────────────
-  // Current year-of-study: default to 1. The full semester → batch →
-  // academic-year arithmetic (plan §1.6 step 2) is an existing
-  // upstream concern; we honour any pin at yearOfStudy=1 to stay
-  // compatible with the admission-pin flow (T8). When the upstream
-  // helper lands, it replaces this line only.
-  const yearOfStudy = 1;
+  // Year-of-study is derived via the canonical helper (T20 / OQ-11):
+  // AY context comes from the Semester.academicYearId tied to this
+  // invoice run; the helper loads Student → Batch → Programme math.
+  //
+  // Fallback: if derivation fails (no batch on student, semester
+  // missing, or no matching AY) we degrade to `yearOfStudy = 1`. This
+  // is a defensive best-effort to keep invoice generation running for
+  // pre-T20 data where batches / batches.academicYear are not yet
+  // backfilled — the pin-first lookup still behaves correctly for
+  // Year-1-pinned admission students (the common case).
+  let yearOfStudy = 1;
+  try {
+    const sem = await Semester.findOne({ _id: data.semesterId, collegeId })
+      .select('academicYearId')
+      .lean();
+    const academicYearId = sem?.academicYearId
+      ? String(sem.academicYearId)
+      : undefined;
+    const resolved = await resolveStudentYearOfStudy(
+      String(student._id),
+      academicYearId ? { academicYearId } : {},
+    );
+    yearOfStudy = resolved.yearOfStudy;
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[fee-invoice] year-of-study resolution failed for student=${String(
+        student._id,
+      )} semester=${data.semesterId}; defaulting to 1. reason=${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
+  }
 
   let pin = await feePinService.resolveActivePin(data.studentId, yearOfStudy);
   let instance: IResolvedInstance | null = null;

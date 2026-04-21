@@ -36,6 +36,7 @@ import { createAuditLog } from '../../shared/audit';
 import { paginate as _paginate } from '../../shared/pagination';
 import * as feePinService from '../finance/fee-pin-service';
 import { FeeStructureNotFoundError } from '../finance/fee-pin-service';
+import { resolveStudentYearOfStudy } from '../finance/resolve-year-of-study';
 
 
 // ═══════════════════════════════════════════════════════════════
@@ -1012,13 +1013,34 @@ export async function promoteStudents(
   // Track promoted students + their source yearOfStudy so we can pin
   // Year-N+1 after decisions are written.
   const promotedQueue: Array<{ studentId: string; newYearOfStudy: number }> = [];
-  const fromYear = 1; // existing placeholder — see also T1 / model note.
 
   for (const r of results) {
     if (!programmeStudentIds.has(String(r.studentId))) continue;
 
     let decision: string;
     let reason: string;
+
+    // Per-student year-of-study via the canonical T20 helper (OQ-11).
+    // academicYearId = finishing semester's AY (OQ-16 convention). If
+    // the helper cannot resolve (batch missing on pre-T20 data) we
+    // default to 1 so the promotion workflow does not block — the
+    // downstream pin lookup will still use the correct AY.
+    let fromYear = 1;
+    try {
+      const resolved = await resolveStudentYearOfStudy(String(r.studentId), {
+        academicYearId: targetAcademicYearId,
+      });
+      fromYear = resolved.yearOfStudy;
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[promote] year-of-study resolution failed for student=${String(
+          r.studentId,
+        )}; defaulting to 1. reason=${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
 
     if (r.backlogs === 0 && r.sgpa >= 5.0) {
       decision = 'promoted';

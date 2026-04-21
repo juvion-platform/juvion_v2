@@ -9,6 +9,7 @@ import { paginate } from '../../shared/pagination';
 import { createAuditLog } from '../../shared/audit';
 import { AppError } from '../../middleware/errorHandler';
 import * as feePinService from '../finance/fee-pin-service';
+import { resolveStudentYearOfStudy } from '../finance/resolve-year-of-study';
 import { AuthScope } from '../../shared/rbac/types';
 import { applyAuthScope } from '../../shared/rbac/apply-scope';
 import {
@@ -404,7 +405,7 @@ export async function updateStudent(collegeId: string, id: string, data: any, pe
 
   if (feeAxisChanged) {
     try {
-      const yearOfStudy = await resolveActiveYearOfStudy(id);
+      const yearOfStudy = await resolveYearOfStudyForStalePinCheck(id);
       if (yearOfStudy !== null) {
         const validity = await feePinService.checkPinValidity(id, yearOfStudy);
         if (!validity.valid && validity.currentPin) {
@@ -436,19 +437,29 @@ export async function updateStudent(collegeId: string, id: string, data: any, pe
 }
 
 /**
- * Resolve the student's current year-of-study for pin-validity checks.
+ * Resolve the student's current year-of-study for stale-pin checks.
  *
- * Heuristic: pick the highest yearOfStudy among active (non-archived)
- * pins. If the student has no active pin we return null — there's no
- * pin to invalidate, so the caller skips the stale-check.
+ * Primary source: the canonical T20 helper `resolveStudentYearOfStudy`
+ * (Student → Batch → AcademicYear arithmetic). The stale-pin hook runs
+ * without an explicit academicYearId, so the helper picks the currently
+ * active AY at the college (spec §Journey 4).
  *
- * A more precise resolver would walk batch → academicYear arithmetic
- * (cf. plan §1.6), but callers of updateStudent don't typically change
- * year-of-study and the active-pin heuristic is sufficient for the
- * rebind-hook use case. Future: lift this into a shared helper as part
- * of T10 lazy-pin work.
+ * Fallback: if the helper cannot resolve (no batch on student, no
+ * active AY at college — common for legacy/pre-backfill data, cf.
+ * OQ-11 / T16), we fall back to the prior heuristic of picking the
+ * highest non-archived pin's yearOfStudy. If there is also no active
+ * pin, we return null and the caller skips the stale-check silently —
+ * same behavior as before T20.
  */
-async function resolveActiveYearOfStudy(studentId: string): Promise<number | null> {
+async function resolveYearOfStudyForStalePinCheck(
+  studentId: string,
+): Promise<number | null> {
+  try {
+    const { yearOfStudy } = await resolveStudentYearOfStudy(studentId);
+    return yearOfStudy;
+  } catch {
+    // Fall through to the active-pin heuristic.
+  }
   const doc = await Student.findById(studentId).select('feePins').lean();
   if (!doc) return null;
   const actives = (doc.feePins || []).filter((p: any) => !p.archivedAt);
