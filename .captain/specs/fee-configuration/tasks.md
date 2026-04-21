@@ -73,15 +73,16 @@ Foundation (parallel, no deps)
 | 9 | Promotion integration: promoteStudents calls pinYear(N+1); per-student deferred-pin reporting | Code | 5 | Done |
 | 10 | Invoice generation pin-first: generateSemesterInvoice reads Student.feePins before live resolution | Code | 5 | Done |
 | 11 | Rebind hooks: stale-pin detection on Student attribute change; auto-rebind on programme transfer | Code | 5 | Done |
-| 12 | HTTP API: /pins GET, /pins/re-pin POST, /commitment-sheet/regenerate POST, /component-template GET/PUT, /pin-audit endpoints + validation | Code | 5, 6, 7 | Pending |
-| 13 | Admin UI: Fee Pins tab on StudentDetailPage (active pin + history + Principal-gated re-pin action) | Code | 12 | Pending |
-| 14 | Admin UI: FeeComponentTemplatePage (CRUD editor with approval workflow) | Code | 12 | Pending |
-| 15 | Admin UI: Promotion page pin-progress + deferred-pin error list | Code | 12, 9 | Pending |
+| 12 | HTTP API: /pins GET, /pins/re-pin POST, /commitment-sheet/regenerate POST, /component-template GET/PUT, /pin-audit endpoints + validation | Code | 5, 6, 7 | Done |
+| 13 | Admin UI: Fee Pins tab on StudentDetailPage (active pin + history + Principal-gated re-pin action) | Code | 12 | Done |
+| 14 | Admin UI: FeeComponentTemplatePage (CRUD editor with approval workflow) | Code | 12 | Done |
+| 15 | Admin UI: Promotion page pin-progress + deferred-pin error list | Code | 12, 9 | Done |
 | 16 | Backfill script for existing students — DRY-RUN mode + audit CSV + --commit flag + --rollback | Code | 5 | Pending |
 | 17 | Nightly audit job (BullMQ) + Finance dashboard metrics (coverage, invariants, PDF failure rate, deferred-pin count) | Code | 5, 10 | Pending |
 | 18 | E2E integration tests covering admission→pin→invoice, promotion→pin, rebind, commitment sheet, invoice pin-first fallback | Code | 8, 9, 10, 11, 12 | Pending |
 | 19 | API reference docs + QA / deploy checklist | Doc | 12, 18 | Pending |
-| 20 | **(new, blocking T16)** `resolveStudentYearOfStudy` canonical helper from Student → Batch → AcademicYear math; consume from T8/T9/T10/T11; remove placeholders | Code | 5 | Pending |
+| 20 | **(new, blocking T16)** `resolveStudentYearOfStudy` canonical helper from Student → Batch → AcademicYear math; consume from T8/T9/T10/T11; remove placeholders | Code | 5 | Done |
+| 21 | **(new)** Add `Student.studyYearAtAdmission` field for lateral-entry support; backfill existing students to 1 | Code | 1 | Pending |
 
 ---
 
@@ -563,3 +564,4 @@ All 40+ ACs trace to ≥1 task; all 12 edge cases have a home; all NOT-For items
 - **2026-04-21** — T1–T4 (foundation) completed in parallel. 51 new tests (19 schema + 11 seed + 13 pdfkit + 8 queue). Full backend suite 326/326 passing. Spec typo "30-component" → "33-component" fixed in same session. Completion signals in `./completions/task-1..4.md`.
 - **2026-04-21** — T5, T6, T7 (core services) completed. 45 new tests (10 pin + 24 template + 11 commitment-sheet). Full backend suite 372/372 passing. Five new open questions logged in spec.md changelog: OQ-6 (FSI yearOfStudy), OQ-7 (Batch academicYearId), OQ-8 (M02 generic Document), OQ-9 (ExitDocument supersede), OQ-10 (Student opt-in flags). OQ-8 is the significant one — M02 lacks a generic document service; T7 shipped a pragmatic workaround with a test-overridable seam. Completion signals in `./completions/task-5..7.md`.
 - **2026-04-21** — T8, T9, T10, T11 (integration) completed in parallel. 26 new tests (5 + 5 + 6 + 10). Full backend suite 398/398 passing. Six new open questions logged (OQ-11..OQ-16). **OQ-11 is the significant one**: year-of-study derivation is an unfinished seam across 4 tasks. New task **T20** added: canonical `resolveStudentYearOfStudy` helper, blocking T16 (backfill). Completion signals in `./completions/task-8..11.md`.
+- **2026-04-21** — T12, T13, T14, T15, T20 (API + UI + helper) completed in parallel. ~58 new tests (36 HTTP + 12 helper + 10 frontend validation). Backend suite 410/410; E2E suite 187/187; admin-portal build green. OQ-15 resolved (FeeAgreement override moved to explicit §NOT-For). T20's canonical helper swapped in 4 consumer sites (invoice, promotion, student-update stale-pin, audit coverage). **T21 (new)** added for the lateral-entry schema field gap (`Student.studyYearAtAdmission`) surfaced by T20. Completion signals in `./completions/task-12..15,20.md`.
