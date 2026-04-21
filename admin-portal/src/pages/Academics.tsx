@@ -1,7 +1,7 @@
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getStats } from '../services/academics';
-import { BookOpen, GraduationCap, Building2, GitBranch, Users, LayoutGrid, Calendar, Clock, ArrowLeft, BookMarked, Map, Layers, UserCheck, CalendarDays, Table2, ClipboardCheck, FileText, FileCheck, Award, Target, MessageSquare, BookCopy } from 'lucide-react';
+import { BookOpen, GraduationCap, Building2, GitBranch, Users, LayoutGrid, Calendar, Clock, ArrowLeft, BookMarked, Map, Layers, UserCheck, CalendarDays, Table2, ClipboardCheck, FileText, FileCheck, Award, Target, MessageSquare, BookCopy, TrendingUp } from 'lucide-react';
 
 import RegulationsPage from './academics/RegulationsPage';
 import ProgrammesPage from './academics/ProgrammesPage';
@@ -24,6 +24,7 @@ import GradeCardsPage from './academics/GradeCardsPage';
 import SemesterResultsPage from './academics/SemesterResultsPage';
 import LessonPlansPage from './academics/LessonPlansPage';
 import CourseFeedbackPage from './academics/CourseFeedbackPage';
+import PromotionPage from './academics/PromotionPage';
 
 const STRUCTURE_CARDS = [
   { to: 'regulations', icon: BookOpen, label: 'Regulations', desc: 'Academic rule sets (R20, R23)', iconBg: 'bg-violet-50 text-violet-600', border: 'border-violet-200 hover:border-violet-400', statKey: 'regulations' },
@@ -154,6 +155,7 @@ function AcademicsHome() {
         {[
           { to: 'grade-cards', icon: Award, label: 'Grade Cards', desc: 'Course-wise grades', iconBg: 'bg-yellow-50 text-yellow-600', border: 'border-yellow-200 hover:border-yellow-400' },
           { to: 'semester-results', icon: Target, label: 'Semester Results', desc: 'SGPA/CGPA computation', iconBg: 'bg-indigo-50 text-indigo-600', border: 'border-indigo-200 hover:border-indigo-400' },
+          { to: 'promotion', icon: TrendingUp, label: 'Promotion', desc: 'Promote students + fee pin', iconBg: 'bg-emerald-50 text-emerald-600', border: 'border-emerald-200 hover:border-emerald-400' },
           { to: 'lesson-plans', icon: BookCopy, label: 'Lesson Plans', desc: 'Week-wise planning', iconBg: 'bg-teal-50 text-teal-600', border: 'border-teal-200 hover:border-teal-400' },
           { to: 'course-feedback', icon: MessageSquare, label: 'Feedback', desc: 'Course & faculty feedback', iconBg: 'bg-pink-50 text-pink-600', border: 'border-pink-200 hover:border-pink-400' },
         ].map(card => {
@@ -213,6 +215,7 @@ export default function Academics() {
         <Route path="exam-registrations" element={<ExamRegistrationsPage />} />
         <Route path="grade-cards" element={<GradeCardsPage />} />
         <Route path="semester-results" element={<SemesterResultsPage />} />
+        <Route path="promotion" element={<PromotionPage />} />
         <Route path="lesson-plans" element={<LessonPlansPage />} />
         <Route path="course-feedback" element={<CourseFeedbackPage />} />
       </Routes>
