@@ -66,9 +66,9 @@ Foundation (parallel, no deps)
 | 2 | Seed canonical 33-component template per college (idempotent script + hook into onboarding) | Code | 1 | Done |
 | 3 | pdfkit dependency + shared PdfRenderer utility wrapper | Code | — | Done |
 | 4 | FEE_COMMITMENT BullMQ queue registration + worker skeleton | Code | — | Done |
-| 5 | fee-pin-service.ts: pinYear, rePin, archivePin, resolveActivePin, checkPinValidity | Code | 1 | Pending |
-| 6 | fee-component-template-service.ts: CRUD + admin-approval gate on edits | Code | 1 | Pending |
-| 7 | fee-commitment-sheet-service.ts: PDF generation via PdfRenderer + M02 Document attach + worker implementation | Code | 3, 4, 5 | Pending |
+| 5 | fee-pin-service.ts: pinYear, rePin, archivePin, resolveActivePin, checkPinValidity | Code | 1 | Done |
+| 6 | fee-component-template-service.ts: CRUD + admin-approval gate on edits | Code | 1 | Done |
+| 7 | fee-commitment-sheet-service.ts: PDF generation via PdfRenderer + M02 Document attach + worker implementation | Code | 3, 4, 5 | Done |
 | 8 | Admission integration: provision_m04 calls pinYear(N=1); hard-fail if no active structure | Code | 5 | Pending |
 | 9 | Promotion integration: promoteStudents calls pinYear(N+1); per-student deferred-pin reporting | Code | 5 | Pending |
 | 10 | Invoice generation pin-first: generateSemesterInvoice reads Student.feePins before live resolution | Code | 5 | Pending |
@@ -560,3 +560,4 @@ All 40+ ACs trace to ≥1 task; all 12 edge cases have a home; all NOT-For items
 
 - **2026-04-21** — Initial task list drafted from spec + plan. 19 tasks, 4 parallel starters (T1, T2, T3, T4). Front-loaded risks: T15 (backfill, hardest part) has DRY-RUN + audit CSV + --commit gate; T8 (admission pin) has hard-fail + proactive dashboard warning.
 - **2026-04-21** — T1–T4 (foundation) completed in parallel. 51 new tests (19 schema + 11 seed + 13 pdfkit + 8 queue). Full backend suite 326/326 passing. Spec typo "30-component" → "33-component" fixed in same session. Completion signals in `./completions/task-1..4.md`.
+- **2026-04-21** — T5, T6, T7 (core services) completed. 45 new tests (10 pin + 24 template + 11 commitment-sheet). Full backend suite 372/372 passing. Five new open questions logged in spec.md changelog: OQ-6 (FSI yearOfStudy), OQ-7 (Batch academicYearId), OQ-8 (M02 generic Document), OQ-9 (ExitDocument supersede), OQ-10 (Student opt-in flags). OQ-8 is the significant one — M02 lacks a generic document service; T7 shipped a pragmatic workaround with a test-overridable seam. Completion signals in `./completions/task-5..7.md`.

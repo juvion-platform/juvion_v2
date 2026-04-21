@@ -23,12 +23,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { QUEUE_NAMES } from '../QueueManager';
-import {
-  feeCommitmentWorker,
-  FEE_COMMITMENT_CONCURRENCY,
-  FEE_COMMITMENT_JOB_OPTS,
-  enqueueFeeCommitmentJob,
-} from '../../../workers/fee-commitment.worker';
 
 // Mock the queue-add primitive so we can assert the options we pass
 // without needing a live Redis connection.
@@ -40,7 +34,22 @@ vi.mock('../QueueManager', async (importOriginal) => {
   };
 });
 
+// Mock the commitment-sheet service (T7) so T4's queue-config tests
+// remain isolated from business-logic behavior. The worker now
+// delegates to `generateSheet` — we stub it to a trivial resolve so
+// the worker ACKs cleanly when invoked with synthetic payloads.
+vi.mock('../../../modules/finance/fee-commitment-sheet-service', () => ({
+  generateSheet: vi.fn().mockResolvedValue({ documentId: 'doc-1', pdfBuffer: Buffer.alloc(1) }),
+}));
+
+import {
+  feeCommitmentWorker,
+  FEE_COMMITMENT_CONCURRENCY,
+  FEE_COMMITMENT_JOB_OPTS,
+  enqueueFeeCommitmentJob,
+} from '../../../workers/fee-commitment.worker';
 import { addJob } from '../QueueManager';
+import * as feeCommitmentSheetService from '../../../modules/finance/fee-commitment-sheet-service';
 
 describe('FEE_COMMITMENT queue registration', () => {
   it('registers FEE_COMMITMENT in the QUEUE_NAMES registry', () => {
@@ -73,15 +82,12 @@ describe('FEE_COMMITMENT worker config', () => {
   });
 });
 
-describe('feeCommitmentWorker (skeleton)', () => {
-  let consoleSpy: ReturnType<typeof vi.spyOn>;
-
+describe('feeCommitmentWorker (T7)', () => {
   beforeEach(() => {
-    consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.mocked(feeCommitmentSheetService.generateSheet).mockClear();
   });
 
   it('has the expected signature and resolves for a valid payload', async () => {
-    // Minimal Job-shaped stub — only fields the skeleton touches.
     const job = {
       id: 'job-xyz',
       name: 'generate-commitment-sheet',
@@ -91,7 +97,7 @@ describe('feeCommitmentWorker (skeleton)', () => {
     await expect(feeCommitmentWorker(job)).resolves.toBeUndefined();
   });
 
-  it('logs the incoming payload so ops can trace it (pre-T7 behavior)', async () => {
+  it('delegates to fee-commitment-sheet-service.generateSheet with the job payload', async () => {
     const job = {
       id: 'job-xyz',
       name: 'generate-commitment-sheet',
@@ -100,12 +106,24 @@ describe('feeCommitmentWorker (skeleton)', () => {
 
     await feeCommitmentWorker(job);
 
-    expect(consoleSpy).toHaveBeenCalled();
-    // One of the log calls mentions the student + pin so operators can
-    // correlate the job with the data it was processing.
-    const flattened = consoleSpy.mock.calls.flat().join(' ');
-    expect(flattened).toContain('student-42');
-    expect(flattened).toContain('pin-9');
+    expect(feeCommitmentSheetService.generateSheet).toHaveBeenCalledTimes(1);
+    expect(feeCommitmentSheetService.generateSheet).toHaveBeenCalledWith(
+      'student-42',
+      'pin-9',
+    );
+  });
+
+  it('rethrows when generateSheet fails so BullMQ applies its retry policy', async () => {
+    vi.mocked(feeCommitmentSheetService.generateSheet).mockRejectedValueOnce(
+      new Error('pdf-store-down'),
+    );
+    const job = {
+      id: 'job-xyz',
+      name: 'generate-commitment-sheet',
+      data: { studentId: 'student-1', pinId: 'pin-1' },
+    } as unknown as Parameters<typeof feeCommitmentWorker>[0];
+
+    await expect(feeCommitmentWorker(job)).rejects.toThrow('pdf-store-down');
   });
 });
 

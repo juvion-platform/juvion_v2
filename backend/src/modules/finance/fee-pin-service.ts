@@ -1,0 +1,570 @@
+/**
+ * fee-pin-service (Task 5 — Fee Configuration)
+ *
+ * Central pinning business logic: binds a student to a specific
+ * `FeeStructureInstance` for a given year-of-study. Once pinned, the
+ * student owes that version's totals for that year even if the college
+ * later revises rates (see spec §Journey 7 + plan §1.4–1.7).
+ *
+ * Public API (all functions take plain ids / POJO opts):
+ *   - `pinYear(studentId, yearOfStudy, opts)` — resolve + pin + enqueue sheet
+ *   - `rePin(studentId, yearOfStudy, opts)` — admin-driven re-pin to a
+ *      supplied target instance
+ *   - `archivePin(studentId, pinId, archiveReason)` — idempotent archive
+ *   - `resolveActivePin(studentId, yearOfStudy)` — read helper for invoices
+ *   - `checkPinValidity(studentId, yearOfStudy)` — stale-pin detector used
+ *      by the rebind hook + invoice UI banner
+ *   - `resolveMatchingFeeStructureInstance(student, yearOfStudy, opts)` —
+ *      preference-matched lookup (exact-branch > null-branch; exact-category
+ *      > null-category; quota MUST match; tie-break on `approvedAt`)
+ *
+ * Invariant (enforced here, NOT in the schema): for any
+ * `(studentId, yearOfStudy)`, at most one pin has `archivedAt === null`.
+ * `pinYear` / `rePin` always archive any existing active pin for that year
+ * before pushing a new one.
+ *
+ * Spec: .captain/specs/fee-configuration/spec.md
+ * Plan: .captain/specs/fee-configuration/plan.md §1.4–1.7, §2.1
+ */
+
+import { Types } from 'mongoose';
+
+import { AppError } from '../../middleware/errorHandler';
+import { createAuditLog } from '../../shared/audit';
+import {
+  Student,
+  IStudent,
+  IFeePin,
+  FeePinReason,
+} from '../../models/people/Student';
+import {
+  FeeStructureInstance,
+  IFeeStructureInstance,
+} from '../../models/finance/FeeStructureInstance';
+import { Batch } from '../../models/academic-structure/Batch';
+import { enqueueFeeCommitmentJob } from '../../workers/fee-commitment.worker';
+
+// ── Types ─────────────────────────────────────────────────────────────
+
+/**
+ * Thrown when `pinYear` cannot find an active FeeStructureInstance for
+ * a student's attributes. The constructor packs the combo into the
+ * message so operators can reproduce / fix it without spelunking logs.
+ */
+export class FeeStructureNotFoundError extends AppError {
+  public readonly detail: FeeStructureNotFoundDetail;
+
+  constructor(detail: FeeStructureNotFoundDetail) {
+    super(404, formatMissingStructureMessage(detail));
+    this.name = 'FeeStructureNotFoundError';
+    this.detail = detail;
+  }
+}
+
+export interface FeeStructureNotFoundDetail {
+  programmeId: Types.ObjectId | string;
+  branchId?: Types.ObjectId | string | null;
+  quota?: string;
+  category?: string;
+  yearOfStudy: number;
+  academicYearId?: Types.ObjectId | string;
+}
+
+export interface PinYearOpts {
+  pinnedBy: string;
+  reason?: FeePinReason;
+  remarks?: string;
+  academicYearId?: Types.ObjectId | string;
+  /** Default true. Disabling skips the BullMQ enqueue (used in tests / bulk flows). */
+  enqueueCommitmentSheet?: boolean;
+}
+
+export interface RePinOpts {
+  targetFeeStructureInstanceId: Types.ObjectId | string;
+  reason: FeePinReason;
+  remarks?: string;
+  pinnedBy: string;
+  /** Default true. */
+  enqueueCommitmentSheet?: boolean;
+}
+
+export type PinValidityReason =
+  | 'branch_mismatch'
+  | 'quota_mismatch'
+  | 'category_mismatch'
+  | 'programme_mismatch'
+  | 'no_active_pin';
+
+export interface PinValidity {
+  valid: boolean;
+  reason?: PinValidityReason;
+  currentPin: IFeePin | null;
+  matchingInstance: IFeeStructureInstance | null;
+}
+
+export interface ResolveMatchOpts {
+  academicYearId?: Types.ObjectId | string;
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────
+
+function formatMissingStructureMessage(d: FeeStructureNotFoundDetail): string {
+  const parts = [
+    `programme=${String(d.programmeId)}`,
+    d.branchId ? `branch=${String(d.branchId)}` : 'branch=<any>',
+    d.quota ? `quota=${d.quota}` : 'quota=<any>',
+    d.category ? `category=${d.category}` : 'category=<any>',
+    `year ${d.yearOfStudy}`,
+    d.academicYearId ? `academicYear=${String(d.academicYearId)}` : 'academicYear=<unknown>',
+  ];
+  return `No approved fee structure for ${parts.join(', ')}. Finance must create and activate a matching FeeStructureInstance before this student can be pinned.`;
+}
+
+function asObjectId(id: Types.ObjectId | string): Types.ObjectId {
+  return id instanceof Types.ObjectId ? id : new Types.ObjectId(String(id));
+}
+
+function sameId(a: unknown, b: unknown): boolean {
+  if (!a || !b) return !a && !b;
+  return String(a) === String(b);
+}
+
+/**
+ * Best-effort derivation of the student's current AcademicYear.
+ *
+ * Pin lookup REQUIRES an academicYearId (FeeStructureInstance is scoped
+ * by it). Callers may pass it explicitly via opts; if not, we try to
+ * resolve via the student's batch. If still unknown, the resolver
+ * receives `undefined` and will return null (which surfaces as
+ * FeeStructureNotFoundError with academicYear=<unknown>).
+ */
+async function deriveAcademicYearId(
+  student: IStudent,
+  opt?: Types.ObjectId | string,
+): Promise<Types.ObjectId | undefined> {
+  if (opt) return asObjectId(opt);
+  if (!student.batchId) return undefined;
+  const batch = await Batch.findById(student.batchId).lean();
+  if (!batch) return undefined;
+  // Batch does not own academicYearId directly (it tracks admissionYear +
+  // regulation). Callers that need precise year-of-study → academic-year
+  // mapping must pass `academicYearId` explicitly. Return undefined so
+  // the resolver fails cleanly rather than guessing.
+  return undefined;
+}
+
+/** Convert a Mongoose FeePin subdoc to a plain IFeePin object. */
+function toPinPojo(subdoc: IFeePin & { toObject?: () => IFeePin }): IFeePin {
+  if (typeof subdoc.toObject === 'function') {
+    return subdoc.toObject() as IFeePin;
+  }
+  return subdoc as IFeePin;
+}
+
+// ── Core: resolveMatchingFeeStructureInstance ────────────────────────
+
+/**
+ * Find the FeeStructureInstance that should apply to `student` for
+ * `yearOfStudy` within the given academic year.
+ *
+ * Preference rules (matches `resolveFeeStructure` in workflow.handlers
+ * semantically; adapted to the FeeStructureInstance model):
+ *   1. `collegeId`, `programmeId`, `academicYearId`, `status='active'`
+ *      are required filters.
+ *   2. `quota` must match exactly — no fallback. A student with
+ *      `quota='convener'` NEVER resolves to a `quota='management'`
+ *      structure.
+ *   3. `branchId`: exact match preferred. If none exists, fall back to
+ *      records where the instance's `branchId` is null/absent
+ *      (wildcard).
+ *   4. `category`: exact match preferred. Null/absent category on the
+ *      instance acts as a wildcard default.
+ *   5. Preference ordering: most specific wins (branch-exact +
+ *      category-exact > branch-exact + category-wild > branch-wild +
+ *      category-exact > branch-wild + category-wild). Within a bucket,
+ *      tie-break on `approvedAt` descending.
+ */
+export async function resolveMatchingFeeStructureInstance(
+  student: IStudent,
+  yearOfStudy: number,
+  opts: ResolveMatchOpts = {},
+): Promise<IFeeStructureInstance | null> {
+  if (!student.programmeId) return null;
+  const academicYearId = opts.academicYearId
+    ? asObjectId(opts.academicYearId)
+    : undefined;
+  if (!academicYearId) return null;
+
+  const baseFilter: Record<string, unknown> = {
+    collegeId: student.collegeId,
+    programmeId: student.programmeId,
+    academicYearId,
+    status: 'active',
+  };
+  if (student.quota) {
+    // Quota must match exactly — no fallback.
+    baseFilter.quota = student.quota;
+  }
+  // NOTE: yearOfStudy is not a field on FeeStructureInstance (see model).
+  // The plan / AC says year-of-study is a dimension of the combo; the
+  // existing codebase tracks that via the AcademicYear + programme
+  // together (each year gets its own academicYearId row per programme).
+  // We pass yearOfStudy through so the caller can include it if/when the
+  // model grows a `yearOfStudy` field. For now it's a no-op filter.
+  void yearOfStudy;
+
+  const candidates = await FeeStructureInstance.find(baseFilter);
+  if (candidates.length === 0) return null;
+
+  const studentBranch = student.branchId ? String(student.branchId) : null;
+  const studentCategory = student.category ?? null;
+
+  type Scored = { doc: IFeeStructureInstance; score: number; approvedAt: number };
+  const scored: Scored[] = [];
+
+  for (const doc of candidates) {
+    const docBranch = doc.branchId ? String(doc.branchId) : null;
+    const docCategory = doc.category ?? null;
+
+    // Branch: exact match gets 2, null-branch (wildcard) gets 1, mismatch is rejected.
+    let branchScore: number;
+    if (docBranch === null) {
+      branchScore = 1; // wildcard — always acceptable
+    } else if (studentBranch && docBranch === studentBranch) {
+      branchScore = 2;
+    } else {
+      continue; // branch on instance that doesn't match student → drop
+    }
+
+    // Category: exact 2, wildcard 1, mismatch rejected.
+    let categoryScore: number;
+    if (docCategory === null) {
+      categoryScore = 1;
+    } else if (studentCategory && docCategory === studentCategory) {
+      categoryScore = 2;
+    } else {
+      continue;
+    }
+
+    const approvedAt = doc.approvedAt ? doc.approvedAt.getTime() : 0;
+    // Weight branch higher than category so branch-exact always beats
+    // branch-wildcard regardless of category.
+    const score = branchScore * 10 + categoryScore;
+    scored.push({ doc, score, approvedAt });
+  }
+
+  if (scored.length === 0) return null;
+  scored.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    return b.approvedAt - a.approvedAt;
+  });
+  return scored[0]!.doc;
+}
+
+// ── pinYear ───────────────────────────────────────────────────────────
+
+export async function pinYear(
+  studentId: string,
+  yearOfStudy: number,
+  opts: PinYearOpts,
+): Promise<IFeePin> {
+  const student = await Student.findById(studentId);
+  if (!student) throw new AppError(404, 'Student not found');
+
+  const academicYearId = await deriveAcademicYearId(student, opts.academicYearId);
+
+  const match = await resolveMatchingFeeStructureInstance(student, yearOfStudy, {
+    academicYearId,
+  });
+  if (!match) {
+    throw new FeeStructureNotFoundError({
+      programmeId: student.programmeId ? String(student.programmeId) : 'unknown',
+      branchId: student.branchId ? String(student.branchId) : null,
+      quota: student.quota,
+      category: student.category,
+      yearOfStudy,
+      academicYearId: academicYearId ? String(academicYearId) : undefined,
+    });
+  }
+
+  return commitPin(student, yearOfStudy, {
+    feeStructureInstanceId: match._id as Types.ObjectId,
+    pinnedBy: opts.pinnedBy,
+    reason: opts.reason ?? 'initial',
+    remarks: opts.remarks,
+    enqueueCommitmentSheet: opts.enqueueCommitmentSheet,
+  });
+}
+
+// ── rePin ─────────────────────────────────────────────────────────────
+
+export async function rePin(
+  studentId: string,
+  yearOfStudy: number,
+  opts: RePinOpts,
+): Promise<IFeePin> {
+  const student = await Student.findById(studentId);
+  if (!student) throw new AppError(404, 'Student not found');
+
+  const targetId = asObjectId(opts.targetFeeStructureInstanceId);
+  const target = await FeeStructureInstance.findOne({
+    _id: targetId,
+    collegeId: student.collegeId,
+  });
+  if (!target) {
+    throw new AppError(
+      404,
+      `Target FeeStructureInstance ${String(targetId)} not found for this college`,
+    );
+  }
+
+  return commitPin(student, yearOfStudy, {
+    feeStructureInstanceId: target._id as Types.ObjectId,
+    pinnedBy: opts.pinnedBy,
+    reason: opts.reason,
+    remarks: opts.remarks,
+    enqueueCommitmentSheet: opts.enqueueCommitmentSheet,
+  });
+}
+
+// ── archivePin ────────────────────────────────────────────────────────
+
+export async function archivePin(
+  studentId: string,
+  pinId: string,
+  archiveReason: string,
+): Promise<void> {
+  const student = await Student.findById(studentId);
+  if (!student) throw new AppError(404, 'Student not found');
+
+  const pin = student.feePins.find((p) => String(p._id) === String(pinId));
+  if (!pin) throw new AppError(404, 'Pin not found on student');
+
+  if (pin.archivedAt) return; // idempotent no-op
+
+  pin.archivedAt = new Date();
+  pin.archiveReason = archiveReason;
+  await student.save();
+
+  await createAuditLog({
+    collegeId: String(student.collegeId),
+    entityType: 'Student',
+    entityId: String(student._id),
+    entityName: `Student#${String(student._id)}`,
+    studentId: String(student._id),
+    action: 'archive',
+    changes: [
+      {
+        field: 'feePins',
+        displayName: 'Fee Pin',
+        oldValue: { pinId: String(pin._id), archivedAt: null },
+        newValue: { pinId: String(pin._id), archivedAt: pin.archivedAt, archiveReason },
+      },
+    ],
+    performedBy: 'system',
+  });
+}
+
+// ── resolveActivePin ─────────────────────────────────────────────────
+
+export async function resolveActivePin(
+  studentId: string,
+  yearOfStudy: number,
+): Promise<IFeePin | null> {
+  const student = await Student.findById(studentId);
+  if (!student) return null;
+  const match = student.feePins.find(
+    (p) => p.yearOfStudy === yearOfStudy && !p.archivedAt,
+  );
+  return match ? toPinPojo(match) : null;
+}
+
+// ── checkPinValidity ─────────────────────────────────────────────────
+
+export async function checkPinValidity(
+  studentId: string,
+  yearOfStudy: number,
+): Promise<PinValidity> {
+  const student = await Student.findById(studentId);
+  if (!student) {
+    return { valid: false, reason: 'no_active_pin', currentPin: null, matchingInstance: null };
+  }
+
+  const activeSub = student.feePins.find(
+    (p) => p.yearOfStudy === yearOfStudy && !p.archivedAt,
+  );
+  const currentPin = activeSub ? toPinPojo(activeSub) : null;
+
+  // Always compute what SHOULD currently be pinned for comparison.
+  // We don't know which academicYear to use without context — try to
+  // infer from the pinned instance.
+  let academicYearId: Types.ObjectId | undefined;
+  let pinnedInstance: IFeeStructureInstance | null = null;
+  if (activeSub) {
+    pinnedInstance = await FeeStructureInstance.findById(activeSub.feeStructureInstanceId);
+    if (pinnedInstance) {
+      academicYearId = pinnedInstance.academicYearId as unknown as Types.ObjectId;
+    }
+  }
+
+  const matchingInstance = await resolveMatchingFeeStructureInstance(
+    student,
+    yearOfStudy,
+    { academicYearId },
+  );
+
+  if (!currentPin || !pinnedInstance) {
+    return {
+      valid: false,
+      reason: 'no_active_pin',
+      currentPin,
+      matchingInstance,
+    };
+  }
+
+  // Compare student attributes vs the pinned instance.
+  if (!sameId(pinnedInstance.programmeId, student.programmeId)) {
+    return { valid: false, reason: 'programme_mismatch', currentPin, matchingInstance };
+  }
+  // branch: mismatch only when instance has a branch and student's branch
+  // differs. Null-branch instances remain valid regardless.
+  const docBranch = pinnedInstance.branchId ? String(pinnedInstance.branchId) : null;
+  const studentBranch = student.branchId ? String(student.branchId) : null;
+  if (docBranch && docBranch !== studentBranch) {
+    return { valid: false, reason: 'branch_mismatch', currentPin, matchingInstance };
+  }
+  // quota: strict exact
+  if ((pinnedInstance.quota ?? null) !== (student.quota ?? null)) {
+    // null/absent on either side counts as mismatch (quota is a required axis)
+    if (pinnedInstance.quota || student.quota) {
+      return { valid: false, reason: 'quota_mismatch', currentPin, matchingInstance };
+    }
+  }
+  // category: mismatch only when instance has a category set and student
+  // differs. Null-category instance is a wildcard.
+  const docCategory = pinnedInstance.category ?? null;
+  const studentCategory = student.category ?? null;
+  if (docCategory && docCategory !== studentCategory) {
+    return { valid: false, reason: 'category_mismatch', currentPin, matchingInstance };
+  }
+
+  return { valid: true, currentPin, matchingInstance };
+}
+
+// ── Internal: shared pin commit path ─────────────────────────────────
+
+interface CommitPinInput {
+  feeStructureInstanceId: Types.ObjectId;
+  pinnedBy: string;
+  reason: FeePinReason;
+  remarks?: string;
+  enqueueCommitmentSheet?: boolean;
+}
+
+async function commitPin(
+  student: IStudent,
+  yearOfStudy: number,
+  input: CommitPinInput,
+): Promise<IFeePin> {
+  const now = new Date();
+
+  // Archive any existing active pin for this yearOfStudy (invariant:
+  // at most one active pin per (studentId, yearOfStudy)).
+  for (const existing of student.feePins) {
+    if (existing.yearOfStudy === yearOfStudy && !existing.archivedAt) {
+      existing.archivedAt = now;
+      existing.archiveReason = 'replaced';
+    }
+  }
+
+  student.feePins.push({
+    yearOfStudy,
+    feeStructureInstanceId: input.feeStructureInstanceId,
+    pinnedAt: now,
+    pinnedBy: input.pinnedBy,
+    reason: input.reason,
+    remarks: input.remarks,
+    archivedAt: null,
+  } as unknown as IFeePin);
+
+  await student.save();
+
+  const pushed = student.feePins[student.feePins.length - 1]!;
+  const pushedId = String(pushed._id);
+
+  // Concurrency guard: if two `pinYear` calls raced for the same
+  // (studentId, yearOfStudy), each will have archived nothing and
+  // pushed its own pin — the final doc ends up with 2+ active pins
+  // for the same year. Reconcile with a second atomic pass: last
+  // writer wins (the pin with the most recent pinnedAt survives).
+  const reconciled = await Student.findById(student._id);
+  if (reconciled) {
+    const actives = reconciled.feePins.filter(
+      (p) => p.yearOfStudy === yearOfStudy && !p.archivedAt,
+    );
+    if (actives.length > 1) {
+      const survivor = actives.reduce((latest, cur) =>
+        (cur.pinnedAt?.getTime() ?? 0) >= (latest.pinnedAt?.getTime() ?? 0)
+          ? cur
+          : latest,
+      );
+      const now = new Date();
+      for (const a of actives) {
+        if (String(a._id) !== String(survivor._id)) {
+          a.archivedAt = now;
+          a.archiveReason = 'replaced';
+        }
+      }
+      await reconciled.save();
+    }
+  }
+
+  // Re-read the pushed pin from the reconciled doc so its archivedAt
+  // reflects whether the current caller was the survivor.
+  const finalStudent = reconciled ?? student;
+  const finalPushed =
+    finalStudent.feePins.find((p) => String(p._id) === pushedId) ?? pushed;
+  const pinPojo = toPinPojo(finalPushed);
+
+  await createAuditLog({
+    collegeId: String(student.collegeId),
+    entityType: 'Student',
+    entityId: String(student._id),
+    entityName: `Student#${String(student._id)}`,
+    studentId: String(student._id),
+    action: 'create',
+    changes: [
+      {
+        field: 'feePins',
+        displayName: 'Fee Pin',
+        oldValue: null,
+        newValue: {
+          pinId: String(pushed._id),
+          yearOfStudy,
+          feeStructureInstanceId: String(input.feeStructureInstanceId),
+          reason: input.reason,
+        },
+      },
+    ],
+    performedBy: input.pinnedBy,
+  });
+
+  if (input.enqueueCommitmentSheet !== false) {
+    try {
+      await enqueueFeeCommitmentJob({
+        studentId: String(student._id),
+        pinId: String(pushed._id),
+      });
+    } catch (e) {
+      // Enqueue failures must not block the pin itself. The nightly
+      // audit job (T17) will surface pins whose commitmentSheetStatus
+      // never reaches 'generated'.
+      console.warn(
+        `[fee-pin-service] enqueueFeeCommitmentJob failed for student=${String(student._id)} pin=${String(pushed._id)}`,
+        e,
+      );
+    }
+  }
+
+  return pinPojo;
+}
