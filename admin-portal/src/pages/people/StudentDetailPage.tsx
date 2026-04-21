@@ -6,6 +6,7 @@ import Badge from '../../components/ui/Badge';
 import {
   DetailSection, DetailField, DetailBool, formatDate, extractPerson,
 } from '../../components/ui/DetailView';
+import FeePinsPanel from '../../components/finance/FeePinsPanel';
 
 /**
  * Read-only view for a single Student. Clicking Edit navigates to the
@@ -160,6 +161,23 @@ export default function StudentDetailPage() {
         <DetailField label="Phone" value={emergency.phone} />
         <DetailField label="Relationship" value={emergency.relationship} />
       </DetailSection>
+
+      {/* Fee Pins (Task 13) */}
+      {id && (
+        <FeePinsPanel
+          studentId={id}
+          programmeId={s.programmeId?._id ?? s.programmeId}
+          branchId={s.branchId?._id ?? s.branchId}
+          academicYearId={
+            s.batchId?.academicYearId?._id ??
+            s.batchId?.academicYearId ??
+            s.batch?.academicYearId
+          }
+          quota={s.quota}
+          category={s.category}
+          currentYearOfStudy={s.currentYearOfStudy ?? s.yearOfStudy}
+        />
+      )}
     </div>
   );
 }
