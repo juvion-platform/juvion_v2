@@ -29,10 +29,10 @@ import { AppError } from '../../middleware/errorHandler';
  * helper unifies the four ad-hoc derivations).
  *
  * Lateral-entry handling: some colleges admit students directly into
- * Year 2 (and rarely Year 3). The Student model does NOT yet carry a
- * `studyYearAtAdmission` field, so the helper accepts such a field if it
- * exists on the loaded student record (forward-compat) and otherwise
- * assumes `1`. See OQ-6 follow-up for when / if we formalize lateral.
+ * Year 2 (and rarely Year 3). `Student.studyYearAtAdmission` (T21)
+ * carries this value; callers that pre-date the field default to `1`.
+ * Helper defaults to `1` when the field is missing / null for extra
+ * safety.
  *
  * Year-back handling: students who repeat a year are still *calendar*-
  * equivalent to their batch mates — this helper returns the CALENDAR
@@ -174,12 +174,11 @@ export async function resolveStudentYearOfStudy(
   }
 
   // ── Arithmetic ────────────────────────────────────────────────────
-  // Lateral entry: honour `studyYearAtAdmission` if present on the
-  // Student record (schema forward-compat). Common case is `2` for BTech
-  // lateral entry. Default `1`.
-  const studyYearAtAdmission =
-    (student as unknown as { studyYearAtAdmission?: number })
-      .studyYearAtAdmission ?? 1;
+  // Lateral entry: honour `studyYearAtAdmission` (schema field, T21).
+  // Common case is `2` for BTech lateral entry. Default `1` when the
+  // field is null/undefined (records older than T21's backfill or
+  // corrupted data).
+  const studyYearAtAdmission = student.studyYearAtAdmission ?? 1;
   const lateralOffset = studyYearAtAdmission - 1;
 
   const raw = ayStartYear - admissionYear + 1 + lateralOffset;
