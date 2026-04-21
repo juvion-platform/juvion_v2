@@ -2,8 +2,12 @@ import { Router } from 'express';
 import { authenticate } from '../../middleware/authenticate';
 import { authorize } from '../../middleware/authorize';
 import { validate } from '../../middleware/validate';
+import { createUserRateLimit } from '../../middleware/rateLimitPerUser';
 import { verifyPaymentWebhookSignature } from '../../middleware/webhookSignature';
 import * as ctrl from './controller';
+import * as feePinCtrl from './fee-pin-controller';
+import * as feeTemplateCtrl from './fee-component-template-controller';
+import * as feePinAuditCtrl from './fee-pin-audit-controller';
 import {
   createFeeStructureSchema, updateFeeStructureSchema,
   createStudentFeeAccountSchema, updateStudentFeeAccountSchema,
@@ -133,6 +137,11 @@ import {
   scheduleVendorPaymentSchema,
   confirmVendorPaymentSchema,
   generateRevenueReportSchema,
+  feePinRePinSchema,
+  commitmentSheetRegenerateSchema,
+  programmeTransferSchema,
+  feeComponentCreateSchema,
+  feeComponentUpdateSchema,
 } from './validation';
 
 const router = Router();
@@ -535,5 +544,85 @@ router.post('/vendor-payments/:id/confirm', authorize('finance', 'update'), vali
 
 // ── Revenue Reports ────────────────────────────────────────
 router.post('/revenue-reports', authorize('finance', 'create'), validate(generateRevenueReportSchema), ctrl.generateRevenueReportCtrl);
+
+// ═══ Fee Configuration (Task 12) ═════════════════════════════
+// Per-student pin management, component template CRUD, audit reads.
+// All routes sit behind authenticate + authorize + per-user rate limit.
+// Principal-gated actions use `authorize('finance', 'approve')` which
+// the default policy set grants to role=principal (and super_admin via
+// wildcard). See shared/rbac/defaults.ts.
+
+const feeConfigRateLimit = createUserRateLimit({ max: 60, windowMs: 60_000 });
+
+// Student pin management
+router.get(
+  '/students/:id/pins',
+  authorize('people', 'read'),
+  feeConfigRateLimit,
+  feePinCtrl.listStudentPins,
+);
+router.post(
+  '/students/:id/pins/re-pin',
+  authorize('finance', 'approve'),
+  feeConfigRateLimit,
+  validate(feePinRePinSchema),
+  feePinCtrl.rePinStudent,
+);
+router.post(
+  '/students/:id/commitment-sheet/regenerate',
+  authorize('finance', 'update'),
+  feeConfigRateLimit,
+  validate(commitmentSheetRegenerateSchema),
+  feePinCtrl.regenerateCommitmentSheet,
+);
+router.post(
+  '/students/:id/transfer-programme',
+  authorize('finance', 'approve'),
+  feeConfigRateLimit,
+  validate(programmeTransferSchema),
+  feePinCtrl.transferProgramme,
+);
+
+// Component template CRUD
+router.get(
+  '/component-template',
+  authorize('finance', 'read'),
+  feeConfigRateLimit,
+  feeTemplateCtrl.listTemplateComponents,
+);
+router.post(
+  '/component-template/components',
+  authorize('finance', 'update'),
+  feeConfigRateLimit,
+  validate(feeComponentCreateSchema),
+  feeTemplateCtrl.createTemplateComponent,
+);
+router.put(
+  '/component-template/components/:componentId',
+  authorize('finance', 'update'),
+  feeConfigRateLimit,
+  validate(feeComponentUpdateSchema),
+  feeTemplateCtrl.updateTemplateComponent,
+);
+router.delete(
+  '/component-template/components/:componentId',
+  authorize('finance', 'update'),
+  feeConfigRateLimit,
+  feeTemplateCtrl.deleteTemplateComponent,
+);
+
+// Pin-audit reads
+router.get(
+  '/pin-audit/coverage',
+  authorize('finance', 'read'),
+  feeConfigRateLimit,
+  feePinAuditCtrl.getCoverage,
+);
+router.get(
+  '/pin-audit/invariants',
+  authorize('finance', 'read'),
+  feeConfigRateLimit,
+  feePinAuditCtrl.getInvariants,
+);
 
 export default router;
