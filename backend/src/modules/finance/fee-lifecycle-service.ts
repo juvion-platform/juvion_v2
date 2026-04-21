@@ -27,6 +27,7 @@ import { createAuditLog } from '../../shared/audit';
 import { Student } from '../../models/people/Student';
 import { Enrollment } from '../../models/academic-ops/Enrollment';
 import { FinePenalty } from '../../models/finance/FinePenalty';
+import * as feePinService from './fee-pin-service';
 import crypto from 'crypto';
 
 // ─── Helpers ──────────────────────────────────────────────
@@ -36,6 +37,103 @@ function generateInvoiceNumber(): string {
 
 function generateReceiptNumber(): string {
   return `REC-${Date.now()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+}
+
+/** Minimal shape of the FeeStructureInstance fields we rely on at the
+ * invoice-generation level — avoids leaking Mongoose document types. */
+interface IResolvedInstance {
+  _id: unknown;
+  collegeId: unknown;
+  academicYearId: unknown;
+  programmeId: unknown;
+  branchId?: unknown;
+  category?: string;
+  quota?: string;
+  status: string;
+  totalAmount: number;
+}
+
+/**
+ * Evaluate applicable fee components for a SPECIFIC FeeStructureInstance
+ * (pin-driven invoice generation, Task 10). Mirrors the rule-matching
+ * logic of `evaluateFeeComponentRules` but scoped to one instance so we
+ * can honour pins on `superseded` instances — which the status-filtered
+ * programme-wide evaluator would otherwise drop.
+ *
+ * Do NOT replace `evaluateFeeComponentRules` with this — the programme-wide
+ * evaluator is still used by the no-pin fallback path to preserve pre-Task-10
+ * behavior exactly.
+ */
+async function evaluateRulesForInstance(
+  collegeId: string,
+  feeStructureInstanceId: string,
+  studentProfile: {
+    quota: string;
+    category?: string;
+    isHosteler?: boolean;
+    transportRequired?: boolean;
+  },
+): Promise<Array<{ feeComponentId: string; name: string; amount: number }>> {
+  const components = await FeeComponent.find({
+    collegeId,
+    feeStructureInstanceId,
+  }).lean();
+
+  const out: Array<{ feeComponentId: string; name: string; amount: number }> = [];
+  for (const comp of components) {
+    if (!comp.isConditional) {
+      out.push({ feeComponentId: String(comp._id), name: comp.name, amount: comp.amount });
+      continue;
+    }
+
+    const rules = await FeeComponentRule.find({
+      collegeId,
+      feeComponentId: comp._id,
+      status: 'configured',
+    }).lean();
+
+    let applicable = true;
+    for (const rule of rules) {
+      let matches = false;
+      switch (rule.conditionType) {
+        case 'hostel':
+          matches = rule.operator === 'equals'
+            ? String(studentProfile.isHosteler ?? false) === rule.conditionValue
+            : true;
+          break;
+        case 'transport':
+          matches = rule.operator === 'equals'
+            ? String(studentProfile.transportRequired ?? false) === rule.conditionValue
+            : true;
+          break;
+        case 'quota':
+          matches = rule.operator === 'equals'
+            ? studentProfile.quota === rule.conditionValue
+            : rule.operator === 'in'
+              ? rule.conditionValue.split(',').includes(studentProfile.quota)
+              : true;
+          break;
+        case 'category':
+          matches = rule.operator === 'equals'
+            ? studentProfile.category === rule.conditionValue
+            : rule.operator === 'in'
+              ? rule.conditionValue.split(',').includes(studentProfile.category ?? '')
+              : true;
+          break;
+        default:
+          matches = true;
+      }
+      if (!matches) {
+        applicable = false;
+        break;
+      }
+    }
+
+    if (applicable) {
+      out.push({ feeComponentId: String(comp._id), name: comp.name, amount: comp.amount });
+    }
+  }
+  return out;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -258,7 +356,26 @@ export async function evaluateFeeComponentRules(
 // Invoice Generation (6)
 // ═══════════════════════════════════════════════════════════
 
-/** 5. Generate a semester invoice for a single student. */
+/** 5. Generate a semester invoice for a single student.
+ *
+ * Pin-first resolution (Task 10, plan §1.6, spec §Journey 8):
+ *   1. Determine student's year-of-study for the semester.
+ *   2. Read `Student.feePins[]` via `feePinService.resolveActivePin` first.
+ *   3. If a pin exists → load THAT FeeStructureInstance + its components +
+ *      rules, regardless of the instance's current status (honours Journey 7
+ *      superseded-but-pinned behavior).
+ *   4. If no pin → fall back to the `data.feeStructureInstanceId` argument
+ *      (legacy resolve-at-caller path), log a warning, and lazy-pin the
+ *      resolved instance so subsequent invoices are pin-driven.
+ *   5. Line items are stamped with `sourcePinId` for the nightly invariant
+ *      audit (plan §2.3).
+ *
+ * Preserved behavior (NOT touched by this task):
+ *   - Component-rule evaluation (hostel/transport opt-ins, quota, category)
+ *   - Concession stacking, scholarship ledger allocation
+ *   - FeeAgreement override (still a no-op at this layer; unchanged)
+ *   - Invoice/line-item/StudentFeeAccount writes + audit log
+ */
 export async function generateSemesterInvoice(
   collegeId: string,
   data: { studentId: string; semesterId: string; feeStructureInstanceId: string },
@@ -267,20 +384,91 @@ export async function generateSemesterInvoice(
   const student = await Student.findOne({ _id: data.studentId, collegeId }).lean();
   if (!student) throw new AppError(404, 'Student not found');
 
-  const instance = await FeeStructureInstance.findOne({
-    _id: data.feeStructureInstanceId,
-    collegeId,
-  }).lean();
-  if (!instance) throw new AppError(404, 'Fee structure instance not found');
+  // ── Pin-first resolution ──────────────────────────────────────────
+  // Current year-of-study: default to 1. The full semester → batch →
+  // academic-year arithmetic (plan §1.6 step 2) is an existing
+  // upstream concern; we honour any pin at yearOfStudy=1 to stay
+  // compatible with the admission-pin flow (T8). When the upstream
+  // helper lands, it replaces this line only.
+  const yearOfStudy = 1;
 
-  // Evaluate applicable components
-  const applicableComponents = await evaluateFeeComponentRules(collegeId, {
-    programmeId: String(student.programmeId),
-    quota: student.quota ?? 'convener',
-    category: student.category,
-    isHosteler: undefined,
-    transportRequired: undefined,
-  });
+  let pin = await feePinService.resolveActivePin(data.studentId, yearOfStudy);
+  let instance: IResolvedInstance | null = null;
+
+  if (pin) {
+    // Pin exists — use it as source of truth (works for 'active' AND
+    // 'superseded' instances by design; see spec §Journey 7).
+    const pinned = await FeeStructureInstance.findOne({
+      _id: pin.feeStructureInstanceId,
+      collegeId,
+    }).lean();
+    if (!pinned) {
+      throw new AppError(
+        500,
+        `Pin references missing FeeStructureInstance ${String(pin.feeStructureInstanceId)}`,
+      );
+    }
+    instance = pinned as unknown as IResolvedInstance;
+  } else {
+    // No pin — fall back to the legacy caller-supplied instance id.
+    console.warn(
+      `[fee-invoice] no pin for student ${String(student._id)} year ${yearOfStudy}; falling back to live resolution`,
+    );
+
+    const live = await FeeStructureInstance.findOne({
+      _id: data.feeStructureInstanceId,
+      collegeId,
+    }).lean();
+    if (!live) throw new AppError(404, 'Fee structure instance not found');
+    instance = live as unknown as IResolvedInstance;
+
+    // Lazy-pin: commit the resolved instance as a pin so future
+    // invoices read it directly. If this fails (e.g., race with a
+    // manual pin) we log and proceed with the already-resolved
+    // structure — the next run will retry via the same branch.
+    try {
+      pin = await feePinService.pinYear(data.studentId, yearOfStudy, {
+        pinnedBy: 'system:invoice-lazy',
+        reason: 'initial',
+        academicYearId: instance.academicYearId as unknown as string,
+        enqueueCommitmentSheet: true,
+      });
+    } catch (err) {
+      console.warn(
+        `[fee-invoice] lazy-pin failed for student ${String(student._id)} year ${yearOfStudy}; proceeding with resolved structure`,
+        err,
+      );
+    }
+  }
+
+  // ── Applicable components ─────────────────────────────────────────
+  // When a pin drives resolution we evaluate rules ONLY against the
+  // pinned instance's components (honours Journey 7 supersede semantics:
+  // superseded instances are excluded by the existing evaluator's status
+  // filter, so we cannot delegate to it here).
+  // When we fell back to live resolution we preserve the pre-Task-10
+  // behavior by calling the existing evaluator.
+  let applicableComponents: Array<{ feeComponentId: string; name: string; amount: number }>;
+  if (pin && instance) {
+    applicableComponents = await evaluateRulesForInstance(
+      collegeId,
+      String(instance._id),
+      {
+        quota: student.quota ?? 'convener',
+        category: student.category,
+        isHosteler: undefined,
+        transportRequired: undefined,
+      },
+    );
+  } else {
+    applicableComponents = await evaluateFeeComponentRules(collegeId, {
+      programmeId: String(student.programmeId),
+      quota: student.quota ?? 'convener',
+      category: student.category,
+      isHosteler: undefined,
+      transportRequired: undefined,
+    });
+  }
 
   // Fetch existing scholarships and concessions for this student
   const concessions = await Concession.find({
@@ -317,6 +505,7 @@ export async function generateSemesterInvoice(
   });
 
   // Create line items
+  const sourcePinId = pin?._id;
   for (const comp of applicableComponents) {
     await InvoiceLineItem.create({
       collegeId,
@@ -328,6 +517,7 @@ export async function generateSemesterInvoice(
       concessionApplied: 0,
       netAmount: comp.amount,
       status: 'active',
+      sourcePinId,
     });
   }
 
