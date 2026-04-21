@@ -79,8 +79,24 @@ export interface ViewEditModeApi<T> {
   openForEdit: (entity: T) => void;
   /** Open the modal in create mode (from the page's "+ New" button). */
   openForCreate: () => void;
-  /** Transition view → edit, keeping the current entity. No-op outside view. */
-  switchToEdit: () => void;
+  /**
+   * Transition view → edit, keeping the current entity. No-op outside view.
+   *
+   * Accepts the React synthetic event from the button's `onClick` so it can
+   * call `preventDefault()`. This is REQUIRED to avoid an insidious bug:
+   * React 18 flushes state updates synchronously inside click handlers, so
+   * when we change `mode` from 'view' to 'edit', React immediately re-renders
+   * the footer's conditional `{isView ? <Edit/> : <Save/>}`. Because both
+   * branches render a `<button>` at the same position, React reuses the
+   * DOM node and only mutates `type="button"` → `type="submit"`. THEN the
+   * browser processes the click's default action using the NEW type,
+   * submitting the form and triggering the mutation → modal closes.
+   *
+   * Calling preventDefault() on the click event stops the browser's default
+   * form-submission, so the Edit button cleanly transitions to edit mode
+   * without silently creating a record.
+   */
+  switchToEdit: (e?: React.SyntheticEvent) => void;
   /** Close the modal. */
   close: () => void;
   /**
@@ -116,7 +132,12 @@ export function useViewEditMode<T>(opts: UseViewEditModeOpts<T> = {}): ViewEditM
     setMode('create');
   }, [onOpenCreate]);
 
-  const switchToEdit = useCallback(() => {
+  const switchToEdit = useCallback((e?: React.SyntheticEvent) => {
+    // See the `switchToEdit` doc in the type definition above for the full
+    // explanation. TL;DR: preventDefault blocks the browser from treating
+    // the (now type="submit") button's click as a form submission after
+    // React re-renders mid-event.
+    e?.preventDefault?.();
     setMode((prev) => {
       if (prev !== 'view') return prev;
       if (entity && onSwitchToEdit) onSwitchToEdit(entity);
