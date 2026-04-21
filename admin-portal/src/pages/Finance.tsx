@@ -2,9 +2,10 @@ import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getFinanceStats } from '../services/finance';
 import { getStats as getPeopleStats } from '../services/people';
-import { ArrowLeft, Landmark, CreditCard, GraduationCap, HandCoins, RotateCcw, Gavel, FileText, Wallet, Receipt, BookOpen, Users, ShieldAlert, CircleCheckBig } from 'lucide-react';
+import { ArrowLeft, Landmark, CreditCard, GraduationCap, HandCoins, RotateCcw, Gavel, FileText, Wallet, Receipt, BookOpen, Users, ShieldAlert, CircleCheckBig, LayoutList } from 'lucide-react';
 
 import FeeStructuresPage from './finance/FeeStructuresPage';
+import FeeComponentTemplatePage from './finance/FeeComponentTemplatePage';
 import StudentFeeAccountsPage from './finance/StudentFeeAccountsPage';
 import FeeLineItemsPage from './finance/FeeLineItemsPage';
 import PaymentsPage from './finance/PaymentsPage';
@@ -99,6 +100,7 @@ function FinanceHome() {
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4 mb-8">
         {[
           { to: 'fee-structures', icon: Landmark, label: 'Fee Structures', desc: 'Programme-wise fee setup', iconBg: 'bg-violet-50 text-violet-600', border: 'border-violet-200 hover:border-violet-400', statKey: 'feeStructures' },
+          { to: 'component-template', icon: LayoutList, label: 'Component Template', desc: 'Canonical + custom fee components', iconBg: 'bg-fuchsia-50 text-fuchsia-600', border: 'border-fuchsia-200 hover:border-fuchsia-400', statKey: null },
           { to: 'student-fee-accounts', icon: BookOpen, label: 'Fee Accounts', desc: 'Student balance ledgers', iconBg: 'bg-cyan-50 text-cyan-600', border: 'border-cyan-200 hover:border-cyan-400', statKey: 'studentFeeAccounts' },
           { to: 'fee-line-items', icon: FileText, label: 'Fee Line Items', desc: 'Charge-level fee tracking', iconBg: 'bg-sky-50 text-sky-600', border: 'border-sky-200 hover:border-sky-400', statKey: 'feeLineItems' },
           { to: 'payments', icon: CreditCard, label: 'Payments', desc: 'Collection & receipts', iconBg: 'bg-green-50 text-green-600', border: 'border-green-200 hover:border-green-400', statKey: 'payments' },
@@ -189,6 +191,7 @@ export default function Finance() {
       <Routes>
         <Route index element={<FinanceHome />} />
         <Route path="fee-structures" element={<FeeStructuresPage />} />
+        <Route path="component-template" element={<FeeComponentTemplatePage />} />
         <Route path="student-fee-accounts" element={<StudentFeeAccountsPage />} />
         <Route path="fee-line-items" element={<FeeLineItemsPage />} />
         <Route path="payments" element={<PaymentsPage />} />

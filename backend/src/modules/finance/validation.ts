@@ -769,3 +769,76 @@ export const releaseHoldSchema = z.object({ releasedBy: z.string().min(1), reaso
 export const scheduleVendorPaymentSchema = z.object({ paymentRequestId: z.string().min(1), scheduledDate: z.string().min(1), approvedBy: z.string().min(1) });
 export const confirmVendorPaymentSchema = z.object({ bankReference: z.string().min(1) });
 export const generateRevenueReportSchema = z.object({ academicYearId: z.string().min(1) });
+
+// ═══ Fee Configuration (Task 12) ═════════════════════════════
+// Pin management, component template, audit endpoints.
+
+const feePinReasonEnum = z.enum([
+  'initial',
+  'branch_change',
+  'quota_change',
+  'programme_transfer',
+  'admin_override',
+  'data_correction',
+  'year_back_carryforward',
+]);
+
+export const feePinRePinSchema = z.object({
+  yearOfStudy: z.number().int().min(1).max(8),
+  targetFeeStructureInstanceId: z.string().min(1),
+  reason: feePinReasonEnum,
+  remarks: z.string().optional(),
+});
+
+export const commitmentSheetRegenerateSchema = z.object({
+  pinId: z.string().min(1).optional(),
+});
+
+export const programmeTransferSchema = z.object({
+  newProgrammeId: z.string().min(1),
+  newBranchId: z.string().min(1).optional(),
+  newRegulationId: z.string().min(1).optional(),
+  effectiveYearOfStudy: z.number().int().min(1).max(8),
+  academicYearId: z.string().min(1),
+  reason: z.string().min(1),
+  remarks: z.string().optional(),
+});
+
+const feeComponentTemplateCategoryEnum = z.enum([
+  'academic',
+  'admission_oneoff',
+  'lab',
+  'infrastructure',
+  'student_life',
+  'regulatory',
+  'caution',
+  'conditional',
+]);
+
+export const feeComponentCreateSchema = z.object({
+  componentKey: z.string().min(1),
+  displayLabel: z.string().min(1),
+  category: feeComponentTemplateCategoryEnum,
+  isRefundable: z.boolean().optional(),
+  defaultOneTime: z.boolean().optional(),
+  applicableToYears: z.array(z.number().int().min(1).max(8)).optional(),
+  displayOrder: z.number().int().optional(),
+});
+
+export const feeComponentUpdateSchema = z.object({
+  displayLabel: z.string().min(1).optional(),
+  category: feeComponentTemplateCategoryEnum.optional(),
+  isRefundable: z.boolean().optional(),
+  defaultOneTime: z.boolean().optional(),
+  applicableToYears: z.array(z.number().int().min(1).max(8)).optional(),
+  displayOrder: z.number().int().optional(),
+});
+
+export const feeComponentTemplateListQuerySchema = z.object({
+  category: feeComponentTemplateCategoryEnum.optional(),
+  applicableToYear: z.coerce.number().int().min(1).max(8).optional(),
+});
+
+export const pinAuditQuerySchema = z.object({
+  collegeId: z.string().optional(),
+});

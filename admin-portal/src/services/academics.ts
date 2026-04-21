@@ -336,3 +336,28 @@ export const updateCourseFeedback = (id: string, data: any) =>
   api.put(`${BASE}/course-feedback/${id}`, data).then(r => r.data);
 export const deleteCourseFeedback = (id: string) =>
   api.delete(`${BASE}/course-feedback/${id}`).then(r => r.data);
+
+// ─── Promotions (Task 15 — Fee Configuration) ─────────
+/**
+ * `POST /academics/results/promote` triggers promotion for all `computed`/
+ * `published` semester results in a programme+semester combination. The
+ * response mirrors the T9-extended `promoteStudents` service return value:
+ *   { promoted, detained, yearBack, deferredPins: [{ studentId, reason, targetYear }] }
+ * Deferred pins are consumed by `PromotionResultsPanel` to list students
+ * whose Year-N+1 FeeStructureInstance isn't published yet.
+ */
+export interface DeferredPin {
+  studentId: string;
+  reason: string;
+  targetYear: number;
+}
+
+export interface PromotionSummary {
+  promoted: number;
+  detained: number;
+  yearBack: number;
+  deferredPins: DeferredPin[];
+}
+
+export const promoteStudents = (data: { semesterId: string; programmeId: string }): Promise<PromotionSummary> =>
+  api.post(`${BASE}/results/promote`, data).then(r => r.data);
