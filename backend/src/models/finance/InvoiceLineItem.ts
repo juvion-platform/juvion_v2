@@ -10,6 +10,14 @@ export interface IInvoiceLineItem extends Document {
   concessionApplied: number;
   netAmount: number;
   status: string;
+  /**
+   * Optional pointer to the Student.feePins[_id] that produced this
+   * line item. Populated by `generateSemesterInvoice` once pin-first
+   * resolution is live (plan §2.3, §1.6, Task 10). Mirrors the field
+   * added on `FeeLineItem` in T1. Existing line items leave this
+   * undefined — backward compatible.
+   */
+  sourcePinId?: Schema.Types.ObjectId;
 }
 
 const schema = new Schema<IInvoiceLineItem>({
@@ -22,6 +30,7 @@ const schema = new Schema<IInvoiceLineItem>({
   concessionApplied: { type: Number, required: true, default: 0 },
   netAmount: { type: Number, required: true },
   status: { type: String, enum: ['active', 'adjusted', 'waived', 'cancelled'], required: true, default: 'active' },
+  sourcePinId: { type: Schema.Types.ObjectId },
 }, { timestamps: true });
 
 schema.index({ collegeId: 1, invoiceId: 1 });

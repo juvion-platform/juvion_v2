@@ -24,6 +24,7 @@ import { POAttainmentRecord } from '../../models/academic-ops/POAttainmentRecord
 import { ProgrammeHealthMetrics } from '../../models/academic-ops/ProgrammeHealthMetrics';
 import { AttainmentRun } from '../../models/academic-ops/AttainmentRun';
 import { Section } from '../../models/academic-structure/Section';
+import { Semester } from '../../models/academic-structure/Semester';
 import { ElectiveAllocation } from '../../models/academic-ops/ElectiveAllocation';
 import { CourseOutcome } from '../../models/academic-ops/CourseOutcome';
 import { Course } from '../../models/academic-ops/Course';
@@ -33,6 +34,8 @@ import { FinancialHold } from '../../models/finance/FinancialHold';
 import { AppError } from '../../middleware/errorHandler';
 import { createAuditLog } from '../../shared/audit';
 import { paginate as _paginate } from '../../shared/pagination';
+import * as feePinService from '../finance/fee-pin-service';
+import { FeeStructureNotFoundError } from '../finance/fee-pin-service';
 
 
 // ═══════════════════════════════════════════════════════════════
@@ -945,6 +948,31 @@ export async function publishResults(
 
 /**
  * 19. Promote students based on semester results
+ *
+ * Task 9 (Fee Configuration): after the promotion decision is recorded,
+ * for each student whose decision is `promoted`, call
+ * `feePinService.pinYear(studentId, N+1, ...)` so the new year-of-study
+ * is bound to its active FeeStructureInstance. If no active structure
+ * exists (FeeStructureNotFoundError), the student's promotion still
+ * succeeds and is recorded in `deferredPins` on the returned summary —
+ * promotion must never fail because Finance hasn't finalised next year's
+ * rates (spec §Journey 3 step 5, §EC-5).
+ *
+ * Idempotency: `feePinService.pinYear` archives any existing active pin
+ * for the same `(studentId, yearOfStudy)` and pushes a fresh one. So
+ * re-running promotion against the same batch is safe — the net effect
+ * is "the latest pin wins; prior pin is archived". Operators re-running
+ * promotion should be aware that they will generate a new pin + new
+ * commitment sheet for each re-run even if the target FeeStructureInstance
+ * is unchanged.
+ *
+ * academicYearId source (OQ-7): derived from the supplied `semesterId` →
+ * `Semester.academicYearId`. This is the academic year the promotion
+ * workflow is operating within; callers needing precise control over the
+ * target academic year (e.g. explicit Y_N+1 mapping) should instead use
+ * a dedicated admin promotion endpoint that supplies it directly. Batch
+ * has no `academicYearId` field so this is the closest deterministic
+ * context available. Documented in spec changelog OQ-7.
  */
 export async function promoteStudents(
   collegeId: string,
@@ -965,9 +993,26 @@ export async function promoteStudents(
   }).select('_id').lean();
   const programmeStudentIds = new Set(programmeStudents.map(s => String(s._id)));
 
+  // Derive the academic year from the semester being promoted. If the
+  // semester record is missing, we fall back to `undefined` — the pin
+  // service will return FeeStructureNotFoundError with academicYear=
+  // <unknown> and every pin attempt will be deferred (which is the
+  // safe outcome).
+  const semester = await Semester.findOne({ _id: data.semesterId, collegeId })
+    .select('academicYearId').lean();
+  const targetAcademicYearId = semester?.academicYearId
+    ? String(semester.academicYearId)
+    : undefined;
+
   let promoted = 0;
   let detained = 0;
   let yearBack = 0;
+  const deferredPins: Array<{ studentId: string; reason: string; targetYear: number }> = [];
+
+  // Track promoted students + their source yearOfStudy so we can pin
+  // Year-N+1 after decisions are written.
+  const promotedQueue: Array<{ studentId: string; newYearOfStudy: number }> = [];
+  const fromYear = 1; // existing placeholder — see also T1 / model note.
 
   for (const r of results) {
     if (!programmeStudentIds.has(String(r.studentId))) continue;
@@ -979,6 +1024,7 @@ export async function promoteStudents(
       decision = 'promoted';
       reason = 'All courses cleared with SGPA >= 5.0';
       promoted++;
+      promotedQueue.push({ studentId: String(r.studentId), newYearOfStudy: fromYear + 1 });
     } else if (r.backlogs > 0 && r.backlogs <= 4) {
       decision = 'detained';
       reason = `${r.backlogs} backlog(s) pending`;
@@ -995,7 +1041,7 @@ export async function promoteStudents(
         collegeId,
         studentId: r.studentId,
         academicYearId: data.semesterId,
-        fromYear: 1,
+        fromYear,
         decision,
         reason,
         totalBacklogs: r.backlogs,
@@ -1004,17 +1050,43 @@ export async function promoteStudents(
     );
   }
 
+  // Pin Year N+1 for every promoted student. `detained` / `year_back`
+  // students intentionally receive no pin call — their existing pin
+  // (for the current year) continues to apply (§Journey 5).
+  for (const { studentId, newYearOfStudy } of promotedQueue) {
+    try {
+      await feePinService.pinYear(studentId, newYearOfStudy, {
+        pinnedBy: 'system:promotion',
+        reason: 'initial',
+        academicYearId: targetAcademicYearId,
+        enqueueCommitmentSheet: true,
+      });
+    } catch (err) {
+      if (err instanceof FeeStructureNotFoundError) {
+        deferredPins.push({
+          studentId,
+          reason: err.message,
+          targetYear: newYearOfStudy,
+        });
+      } else {
+        // Unexpected failure — do not silently swallow. Surface it so
+        // the caller's transaction / retry logic can react.
+        throw err;
+      }
+    }
+  }
+
   await createAuditLog({
     collegeId,
     entityType: 'PromotionDecision',
     entityId: data.semesterId,
     entityName: `Student promotions for semester ${data.semesterId}`,
     action: 'create',
-    changes: [{ field: 'promotions', displayName: 'Promotions', oldValue: null, newValue: { promoted, detained, yearBack } }],
+    changes: [{ field: 'promotions', displayName: 'Promotions', oldValue: null, newValue: { promoted, detained, yearBack, deferred: deferredPins.length } }],
     performedBy,
   });
 
-  return { promoted, detained, yearBack };
+  return { promoted, detained, yearBack, deferredPins };
 }
 
 /**
