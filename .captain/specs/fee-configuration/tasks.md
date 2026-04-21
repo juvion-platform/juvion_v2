@@ -69,10 +69,10 @@ Foundation (parallel, no deps)
 | 5 | fee-pin-service.ts: pinYear, rePin, archivePin, resolveActivePin, checkPinValidity | Code | 1 | Done |
 | 6 | fee-component-template-service.ts: CRUD + admin-approval gate on edits | Code | 1 | Done |
 | 7 | fee-commitment-sheet-service.ts: PDF generation via PdfRenderer + M02 Document attach + worker implementation | Code | 3, 4, 5 | Done |
-| 8 | Admission integration: provision_m04 calls pinYear(N=1); hard-fail if no active structure | Code | 5 | Pending |
-| 9 | Promotion integration: promoteStudents calls pinYear(N+1); per-student deferred-pin reporting | Code | 5 | Pending |
-| 10 | Invoice generation pin-first: generateSemesterInvoice reads Student.feePins before live resolution | Code | 5 | Pending |
-| 11 | Rebind hooks: stale-pin detection on Student attribute change; auto-rebind on programme transfer | Code | 5 | Pending |
+| 8 | Admission integration: provision_m04 calls pinYear(N=1); hard-fail if no active structure | Code | 5 | Done |
+| 9 | Promotion integration: promoteStudents calls pinYear(N+1); per-student deferred-pin reporting | Code | 5 | Done |
+| 10 | Invoice generation pin-first: generateSemesterInvoice reads Student.feePins before live resolution | Code | 5 | Done |
+| 11 | Rebind hooks: stale-pin detection on Student attribute change; auto-rebind on programme transfer | Code | 5 | Done |
 | 12 | HTTP API: /pins GET, /pins/re-pin POST, /commitment-sheet/regenerate POST, /component-template GET/PUT, /pin-audit endpoints + validation | Code | 5, 6, 7 | Pending |
 | 13 | Admin UI: Fee Pins tab on StudentDetailPage (active pin + history + Principal-gated re-pin action) | Code | 12 | Pending |
 | 14 | Admin UI: FeeComponentTemplatePage (CRUD editor with approval workflow) | Code | 12 | Pending |
@@ -81,6 +81,7 @@ Foundation (parallel, no deps)
 | 17 | Nightly audit job (BullMQ) + Finance dashboard metrics (coverage, invariants, PDF failure rate, deferred-pin count) | Code | 5, 10 | Pending |
 | 18 | E2E integration tests covering admission→pin→invoice, promotion→pin, rebind, commitment sheet, invoice pin-first fallback | Code | 8, 9, 10, 11, 12 | Pending |
 | 19 | API reference docs + QA / deploy checklist | Doc | 12, 18 | Pending |
+| 20 | **(new, blocking T16)** `resolveStudentYearOfStudy` canonical helper from Student → Batch → AcademicYear math; consume from T8/T9/T10/T11; remove placeholders | Code | 5 | Pending |
 
 ---
 
@@ -561,3 +562,4 @@ All 40+ ACs trace to ≥1 task; all 12 edge cases have a home; all NOT-For items
 - **2026-04-21** — Initial task list drafted from spec + plan. 19 tasks, 4 parallel starters (T1, T2, T3, T4). Front-loaded risks: T15 (backfill, hardest part) has DRY-RUN + audit CSV + --commit gate; T8 (admission pin) has hard-fail + proactive dashboard warning.
 - **2026-04-21** — T1–T4 (foundation) completed in parallel. 51 new tests (19 schema + 11 seed + 13 pdfkit + 8 queue). Full backend suite 326/326 passing. Spec typo "30-component" → "33-component" fixed in same session. Completion signals in `./completions/task-1..4.md`.
 - **2026-04-21** — T5, T6, T7 (core services) completed. 45 new tests (10 pin + 24 template + 11 commitment-sheet). Full backend suite 372/372 passing. Five new open questions logged in spec.md changelog: OQ-6 (FSI yearOfStudy), OQ-7 (Batch academicYearId), OQ-8 (M02 generic Document), OQ-9 (ExitDocument supersede), OQ-10 (Student opt-in flags). OQ-8 is the significant one — M02 lacks a generic document service; T7 shipped a pragmatic workaround with a test-overridable seam. Completion signals in `./completions/task-5..7.md`.
+- **2026-04-21** — T8, T9, T10, T11 (integration) completed in parallel. 26 new tests (5 + 5 + 6 + 10). Full backend suite 398/398 passing. Six new open questions logged (OQ-11..OQ-16). **OQ-11 is the significant one**: year-of-study derivation is an unfinished seam across 4 tasks. New task **T20** added: canonical `resolveStudentYearOfStudy` helper, blocking T16 (backfill). Completion signals in `./completions/task-8..11.md`.
