@@ -125,4 +125,5 @@ export const QUEUE_NAMES = {
 
   // Finance
   FEE_COMMITMENT: 'finance:fee-commitment',
+  FEE_PIN_AUDIT: 'finance:fee-pin-audit',
 } as const;

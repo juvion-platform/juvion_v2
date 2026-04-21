@@ -169,24 +169,39 @@ describe('resolveStudentYearOfStudy', () => {
 
   // ── 3 ──────────────────────────────────────────────────────────────
   it('lateral entry (studyYearAtAdmission=2) → offsets +1', async () => {
+    // Post-T21: the field lives in the Mongoose schema; set it on the
+    // seed directly rather than bypassing the schema.
     const f = await seed({
       admissionYear: 2023,
       ayStart: new Date('2024-06-01'),
       ayEnd: new Date('2025-05-31'),
       ayLabel: '2024-25',
+      studyYearAtAdmission: 2,
     });
-    // Student.studyYearAtAdmission is not yet in the Mongoose schema —
-    // write it directly to the collection so the helper's forward-compat
-    // branch is exercised.
-    await Student.collection.updateOne(
-      { _id: new mongoose.Types.ObjectId(f.studentId) },
-      { $set: { studyYearAtAdmission: 2 } },
-    );
     const result = await resolveStudentYearOfStudy(f.studentId, {
       academicYearId: String(f.academicYearId),
     });
     // raw = 2024 - 2023 + 1 + (2-1) = 3
     expect(result.yearOfStudy).toBe(3);
+  });
+
+  // ── 3b (T21 regression) ────────────────────────────────────────────
+  it('lateral-entry student (2022 admission, studyYearAtAdmission=2) in 2023-24 AY → yearOfStudy = 3', async () => {
+    // Regression for T21: pre-T21 a lateral-entry student was
+    // incorrectly returned as Year-2. With the schema field populated
+    // they correctly map to Year-3 (raw = 2023 - 2022 + 1 + 1 = 3).
+    const f = await seed({
+      admissionYear: 2022,
+      ayStart: new Date('2023-06-01'),
+      ayEnd: new Date('2024-05-31'),
+      ayLabel: '2023-24',
+      studyYearAtAdmission: 2,
+    });
+    const result = await resolveStudentYearOfStudy(f.studentId, {
+      academicYearId: String(f.academicYearId),
+    });
+    expect(result.yearOfStudy).toBe(3);
+    expect(result.isGraduated).toBe(false);
   });
 
   // ── 4 ──────────────────────────────────────────────────────────────

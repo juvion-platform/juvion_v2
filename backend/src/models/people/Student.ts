@@ -75,6 +75,7 @@ export interface IStudent extends Document {
   collegeId: Schema.Types.ObjectId;
   personId: Schema.Types.ObjectId;
   admissionYear: number;
+  studyYearAtAdmission?: number;
   category?: string;
   quota?: string;
   regulationId?: Schema.Types.ObjectId;
@@ -116,6 +117,26 @@ const schema = new Schema<IStudent>({
   collegeId: { type: Schema.Types.ObjectId, required: true, index: true },
   personId: { type: Schema.Types.ObjectId, ref: 'Person', required: true },
   admissionYear: { type: Number, required: true },
+  /**
+   * The year-of-study this student entered the programme at.
+   * - 1 for normal direct-admission students (the default)
+   * - 2 for lateral-entry students (e.g., diploma-holders entering BTech Year 2)
+   * - higher values for unusual transfers
+   *
+   * Used by resolveStudentYearOfStudy (T20) to compute the current
+   * year-of-study from the admission batch + current academic year.
+   * Without this field, lateral-entry students are incorrectly treated
+   * as Year-1 admissions.
+   *
+   * See .captain/specs/fee-configuration/ (T21, OQ-11).
+   */
+  studyYearAtAdmission: {
+    type: Number,
+    min: 1,
+    max: 8,
+    default: 1,
+    required: false,
+  },
   category: String,
   quota: { type: String, enum: ['convener', 'management', 'nri'] },
   regulationId: { type: Schema.Types.ObjectId, ref: 'Regulation' },
