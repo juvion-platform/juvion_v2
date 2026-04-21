@@ -8,6 +8,7 @@ import { Organization } from '../../models/people/Organization';
 import { paginate } from '../../shared/pagination';
 import { createAuditLog } from '../../shared/audit';
 import { AppError } from '../../middleware/errorHandler';
+import * as feePinService from '../finance/fee-pin-service';
 import { AuthScope } from '../../shared/rbac/types';
 import { applyAuthScope } from '../../shared/rbac/apply-scope';
 import {
@@ -336,6 +337,22 @@ export async function createStudent(collegeId: string, data: any, performedBy: s
 export async function updateStudent(collegeId: string, id: string, data: any, performedBy: string): Promise<any> {
   const student = await Student.findOne({ _id: id, collegeId });
   if (!student) throw new AppError(404, 'Student not found');
+
+  // T11 rebind guard: programmeId changes MUST go through
+  // programme-transfer-service (which archives the old pin, re-pins the
+  // current year against the new programme's structure, and rolls back
+  // if that structure is missing). Block the generic patch path so
+  // admins are forced onto the correct workflow.
+  if (
+    data.programmeId !== undefined &&
+    String(data.programmeId) !== String(student.programmeId ?? '')
+  ) {
+    throw new AppError(
+      403,
+      'programmeId changes are not allowed via the generic student update; use the programme-transfer endpoint to ensure fee pins are rebound atomically.',
+    );
+  }
+
   const previousPrimaryParentId = student.primaryParentId ? String(student.primaryParentId) : '';
   const previousFeeResponsibleParentId = student.feeResponsibleParentId ? String(student.feeResponsibleParentId) : '';
   const previousParentIds = [previousPrimaryParentId, previousFeeResponsibleParentId].filter(Boolean);
@@ -343,6 +360,14 @@ export async function updateStudent(collegeId: string, id: string, data: any, pe
   const personFields: any = {};
   ['name', 'phone', 'alternatePhone', 'email', 'aadhaar', 'dob', 'gender', 'preferredLanguage', 'address', 'emergencyContact', 'photo', 'biometricEnrolled'].forEach(k => { if (data[k] !== undefined) personFields[k] = data[k]; });
   if (Object.keys(personFields).length > 0) await Person.findByIdAndUpdate(student.personId, { $set: personFields });
+
+  // Snapshot fields-that-affect-fees BEFORE applying changes, so we can
+  // detect a drift vs the pinned structure after the write.
+  const prevFeeAxes = {
+    branchId: student.branchId ? String(student.branchId) : null,
+    quota: student.quota ?? null,
+    category: student.category ?? null,
+  };
 
   const studentFields: any = {};
   ['admissionYear', 'category', 'quota', 'rollNumber', 'status', 'regulationId', 'programmeId', 'branchId', 'batchId', 'primaryParentId', 'feeResponsibleParentId'].forEach(k => { if (data[k] !== undefined) studentFields[k] = data[k]; });
@@ -364,7 +389,74 @@ export async function updateStudent(collegeId: string, id: string, data: any, pe
   await syncStudentParentLinks(collegeId, id, previousParentIds, nextParentIds);
 
   await createAuditLog({ collegeId, entityType: 'Student', entityId: id, entityName: data.name || 'Student', action: 'update', changes: [], performedBy });
+
+  // T11 stale-pin detection. If any of the fee-axis fields changed, check
+  // the active pin for the student's current year-of-study: if the pin no
+  // longer matches the student's attributes, set `staleSince` so admins
+  // are prompted (via UI banner — T13) to re-pin manually.
+  //
+  // This is deliberately best-effort: failures here MUST NOT fail the
+  // student update. We log and move on.
+  const feeAxisChanged =
+    (data.branchId !== undefined && String(data.branchId) !== prevFeeAxes.branchId) ||
+    (data.quota !== undefined && (data.quota ?? null) !== prevFeeAxes.quota) ||
+    (data.category !== undefined && (data.category ?? null) !== prevFeeAxes.category);
+
+  if (feeAxisChanged) {
+    try {
+      const yearOfStudy = await resolveActiveYearOfStudy(id);
+      if (yearOfStudy !== null) {
+        const validity = await feePinService.checkPinValidity(id, yearOfStudy);
+        if (!validity.valid && validity.currentPin) {
+          const now = new Date();
+          await Student.updateOne(
+            {
+              _id: id,
+              'feePins._id': validity.currentPin._id,
+            },
+            { $set: { 'feePins.$.staleSince': now } },
+          );
+          // eslint-disable-next-line no-console
+          console.info(
+            `[fee-pin] marked stale student=${id} year=${yearOfStudy} reason=${validity.reason ?? 'unknown'}`,
+          );
+        }
+      }
+    } catch (err) {
+      // Log, don't fail the update.
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[fee-pin] stale-pin validity check failed for student=${id}:`,
+        err,
+      );
+    }
+  }
+
   return getStudent(collegeId, id);
+}
+
+/**
+ * Resolve the student's current year-of-study for pin-validity checks.
+ *
+ * Heuristic: pick the highest yearOfStudy among active (non-archived)
+ * pins. If the student has no active pin we return null — there's no
+ * pin to invalidate, so the caller skips the stale-check.
+ *
+ * A more precise resolver would walk batch → academicYear arithmetic
+ * (cf. plan §1.6), but callers of updateStudent don't typically change
+ * year-of-study and the active-pin heuristic is sufficient for the
+ * rebind-hook use case. Future: lift this into a shared helper as part
+ * of T10 lazy-pin work.
+ */
+async function resolveActiveYearOfStudy(studentId: string): Promise<number | null> {
+  const doc = await Student.findById(studentId).select('feePins').lean();
+  if (!doc) return null;
+  const actives = (doc.feePins || []).filter((p: any) => !p.archivedAt);
+  if (actives.length === 0) return null;
+  return actives.reduce(
+    (max: number, p: any) => (p.yearOfStudy > max ? p.yearOfStudy : max),
+    0,
+  );
 }
 
 export async function deleteStudent(collegeId: string, id: string, performedBy: string) {
