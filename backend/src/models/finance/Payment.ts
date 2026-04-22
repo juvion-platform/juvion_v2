@@ -3,6 +3,7 @@ import { Schema, model, Document } from 'mongoose';
 export interface IPayment extends Document {
   collegeId: Schema.Types.ObjectId;
   studentId: Schema.Types.ObjectId; receiptNumber: string; amount: number; paymentMode: string; transactionRef?: string; paymentDate: Date; allocations: { lineItemId: Schema.Types.ObjectId; amount: number }[]; status: string; collectedBy?: Schema.Types.ObjectId; remarks?: string;
+  metadata?: Record<string, unknown>;
 }
 
 const schema = new Schema<IPayment>({
@@ -17,9 +18,12 @@ const schema = new Schema<IPayment>({
   status: { type: String, enum: ['success', 'pending', 'failed', 'reversed'], default: 'success' },
   collectedBy: { type: Schema.Types.ObjectId, ref: 'Person' },
   remarks: String,
+  metadata: { type: Schema.Types.Mixed, default: {} },
 }, { timestamps: true });
 
 schema.index({ collegeId: 1, receiptNumber: 1 }, { unique: true });
 schema.index({ collegeId: 1, studentId: 1 });
+// Dashboard collection time-series aggregation — plan §2.4
+schema.index({ collegeId: 1, status: 1, createdAt: 1 });
 
 export const Payment = model<IPayment>('Payment', schema);

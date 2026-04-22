@@ -5,12 +5,26 @@ export interface IFinancialHold extends Document {
   studentId: Schema.Types.ObjectId;
   defaulterRecordId: Schema.Types.ObjectId;
   holdType: 'exam_debarment' | 'hostel_restriction' | 'transcript_hold' | 'full_clearance_block';
-  holdStatus: 'active' | 'released';
+  /**
+   * 'pending_approval' added by the fee-alerts-cron feature (T5): holds
+   * auto-raised on a stage_4 transition start in this state; Principal
+   * activates/waives via the fee-holds-service (T4). Until T4 lands, the
+   * enum extension here is the minimum cross-task dependency the cron
+   * worker needs to auto-create a pending hold.
+   */
+  holdStatus: 'active' | 'released' | 'pending_approval';
   effectiveDate: Date;
-  approvedBy: Schema.Types.ObjectId;
+  /**
+   * Approver is optional at creation: cron-raised `pending_approval`
+   * holds have no approver yet (Principal fills this in on activate).
+   */
+  approvedBy?: Schema.Types.ObjectId;
   releaseDate?: Date;
   releasedBy?: Schema.Types.ObjectId;
   releaseReason?: string;
+  metadata?: Record<string, unknown>;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 const schema = new Schema<IFinancialHold>({
@@ -24,14 +38,17 @@ const schema = new Schema<IFinancialHold>({
   },
   holdStatus: {
     type: String,
-    enum: ['active', 'released'],
+    enum: ['active', 'released', 'pending_approval'],
     default: 'active',
   },
   effectiveDate: { type: Date, default: Date.now },
-  approvedBy: { type: Schema.Types.ObjectId, ref: 'Person', required: true },
+  // Approver is optional — auto-raised pending_approval holds have no
+  // approver until the Principal activates them.
+  approvedBy: { type: Schema.Types.ObjectId, ref: 'Person' },
   releaseDate: { type: Date },
   releasedBy: { type: Schema.Types.ObjectId, ref: 'Person' },
   releaseReason: { type: String },
+  metadata: { type: Schema.Types.Mixed, default: {} },
 }, { timestamps: true });
 
 schema.index({ collegeId: 1, studentId: 1, holdStatus: 1 });
