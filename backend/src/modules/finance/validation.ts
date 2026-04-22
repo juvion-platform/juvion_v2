@@ -842,3 +842,51 @@ export const feeComponentTemplateListQuerySchema = z.object({
 export const pinAuditQuerySchema = z.object({
   collegeId: z.string().optional(),
 });
+
+// ═══ Fee Analytics & Alerts (Task 8) ══════════════════════════
+// Spec: .captain/specs/fee-collection-analytics-and-alerts/plan.md §1.8
+
+/**
+ * Normalize a query-string value that may come through as a string or
+ * (when repeated like `?programmeIds=a&programmeIds=b`) as a string[].
+ * Returns `string[] | undefined`. Empty strings are dropped.
+ */
+const stringOrStringArray = z
+  .union([z.string(), z.array(z.string())])
+  .optional()
+  .transform((v) => {
+    if (v === undefined) return undefined;
+    const arr = Array.isArray(v) ? v : [v];
+    const cleaned = arr.map((s) => String(s).trim()).filter((s) => s.length > 0);
+    return cleaned.length === 0 ? undefined : cleaned;
+  });
+
+export const dashboardQuerySchema = z.object({
+  from: z.coerce.date(),
+  to: z.coerce.date(),
+  programmeIds: stringOrStringArray,
+  branchIds: stringOrStringArray,
+  batchIds: stringOrStringArray,
+  academicYearId: z.string().optional(),
+});
+
+export const defaultersQuerySchema = z.object({
+  limit: z.coerce.number().int().positive().max(100).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
+  sort: z.enum(['overdueAmount', 'daysOverdue']).optional(),
+});
+
+export const holdsListQuerySchema = z.object({
+  status: z.enum(['pending_approval', 'active', 'released']).optional(),
+  studentId: z.string().optional(),
+  limit: z.coerce.number().int().positive().max(100).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
+});
+
+export const waiveHoldSchema = z.object({
+  reason: z.string().trim().min(1, 'Reason is required'),
+});
+
+export const pauseEscalationSchema = z.object({
+  pausedUntil: z.coerce.date(),
+});

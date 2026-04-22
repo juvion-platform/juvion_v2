@@ -8,6 +8,8 @@ import * as ctrl from './controller';
 import * as feePinCtrl from './fee-pin-controller';
 import * as feeTemplateCtrl from './fee-component-template-controller';
 import * as feePinAuditCtrl from './fee-pin-audit-controller';
+import * as feeAnalyticsCtrl from './fee-analytics-controller';
+import * as feeHoldsCtrl from './fee-holds-controller';
 import {
   createFeeStructureSchema, updateFeeStructureSchema,
   createStudentFeeAccountSchema, updateStudentFeeAccountSchema,
@@ -142,10 +144,75 @@ import {
   programmeTransferSchema,
   feeComponentCreateSchema,
   feeComponentUpdateSchema,
+  dashboardQuerySchema,
+  defaultersQuerySchema,
+  holdsListQuerySchema,
+  waiveHoldSchema,
+  pauseEscalationSchema,
 } from './validation';
 
 const router = Router();
 router.use(authenticate);
+
+// Shared rate-limiter used by fee-configuration (T12) and
+// fee-analytics-and-alerts (T8) routes. 60 requests/min/user. See
+// `.captain/specs/fee-collection-analytics-and-alerts/plan.md` §1.8.
+const feeConfigRateLimit = createUserRateLimit({ max: 60, windowMs: 60_000 });
+
+// ═══════════════════════════════════════════════════════════════
+//  T8: Fee Analytics & Alerts HTTP API
+//  Declared BEFORE the legacy `/holds` CRUD routes so the new
+//  `GET /holds` (listing via fee-holds-service) takes precedence
+//  over the older `listFinancialHolds` controller below.
+//  Spec: .captain/specs/fee-collection-analytics-and-alerts/
+// ═══════════════════════════════════════════════════════════════
+
+// Analytics — dashboard + defaulters (reads).
+router.get(
+  '/analytics/dashboard',
+  authorize('finance', 'read'),
+  feeConfigRateLimit,
+  validate(dashboardQuerySchema, 'query'),
+  feeAnalyticsCtrl.getDashboardHandler,
+);
+router.get(
+  '/analytics/defaulters',
+  authorize('finance', 'read'),
+  feeConfigRateLimit,
+  validate(defaultersQuerySchema, 'query'),
+  feeAnalyticsCtrl.getDefaultersHandler,
+);
+
+// Holds — list + principal-gated activate / waive.
+router.get(
+  '/holds',
+  authorize('finance', 'read'),
+  feeConfigRateLimit,
+  validate(holdsListQuerySchema, 'query'),
+  feeHoldsCtrl.listHoldsHandler,
+);
+router.post(
+  '/holds/:id/activate',
+  authorize('finance', 'update'),
+  feeConfigRateLimit,
+  feeHoldsCtrl.activateHoldHandler,
+);
+router.post(
+  '/holds/:id/waive',
+  authorize('finance', 'update'),
+  feeConfigRateLimit,
+  validate(waiveHoldSchema),
+  feeHoldsCtrl.waiveHoldHandler,
+);
+
+// Pause auto-escalation on a student's DefaulterRecord(s).
+router.post(
+  '/students/:id/pause-escalation',
+  authorize('finance', 'update'),
+  feeConfigRateLimit,
+  validate(pauseEscalationSchema),
+  feeHoldsCtrl.pauseEscalationHandler,
+);
 
 // Dashboard
 router.get('/stats', authorize('finance', 'read'), ctrl.dashboardStats);
@@ -550,9 +617,8 @@ router.post('/revenue-reports', authorize('finance', 'create'), validate(generat
 // All routes sit behind authenticate + authorize + per-user rate limit.
 // Principal-gated actions use `authorize('finance', 'approve')` which
 // the default policy set grants to role=principal (and super_admin via
-// wildcard). See shared/rbac/defaults.ts.
-
-const feeConfigRateLimit = createUserRateLimit({ max: 60, windowMs: 60_000 });
+// wildcard). See shared/rbac/defaults.ts. `feeConfigRateLimit` is
+// declared at the top of this file (shared with the T8 routes above).
 
 // Student pin management
 router.get(
