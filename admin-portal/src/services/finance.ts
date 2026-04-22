@@ -178,3 +178,53 @@ export const createFinancialReport = (data: any) =>
   api.post(`${BASE}/reports`, data).then(r => r.data);
 export const deleteFinancialReport = (id: string) =>
   api.delete(`${BASE}/reports/${id}`).then(r => r.data);
+
+// ─── Fee Analytics & Alerts (T8 / T11) ────────────────────
+// Backend spec: .captain/specs/fee-collection-analytics-and-alerts
+
+export interface DefaulterListItem {
+  studentId: string;
+  rollNumber: string;
+  name: string;
+  programmeName: string;
+  overdueAmount: number;
+  daysOverdue: number;
+  escalationStage: string;
+  /** ISO date string when the cron auto-escalation is paused until (future → skipped). */
+  autoEscalationPaused?: string | null;
+}
+
+export interface DefaulterListResponse {
+  items: DefaulterListItem[];
+  total: number;
+}
+
+export const getDefaulters = (params: {
+  limit?: number;
+  offset?: number;
+  sort?: 'overdueAmount' | 'daysOverdue';
+} = {}) =>
+  api
+    .get<DefaulterListResponse>(`${BASE}/analytics/defaulters`, { params })
+    .then(r => r.data);
+
+export interface PauseEscalationResponse {
+  updated: number;
+  studentId: string;
+  /** ISO date string the records are now paused until (server echoes what was set). */
+  pausedUntil: string;
+}
+
+/**
+ * Pause / resume auto-escalation for a student.
+ * - To pause: pass a future-dated ISO string.
+ * - To "resume now": pass `new Date().toISOString()` — cron skip-guard
+ *   uses `autoEscalationPaused > now`, so a past/now value effectively
+ *   un-pauses on the next run.
+ */
+export const pauseEscalation = (studentId: string, pausedUntil: string) =>
+  api
+    .post<PauseEscalationResponse>(`${BASE}/students/${studentId}/pause-escalation`, {
+      pausedUntil,
+    })
+    .then(r => r.data);

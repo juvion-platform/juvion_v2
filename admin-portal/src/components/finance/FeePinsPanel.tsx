@@ -9,6 +9,8 @@ import {
   Pin,
   ChevronDown,
   ChevronUp,
+  PauseCircle,
+  PlayCircle,
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import {
@@ -17,6 +19,11 @@ import {
   type IFeePin,
   type PopulatedFeeStructureInstance,
 } from '../../services/fee-configuration';
+import {
+  getDefaulters,
+  pauseEscalation,
+  type DefaulterListItem,
+} from '../../services/finance';
 import { DetailSection, DetailField, formatDate } from '../ui/DetailView';
 import Badge from '../ui/Badge';
 import RePinDialog from './RePinDialog';
@@ -89,6 +96,8 @@ export default function FeePinsPanel({
 }: Props) {
   const qc = useQueryClient();
   const userRole = useAuthStore((s) => s.user?.role ?? '');
+  const hasPermission = useAuthStore((s) => s.hasPermission);
+  const canPauseEscalation = hasPermission('finance', 'update');
   const isPrincipal = userRole === 'principal' || userRole === 'super_admin';
 
   const [rePinOpen, setRePinOpen] = useState(false);
@@ -96,12 +105,103 @@ export default function FeePinsPanel({
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [regenPinId, setRegenPinId] = useState<string | null>(null);
+  // Auto-escalation pause block state
+  const [pauseUntilInput, setPauseUntilInput] = useState<string>('');
+  const [pauseError, setPauseError] = useState<string | null>(null);
+  const [pauseMessage, setPauseMessage] = useState<string | null>(null);
 
   const pinsQuery = useQuery({
     queryKey: ['student-pins', studentId],
     queryFn: () => getStudentPins(studentId),
     enabled: !!studentId,
   });
+
+  // Fetch defaulters to locate this student's auto-escalation state.
+  // Using the defaulters list (T8 §Journey 1) because T8 didn't ship a
+  // per-student GET; sort + large limit so the student is reliably in
+  // the first page. Filter client-side to find this student's row.
+  const defaultersQuery = useQuery({
+    queryKey: ['finance-defaulters', 'all'],
+    queryFn: () => getDefaulters({ limit: 100, sort: 'daysOverdue' }),
+    enabled: !!studentId,
+    staleTime: 30_000,
+  });
+
+  const defaulterRow: DefaulterListItem | undefined = useMemo(() => {
+    const items = defaultersQuery.data?.items ?? [];
+    return items.find((d) => String(d.studentId) === String(studentId));
+  }, [defaultersQuery.data, studentId]);
+
+  const now = Date.now();
+  const pausedUntilDate = defaulterRow?.autoEscalationPaused
+    ? new Date(defaulterRow.autoEscalationPaused)
+    : null;
+  const isCurrentlyPaused =
+    !!pausedUntilDate && pausedUntilDate.getTime() > now;
+
+  const pauseMut = useMutation({
+    mutationFn: (pausedUntilIso: string) =>
+      pauseEscalation(studentId, pausedUntilIso),
+    onMutate: () => {
+      setPauseError(null);
+      setPauseMessage(null);
+    },
+    onSuccess: (res) => {
+      setPauseMessage(
+        res.updated > 0
+          ? `Updated ${res.updated} defaulter record${res.updated === 1 ? '' : 's'}.`
+          : 'Pause state updated.',
+      );
+      setPauseUntilInput('');
+      qc.invalidateQueries({ queryKey: ['finance-defaulters'] });
+      qc.invalidateQueries({ queryKey: ['student-pins', studentId] });
+    },
+    onError: (err: unknown) => {
+      const e = err as {
+        response?: { data?: { message?: string } };
+        message?: string;
+      };
+      setPauseError(
+        e?.response?.data?.message ||
+          e?.message ||
+          'Failed to update auto-escalation pause.',
+      );
+    },
+  });
+
+  const tomorrowIso = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().slice(0, 10);
+  }, []);
+  const maxPauseIso = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 90);
+    return d.toISOString().slice(0, 10);
+  }, []);
+
+  function submitPause() {
+    if (!pauseUntilInput) {
+      setPauseError('Please pick a date to pause until.');
+      return;
+    }
+    // `<input type="date">` returns YYYY-MM-DD (local). Convert to
+    // end-of-day UTC ISO so the cron's `> now` check holds for the full
+    // chosen day regardless of timezone.
+    const [y, m, d] = pauseUntilInput.split('-').map(Number);
+    if (!y || !m || !d) {
+      setPauseError('Invalid date.');
+      return;
+    }
+    const iso = new Date(Date.UTC(y, m - 1, d, 23, 59, 59)).toISOString();
+    pauseMut.mutate(iso);
+  }
+
+  function submitResume() {
+    // "Resume now" = pass the current timestamp. Cron guard is `> now`,
+    // so any value ≤ now means un-paused on the next run.
+    pauseMut.mutate(new Date().toISOString());
+  }
 
   const regenMut = useMutation({
     mutationFn: (pinId: string) => regenerateCommitmentSheet(studentId, { pinId }),
@@ -338,6 +438,140 @@ export default function FeePinsPanel({
             )}
           </div>
         )}
+      </section>
+
+      {/* ═══ Auto-Escalation Control (T11) ═══════════════════════════ */}
+      <section className="bg-white rounded-xl border shadow-sm overflow-hidden">
+        <header className="px-5 py-3 border-b bg-gray-50">
+          <h3 className="text-sm font-semibold text-navy uppercase tracking-wide flex items-center gap-2">
+            <PauseCircle className="w-4 h-4" /> Auto-Escalation Control
+          </h3>
+        </header>
+
+        <div className="p-5 space-y-3">
+          {/* Status line */}
+          {defaultersQuery.isLoading ? (
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              <Loader2 className="w-4 h-4 animate-spin" /> Loading status…
+            </div>
+          ) : defaultersQuery.error ? (
+            <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              Couldn't load auto-escalation status.{' '}
+              <button
+                className="underline"
+                onClick={() => defaultersQuery.refetch()}
+                type="button"
+              >
+                Retry
+              </button>
+            </div>
+          ) : !defaulterRow ? (
+            <div className="text-sm text-gray-500">
+              <span className="font-medium text-gray-700">Status:</span>{' '}
+              Not a defaulter — nothing to pause.
+            </div>
+          ) : isCurrentlyPaused ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <Badge variant="warning">Paused</Badge>
+              <span className="text-sm text-gray-700">
+                Currently paused until{' '}
+                <span className="font-medium">
+                  {formatDate(pausedUntilDate!.toISOString())}
+                </span>
+                .
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Badge variant="success">Active</Badge>
+              <span className="text-sm text-gray-700">
+                Cron auto-escalation is running normally for this student.
+              </span>
+            </div>
+          )}
+
+          {/* Action feedback */}
+          {pauseError && (
+            <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              {pauseError}
+            </div>
+          )}
+          {pauseMessage && !pauseError && (
+            <div className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+              {pauseMessage}
+            </div>
+          )}
+
+          {/* Controls (Finance-Officer / super-admin only) */}
+          {canPauseEscalation && defaulterRow && (
+            <div className="pt-2 border-t border-gray-100">
+              {isCurrentlyPaused ? (
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={submitResume}
+                    disabled={pauseMut.isPending}
+                    className="inline-flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-lg bg-primary-50 text-primary-700 border border-primary-200 hover:bg-primary-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {pauseMut.isPending ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <PlayCircle className="w-3.5 h-3.5" />
+                    )}
+                    Resume now
+                  </button>
+                  <span className="text-xs text-gray-500">
+                    Resuming clears the pause on the next cron run.
+                  </span>
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-end gap-3">
+                  <div className="flex flex-col">
+                    <label
+                      htmlFor="pause-until-input"
+                      className="text-xs font-medium text-gray-600 mb-1"
+                    >
+                      Pause until
+                    </label>
+                    <input
+                      id="pause-until-input"
+                      type="date"
+                      value={pauseUntilInput}
+                      min={tomorrowIso}
+                      max={maxPauseIso}
+                      onChange={(e) => setPauseUntilInput(e.target.value)}
+                      disabled={pauseMut.isPending}
+                      className="text-sm px-3 py-1.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-200 disabled:bg-gray-50"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={submitPause}
+                    disabled={pauseMut.isPending || !pauseUntilInput}
+                    className="inline-flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-lg bg-primary-50 text-primary-700 border border-primary-200 hover:bg-primary-100 disabled:bg-gray-50 disabled:text-gray-400 disabled:border-gray-200 disabled:cursor-not-allowed"
+                  >
+                    {pauseMut.isPending ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <PauseCircle className="w-3.5 h-3.5" />
+                    )}
+                    Pause
+                  </button>
+                </div>
+              )}
+              <p className="text-xs text-gray-500 mt-3">
+                Finance Officer can pause cron escalations on this student
+                (e.g., after Principal approves a delay). Max 90 days.
+              </p>
+            </div>
+          )}
+          {!canPauseEscalation && defaulterRow && (
+            <p className="text-xs text-gray-500 pt-2 border-t border-gray-100">
+              Only users with <code>finance:update</code> permission can
+              change the auto-escalation pause state.
+            </p>
+          )}
+        </div>
       </section>
 
       <RePinDialog
