@@ -3,6 +3,7 @@ import { Schema, model, Document } from 'mongoose';
 export interface IFinePenalty extends Document {
   collegeId: Schema.Types.ObjectId;
   studentId: Schema.Types.ObjectId; type: string; reason: string; amount: number; dueDate: Date; paidAmount: number; status: string; imposedBy?: Schema.Types.ObjectId;
+  metadata?: Record<string, unknown>;
 }
 
 const schema = new Schema<IFinePenalty>({
@@ -15,6 +16,7 @@ const schema = new Schema<IFinePenalty>({
   paidAmount: { type: Number, default: 0 },
   status: { type: String, enum: ['pending', 'partial', 'paid', 'waived'], default: 'pending' },
   imposedBy: { type: Schema.Types.ObjectId, ref: 'Person' },
+  metadata: { type: Schema.Types.Mixed, default: {} },
 }, { timestamps: true });
 
 schema.index({ collegeId: 1, studentId: 1, status: 1 });

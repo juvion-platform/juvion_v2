@@ -3,6 +3,7 @@ import { Schema, model, Document } from 'mongoose';
 export interface IScholarship extends Document {
   collegeId: Schema.Types.ObjectId;
   name: string; provider: string; type: string; amount: number; criteria: string; academicYearId: Schema.Types.ObjectId; maxRecipients?: number; isActive: boolean;
+  metadata?: Record<string, unknown>;
 }
 
 const schema = new Schema<IScholarship>({
@@ -15,6 +16,7 @@ const schema = new Schema<IScholarship>({
   academicYearId: { type: Schema.Types.ObjectId, ref: 'AcademicYear', required: true },
   maxRecipients: Number,
   isActive: { type: Boolean, default: true },
+  metadata: { type: Schema.Types.Mixed, default: {} },
 }, { timestamps: true });
 
 schema.index({ collegeId: 1, academicYearId: 1 });

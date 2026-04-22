@@ -8,6 +8,7 @@ export interface IConcession extends Document {
   effectiveFrom?: Date;
   effectiveTo?: Date;
   welfareReferralId?: Schema.Types.ObjectId;
+  metadata?: Record<string, unknown>;
 }
 
 const schema = new Schema<IConcession>({
@@ -25,6 +26,7 @@ const schema = new Schema<IConcession>({
   effectiveFrom: { type: Date },
   effectiveTo: { type: Date },
   welfareReferralId: { type: Schema.Types.ObjectId },
+  metadata: { type: Schema.Types.Mixed, default: {} },
 }, { timestamps: true });
 
 schema.index({ collegeId: 1, studentId: 1, academicYearId: 1 });

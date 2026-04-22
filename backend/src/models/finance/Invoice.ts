@@ -11,6 +11,7 @@ export interface IInvoice extends Document {
   concessionApplied?: number;
   paymentPlanId?: Schema.Types.ObjectId;
   batchId?: string;
+  metadata?: Record<string, unknown>;
 }
 
 const schema = new Schema<IInvoice>({
@@ -31,8 +32,11 @@ const schema = new Schema<IInvoice>({
   concessionApplied: { type: Number, default: 0 },
   paymentPlanId: { type: Schema.Types.ObjectId, ref: 'PaymentPlan' },
   batchId: { type: String },
+  metadata: { type: Schema.Types.Mixed, default: {} },
 }, { timestamps: true });
 
 schema.index({ collegeId: 1, invoiceNumber: 1 }, { unique: true });
+// Cron primary scan query — plan §2.4
+schema.index({ collegeId: 1, status: 1, dueDate: 1 });
 
 export const Invoice = model<IInvoice>('Invoice', schema);
