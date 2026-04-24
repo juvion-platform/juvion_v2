@@ -1,26 +1,13 @@
-import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getFinanceStats } from '../services/finance';
 import { getStats as getPeopleStats } from '../services/people';
 import { ArrowLeft, Landmark, CreditCard, GraduationCap, HandCoins, RotateCcw, Gavel, FileText, Wallet, Receipt, BookOpen, Users, ShieldAlert, CircleCheckBig, LayoutList, BarChart3 } from 'lucide-react';
 
-import FeeStructuresPage from './finance/FeeStructuresPage';
 import FeeDashboardPage from './finance/FeeDashboardPage';
-import FeeComponentTemplatePage from './finance/FeeComponentTemplatePage';
-import StudentFeeAccountsPage from './finance/StudentFeeAccountsPage';
-import FeeLineItemsPage from './finance/FeeLineItemsPage';
-import PaymentsPage from './finance/PaymentsPage';
-import ScholarshipsPage from './finance/ScholarshipsPage';
-import ScholarshipAllocationsPage from './finance/ScholarshipAllocationsPage';
-import ConcessionsPage from './finance/ConcessionsPage';
-import RefundsPage from './finance/RefundsPage';
-import BudgetsPage from './finance/BudgetsPage';
-import ExpensesPage from './finance/ExpensesPage';
-import InvoicesPage from './finance/InvoicesPage';
-import FinePenaltiesPage from './finance/FinePenaltiesPage';
-import FeeRemindersPage from './finance/FeeRemindersPage';
-import LedgerPage from './finance/LedgerPage';
-import FinancialHoldsPage from './finance/FinancialHoldsPage';
+import FeeManagementPage from './finance/FeeManagementPage';
+import ScholarshipsConcessionsPage from './finance/ScholarshipsConcessionsPage';
+import AccountingPage from './finance/AccountingPage';
 
 function FinanceHome() {
   const navigate = useNavigate();
@@ -175,13 +162,21 @@ function SubPageWrapper({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
   const path = location.pathname;
-  const isSubPage = path !== '/finance' && path !== '/finance/';
+  // Dashboard is the default landing; don't show a back link on it. The
+  // sidebar Finance group is how users navigate between sub-pages now.
+  const showBack =
+    path !== '/finance' &&
+    path !== '/finance/' &&
+    path !== '/finance/dashboard';
 
   return (
     <div>
-      {isSubPage && (
-        <button onClick={() => navigate('/finance')} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4">
-          <ArrowLeft size={16} className="text-gray-400" /> Back to Finance
+      {showBack && (
+        <button
+          onClick={() => navigate('/finance/dashboard')}
+          className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4"
+        >
+          <ArrowLeft size={16} className="text-gray-400" /> Back to Finance Dashboard
         </button>
       )}
       {children}
@@ -193,24 +188,89 @@ export default function Finance() {
   return (
     <SubPageWrapper>
       <Routes>
-        <Route index element={<FinanceHome />} />
+        {/* Finance lands on the Dashboard by default. The sidebar expandable
+            Finance group is the primary navigation surface. Sub-tabs live
+            under three tabbed parent pages (Fee Management, Scholarships &
+            Concessions, Accounting). */}
+        <Route index element={<Navigate to="dashboard" replace />} />
+        <Route path="overview" element={<FinanceHome />} />
         <Route path="dashboard" element={<FeeDashboardPage />} />
-        <Route path="fee-structures" element={<FeeStructuresPage />} />
-        <Route path="component-template" element={<FeeComponentTemplatePage />} />
-        <Route path="student-fee-accounts" element={<StudentFeeAccountsPage />} />
-        <Route path="fee-line-items" element={<FeeLineItemsPage />} />
-        <Route path="payments" element={<PaymentsPage />} />
-        <Route path="scholarships" element={<ScholarshipsPage />} />
-        <Route path="scholarship-allocations" element={<ScholarshipAllocationsPage />} />
-        <Route path="concessions" element={<ConcessionsPage />} />
-        <Route path="refunds" element={<RefundsPage />} />
-        <Route path="reminders" element={<FeeRemindersPage />} />
-        <Route path="budgets" element={<BudgetsPage />} />
-        <Route path="expenses" element={<ExpensesPage />} />
-        <Route path="invoices" element={<InvoicesPage />} />
-        <Route path="fines" element={<FinePenaltiesPage />} />
-        <Route path="holds" element={<FinancialHoldsPage />} />
-        <Route path="ledger" element={<LedgerPage />} />
+
+        {/* New tabbed parent pages. */}
+        <Route path="fee-management/*" element={<FeeManagementPage />} />
+        <Route
+          path="scholarships-concessions/*"
+          element={<ScholarshipsConcessionsPage />}
+        />
+        <Route path="accounting/*" element={<AccountingPage />} />
+
+        {/* Back-compat: redirect old flat URLs to the tabbed ones so existing
+            bookmarks / external links keep working. */}
+        <Route
+          path="fee-structures"
+          element={<Navigate to="/finance/fee-management/fee-structures" replace />}
+        />
+        <Route
+          path="component-template"
+          element={<Navigate to="/finance/fee-management/component-template" replace />}
+        />
+        <Route
+          path="student-fee-accounts"
+          element={<Navigate to="/finance/fee-management/fee-accounts" replace />}
+        />
+        <Route
+          path="fee-line-items"
+          element={<Navigate to="/finance/fee-management/fee-line-items" replace />}
+        />
+        <Route
+          path="payments"
+          element={<Navigate to="/finance/fee-management/payments" replace />}
+        />
+        <Route
+          path="invoices"
+          element={<Navigate to="/finance/fee-management/invoices" replace />}
+        />
+        <Route
+          path="reminders"
+          element={<Navigate to="/finance/fee-management/reminders" replace />}
+        />
+        <Route
+          path="fines"
+          element={<Navigate to="/finance/fee-management/fines" replace />}
+        />
+        <Route
+          path="holds"
+          element={<Navigate to="/finance/fee-management/holds" replace />}
+        />
+        <Route
+          path="scholarships"
+          element={<Navigate to="/finance/scholarships-concessions/scholarships" replace />}
+        />
+        <Route
+          path="scholarship-allocations"
+          element={<Navigate to="/finance/scholarships-concessions/allocations" replace />}
+        />
+        <Route
+          path="concessions"
+          element={<Navigate to="/finance/scholarships-concessions/concessions" replace />}
+        />
+        <Route
+          path="refunds"
+          element={<Navigate to="/finance/scholarships-concessions/refunds" replace />}
+        />
+        <Route
+          path="budgets"
+          element={<Navigate to="/finance/accounting/budgets" replace />}
+        />
+        <Route
+          path="expenses"
+          element={<Navigate to="/finance/accounting/expenses" replace />}
+        />
+        <Route
+          path="ledger"
+          element={<Navigate to="/finance/accounting/ledger" replace />}
+        />
+
       </Routes>
     </SubPageWrapper>
   );
