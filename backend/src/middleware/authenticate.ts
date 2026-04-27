@@ -13,7 +13,11 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
   if (process.env.NODE_ENV === 'development') {
     const token = req.headers.authorization?.replace('Bearer ', '');
     if (!token) {
-      req.user = { id: 'dev-user', name: 'Dev Admin', email: 'admin@juvion.dev', role: 'super_admin', personaType: 'L-PRIN' };
+      // Use a valid 24-char hex so models that type `userId: ObjectId`
+      // (e.g. SituationDismissal, AgentAction) can cast it without
+      // throwing in dev. Sentinel value '...099' makes dev users easy
+      // to spot in audit logs.
+      req.user = { id: '000000000000000000000099', name: 'Dev Admin', email: 'admin@juvion.dev', role: 'super_admin', personaType: 'L-PRIN' };
       req.collegeId = (req.headers['x-college-id'] as string) || process.env.DEV_COLLEGE_ID || '000000000000000000000001';
       return next();
     }
