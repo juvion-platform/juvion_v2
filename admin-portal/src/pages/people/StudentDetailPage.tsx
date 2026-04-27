@@ -7,6 +7,7 @@ import {
   DetailSection, DetailField, DetailBool, formatDate, extractPerson,
 } from '../../components/ui/DetailView';
 import FeePinsPanel from '../../components/finance/FeePinsPanel';
+import StudentFeeStructurePanel from '../../components/finance/StudentFeeStructurePanel';
 
 /**
  * Read-only view for a single Student. Clicking Edit navigates to the
@@ -161,6 +162,11 @@ export default function StudentDetailPage() {
         <DetailField label="Phone" value={emergency.phone} />
         <DetailField label="Relationship" value={emergency.relationship} />
       </DetailSection>
+
+      {/* Fee Structure summary — billed/paid/waived/balance + per-component
+          breakdown + active holds. Sits above FeePinsPanel so the financial
+          state appears before the lifecycle/admin controls. */}
+      {id && <StudentFeeStructurePanel studentId={id} />}
 
       {/* Fee Pins (Task 13) */}
       {id && (
