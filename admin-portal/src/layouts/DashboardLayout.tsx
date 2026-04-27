@@ -1,21 +1,52 @@
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import {
   LayoutDashboard, UserPlus, Users, GraduationCap, IndianRupee,
   Briefcase, Heart, Building2, TrendingUp, Shield, Landmark,
-  Settings, Bot, ChevronLeft, Menu, BookOpen, LogOut, ArrowLeftRight, ChevronDown, Database
+  Settings, Bot, ChevronLeft, Menu, BookOpen, LogOut, ArrowLeftRight, ChevronDown, ChevronRight, Database
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuthStore } from '../stores/authStore';
 import GlobalSearch from '../components/search/GlobalSearch';
 
-const NAV_ITEMS = [
+/**
+ * Nav item shape. `children` makes an entry an expandable group (e.g. Finance);
+ * clicking the parent expands the group AND navigates to the group's `to`.
+ * A child with `section: true` renders as an uppercase label divider in the
+ * expanded submenu instead of a clickable link.
+ */
+type NavChild =
+  | { to: string; label: string; section?: false }
+  | { section: true; label: string };
+
+interface NavItem {
+  to: string;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  label: string;
+  iconColor: string;
+  module: string | null;
+  children?: NavChild[];
+}
+
+const NAV_ITEMS: NavItem[] = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard', iconColor: 'text-sky-400', module: null },
   { to: '/master-data', icon: Database, label: 'Master Data', iconColor: 'text-slate-400', module: null },
   { to: '/admissions', icon: UserPlus, label: 'Admissions', iconColor: 'text-emerald-400', module: 'admissions' },
   { to: '/people', icon: Users, label: 'People', iconColor: 'text-blue-400', module: 'people' },
   { to: '/academics', icon: GraduationCap, label: 'Academics', iconColor: 'text-amber-400', module: 'academics' },
-  { to: '/finance', icon: IndianRupee, label: 'Finance', iconColor: 'text-green-400', module: 'finance' },
+  {
+    to: '/finance',
+    icon: IndianRupee,
+    label: 'Finance',
+    iconColor: 'text-green-400',
+    module: 'finance',
+    children: [
+      { to: '/finance/dashboard', label: 'Dashboard' },
+      { to: '/finance/fee-management', label: 'Fee Management' },
+      { to: '/finance/scholarships-concessions', label: 'Scholarships & Concessions' },
+      { to: '/finance/accounting', label: 'Accounting' },
+    ],
+  },
   { to: '/hr', icon: Briefcase, label: 'HR', iconColor: 'text-violet-400', module: 'hr' },
   { to: '/welfare', icon: Heart, label: 'Welfare', iconColor: 'text-rose-400', module: 'welfare' },
   { to: '/placement', icon: TrendingUp, label: 'Placement', iconColor: 'text-cyan-400', module: 'placement' },
@@ -30,7 +61,9 @@ const NAV_ITEMS = [
 export default function DashboardLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const navigate = useNavigate();
+  const location = useLocation();
   const user = useAuthStore((s) => s.user);
   const token = useAuthStore((s) => s.token);
   const logout = useAuthStore((s) => s.logout);
@@ -41,6 +74,20 @@ export default function DashboardLayout() {
   const visibleItems = NAV_ITEMS.filter(
     (item) => !item.module || hasPermission(item.module, 'read')
   );
+
+  // Auto-expand any group whose `to` is a prefix of the current URL. Keeps the
+  // submenu visible when the user navigates into a finance sub-page directly
+  // (e.g. refresh on /finance/holds) or clicks a sub-link.
+  useEffect(() => {
+    const match = NAV_ITEMS.find(
+      (n) => n.children && location.pathname.startsWith(n.to),
+    );
+    if (match) setExpandedGroup(match.to);
+  }, [location.pathname]);
+
+  const toggleGroup = (groupKey: string) => {
+    setExpandedGroup((prev) => (prev === groupKey ? null : groupKey));
+  };
 
   // Decode user from token if user is null (page refresh)
   const displayName = user?.name || (() => {
@@ -108,22 +155,101 @@ export default function DashboardLayout() {
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto py-2 space-y-0.5">
-          {visibleItems.map(({ to, icon: Icon, label, iconColor }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={to === '/'}
-              className={({ isActive }) => clsx(
-                'flex items-center gap-3 px-3 py-2 mx-1.5 rounded-lg text-sm transition-all duration-150',
-                isActive
-                  ? 'bg-teal-500/20 text-teal-300 font-medium shadow-sm'
-                  : 'text-gray-400 hover:bg-white/5 hover:text-gray-200',
-              )}
-            >
-              <Icon size={18} className={clsx('shrink-0', iconColor)} />
-              {!collapsed && <span>{label}</span>}
-            </NavLink>
-          ))}
+          {visibleItems.map((item) => {
+            const { to, icon: Icon, label, iconColor, children } = item;
+            const isGroup = !!children?.length;
+            const isGroupExpanded = isGroup && expandedGroup === to && !collapsed;
+            const isOnGroupPath = isGroup && location.pathname.startsWith(to);
+
+            if (!isGroup) {
+              return (
+                <NavLink
+                  key={to}
+                  to={to}
+                  end={to === '/'}
+                  className={({ isActive }) => clsx(
+                    'flex items-center gap-3 px-3 py-2 mx-1.5 rounded-lg text-sm transition-all duration-150',
+                    isActive
+                      ? 'bg-teal-500/20 text-teal-300 font-medium shadow-sm'
+                      : 'text-gray-400 hover:bg-white/5 hover:text-gray-200',
+                  )}
+                >
+                  <Icon size={18} className={clsx('shrink-0', iconColor)} />
+                  {!collapsed && <span>{label}</span>}
+                </NavLink>
+              );
+            }
+
+            // Group entry: clicking navigates AND toggles expansion.
+            return (
+              <div key={to}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!collapsed) toggleGroup(to);
+                    navigate(to);
+                  }}
+                  className={clsx(
+                    'w-full flex items-center gap-3 px-3 py-2 mx-1.5 rounded-lg text-sm transition-all duration-150',
+                    isOnGroupPath
+                      ? 'bg-teal-500/20 text-teal-300 font-medium shadow-sm'
+                      : 'text-gray-400 hover:bg-white/5 hover:text-gray-200',
+                  )}
+                  style={{ width: 'calc(100% - 0.75rem)' }}
+                  aria-expanded={isGroupExpanded}
+                >
+                  <Icon size={18} className={clsx('shrink-0', iconColor)} />
+                  {!collapsed && (
+                    <>
+                      <span className="flex-1 text-left">{label}</span>
+                      {isGroupExpanded ? (
+                        <ChevronDown size={14} className="shrink-0 text-gray-500" />
+                      ) : (
+                        <ChevronRight size={14} className="shrink-0 text-gray-500" />
+                      )}
+                    </>
+                  )}
+                </button>
+
+                {isGroupExpanded && (
+                  <div className="mt-0.5 mb-1 space-y-0.5">
+                    {children!.map((child, idx) => {
+                      if (child.section) {
+                        return (
+                          <div
+                            key={`sec-${idx}`}
+                            className="px-3 pt-2 pb-1 ml-7 text-[10px] font-semibold uppercase tracking-wider text-gray-500"
+                          >
+                            {child.label}
+                          </div>
+                        );
+                      }
+                      return (
+                        <NavLink
+                          key={child.to}
+                          to={child.to}
+                          // No `end` so that tabbed parent pages stay active
+                          // while the user is on any of their sub-tabs
+                          // (e.g. /finance/fee-management/payments keeps the
+                          // "Fee Management" sidebar row highlighted).
+                          className={({ isActive }) =>
+                            clsx(
+                              'flex items-center gap-2 px-3 py-1.5 ml-7 mr-1.5 rounded-md text-xs transition-all duration-150',
+                              isActive
+                                ? 'bg-teal-500/15 text-teal-300 font-medium'
+                                : 'text-gray-400 hover:bg-white/5 hover:text-gray-200',
+                            )
+                          }
+                        >
+                          <span className="truncate">{child.label}</span>
+                        </NavLink>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </nav>
 
         {/* Bottom branding */}

@@ -3,6 +3,7 @@ import { authenticate } from '../../middleware/authenticate';
 import { authorize } from '../../middleware/authorize';
 import { validate } from '../../middleware/validate';
 import * as ctrl from './controller';
+import financeAgentRouter from './finance-agent/routes';
 import {
   createConversationSchema, updateConversationSchema,
   createMessageSchema, updateMessageSchema,
@@ -15,6 +16,13 @@ import {
 } from './validation';
 
 const router = Router();
+
+// Task A5 — fee-analytics-ai-native finance agent (7 endpoints under
+// /api/juvi/finance-agent/*). Mounted FIRST so its own `authenticate`
+// + per-route `authorize()` chain is what runs for those paths; the
+// outer juvi `authenticate` below still works for the legacy CRUD.
+router.use('/finance-agent', financeAgentRouter);
+
 router.use(authenticate);
 
 // Dashboard

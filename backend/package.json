@@ -16,6 +16,7 @@
     "migrate:optional-allotment": "ts-node -r dotenv/config src/migrations/2026-04-optional-allotment.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.30.1",
     "bcryptjs": "^2.4.3",
     "bullmq": "^5.0.0",
     "cors": "^2.8.5",
@@ -27,6 +28,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.8.0",
     "morgan": "^1.10.0",
+    "openai": "^4.104.0",
     "pdfkit": "^0.15.2",
     "zod": "^3.23.0"
   },
