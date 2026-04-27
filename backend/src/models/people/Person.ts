@@ -1,5 +1,41 @@
 import { Schema, model, Document } from 'mongoose';
 
+/**
+ * Allowed mime types for student photos. Locked to the formats that
+ * `sharp` can decode + re-encode losslessly enough for thumbnails.
+ */
+export const PERSON_PHOTO_CONTENT_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+] as const;
+export type PersonPhotoContentType = (typeof PERSON_PHOTO_CONTENT_TYPES)[number];
+
+export interface IPersonPhoto {
+  /** S3 key for the original upload, e.g. 'colleges/<cid>/students/<sid>/photo/original.jpg' */
+  original: string;
+  /** S3 key for the 200x200 cover thumbnail, always JPEG */
+  thumb: string;
+  contentType: PersonPhotoContentType;
+  sizeBytes: number;
+  uploadedAt: Date;
+}
+
+export const photoSchema = new Schema<IPersonPhoto>(
+  {
+    original: { type: String, required: true },
+    thumb: { type: String, required: true },
+    contentType: {
+      type: String,
+      enum: PERSON_PHOTO_CONTENT_TYPES,
+      required: true,
+    },
+    sizeBytes: { type: Number, required: true, min: 0 },
+    uploadedAt: { type: Date, required: true },
+  },
+  { _id: false },
+);
+
 export interface IPerson extends Document {
   collegeId: Schema.Types.ObjectId;
   aadhaar?: string;
@@ -16,7 +52,7 @@ export interface IPerson extends Document {
     phone?: string;
     relationship?: string;
   };
-  photo?: string;
+  photo?: IPersonPhoto | null;
   biometricEnrolled?: boolean;
   // W01 intake enhancements
   nationality?: string;
@@ -40,7 +76,11 @@ const schema = new Schema<IPerson>({
     phone: String,
     relationship: String,
   },
-  photo: String,
+  // Photo upload is owned by `photo-service.ts` (POST /students/:id/photo).
+  // The generic Person create/update body cannot write this field — it's
+  // populated only by the dedicated upload endpoint after S3 + thumbnail
+  // generation succeed.
+  photo: { type: photoSchema, default: undefined },
   biometricEnrolled: { type: Boolean, default: false },
   // W01 intake enhancements
   nationality: String,
