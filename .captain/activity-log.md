@@ -53,3 +53,19 @@
 | 2026-04-18 06:58 | captain-tdd | optional-hostel-transport-allotment/task-19 | status Refactored (dashboard widget created) |
 | 2026-04-18 06:58 | captain-spec | optional-hostel-transport-allotment/task-20 | status Done (API reference saved) |
 | 2026-04-18 06:58 | captain-spec | optional-hostel-transport-allotment | feature COMPLETE — 20/20 tasks Done, 171/171 tests, effectiveness: Adequate |
+| 2026-04-22 10:26 | captain-tdd | fee-analytics-ai-native/task-1 | status Red (35 tests failing — module not found, suite failed to load) |
+| 2026-04-22 10:28 | captain-tdd | fee-analytics-ai-native/task-1 | status Green (35/35 passing after SDK mock-class fix) |
+| 2026-04-22 10:31 | captain-tdd | fee-analytics-ai-native/task-1 | status Refactored (35/35 still passing; computeCostInr shared between adapters; dead imports removed; typecheck clean; full 648/648) |
+| 2026-04-22 10:36 | captain-tdd | fee-analytics-ai-native/task-1 | completion written |
+| 2026-04-22 10:36 | captain-tdd | fee-analytics-ai-native/task-1 | spec gap — `LLM_RATE_LIMIT_PER_MINUTE` and `LLM_COST_TRACKING` env vars listed in spec deps but consumed by A5/A4, not A1 |
+| 2026-04-22 10:36 | captain-tdd | fee-analytics-ai-native/task-1 | spec gap — Anthropic SDK 0.30.x `Model` type doesn't list `claude-sonnet-4-5` literally; passes via `(string & {})` overload, cast through `unknown` documented inline |
+| 2026-04-22 10:36 | captain-tdd | fee-analytics-ai-native/task-1 | spec gap — OpenAI streaming requires explicit `stream_options.include_usage = true` to surface token counts; documented inline in adapter |
+| 2026-04-22 10:32 | captain-tdd | fee-analytics-ai-native/task-3 | status Red (3 test files, 45 tests un-loadable — module not found) |
+| 2026-04-22 10:33 | captain-tdd | fee-analytics-ai-native/task-3 | status Green (45/45 finance-agent helpers, 80/80 with A2 models, full 648/648 backend) |
+| 2026-04-22 10:39 | captain-tdd | fee-analytics-ai-native/task-3 | status Refactored (extracted mean/stddev/time-helpers; 45/45 + 648/648 still green; typecheck 0 errors) |
+| 2026-04-22 10:40 | captain-tdd | fee-analytics-ai-native/task-3 | completion written — 7 files (4 prod + 3 test); 10 spec gaps documented |
+| 2026-04-22 10:40 | captain-tdd | fee-analytics-ai-native/task-3 | spec gap — guardianIncomeBandDropFlag deferred (no dated income-band history on Person) |
+| 2026-04-22 10:40 | captain-tdd | fee-analytics-ai-native/task-3 | spec gap — stageAdvanceVelocityDays defaults 0 (no transition log on DefaulterRecord) |
+| 2026-04-22 10:40 | captain-tdd | fee-analytics-ai-native/task-3 | spec gap — forecast seasonality test reframed: perfect periodic input → sigma=0 → band width 0 by construction; assertion shifted to "mean reflects spike pattern" |
+| 2026-04-22 10:40 | captain-tdd | fee-analytics-ai-native/task-3 | spec gap — daysInWindow trims leading zero days, reflects observed span (not historyDays request) |
+| 2026-04-22 10:40 | captain-tdd | fee-analytics-ai-native/task-3 | spec gap — sibling lookup keys on primaryParentId, not feeResponsibleParentId (more common case) |
