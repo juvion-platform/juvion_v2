@@ -33,7 +33,9 @@ const basePersonSchema = z.object({
   preferredLanguage: z.string().optional(),
   address: contactSchema.optional(),
   emergencyContact: emergencyContactSchema.optional(),
-  photo: z.string().optional(),
+  // photo is no longer settable via the generic Person body — writes flow
+  // through POST /api/people/students/:id/photo (multipart) which returns
+  // the S3 keys + metadata.
   biometricEnrolled: z.boolean().optional(),
 });
 

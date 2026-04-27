@@ -87,7 +87,7 @@ async function createPersonRecord(collegeId: string, data: any) {
     name: data.name,
     phone: data.phone,
   };
-  ['email', 'aadhaar', 'dob', 'gender', 'alternatePhone', 'preferredLanguage', 'address', 'emergencyContact', 'photo', 'biometricEnrolled'].forEach(k => {
+  ['email', 'aadhaar', 'dob', 'gender', 'alternatePhone', 'preferredLanguage', 'address', 'emergencyContact', 'biometricEnrolled'].forEach(k => {
     if (data[k] !== undefined) personFields[k] = data[k];
   });
   return Person.create(personFields);
@@ -359,7 +359,7 @@ export async function updateStudent(collegeId: string, id: string, data: any, pe
   const previousParentIds = [previousPrimaryParentId, previousFeeResponsibleParentId].filter(Boolean);
 
   const personFields: any = {};
-  ['name', 'phone', 'alternatePhone', 'email', 'aadhaar', 'dob', 'gender', 'preferredLanguage', 'address', 'emergencyContact', 'photo', 'biometricEnrolled'].forEach(k => { if (data[k] !== undefined) personFields[k] = data[k]; });
+  ['name', 'phone', 'alternatePhone', 'email', 'aadhaar', 'dob', 'gender', 'preferredLanguage', 'address', 'emergencyContact', 'biometricEnrolled'].forEach(k => { if (data[k] !== undefined) personFields[k] = data[k]; });
   if (Object.keys(personFields).length > 0) await Person.findByIdAndUpdate(student.personId, { $set: personFields });
 
   // Snapshot fields-that-affect-fees BEFORE applying changes, so we can
@@ -531,7 +531,7 @@ export async function updateFaculty(collegeId: string, id: string, data: any, pe
   if (!fac) throw new AppError(404, 'Faculty not found');
 
   const personFields: any = {};
-  ['name', 'phone', 'alternatePhone', 'email', 'aadhaar', 'dob', 'gender', 'preferredLanguage', 'address', 'emergencyContact', 'photo', 'biometricEnrolled'].forEach(k => { if (data[k] !== undefined) personFields[k] = data[k]; });
+  ['name', 'phone', 'alternatePhone', 'email', 'aadhaar', 'dob', 'gender', 'preferredLanguage', 'address', 'emergencyContact', 'biometricEnrolled'].forEach(k => { if (data[k] !== undefined) personFields[k] = data[k]; });
   if (Object.keys(personFields).length > 0) await Person.findByIdAndUpdate(fac.personId, { $set: personFields });
 
   const facFields: any = {};
@@ -604,7 +604,7 @@ export async function updateStaff(collegeId: string, id: string, data: any, perf
   if (!s) throw new AppError(404, 'Staff not found');
 
   const personFields: any = {};
-  ['name', 'phone', 'alternatePhone', 'email', 'aadhaar', 'dob', 'gender', 'preferredLanguage', 'address', 'emergencyContact', 'photo', 'biometricEnrolled'].forEach(k => { if (data[k] !== undefined) personFields[k] = data[k]; });
+  ['name', 'phone', 'alternatePhone', 'email', 'aadhaar', 'dob', 'gender', 'preferredLanguage', 'address', 'emergencyContact', 'biometricEnrolled'].forEach(k => { if (data[k] !== undefined) personFields[k] = data[k]; });
   if (Object.keys(personFields).length > 0) await Person.findByIdAndUpdate(s.personId, { $set: personFields });
 
   const staffFields: any = {};
@@ -681,7 +681,7 @@ export async function updateParent(collegeId: string, id: string, data: any, per
   if (!parent) throw new AppError(404, 'Parent not found');
 
   const personFields: any = {};
-  ['name', 'phone', 'alternatePhone', 'email', 'aadhaar', 'dob', 'gender', 'preferredLanguage', 'address', 'emergencyContact', 'photo', 'biometricEnrolled'].forEach(k => { if (data[k] !== undefined) personFields[k] = data[k]; });
+  ['name', 'phone', 'alternatePhone', 'email', 'aadhaar', 'dob', 'gender', 'preferredLanguage', 'address', 'emergencyContact', 'biometricEnrolled'].forEach(k => { if (data[k] !== undefined) personFields[k] = data[k]; });
   if (Object.keys(personFields).length > 0) await Person.findByIdAndUpdate(parent.personId, { $set: personFields });
 
   const parentFields: any = {};

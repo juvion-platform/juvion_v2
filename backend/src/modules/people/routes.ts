@@ -4,6 +4,13 @@ import { authorize } from '../../middleware/authorize';
 import { validate } from '../../middleware/validate';
 import { createUserRateLimit } from '../../middleware/rateLimitPerUser';
 import * as ctrl from './controller';
+import {
+  photoUpload,
+  uploadPhotoHandler,
+  deletePhotoHandler,
+  getPhotoUrlHandler,
+  multerErrorHandler,
+} from './photo-controller';
 import { searchPeopleController } from './search-controller';
 import { searchQuerySchema } from './search-validation';
 import {
@@ -50,6 +57,27 @@ router.get('/students/:id', authorize('people', 'read'), ctrl.getStudent);
 router.post('/students', authorize('people', 'create'), validate(createStudentSchema), ctrl.createStudent);
 router.put('/students/:id', authorize('people', 'update'), validate(updateStudentSchema), ctrl.updateStudent);
 router.delete('/students/:id', authorize('people', 'delete'), ctrl.deleteStudent);
+
+// Student photos — multipart upload + presigned-url fetch
+// (multer error handler installed BETWEEN upload middleware and the
+// handler so size / mime errors map cleanly to AppError(400)).
+router.post(
+  '/students/:id/photo',
+  authorize('people', 'update'),
+  photoUpload.single('file'),
+  multerErrorHandler,
+  uploadPhotoHandler,
+);
+router.delete(
+  '/students/:id/photo',
+  authorize('people', 'update'),
+  deletePhotoHandler,
+);
+router.get(
+  '/students/:id/photo-url',
+  authorize('people', 'read'),
+  getPhotoUrlHandler,
+);
 
 // Faculty
 router.get('/faculty', authorize('people', 'read'), ctrl.listFaculty);
