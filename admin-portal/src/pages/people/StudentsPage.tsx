@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { listStudents, deleteStudent } from '../../services/people';
 import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
+import StudentThumbnail from '../../components/people/StudentThumbnail';
 import { useHighlightRow } from '../../hooks/useHighlightRow';
 import { Plus, Pencil, Trash2, Search } from 'lucide-react';
 
@@ -48,6 +49,10 @@ export default function StudentsPage() {
   });
 
   const columns = [
+    { key: 'photo', label: '', render: (r: any) => {
+      const name = r.person?.name || r.personId?.name || undefined;
+      return <StudentThumbnail studentId={r._id} studentName={name} />;
+    } },
     { key: 'name', label: 'Name', render: (r: any) => (r.person?.name || r.personId?.name || '—') },
     { key: 'phone', label: 'Phone', render: (r: any) => (r.person?.phone || r.personId?.phone || '—') },
     { key: 'rollNumber', label: 'Roll No', render: (r: any) => r.rollNumber || '—' },
