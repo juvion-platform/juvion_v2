@@ -42,6 +42,9 @@ import {
 } from '../../../__tests__/helpers/mongoMemory';
 import { Person } from '../../../models/people/Person';
 import { Student } from '../../../models/people/Student';
+import { Faculty } from '../../../models/people/Faculty';
+import { Staff } from '../../../models/people/Staff';
+import { Parent } from '../../../models/people/Parent';
 
 // ─── S3 client mock (must be declared BEFORE app/router import) ───────
 
@@ -55,6 +58,11 @@ vi.mock('../../../shared/s3/s3-client', () => ({
   getPresignedUrl: (...args: unknown[]) => getPresignedUrlMock(...args),
   studentUploadPrefix: (collegeId: string, studentId: string) =>
     `colleges/${collegeId}/students/${studentId}`,
+  entityUploadPrefix: (
+    entityType: 'students' | 'faculty' | 'staff' | 'parents',
+    collegeId: string,
+    entityId: string,
+  ) => `colleges/${collegeId}/${entityType}/${entityId}`,
 }));
 
 // Set env before importing app — `app.ts` reads NODE_ENV/JWT_SECRET on import.
@@ -112,13 +120,16 @@ afterEach(async () => {
 
 const oid = () => new mongoose.Types.ObjectId();
 
-interface SeededStudent {
+interface SeededEntity {
   collegeId: string;
+  /** Generic id of the seeded row (Student / Faculty / Staff / Parent). */
+  entityId: string;
+  /** Backwards-compat alias for the existing student-only describe blocks. */
   studentId: string;
   personId: mongoose.Types.ObjectId;
 }
 
-async function seedStudent(collegeIdOverride?: string): Promise<SeededStudent> {
+async function seedStudent(collegeIdOverride?: string): Promise<SeededEntity> {
   const collegeId = collegeIdOverride ?? String(oid());
   const person = await Person.create({
     collegeId,
@@ -133,7 +144,75 @@ async function seedStudent(collegeIdOverride?: string): Promise<SeededStudent> {
   });
   return {
     collegeId,
+    entityId: String(student._id),
     studentId: String(student._id),
+    personId: person._id as mongoose.Types.ObjectId,
+  };
+}
+
+async function seedFaculty(collegeIdOverride?: string): Promise<SeededEntity> {
+  const collegeId = collegeIdOverride ?? String(oid());
+  const person = await Person.create({
+    collegeId,
+    name: 'Test Faculty',
+    phone: '9999999998',
+  });
+  const faculty = await Faculty.create({
+    collegeId,
+    personId: person._id,
+    employeeCode: `FAC-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    designation: 'Assistant Professor',
+    contractType: 'regular',
+    status: 'active',
+  });
+  return {
+    collegeId,
+    entityId: String(faculty._id),
+    studentId: String(faculty._id),
+    personId: person._id as mongoose.Types.ObjectId,
+  };
+}
+
+async function seedStaff(collegeIdOverride?: string): Promise<SeededEntity> {
+  const collegeId = collegeIdOverride ?? String(oid());
+  const person = await Person.create({
+    collegeId,
+    name: 'Test Staff',
+    phone: '9999999997',
+  });
+  const staff = await Staff.create({
+    collegeId,
+    personId: person._id,
+    employeeCode: `STF-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    designation: 'Office Manager',
+    staffType: 'admin',
+    status: 'active',
+  });
+  return {
+    collegeId,
+    entityId: String(staff._id),
+    studentId: String(staff._id),
+    personId: person._id as mongoose.Types.ObjectId,
+  };
+}
+
+async function seedParent(collegeIdOverride?: string): Promise<SeededEntity> {
+  const collegeId = collegeIdOverride ?? String(oid());
+  const person = await Person.create({
+    collegeId,
+    name: 'Test Parent',
+    phone: '9999999996',
+  });
+  const parent = await Parent.create({
+    collegeId,
+    personId: person._id,
+    relationship: 'father',
+    primaryContact: true,
+  });
+  return {
+    collegeId,
+    entityId: String(parent._id),
+    studentId: String(parent._id),
     personId: person._id as mongoose.Types.ObjectId,
   };
 }
@@ -328,7 +407,9 @@ describe('DELETE /api/people/students/:id/photo', () => {
       .set('Authorization', `Bearer ${token}`)
       .expect(404);
 
-    expect(res.body.error).toMatch(/Student not found/);
+    // After the G1+G2 generalization the error is now per-entity-type
+    // (the message is the entity-type slug verbatim — "students").
+    expect(res.body.error).toMatch(/students not found/);
     expect(deleteObjectMock).not.toHaveBeenCalled();
   });
 });
@@ -432,5 +513,117 @@ describe('GET /api/people/students/:id/photo-url', () => {
 
     expect(res.body.error).toMatch(/variant/i);
     expect(getPresignedUrlMock).not.toHaveBeenCalled();
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════
+//  Parameterized happy/auth/cross-college tests across all 4 entity types
+//
+//  G3 — student is the existing baseline; faculty/staff/parents are the
+//  three new mounts. Each entity gets the same trio of happy paths
+//  (POST upload, GET photo-url, DELETE) plus a cross-college 404 guard.
+//
+//  The OTHER tests (oversize file, unsupported MIME, multer error
+//  remap, RBAC 403, 401) live in the student blocks above — they're
+//  entity-type-agnostic so we only need to exercise them once.
+// ═════════════════════════════════════════════════════════════════════
+
+const ENTITY_PATHS = [
+  { type: 'students', path: '/api/people/students', seed: seedStudent },
+  { type: 'faculty', path: '/api/people/faculty', seed: seedFaculty },
+  { type: 'staff', path: '/api/people/staff', seed: seedStaff },
+  { type: 'parents', path: '/api/people/parents', seed: seedParent },
+] as const;
+
+ENTITY_PATHS.forEach(({ type, path, seed }) => {
+  describe(`${type} photo endpoints`, () => {
+    it(`200 happy: POST ${path}/:id/photo with valid JPEG`, { timeout: 30_000 }, async () => {
+      const { collegeId, entityId } = await seed();
+      const token = adminToken(collegeId);
+
+      const res = await request(app)
+        .post(`${path}/${entityId}/photo`)
+        .set('Authorization', `Bearer ${token}`)
+        .attach('file', JPEG_50, { filename: 'avatar.jpg', contentType: 'image/jpeg' })
+        .expect(200);
+
+      // Keys live under colleges/<cid>/<entityType>/<eid>/photo/...
+      expect(res.body.original).toMatch(
+        new RegExp(`colleges/${collegeId}/${type}/${entityId}/photo/original\\.jpg$`),
+      );
+      expect(res.body.thumb).toMatch(
+        new RegExp(`colleges/${collegeId}/${type}/${entityId}/photo/thumb\\.jpg$`),
+      );
+      expect(res.body.contentType).toBe('image/jpeg');
+      expect(res.body.sizeBytes).toBe(JPEG_50.length);
+      expect(typeof res.body.uploadedAt).toBe('string');
+
+      expect(putObjectMock).toHaveBeenCalledTimes(2);
+    });
+
+    it(`200 happy: GET ${path}/:id/photo-url returns presigned URL`, async () => {
+      const { collegeId, entityId, personId } = await seed();
+      const prefix = `colleges/${collegeId}/${type}/${entityId}`;
+      await setExistingPhoto(personId, {
+        original: `${prefix}/photo/original.jpg`,
+        thumb: `${prefix}/photo/thumb.jpg`,
+        contentType: 'image/jpeg',
+        sizeBytes: 100,
+        uploadedAt: new Date(),
+      });
+      const token = adminToken(collegeId);
+
+      const res = await request(app)
+        .get(`${path}/${entityId}/photo-url`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(res.body.thumb).toBeDefined();
+      expect(res.body.original).toBeDefined();
+      expect(typeof res.body.thumb.url).toBe('string');
+      expect(typeof res.body.original.url).toBe('string');
+      expect(getPresignedUrlMock).toHaveBeenCalledTimes(2);
+    });
+
+    it(`200 happy: DELETE ${path}/:id/photo clears the photo`, async () => {
+      const { collegeId, entityId, personId } = await seed();
+      const prefix = `colleges/${collegeId}/${type}/${entityId}`;
+      await setExistingPhoto(personId, {
+        original: `${prefix}/photo/original.jpg`,
+        thumb: `${prefix}/photo/thumb.jpg`,
+        contentType: 'image/jpeg',
+        sizeBytes: 1024,
+        uploadedAt: new Date(),
+      });
+      const token = adminToken(collegeId);
+
+      const res = await request(app)
+        .delete(`${path}/${entityId}/photo`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(res.body).toEqual({ deleted: true });
+      expect(deleteObjectMock).toHaveBeenCalledTimes(2);
+
+      const updatedPerson = await Person.findById(personId).lean();
+      expect(updatedPerson?.photo).toBeFalsy();
+    });
+
+    it(`404 cross-college: ${type} from another college returns 404`, async () => {
+      const collegeA = String(oid());
+      // Entity belongs to college B (its own random collegeId).
+      const { entityId } = await seed();
+      const token = adminToken(collegeA); // caller is from college A
+
+      const res = await request(app)
+        .delete(`${path}/${entityId}/photo`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(404);
+
+      // photo-service.loadEntityScoped uses the entity-type slug verbatim
+      // in the 404 message ("students not found", "faculty not found", …).
+      expect(res.body.error).toMatch(new RegExp(`${type} not found`));
+      expect(deleteObjectMock).not.toHaveBeenCalled();
+    });
   });
 });
