@@ -1,44 +1,57 @@
 /**
- * Student photo upload orchestrator (P4 of student-photo-upload).
+ * Person-entity photo upload orchestrator.
  *
- * Owns the end-to-end flow:
- *   - Resolve student (multi-tenant scoped to collegeId).
+ * Owns the end-to-end flow for any person-linked entity (students,
+ * faculty, staff, parents):
+ *   - Resolve the entity row (multi-tenant scoped to collegeId).
+ *   - Defense-in-depth re-confirm Person belongs to the same college.
  *   - Validate the raw image buffer (format / dimensions / size) using
  *     `sharp.metadata()` against the actual decoded bytes — never trust
  *     the browser-supplied MIME.
  *   - Generate a 200×200 cover-fit JPEG thumbnail and an EXIF-stripped
  *     re-encode of the original.
- *   - Upload both to S3 under the locked `colleges/<cid>/students/<sid>`
- *     prefix using the shared S3 client.
+ *   - Upload both to S3 under the locked
+ *     `colleges/<cid>/<entityType>/<eid>` prefix using the shared S3
+ *     client.
  *   - Persist the photo metadata onto the matching Person document.
  *   - Best-effort cleanup of S3 objects on partial failure or replace.
  *
- * The HTTP layer (multer + the upload route) lives in P5 — this module
- * is intentionally transport-agnostic.
+ * Person is the single storage location for the photo regardless of
+ * which entity row was the lookup hop — every supported entity type
+ * has a `personId` ref and Person is the canonical identity record.
  *
- * Multi-tenancy: every Person/Student query is scoped by `collegeId`.
- * S3 keys also embed the collegeId via `studentUploadPrefix`. There is
- * no path that lets a caller from college A touch college B's data.
+ * The HTTP layer (multer + the upload route) lives in `photo-controller.ts`
+ * — this module is intentionally transport-agnostic.
+ *
+ * Multi-tenancy: every entity query AND the follow-up Person query are
+ * scoped by `collegeId`. S3 keys also embed the collegeId via
+ * `entityUploadPrefix`. There is no path that lets a caller from
+ * college A touch college B's data.
  *
  * Migration note: the legacy `Person.photo: String` field was unused in
- * production code (verified before P2), so the structured-shape switch
- * in P2 didn't need a back-compat migration. Mongoose silently drops
- * legacy string values when the schema can't cast them, so any stray
- * dev-seed strings are ignored on read.
+ * production code (verified before the structured-shape switch), so no
+ * back-compat migration was needed. Mongoose silently drops legacy
+ * string values when the schema can't cast them, so any stray dev-seed
+ * strings are ignored on read.
  */
 
 import sharp from 'sharp';
+import { Model } from 'mongoose';
 
 import { Person } from '../../models/people/Person';
 import type { PersonPhotoContentType } from '../../models/people/Person';
 import { Student } from '../../models/people/Student';
+import { Faculty } from '../../models/people/Faculty';
+import { Staff } from '../../models/people/Staff';
+import { Parent } from '../../models/people/Parent';
 import { AppError } from '../../middleware/errorHandler';
 import {
   putObject,
   deleteObject,
   getPresignedUrl,
-  studentUploadPrefix,
+  entityUploadPrefix,
 } from '../../shared/s3/s3-client';
+import type { PersonEntityType } from '../../shared/s3/s3-client';
 
 // ─── Public constants ─────────────────────────────────────────────────
 
@@ -61,6 +74,24 @@ export const PRESIGN_EXPIRY_SECONDS = 3600;
 
 // ─── Public types ─────────────────────────────────────────────────────
 
+/**
+ * Generic upload opts. The `entityType` discriminator picks which
+ * collection holds the entity row whose `personId` we resolve to find
+ * the canonical Person.
+ */
+export interface UploadEntityPhotoOpts {
+  entityType: PersonEntityType;
+  collegeId: string;
+  entityId: string;
+  buffer: Buffer;
+  /** Browser-supplied MIME for sanity only — actual MIME is detected from bytes. */
+  declaredMime?: string;
+}
+
+/**
+ * Compat shape for the student-only API. Kept as `Omit<UploadEntityPhotoOpts, 'entityType'>`
+ * with `studentId` aliased onto `entityId` via the wrapper below.
+ */
 export interface UploadStudentPhotoOpts {
   collegeId: string;
   studentId: string;
@@ -100,10 +131,10 @@ interface ValidatedImage {
   height: number;
 }
 
-interface ResolvedStudent {
-  studentId: string;
+interface ResolvedEntity {
+  entityId: string;
   personId: string;
-  /** May be undefined when the student has no photo yet. */
+  /** May be undefined when the entity has no photo yet. */
   existingPhoto: ResolvedPhoto | null;
 }
 
@@ -115,15 +146,30 @@ interface ResolvedPhoto {
   uploadedAt: Date;
 }
 
-// ─── Public API ───────────────────────────────────────────────────────
+/**
+ * Bound between the entity-type discriminator and the matching Mongoose
+ * model. We intentionally type the values as `Model<unknown>` so the
+ * map can hold heterogeneous models — the only field we read off them
+ * is `personId`, which we re-validate at runtime.
+ */
+const ENTITY_MODELS: Record<PersonEntityType, Model<unknown>> = {
+  students: Student as unknown as Model<unknown>,
+  faculty: Faculty as unknown as Model<unknown>,
+  staff: Staff as unknown as Model<unknown>,
+  parents: Parent as unknown as Model<unknown>,
+};
 
-export async function uploadStudentPhoto(
-  opts: UploadStudentPhotoOpts,
+// ─── Public API — generic over PersonEntityType ───────────────────────
+
+export async function uploadEntityPhoto(
+  opts: UploadEntityPhotoOpts,
 ): Promise<UploadStudentPhotoResult> {
-  const { collegeId, studentId, buffer } = opts;
+  const { entityType, collegeId, entityId, buffer } = opts;
 
-  // 1. Resolve student under collegeId scope. 404 covers cross-college.
-  const resolved = await loadStudentScoped(collegeId, studentId);
+  // 1. Resolve entity row → personId under collegeId scope. 404 covers
+  //    "entity doesn't exist" AND cross-college (same outward shape so
+  //    we don't leak existence of rows in other tenants).
+  const resolved = await loadEntityScoped(entityType, collegeId, entityId);
 
   // 2. Validate the actual decoded image. Defense-in-depth size cap.
   if (buffer.length > PHOTO_MAX_BYTES) {
@@ -131,8 +177,8 @@ export async function uploadStudentPhoto(
   }
   const validated = await validateImageBuffer(buffer);
 
-  // 3. Compute deterministic keys.
-  const prefix = studentUploadPrefix(collegeId, studentId);
+  // 3. Compute deterministic keys under the entity-typed prefix.
+  const prefix = entityUploadPrefix(entityType, collegeId, entityId);
   const ext = formatToExt(validated.format);
   const originalKey = `${prefix}/photo/original.${ext}`;
   const thumbKey = `${prefix}/photo/thumb.jpg`;
@@ -142,7 +188,7 @@ export async function uploadStudentPhoto(
   const originalProcessed = await stripExifKeepFormat(buffer, validated.format);
 
   // 5. Upload original first; on thumb failure, best-effort delete original.
-  const metadata = { collegeId, studentId };
+  const metadata = { collegeId, entityId, entityType };
   await putObject({
     key: originalKey,
     body: originalProcessed,
@@ -208,11 +254,12 @@ export async function uploadStudentPhoto(
   };
 }
 
-export async function deleteStudentPhoto(
+export async function deleteEntityPhoto(
+  entityType: PersonEntityType,
   collegeId: string,
-  studentId: string,
+  entityId: string,
 ): Promise<void> {
-  const resolved = await loadStudentScoped(collegeId, studentId);
+  const resolved = await loadEntityScoped(entityType, collegeId, entityId);
   if (!resolved.existingPhoto) return; // idempotent no-op
 
   await safeDelete(resolved.existingPhoto.original);
@@ -224,12 +271,13 @@ export async function deleteStudentPhoto(
   );
 }
 
-export async function getStudentPhotoUrls(
+export async function getEntityPhotoUrls(
+  entityType: PersonEntityType,
   collegeId: string,
-  studentId: string,
+  entityId: string,
   variant: PhotoUrlVariant = 'both',
 ): Promise<Partial<PhotoUrls>> {
-  const resolved = await loadStudentScoped(collegeId, studentId);
+  const resolved = await loadEntityScoped(entityType, collegeId, entityId);
   if (!resolved.existingPhoto) return {};
 
   const photo = resolved.existingPhoto;
@@ -249,30 +297,74 @@ export async function getStudentPhotoUrls(
   return out;
 }
 
+// ─── Compat shims — student-only API (kept until v7) ──────────────────
+//
+// Existing call sites (photo-controller, frontend service) and the
+// existing test suite target these shims. They're thin wrappers that
+// forward into the generic API with `entityType = 'students'`.
+
+export const uploadStudentPhoto = (
+  opts: UploadStudentPhotoOpts,
+): Promise<UploadStudentPhotoResult> =>
+  uploadEntityPhoto({
+    entityType: 'students',
+    collegeId: opts.collegeId,
+    entityId: opts.studentId,
+    buffer: opts.buffer,
+    ...(opts.declaredMime !== undefined && { declaredMime: opts.declaredMime }),
+  });
+
+export const deleteStudentPhoto = (
+  collegeId: string,
+  studentId: string,
+): Promise<void> => deleteEntityPhoto('students', collegeId, studentId);
+
+export const getStudentPhotoUrls = (
+  collegeId: string,
+  studentId: string,
+  variant: PhotoUrlVariant = 'both',
+): Promise<Partial<PhotoUrls>> =>
+  getEntityPhotoUrls('students', collegeId, studentId, variant);
+
 // ─── Private helpers ──────────────────────────────────────────────────
 
 /**
- * Load the Student → Person under a strict `collegeId` filter and return
- * a normalized snapshot. Throws AppError(404) when the student doesn't
- * exist OR when it belongs to a different college.
+ * Load the entity row → Person under a strict `collegeId` filter and
+ * return a normalized snapshot. Throws AppError(404) when the entity
+ * doesn't exist OR belongs to a different college (same outward error
+ * shape so we don't leak existence across tenants).
  *
- * Two-step query is intentional: even if the student doc itself isn't
- * scoped (defensive: looking up by primary key only) the matching Person
- * lookup MUST also be scoped, so we double-bind the tenant on both
- * sides.
+ * Two-step query is intentional: the entity-row query is scoped by
+ * collegeId, AND the follow-up Person query is also scoped by
+ * collegeId — so we double-bind the tenant on both sides. If the
+ * `personId` ref ever points across tenants (data-corruption case),
+ * the second lookup catches it.
+ *
+ * Person.photo is a single field shared across all entity types because
+ * Person is the canonical identity record; the entity row is just the
+ * lookup hop.
  */
-async function loadStudentScoped(
+async function loadEntityScoped(
+  entityType: PersonEntityType,
   collegeId: string,
-  studentId: string,
-): Promise<ResolvedStudent> {
-  const student = await Student.findOne({ _id: studentId, collegeId }).lean();
-  if (!student) throw new AppError(404, 'Student not found');
+  entityId: string,
+): Promise<ResolvedEntity> {
+  const Model = ENTITY_MODELS[entityType];
+  const row = (await Model.findOne({ _id: entityId, collegeId })
+    .select('personId')
+    .lean()) as { _id: unknown; personId?: unknown } | null;
+
+  // Use the entity-type slug verbatim in the error message — keeps
+  // diagnostic context for the caller without leaking tenant data.
+  const notFound = (): AppError => new AppError(404, `${entityType} not found`);
+
+  if (!row || !row.personId) throw notFound();
 
   const person = await Person.findOne({
-    _id: student.personId,
+    _id: row.personId,
     collegeId,
   }).lean();
-  if (!person) throw new AppError(404, 'Student not found');
+  if (!person) throw notFound();
 
   const existingPhoto: ResolvedPhoto | null = person.photo
     ? {
@@ -285,7 +377,7 @@ async function loadStudentScoped(
     : null;
 
   return {
-    studentId: String(student._id),
+    entityId: String(row._id),
     personId: String(person._id),
     existingPhoto,
   };

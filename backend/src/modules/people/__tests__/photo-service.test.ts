@@ -27,7 +27,11 @@ import {
 } from '../../../__tests__/helpers/mongoMemory';
 import { Person } from '../../../models/people/Person';
 import { Student } from '../../../models/people/Student';
+import { Faculty } from '../../../models/people/Faculty';
+import { Staff } from '../../../models/people/Staff';
+import { Parent } from '../../../models/people/Parent';
 import { AppError } from '../../../middleware/errorHandler';
+import type { PersonEntityType } from '../../../shared/s3/s3-client';
 
 // ─── S3 client mock ───────────────────────────────────────────────────
 //
@@ -44,6 +48,11 @@ vi.mock('../../../shared/s3/s3-client', () => ({
   getPresignedUrl: (...args: unknown[]) => getPresignedUrlMock(...args),
   studentUploadPrefix: (collegeId: string, studentId: string) =>
     `colleges/${collegeId}/students/${studentId}`,
+  entityUploadPrefix: (
+    entityType: 'students' | 'faculty' | 'staff' | 'parents',
+    collegeId: string,
+    entityId: string,
+  ) => `colleges/${collegeId}/${entityType}/${entityId}`,
 }));
 
 // SUT loaded after the mock so the mocked module is what photo-service binds.
@@ -51,6 +60,9 @@ import {
   uploadStudentPhoto,
   deleteStudentPhoto,
   getStudentPhotoUrls,
+  uploadEntityPhoto,
+  deleteEntityPhoto,
+  getEntityPhotoUrls,
   ALLOWED_IMAGE_MIMES,
   PHOTO_MAX_BYTES,
   PHOTO_MAX_DIMENSION,
@@ -149,6 +161,93 @@ async function seedStudent(overrides: { collegeId?: mongoose.Types.ObjectId } = 
   return { collegeId: String(collegeId), person, student };
 }
 
+/**
+ * Generic seed helper across the 4 person-linked entity types. Returns the
+ * created entity row's id (always a Student/Faculty/Staff/Parent doc id —
+ * NOT the Person id) plus the Person it points at, in a single shape so
+ * tests can stay entity-type-agnostic.
+ *
+ * Each branch creates a new Person + a new entity row pointing to that
+ * Person, both scoped to `collegeId`. Defaults stay minimal: only the
+ * required-by-schema fields are populated.
+ */
+async function seedEntity(
+  entityType: PersonEntityType,
+  overrides: { collegeId?: mongoose.Types.ObjectId } = {},
+): Promise<{
+  collegeId: string;
+  person: { _id: mongoose.Types.ObjectId };
+  entityId: string;
+}> {
+  const collegeId = overrides.collegeId ?? oid();
+  const person = await Person.create({
+    collegeId,
+    name: `Test ${entityType}`,
+    phone: '9999999999',
+  });
+
+  switch (entityType) {
+    case 'students': {
+      const student = await Student.create({
+        collegeId,
+        personId: person._id,
+        admissionYear: 2025,
+        status: 'active',
+      });
+      return {
+        collegeId: String(collegeId),
+        person: { _id: person._id as mongoose.Types.ObjectId },
+        entityId: String(student._id),
+      };
+    }
+    case 'faculty': {
+      const faculty = await Faculty.create({
+        collegeId,
+        personId: person._id,
+        employeeCode: `FAC-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        designation: 'Assistant Professor',
+        contractType: 'regular',
+        status: 'active',
+      });
+      return {
+        collegeId: String(collegeId),
+        person: { _id: person._id as mongoose.Types.ObjectId },
+        entityId: String(faculty._id),
+      };
+    }
+    case 'staff': {
+      const staff = await Staff.create({
+        collegeId,
+        personId: person._id,
+        employeeCode: `STF-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        designation: 'Office Manager',
+        staffType: 'admin',
+        status: 'active',
+      });
+      return {
+        collegeId: String(collegeId),
+        person: { _id: person._id as mongoose.Types.ObjectId },
+        entityId: String(staff._id),
+      };
+    }
+    case 'parents': {
+      const parent = await Parent.create({
+        collegeId,
+        personId: person._id,
+        relationship: 'father',
+        primaryContact: true,
+      });
+      return {
+        collegeId: String(collegeId),
+        person: { _id: person._id as mongoose.Types.ObjectId },
+        entityId: String(parent._id),
+      };
+    }
+  }
+}
+
+const ENTITY_TYPES: PersonEntityType[] = ['students', 'faculty', 'staff', 'parents'];
+
 // ─── Constants exposed by the SUT ─────────────────────────────────────
 
 describe('photo-service constants', () => {
@@ -191,7 +290,13 @@ describe('uploadStudentPhoto — happy paths', () => {
     };
     expect(firstCall.key).toBe(result.original);
     expect(firstCall.contentType).toBe('image/jpeg');
-    expect(firstCall.metadata).toEqual({ collegeId, studentId: String(student._id) });
+    // Metadata keys reflect the generalized API; the student compat shim
+    // forwards into uploadEntityPhoto with entityType='students'.
+    expect(firstCall.metadata).toEqual({
+      collegeId,
+      entityId: String(student._id),
+      entityType: 'students',
+    });
 
     const secondCall = putObjectMock.mock.calls[1]![0] as {
       key: string;
@@ -375,7 +480,9 @@ describe('uploadStudentPhoto — validation', () => {
     }
     expect(caught).toBeInstanceOf(AppError);
     expect((caught as AppError).statusCode).toBe(404);
-    expect((caught as AppError).message).toMatch(/Student not found/);
+    // Generalized error: "<entityType> not found" — for the student compat
+    // shim entityType = 'students'.
+    expect((caught as AppError).message).toMatch(/students not found/);
 
     // Person.photo on the cross-college student must remain untouched.
     const personAfter = await Person.findById(personB._id).lean();
@@ -667,5 +774,119 @@ describe('uploadStudentPhoto — EXIF handling', () => {
     // into pixels so a stale orientation tag would be misleading.
     // Acceptable outcomes: orientation undefined/0/1, NOT 6.
     expect(thumbMeta.orientation === undefined || thumbMeta.orientation === 1).toBe(true);
+  });
+});
+
+// ─── uploadEntityPhoto — parameterized over all 4 person-linked types ──
+//
+// Validation, EXIF handling, sharp behavior, replace-flow, etc. are
+// entity-type-agnostic — the path the bytes travel from buffer to S3 is
+// the same regardless of which row was the lookup hop. So we only run
+// the entity-shaped assertions through the parameterized matrix:
+//   - happy path (S3 keys carry the right entity slug; Person.photo updated)
+//   - cross-college guard
+//   - delete + presign happy paths
+// 12 net new tests (3 per entity × 4 entities).
+
+ENTITY_TYPES.forEach((entityType) => {
+  describe(`uploadEntityPhoto — ${entityType}`, () => {
+    it('happy path: uploads original + thumb under the right prefix and updates Person.photo', async () => {
+      const { collegeId, person, entityId } = await seedEntity(entityType);
+
+      const result = await uploadEntityPhoto({
+        entityType,
+        collegeId,
+        entityId,
+        buffer: JPEG_50,
+        declaredMime: 'image/jpeg',
+      });
+
+      const expectedPrefix = `colleges/${collegeId}/${entityType}/${entityId}`;
+      expect(result.original).toBe(`${expectedPrefix}/photo/original.jpg`);
+      expect(result.thumb).toBe(`${expectedPrefix}/photo/thumb.jpg`);
+      expect(result.contentType).toBe('image/jpeg');
+
+      // Two S3 puts under the entity's prefix.
+      expect(putObjectMock).toHaveBeenCalledTimes(2);
+      const firstCall = putObjectMock.mock.calls[0]![0] as {
+        key: string;
+        contentType: string;
+        metadata?: Record<string, string>;
+      };
+      expect(firstCall.key).toBe(result.original);
+      // Metadata threads the entity context for forensic traceability.
+      expect(firstCall.metadata).toMatchObject({ collegeId, entityId, entityType });
+
+      // Person.photo persisted (Person is the storage location; entity is
+      // just the lookup hop).
+      const updatedPerson = await Person.findById(person._id).lean();
+      expect(updatedPerson?.photo).toMatchObject({
+        original: result.original,
+        thumb: result.thumb,
+        contentType: 'image/jpeg',
+      });
+    });
+
+    it(`rejects when the ${entityType} row belongs to a different college`, async () => {
+      const collegeA = oid();
+      // Seed under a fresh college; we'll then call with `collegeA`.
+      const { entityId } = await seedEntity(entityType);
+
+      let caught: unknown;
+      try {
+        await uploadEntityPhoto({
+          entityType,
+          collegeId: String(collegeA),
+          entityId,
+          buffer: JPEG_50,
+        });
+      } catch (e) {
+        caught = e;
+      }
+      expect(caught).toBeInstanceOf(AppError);
+      expect((caught as AppError).statusCode).toBe(404);
+      expect(putObjectMock).not.toHaveBeenCalled();
+    });
+
+    it(`deleteEntityPhoto + getEntityPhotoUrls work end-to-end for ${entityType}`, async () => {
+      const { collegeId, person, entityId } = await seedEntity(entityType);
+      const prefix = `colleges/${collegeId}/${entityType}/${entityId}`;
+
+      // Pre-populate Person.photo so delete + presign have something to act on.
+      await Person.updateOne(
+        { _id: person._id },
+        {
+          $set: {
+            photo: {
+              original: `${prefix}/photo/original.jpg`,
+              thumb: `${prefix}/photo/thumb.jpg`,
+              contentType: 'image/jpeg',
+              sizeBytes: 100,
+              uploadedAt: new Date(),
+            },
+          },
+        },
+      );
+
+      // Presign both variants.
+      const urls = await getEntityPhotoUrls(entityType, collegeId, entityId);
+      expect(urls.original).toBeDefined();
+      expect(urls.thumb).toBeDefined();
+      expect(getPresignedUrlMock).toHaveBeenCalledTimes(2);
+
+      // Delete: both S3 keys removed and Person.photo cleared.
+      await deleteEntityPhoto(entityType, collegeId, entityId);
+      expect(deleteObjectMock).toHaveBeenCalledTimes(2);
+      const deletedKeys = deleteObjectMock.mock.calls.map((c) => c[0]);
+      expect(deletedKeys).toEqual(
+        expect.arrayContaining([
+          `${prefix}/photo/original.jpg`,
+          `${prefix}/photo/thumb.jpg`,
+        ]),
+      );
+
+      const after = await Person.findById(person._id).lean();
+      expect(after?.photo).toBeFalsy();
+    });
   });
 });

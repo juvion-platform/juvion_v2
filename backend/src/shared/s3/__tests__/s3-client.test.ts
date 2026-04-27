@@ -90,6 +90,7 @@ import {
 } from '@aws-sdk/client-s3';
 import {
   studentUploadPrefix,
+  entityUploadPrefix,
   getBucket,
   getS3Client,
   putObject,
@@ -98,6 +99,7 @@ import {
   getPresignedUrl,
   __resetS3ClientForTesting,
 } from '../s3-client';
+import type { PersonEntityType } from '../s3-client';
 import { AppError } from '../../../middleware/errorHandler';
 
 // ─── env capture ────────────────────────────────────────────────────
@@ -145,6 +147,49 @@ describe('studentUploadPrefix', () => {
     expect(studentUploadPrefix('cid-123', 'sid-456')).toBe(
       'colleges/cid-123/students/sid-456',
     );
+  });
+
+  it('still resolves through the entity helper (compat shim parity)', () => {
+    // The shim must be a thin pass-through to entityUploadPrefix so behavior
+    // is guaranteed-identical until the shim is removed in a future release.
+    expect(studentUploadPrefix('cid-X', 'sid-Y')).toBe(
+      entityUploadPrefix('students', 'cid-X', 'sid-Y'),
+    );
+  });
+});
+
+describe('entityUploadPrefix', () => {
+  it('returns colleges/<cid>/students/<sid> for students', () => {
+    expect(entityUploadPrefix('students', 'cid-123', 'sid-456')).toBe(
+      'colleges/cid-123/students/sid-456',
+    );
+  });
+
+  it('returns colleges/<cid>/faculty/<fid> for faculty', () => {
+    expect(entityUploadPrefix('faculty', 'cid-123', 'fid-456')).toBe(
+      'colleges/cid-123/faculty/fid-456',
+    );
+  });
+
+  it('returns colleges/<cid>/staff/<sid> for staff', () => {
+    expect(entityUploadPrefix('staff', 'cid-123', 'sid-456')).toBe(
+      'colleges/cid-123/staff/sid-456',
+    );
+  });
+
+  it('returns colleges/<cid>/parents/<pid> for parents', () => {
+    expect(entityUploadPrefix('parents', 'cid-123', 'pid-456')).toBe(
+      'colleges/cid-123/parents/pid-456',
+    );
+  });
+
+  it('treats IDs as opaque strings (no validation here)', () => {
+    // The helper is dumb-by-design: ObjectId/UUID validation is the
+    // calling service's job. Empty strings, non-Mongo ids — all pass.
+    const types: PersonEntityType[] = ['students', 'faculty', 'staff', 'parents'];
+    for (const t of types) {
+      expect(entityUploadPrefix(t, '', '')).toBe(`colleges//${t}/`);
+    }
   });
 });
 

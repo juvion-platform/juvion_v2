@@ -108,14 +108,35 @@ export function getBucket(): string {
 // ─── Key helpers ───────────────────────────────────────────────────
 
 /**
- * Locked-in prefix layout for any student upload:
- *   colleges/<collegeId>/students/<studentId>
+ * Discriminator for any person-linked entity that owns a photo. Keeps
+ * the S3 prefix segment in lockstep with the API URL slug for that
+ * entity (`/api/people/students/...` ↔ `colleges/<cid>/students/<sid>`).
+ */
+export type PersonEntityType = 'students' | 'faculty' | 'staff' | 'parents';
+
+/**
+ * Locked-in prefix layout for any person-linked entity upload:
+ *   colleges/<collegeId>/<entityType>/<entityId>
  *
  * IDs are treated as opaque — no validation here. Caller validates
  * ObjectId shape / multi-tenancy.
  */
+export function entityUploadPrefix(
+  entityType: PersonEntityType,
+  collegeId: string,
+  entityId: string,
+): string {
+  return `colleges/${collegeId}/${entityType}/${entityId}`;
+}
+
+/**
+ * Compat shim. Existing callers (and tests) target the student-only
+ * helper; this keeps them green while the rename rolls out. Remove
+ * once all in-tree references are migrated to `entityUploadPrefix`
+ * (no external/out-of-tree callers — verified at G1 time).
+ */
 export function studentUploadPrefix(collegeId: string, studentId: string): string {
-  return `colleges/${collegeId}/students/${studentId}`;
+  return entityUploadPrefix('students', collegeId, studentId);
 }
 
 // ─── Object operations ─────────────────────────────────────────────
