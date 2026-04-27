@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { listStaff, deleteStaff } from '../../services/people';
 import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
+import PersonThumbnail from '../../components/people/PersonThumbnail';
 import { useHighlightRow } from '../../hooks/useHighlightRow';
 import { Plus, Pencil, Trash2, Search } from 'lucide-react';
 
@@ -32,6 +33,10 @@ export default function StaffPage() {
   });
 
   const columns = [
+    { key: 'photo', label: '', render: (r: any) => {
+      const name = r.person?.name || r.personId?.name || undefined;
+      return <PersonThumbnail entityType="staff" entityId={r._id} personName={name} />;
+    } },
     { key: 'employeeCode', label: 'Emp Code' },
     { key: 'name', label: 'Name', render: (r: any) => (r.person?.name || r.personId?.name || '—') },
     { key: 'phone', label: 'Phone', render: (r: any) => (r.person?.phone || r.personId?.phone || '—') },

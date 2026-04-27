@@ -5,6 +5,7 @@ import { Plus, Pencil, Search, Trash2 } from 'lucide-react';
 import DataTable from '../../components/ui/DataTable';
 import Modal from '../../components/ui/Modal';
 import Badge from '../../components/ui/Badge';
+import PersonThumbnail from '../../components/people/PersonThumbnail';
 import { createParent, deleteParent, listParents, listStudents, updateParent } from '../../services/people';
 import { useHighlightRow } from '../../hooks/useHighlightRow';
 
@@ -171,6 +172,10 @@ export default function ParentsPage() {
   const error = createMut.error || updateMut.error;
 
   const columns = [
+    { key: 'photo', label: '', render: (row: any) => {
+      const name = row.person?.name || row.personId?.name || undefined;
+      return <PersonThumbnail entityType="parents" entityId={row._id} personName={name} />;
+    } },
     { key: 'name', label: 'Name', render: (row: any) => row.person?.name || row.personId?.name || '—' },
     { key: 'relationship', label: 'Relationship', render: (row: any) => <span className="capitalize">{row.relationship || '—'}</span> },
     { key: 'phone', label: 'Phone', render: (row: any) => row.person?.phone || row.personId?.phone || '—' },

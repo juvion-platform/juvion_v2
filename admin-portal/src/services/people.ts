@@ -18,14 +18,18 @@ export const createStudent = (data: any) => api.post(`${BASE}/students`, data).t
 export const updateStudent = (id: string, data: any) => api.put(`${BASE}/students/${id}`, data).then(r => r.data);
 export const deleteStudent = (id: string) => api.delete(`${BASE}/students/${id}`).then(r => r.data);
 
-// ── Student photos ───────────────────────────────────
+// ── Person-entity photos (Student / Faculty / Staff / Parent) ──────
 // Wire-format mirrors backend photo-controller responses. Date fields
-// are serialized as ISO strings on the wire.
+// are serialized as ISO strings on the wire. The same controller-factory
+// serves all four entity types; the only thing that changes between
+// them is the URL slug (`students` / `faculty` / `staff` / `parents`).
 //
-//   POST   /people/students/:id/photo       → StudentPhotoMeta
-//   DELETE /people/students/:id/photo       → 200 { deleted: true }
-//   GET    /people/students/:id/photo-url   → StudentPhotoUrlsResponse
-//                                             (both keys optional; empty {} when no photo)
+//   POST   /people/{entityType}/:id/photo       → StudentPhotoMeta
+//   DELETE /people/{entityType}/:id/photo       → 200 { deleted: true }
+//   GET    /people/{entityType}/:id/photo-url   → StudentPhotoUrlsResponse
+//                                                 (both keys optional; empty {} when no photo)
+export type PersonEntityType = 'students' | 'faculty' | 'staff' | 'parents';
+
 export interface StudentPhotoMeta {
   original: string;
   thumb: string;
@@ -37,14 +41,15 @@ export interface StudentPhotoMeta {
 export interface PhotoUrl { url: string; expiresAt: string }
 export interface StudentPhotoUrlsResponse { thumb?: PhotoUrl; original?: PhotoUrl }
 
-export async function uploadStudentPhoto(
-  studentId: string,
+export async function uploadEntityPhoto(
+  entityType: PersonEntityType,
+  entityId: string,
   file: File,
   onProgress?: (pct: number) => void,
 ): Promise<StudentPhotoMeta> {
   const fd = new FormData();
   fd.append('file', file);
-  const res = await api.post(`${BASE}/students/${studentId}/photo`, fd, {
+  const res = await api.post(`${BASE}/${entityType}/${entityId}/photo`, fd, {
     headers: { 'Content-Type': 'multipart/form-data' },
     onUploadProgress: (e) => {
       if (onProgress && e.total) onProgress(Math.round((e.loaded * 100) / e.total));
@@ -53,16 +58,47 @@ export async function uploadStudentPhoto(
   return res.data;
 }
 
-export async function deleteStudentPhoto(studentId: string): Promise<void> {
-  await api.delete(`${BASE}/students/${studentId}/photo`);
+export async function deleteEntityPhoto(
+  entityType: PersonEntityType,
+  entityId: string,
+): Promise<void> {
+  await api.delete(`${BASE}/${entityType}/${entityId}/photo`);
 }
 
-export async function getStudentPhotoUrl(
+export async function getEntityPhotoUrl(
+  entityType: PersonEntityType,
+  entityId: string,
+  variant: 'thumb' | 'original' | 'both' = 'thumb',
+): Promise<StudentPhotoUrlsResponse> {
+  const res = await api.get(`${BASE}/${entityType}/${entityId}/photo-url`, { params: { variant } });
+  return res.data;
+}
+
+// ── Compat shims (student-only, deprecated) ────────────────────────
+// Thin wrappers around the entity-aware helpers above so any
+// straggling callers still using the student-only API keep working.
+// Remove once every consumer has migrated to `*EntityPhoto*`.
+
+/** @deprecated Use `uploadEntityPhoto('students', studentId, ...)` instead. */
+export function uploadStudentPhoto(
+  studentId: string,
+  file: File,
+  onProgress?: (pct: number) => void,
+): Promise<StudentPhotoMeta> {
+  return uploadEntityPhoto('students', studentId, file, onProgress);
+}
+
+/** @deprecated Use `deleteEntityPhoto('students', studentId)` instead. */
+export function deleteStudentPhoto(studentId: string): Promise<void> {
+  return deleteEntityPhoto('students', studentId);
+}
+
+/** @deprecated Use `getEntityPhotoUrl('students', studentId, variant)` instead. */
+export function getStudentPhotoUrl(
   studentId: string,
   variant: 'thumb' | 'original' | 'both' = 'thumb',
 ): Promise<StudentPhotoUrlsResponse> {
-  const res = await api.get(`${BASE}/students/${studentId}/photo-url`, { params: { variant } });
-  return res.data;
+  return getEntityPhotoUrl('students', studentId, variant);
 }
 
 // ── Faculty ──────────────────────────────────────────

@@ -6,6 +6,7 @@ import Badge from '../../components/ui/Badge';
 import {
   DetailSection, DetailField, DetailBool, formatDate, extractPerson,
 } from '../../components/ui/DetailView';
+import PersonPhotoBlock from '../../components/people/PersonPhotoBlock';
 
 /**
  * Read-only view for a single Faculty member. Edit navigates to the
@@ -74,6 +75,16 @@ export default function FacultyDetailPage() {
           <Pencil className="w-4 h-4" /> Edit
         </button>
       </div>
+
+      {/* Profile photo — sits above Personal Information so the faculty
+          member is identifiable immediately on load. */}
+      {id && (
+        <PersonPhotoBlock
+          entityType="faculty"
+          entityId={id}
+          personName={person.name}
+        />
+      )}
 
       <DetailSection title="Personal Information">
         <DetailField label="Full Name" value={person.name} />

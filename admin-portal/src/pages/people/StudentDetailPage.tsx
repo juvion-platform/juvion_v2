@@ -8,7 +8,7 @@ import {
 } from '../../components/ui/DetailView';
 import FeePinsPanel from '../../components/finance/FeePinsPanel';
 import StudentFeeStructurePanel from '../../components/finance/StudentFeeStructurePanel';
-import StudentPhotoBlock from '../../components/people/StudentPhotoBlock';
+import PersonPhotoBlock from '../../components/people/PersonPhotoBlock';
 
 /**
  * Read-only view for a single Student. Clicking Edit navigates to the
@@ -99,9 +99,10 @@ export default function StudentDetailPage() {
       {/* Profile photo — sits above Personal Information so the student
           is identifiable immediately on load. */}
       {id && (
-        <StudentPhotoBlock
-          studentId={id}
-          studentName={person.name}
+        <PersonPhotoBlock
+          entityType="students"
+          entityId={id}
+          personName={person.name}
         />
       )}
 

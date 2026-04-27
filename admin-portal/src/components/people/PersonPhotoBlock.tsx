@@ -1,13 +1,21 @@
 /**
- * StudentPhotoBlock — compact horizontal card on the Student Detail page
- * that displays the current photo (or initials fallback) and exposes
- * upload / replace / delete affordances behind a `people:update` gate.
+ * PersonPhotoBlock — compact horizontal card on Person detail pages
+ * (Student / Faculty / Staff / Parent) that displays the current photo
+ * (or initials fallback) and exposes upload / replace / delete affordances
+ * behind a `people:update` gate.
+ *
+ * Generalized in G4 from the student-only `StudentPhotoBlock`. The same
+ * machinery now serves all four person entity types because the backend
+ * exposes a uniform `/api/people/{entityType}/:id/photo*` contract.
  *
  * Data flow:
- *   - `useQuery(['student-photo-url', studentId, 'thumb'])` fetches a
- *     presigned thumb URL with a 30-minute staleTime (well under the
- *     60-minute presign expiry). Same query key as `StudentThumbnail` so
- *     row thumbnails on `StudentsPage` share the cache transparently.
+ *   - `useQuery(['entity-photo-url', entityType, entityId, 'thumb'])` fetches
+ *     a presigned thumb URL with a 30-minute staleTime (well under the
+ *     60-minute presign expiry). Same query-key prefix as `PersonThumbnail`
+ *     so row thumbnails on the matching list page share the cache
+ *     transparently. The `entityType` segment in the key prevents
+ *     cross-type collisions when the same Mongo `_id` happens to exist for
+ *     two different collections (extremely unlikely but defensive).
  *   - Upload + delete mutations invalidate that key on success so the
  *     newly-uploaded image appears without a manual refresh.
  *
@@ -41,16 +49,18 @@ import {
 } from 'lucide-react';
 
 import {
-  uploadStudentPhoto,
-  deleteStudentPhoto,
-  getStudentPhotoUrl,
+  uploadEntityPhoto,
+  deleteEntityPhoto,
+  getEntityPhotoUrl,
+  type PersonEntityType,
 } from '../../services/people';
 import { useAuthStore } from '../../stores/authStore';
 
 interface Props {
-  studentId: string;
-  /** Used for the initials fallback + img alt text. */
-  studentName?: string;
+  entityType: PersonEntityType;
+  entityId: string;
+  /** Display name for the initials avatar fallback + img alt text. */
+  personName?: string;
 }
 
 const STALE_TIME_MS = 30 * 60 * 1000; // 30 min, just under the 60-min presign window.
@@ -277,7 +287,7 @@ function ConfirmDeleteModal({
           Delete photo
         </h3>
         <p className="text-sm text-gray-600 mt-2">
-          Delete this student's photo? This cannot be undone.
+          Delete this photo? This cannot be undone.
         </p>
         <div className="mt-5 flex justify-end gap-2">
           <button
@@ -305,15 +315,16 @@ function ConfirmDeleteModal({
 
 // ─── Main component ───────────────────────────────────────────────────
 
-export default function StudentPhotoBlock({ studentId, studentName }: Props) {
+export default function PersonPhotoBlock({ entityType, entityId, personName }: Props) {
   const qc = useQueryClient();
   const canEdit = useAuthStore(s => s.hasPermission('people', 'update'));
 
-  // Fetch the presigned thumb URL. Same key as `StudentThumbnail` so the
-  // page-level cache is shared across the row + detail surfaces.
+  // Fetch the presigned thumb URL. Same key prefix as `PersonThumbnail` so
+  // the page-level cache is shared across the row + detail surfaces. The
+  // entityType segment isolates each entity's cache to avoid collisions.
   const photoQuery = useQuery({
-    queryKey: ['student-photo-url', studentId, 'thumb'],
-    queryFn: () => getStudentPhotoUrl(studentId, 'thumb'),
+    queryKey: ['entity-photo-url', entityType, entityId, 'thumb'],
+    queryFn: () => getEntityPhotoUrl(entityType, entityId, 'thumb'),
     staleTime: STALE_TIME_MS,
     retry: false,
   });
@@ -351,11 +362,11 @@ export default function StudentPhotoBlock({ studentId, studentName }: Props) {
   // Mutations.
   const uploadMutation = useMutation({
     mutationFn: ({ file }: { file: File }) =>
-      uploadStudentPhoto(studentId, file, (pct) => setProgress(pct)),
+      uploadEntityPhoto(entityType, entityId, file, (pct) => setProgress(pct)),
     onSuccess: (meta) => {
       setLastUploadedAt(meta.uploadedAt);
       setToast({ kind: 'success', message: 'Photo updated' });
-      qc.invalidateQueries({ queryKey: ['student-photo-url', studentId] });
+      qc.invalidateQueries({ queryKey: ['entity-photo-url', entityType, entityId] });
       closeUploadModal();
     },
     onError: (err) => {
@@ -364,11 +375,11 @@ export default function StudentPhotoBlock({ studentId, studentName }: Props) {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: () => deleteStudentPhoto(studentId),
+    mutationFn: () => deleteEntityPhoto(entityType, entityId),
     onSuccess: () => {
       setLastUploadedAt(null);
       setToast({ kind: 'success', message: 'Photo deleted' });
-      qc.invalidateQueries({ queryKey: ['student-photo-url', studentId] });
+      qc.invalidateQueries({ queryKey: ['entity-photo-url', entityType, entityId] });
       setShowDeleteConfirm(false);
     },
     onError: (err) => {
@@ -427,7 +438,7 @@ export default function StudentPhotoBlock({ studentId, studentName }: Props) {
 
   const thumbUrl = photoQuery.data?.thumb?.url;
   const hasPhoto = Boolean(thumbUrl) && !imageBroken;
-  const initials = computeInitials(studentName);
+  const initials = computeInitials(personName);
   const uploadedAtDisplay = formatUploadedAt(lastUploadedAt ?? undefined);
 
   // ── Render ──────────────────────────────────────────────────────────
@@ -436,7 +447,7 @@ export default function StudentPhotoBlock({ studentId, studentName }: Props) {
     <>
       <section
         className="bg-white rounded-xl border shadow-sm p-4 flex items-center gap-4"
-        aria-label="Student photo"
+        aria-label="Profile photo"
       >
         {/* Left: 96×96 circular avatar */}
         <div className="flex-shrink-0">
@@ -448,15 +459,15 @@ export default function StudentPhotoBlock({ studentId, studentName }: Props) {
           ) : hasPhoto ? (
             <img
               src={thumbUrl}
-              alt={studentName ? `${studentName} photo` : 'Student photo'}
+              alt={personName ? `${personName} photo` : 'Profile photo'}
               onError={() => setImageBroken(true)}
               className="w-24 h-24 rounded-full object-cover bg-slate-100 border"
             />
           ) : (
             <div
               className="w-24 h-24 rounded-full bg-gradient-to-br from-teal-400 to-blue-500 text-white flex items-center justify-center text-2xl font-semibold select-none"
-              aria-label={studentName ? `${studentName} initials` : 'Student initials'}
-              title={studentName}
+              aria-label={personName ? `${personName} initials` : 'Initials'}
+              title={personName}
             >
               {initials}
             </div>
