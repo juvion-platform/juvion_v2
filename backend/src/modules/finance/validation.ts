@@ -890,3 +890,31 @@ export const waiveHoldSchema = z.object({
 export const pauseEscalationSchema = z.object({
   pausedUntil: z.coerce.date(),
 });
+
+// ═══ Fee Category ═══════════════════════════════════════════════
+// Per-college reservation-category catalog (OC, OBC, SC, ST, NRI, …).
+// Drives the `Category` dropdown on FeeStructure forms; stored in
+// `FeeStructure.category` as the string `code` (not an ObjectId) so the
+// fee-pin-service category-matching contract stays string-equality.
+
+const feeCategoryStatusEnum = z.enum(['active', 'inactive']);
+
+export const createFeeCategorySchema = z.object({
+  code: z.string().trim().min(1, 'Code is required'),
+  name: z.string().trim().min(1, 'Name is required'),
+  description: z.string().trim().optional(),
+  status: feeCategoryStatusEnum.optional(),
+});
+
+export const updateFeeCategorySchema = z.object({
+  code: z.string().trim().min(1).optional(),
+  name: z.string().trim().min(1).optional(),
+  description: z.string().trim().optional(),
+  status: feeCategoryStatusEnum.optional(),
+});
+
+export const feeCategoryListQuerySchema = z.object({
+  page: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().positive().max(100).optional(),
+  status: feeCategoryStatusEnum.optional(),
+});

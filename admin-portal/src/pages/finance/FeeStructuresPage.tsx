@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listFeeStructures, createFeeStructure, updateFeeStructure, deleteFeeStructure } from '../../services/finance';
 import { listAcademicYears, listProgrammes, listBranches } from '../../services/academics';
+import { listFeeCategories } from '../../services/fee-categories';
 import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
-import { Plus, Pencil, Trash2, ExternalLink } from 'lucide-react';
+import { Plus, Pencil, Trash2, ExternalLink, Copy } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useViewEditMode } from '../../hooks/useViewEditMode';
 
@@ -34,6 +35,7 @@ export default function FeeStructuresPage() {
   const { data: academicYears } = useQuery({ queryKey: ['academic-years-all'], queryFn: () => listAcademicYears(1, 100) });
   const { data: programmes } = useQuery({ queryKey: ['programmes-all'], queryFn: () => listProgrammes(1, 100) });
   const { data: branches } = useQuery({ queryKey: ['branches-all'], queryFn: () => listBranches(1, 100) });
+  const { data: feeCategories } = useQuery({ queryKey: ['fee-categories-all'], queryFn: () => listFeeCategories(1, 100) });
 
   const vem = useViewEditMode<any>({
     onOpenEntity: (row) => {
@@ -97,6 +99,7 @@ export default function FeeStructuresPage() {
     { key: 'actions', label: '', render: (r: any) => (
       <div className="flex gap-1">
         <button onClick={(e) => { e.stopPropagation(); vem.openForEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
+        <button onClick={(e) => { e.stopPropagation(); vem.openForCopy(r); }} className="p-1 rounded hover:bg-blue-50" title="Copy as new"><Copy size={15} className="text-blue-500" /></button>
         <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this fee structure?')) deleteMut.mutate(r._id); }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
       </div>
     )},
@@ -158,7 +161,15 @@ export default function FeeStructuresPage() {
                   ))}
                 </select>
               </div>
-              <div><label className={lbl}>Category *</label><input required value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className={inp} placeholder="e.g. Tuition" /></div>
+              <div>
+                <label className={lbl}>Category * {!vem.isView && <Link to="/finance/fee-management/fee-categories" target="_blank" className={manageLink}>+ Manage <ExternalLink size={10} /></Link>}</label>
+                <select required value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className={inp}>
+                  <option value="">Select category</option>
+                  {(feeCategories?.items || []).map((cat: any) => (
+                    <option key={cat._id} value={cat.code}>{cat.name}</option>
+                  ))}
+                </select>
+              </div>
               <div><label className={lbl}>Quota *</label>
                 <select required value={form.quota} onChange={e => setForm(f => ({ ...f, quota: e.target.value }))} className={inp}>
                   {QUOTAS.map(q => <option key={q} value={q}>{q}</option>)}

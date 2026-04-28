@@ -10,6 +10,7 @@ import * as feeTemplateCtrl from './fee-component-template-controller';
 import * as feePinAuditCtrl from './fee-pin-audit-controller';
 import * as feeAnalyticsCtrl from './fee-analytics-controller';
 import * as feeHoldsCtrl from './fee-holds-controller';
+import * as feeCategoryCtrl from './fee-category-controller';
 import {
   createFeeStructureSchema, updateFeeStructureSchema,
   createStudentFeeAccountSchema, updateStudentFeeAccountSchema,
@@ -149,6 +150,9 @@ import {
   holdsListQuerySchema,
   waiveHoldSchema,
   pauseEscalationSchema,
+  createFeeCategorySchema,
+  updateFeeCategorySchema,
+  feeCategoryListQuerySchema,
 } from './validation';
 
 const router = Router();
@@ -689,6 +693,45 @@ router.get(
   authorize('finance', 'read'),
   feeConfigRateLimit,
   feePinAuditCtrl.getInvariants,
+);
+
+// ═══ Fee Category CRUD ═══════════════════════════════════════════
+// Per-college reservation-category catalog (OC, OBC, SC, ST, NRI, …).
+// Drives the FeeStructure form's Category dropdown. Stored as a string
+// `code` in FeeStructure.category — see fee-pin-service for the
+// string-equality matching contract that downstream callers rely on.
+router.get(
+  '/fee-categories',
+  authorize('finance', 'read'),
+  feeConfigRateLimit,
+  validate(feeCategoryListQuerySchema, 'query'),
+  feeCategoryCtrl.listFeeCategories,
+);
+router.post(
+  '/fee-categories',
+  authorize('finance', 'create'),
+  feeConfigRateLimit,
+  validate(createFeeCategorySchema),
+  feeCategoryCtrl.createFeeCategory,
+);
+router.get(
+  '/fee-categories/:id',
+  authorize('finance', 'read'),
+  feeConfigRateLimit,
+  feeCategoryCtrl.getFeeCategory,
+);
+router.patch(
+  '/fee-categories/:id',
+  authorize('finance', 'update'),
+  feeConfigRateLimit,
+  validate(updateFeeCategorySchema),
+  feeCategoryCtrl.updateFeeCategory,
+);
+router.delete(
+  '/fee-categories/:id',
+  authorize('finance', 'delete'),
+  feeConfigRateLimit,
+  feeCategoryCtrl.deleteFeeCategory,
 );
 
 export default router;

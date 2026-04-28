@@ -14,6 +14,7 @@ import FinanceTabShell, {
 
 import FeeStructuresPage from './FeeStructuresPage';
 import FeeComponentTemplatePage from './FeeComponentTemplatePage';
+import FeeCategoriesPage from './FeeCategoriesPage';
 import StudentFeeAccountsPage from './StudentFeeAccountsPage';
 import FeeLineItemsPage from './FeeLineItemsPage';
 import PaymentsPage from './PaymentsPage';
@@ -25,6 +26,7 @@ import FinancialHoldsPage from './FinancialHoldsPage';
 const TABS: FinanceTabDef[] = [
   { to: '/finance/fee-management/fee-structures', label: 'Fee Structures' },
   { to: '/finance/fee-management/component-template', label: 'Component Template' },
+  { to: '/finance/fee-management/fee-categories', label: 'Fee Categories' },
   { to: '/finance/fee-management/fee-accounts', label: 'Fee Accounts' },
   { to: '/finance/fee-management/fee-line-items', label: 'Fee Line Items' },
   { to: '/finance/fee-management/payments', label: 'Payments' },
@@ -45,6 +47,7 @@ export default function FeeManagementPage() {
         <Route index element={<Navigate to="fee-structures" replace />} />
         <Route path="fee-structures" element={<FeeStructuresPage />} />
         <Route path="component-template" element={<FeeComponentTemplatePage />} />
+        <Route path="fee-categories" element={<FeeCategoriesPage />} />
         <Route path="fee-accounts" element={<StudentFeeAccountsPage />} />
         <Route path="fee-line-items" element={<FeeLineItemsPage />} />
         <Route path="payments" element={<PaymentsPage />} />
