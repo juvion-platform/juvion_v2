@@ -1,7 +1,8 @@
-import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getStats } from '../services/academics';
-import { BookOpen, GraduationCap, Building2, GitBranch, Users, LayoutGrid, Calendar, Clock, ArrowLeft, BookMarked, Map, Layers, UserCheck, CalendarDays, Table2, ClipboardCheck, FileText, FileCheck, Award, Target, MessageSquare, BookCopy, TrendingUp } from 'lucide-react';
+import { BookOpen, GraduationCap, Building2, GitBranch, Users, LayoutGrid, Calendar, Clock, BookMarked, Map, Layers, UserCheck, CalendarDays, Table2, ClipboardCheck, FileText, FileCheck, Award, Target, MessageSquare, BookCopy, TrendingUp } from 'lucide-react';
+import Breadcrumbs from '../components/ui/Breadcrumbs';
 
 import RegulationsPage from './academics/RegulationsPage';
 import ProgrammesPage from './academics/ProgrammesPage';
@@ -174,18 +175,9 @@ function AcademicsHome() {
 }
 
 function SubPageWrapper({ children }: { children: React.ReactNode }) {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const path = location.pathname;
-  const isSubPage = path !== '/academics' && path !== '/academics/';
-
   return (
     <div>
-      {isSubPage && (
-        <button onClick={() => navigate('/academics')} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4">
-          <ArrowLeft size={16} className="text-gray-400" /> Back to Academics
-        </button>
-      )}
+      <Breadcrumbs className="mb-4" />
       {children}
     </div>
   );

@@ -1,8 +1,9 @@
-import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getFinanceStats } from '../services/finance';
 import { getStats as getPeopleStats } from '../services/people';
-import { ArrowLeft, Landmark, CreditCard, GraduationCap, HandCoins, RotateCcw, Gavel, FileText, Wallet, Receipt, BookOpen, Users, ShieldAlert, CircleCheckBig, LayoutList, BarChart3 } from 'lucide-react';
+import { Landmark, CreditCard, GraduationCap, HandCoins, RotateCcw, Gavel, FileText, Wallet, Receipt, BookOpen, Users, ShieldAlert, CircleCheckBig, LayoutList, BarChart3 } from 'lucide-react';
+import Breadcrumbs from '../components/ui/Breadcrumbs';
 
 import FeeDashboardPage from './finance/FeeDashboardPage';
 import FeeManagementPage from './finance/FeeManagementPage';
@@ -159,26 +160,9 @@ function FinanceHome() {
 }
 
 function SubPageWrapper({ children }: { children: React.ReactNode }) {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const path = location.pathname;
-  // Dashboard is the default landing; don't show a back link on it. The
-  // sidebar Finance group is how users navigate between sub-pages now.
-  const showBack =
-    path !== '/finance' &&
-    path !== '/finance/' &&
-    path !== '/finance/dashboard';
-
   return (
     <div>
-      {showBack && (
-        <button
-          onClick={() => navigate('/finance/dashboard')}
-          className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4"
-        >
-          <ArrowLeft size={16} className="text-gray-400" /> Back to Finance Dashboard
-        </button>
-      )}
+      <Breadcrumbs className="mb-4" />
       {children}
     </div>
   );

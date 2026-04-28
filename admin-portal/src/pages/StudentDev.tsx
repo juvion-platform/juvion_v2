@@ -1,7 +1,8 @@
-import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getStudentDevStats } from '../services/student-dev';
-import { ArrowLeft, Users, UserPlus, Calendar, Ticket, Award, BookOpen, Trophy, UserCheck, Heart, HeartHandshake, BadgeCheck, FolderGit2, Building2, ShieldCheck } from 'lucide-react';
+import { Users, UserPlus, Calendar, Ticket, Award, BookOpen, Trophy, UserCheck, Heart, HeartHandshake, BadgeCheck, FolderGit2, Building2, ShieldCheck } from 'lucide-react';
+import Breadcrumbs from '../components/ui/Breadcrumbs';
 
 import ClubsPage from './student-dev/ClubsPage';
 import ClubMembershipsPage from './student-dev/ClubMembershipsPage';
@@ -142,18 +143,9 @@ function StudentDevHome() {
 }
 
 function SubPageWrapper({ children }: { children: React.ReactNode }) {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const path = location.pathname;
-  const isSubPage = path !== '/student-dev' && path !== '/student-dev/';
-
   return (
     <div>
-      {isSubPage && (
-        <button onClick={() => navigate('/student-dev')} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4">
-          <ArrowLeft size={16} className="text-gray-400" /> Back to Student Development
-        </button>
-      )}
+      <Breadcrumbs className="mb-4" />
       {children}
     </div>
   );

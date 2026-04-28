@@ -1,7 +1,8 @@
-import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getWelfareStats } from '../services/welfare';
-import { ArrowLeft, Building2, DoorOpen, BedDouble, UserCheck, Utensils, MessageSquare, Bus, MapPin, Heart, Stethoscope, Brain, AlertTriangle, ShieldAlert, FileWarning, Shield, Users } from 'lucide-react';
+import { Building2, DoorOpen, BedDouble, UserCheck, Utensils, MessageSquare, Bus, MapPin, Heart, Stethoscope, Brain, AlertTriangle, ShieldAlert, FileWarning, Shield, Users } from 'lucide-react';
+import Breadcrumbs from '../components/ui/Breadcrumbs';
 
 import HostelBlocksPage from './welfare/HostelBlocksPage';
 import HostelRoomsPage from './welfare/HostelRoomsPage';
@@ -178,18 +179,9 @@ function WelfareHome() {
 }
 
 function SubPageWrapper({ children }: { children: React.ReactNode }) {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const path = location.pathname;
-  const isSubPage = path !== '/welfare' && path !== '/welfare/';
-
   return (
     <div>
-      {isSubPage && (
-        <button onClick={() => navigate('/welfare')} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4">
-          <ArrowLeft size={16} className="text-gray-400" /> Back to Welfare
-        </button>
-      )}
+      <Breadcrumbs className="mb-4" />
       {children}
     </div>
   );

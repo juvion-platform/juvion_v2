@@ -1,7 +1,8 @@
-import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getGovernanceStats } from '../services/governance';
-import { ArrowLeft, Users, Calendar, FileText, Crown, Target } from 'lucide-react';
+import { Users, Calendar, FileText, Crown, Target } from 'lucide-react';
+import Breadcrumbs from '../components/ui/Breadcrumbs';
 
 import CommitteesPage from './governance/CommitteesPage';
 import MeetingsPage from './governance/MeetingsPage';
@@ -106,18 +107,9 @@ function GovernanceHome() {
 }
 
 function SubPageWrapper({ children }: { children: React.ReactNode }) {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const path = location.pathname;
-  const isSubPage = path !== '/governance' && path !== '/governance/';
-
   return (
     <div>
-      {isSubPage && (
-        <button onClick={() => navigate('/governance')} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4">
-          <ArrowLeft size={16} className="text-gray-400" /> Back to Governance
-        </button>
-      )}
+      <Breadcrumbs className="mb-4" />
       {children}
     </div>
   );

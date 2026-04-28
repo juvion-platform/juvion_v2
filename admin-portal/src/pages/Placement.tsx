@@ -1,7 +1,8 @@
-import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getPlacementStats } from '../services/placement';
-import { ArrowLeft, Calendar, Building2, Briefcase, ClipboardList, Layers, Award, Trophy, BookOpen, GraduationCap, Dumbbell, Users, UserCheck, Lightbulb, Contact, CalendarDays, BarChart3, FileText } from 'lucide-react';
+import { Calendar, Building2, Briefcase, ClipboardList, Layers, Award, Trophy, BookOpen, GraduationCap, Dumbbell, Users, UserCheck, Lightbulb, Contact, CalendarDays, BarChart3, FileText } from 'lucide-react';
+import Breadcrumbs from '../components/ui/Breadcrumbs';
 
 import PlacementSeasonsPage from './placement/PlacementSeasonsPage';
 import CompaniesPage from './placement/CompaniesPage';
@@ -197,18 +198,9 @@ function PlacementHome() {
 }
 
 function SubPageWrapper({ children }: { children: React.ReactNode }) {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const path = location.pathname;
-  const isSubPage = path !== '/placement' && path !== '/placement/';
-
   return (
     <div>
-      {isSubPage && (
-        <button onClick={() => navigate('/placement')} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4">
-          <ArrowLeft size={16} className="text-gray-400" /> Back to Placement
-        </button>
-      )}
+      <Breadcrumbs className="mb-4" />
       {children}
     </div>
   );

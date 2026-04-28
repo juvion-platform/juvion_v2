@@ -1,7 +1,8 @@
-import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getPlatformStats } from '../services/platform';
-import { ArrowLeft, Megaphone, FileText, Bell, ClipboardList, MessageSquare, Mail, Smartphone, MessageCircle, Shield } from 'lucide-react';
+import { Megaphone, FileText, Bell, ClipboardList, MessageSquare, Mail, Smartphone, MessageCircle, Shield } from 'lucide-react';
+import Breadcrumbs from '../components/ui/Breadcrumbs';
 
 import AnnouncementsPage from './platform/AnnouncementsPage';
 import CircularsPage from './platform/CircularsPage';
@@ -119,18 +120,9 @@ function PlatformHome() {
 }
 
 function SubPageWrapper({ children }: { children: React.ReactNode }) {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const path = location.pathname;
-  const isSubPage = path !== '/platform' && path !== '/platform/';
-
   return (
     <div>
-      {isSubPage && (
-        <button onClick={() => navigate('/platform')} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4">
-          <ArrowLeft size={16} className="text-gray-400" /> Back to Platform
-        </button>
-      )}
+      <Breadcrumbs className="mb-4" />
       {children}
     </div>
   );

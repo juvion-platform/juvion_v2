@@ -1,8 +1,8 @@
-import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getCampusOpsStats } from '../services/campus-ops';
 import {
-  ArrowLeft, Building2, DoorOpen, CalendarClock, Truck,
+  Building2, DoorOpen, CalendarClock, Truck,
   ShieldCheck, Users, AlertTriangle, Camera, Phone,
   FlaskConical, ParkingCircle, Zap, Leaf, Droplets,
   Package, ArrowRightLeft, Wrench, CalendarCheck, HardHat,
@@ -11,6 +11,7 @@ import {
   BookOpen, BookMarked, BookCopy, IdCard, Banknote,
   DoorClosed, Globe, Newspaper,
 } from 'lucide-react';
+import Breadcrumbs from '../components/ui/Breadcrumbs';
 
 import AllocationProposalsPage from './campus/AllocationProposalsPage';
 import MyCampusServicesPage from './campus/MyCampusServicesPage';
@@ -249,18 +250,9 @@ function CampusOpsHome() {
 }
 
 function SubPageWrapper({ children }: { children: React.ReactNode }) {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const path = location.pathname;
-  const isSubPage = path !== '/campus-ops' && path !== '/campus-ops/';
-
   return (
     <div>
-      {isSubPage && (
-        <button onClick={() => navigate('/campus-ops')} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4">
-          <ArrowLeft size={16} className="text-gray-400" /> Back to Campus Operations
-        </button>
-      )}
+      <Breadcrumbs className="mb-4" />
       {children}
     </div>
   );

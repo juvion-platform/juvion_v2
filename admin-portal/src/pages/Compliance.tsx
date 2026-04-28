@@ -1,7 +1,8 @@
-import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getComplianceStats } from '../services/compliance';
-import { ArrowLeft, Shield, Award, CheckCircle, FileText, Building2, Link2, Search, ClipboardList, FileWarning, Scale } from 'lucide-react';
+import { Shield, Award, CheckCircle, FileText, Building2, Link2, Search, ClipboardList, FileWarning, Scale } from 'lucide-react';
+import Breadcrumbs from '../components/ui/Breadcrumbs';
 
 import AccreditationBodiesPage from './compliance/AccreditationBodiesPage';
 import AccreditationCyclesPage from './compliance/AccreditationCyclesPage';
@@ -130,18 +131,9 @@ function ComplianceHome() {
 }
 
 function SubPageWrapper({ children }: { children: React.ReactNode }) {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const path = location.pathname;
-  const isSubPage = path !== '/compliance' && path !== '/compliance/';
-
   return (
     <div>
-      {isSubPage && (
-        <button onClick={() => navigate('/compliance')} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4">
-          <ArrowLeft size={16} className="text-gray-400" /> Back to Compliance
-        </button>
-      )}
+      <Breadcrumbs className="mb-4" />
       {children}
     </div>
   );

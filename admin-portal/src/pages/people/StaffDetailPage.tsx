@@ -55,9 +55,6 @@ export default function StaffDetailPage() {
     <div className="max-w-5xl mx-auto space-y-4">
       <div className="flex items-start justify-between">
         <div>
-          <Link to="/people/staff" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-2">
-            <ArrowLeft className="w-4 h-4" /> Back to Staff
-          </Link>
           <h1 className="text-2xl font-bold text-navy">{person.name || 'Staff'}</h1>
           <div className="mt-1 flex items-center gap-2 text-sm text-gray-500">
             {st.employeeCode && <span className="font-mono">{st.employeeCode}</span>}
