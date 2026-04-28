@@ -120,6 +120,9 @@ export const QUEUE_NAMES = {
   SMS: 'platform:sms',
   EMAIL: 'platform:email',
 
+  // Platform — LLM spend governance (llm-spend-limits L5)
+  LLM_USAGE_WEEKLY: 'platform:llm-usage-weekly',
+
   // Campus ops
   CAMPUS_PROPOSAL_EXPIRY: 'campus:proposal-expiry',
 

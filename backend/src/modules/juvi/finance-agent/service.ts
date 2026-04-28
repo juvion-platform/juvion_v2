@@ -21,6 +21,10 @@ import { z } from 'zod';
 
 import { AppError } from '../../../middleware/errorHandler';
 import { addJob, QUEUE_NAMES } from '../../../shared/queue/QueueManager';
+import {
+  assertWithinSpendLimit,
+  type SpendCheckResult,
+} from '../../platform/spend-limits/service';
 
 import { FeeReminder } from '../../../models/finance/FeeReminder';
 import { Student } from '../../../models/people/Student';
@@ -67,6 +71,33 @@ import {
 
 // ── Public types (consumed by A5 controller) ───────────────────────────
 
+/**
+ * Per-call budget warning payload, surfaced when the college is at or
+ * above its alert threshold but still within the hard limit. Plan §1.8.
+ *
+ * Object-shape responses (`ForecastWithNarrative`, `AgentChatFinal`)
+ * inline this directly. Array-shape responses (risk-scores, situations,
+ * reminder-drafts) defer the warning surface to L7's UI hydration design
+ * — likely via response header — to avoid a body-shape break for the
+ * frontend.
+ */
+export interface BudgetWarning {
+  spent: number;
+  limit: number;
+  pct: number;
+  resetsAt: string; // ISO
+}
+
+function toBudgetWarning(check: SpendCheckResult): BudgetWarning | undefined {
+  if (!check.warning) return undefined;
+  return {
+    spent: check.spent,
+    limit: check.limit,
+    pct: check.pct,
+    resetsAt: check.resetsAt.toISOString(),
+  };
+}
+
 export interface AgentChatContext {
   filters?: { from?: Date; to?: Date; programmeIds?: string[] };
   visibleDefaulterIds?: string[];
@@ -81,6 +112,7 @@ export interface AgentChatFinal {
   durationMs: number;
   auditId: string;
   conversationId: string;
+  budgetWarning?: BudgetWarning;
 }
 
 export interface AgentChatChunk {
@@ -101,6 +133,7 @@ export interface ForecastWithNarrative {
   };
   narrative: string | null;
   generatedAt: Date;
+  budgetWarning?: BudgetWarning;
 }
 
 export interface RiskScoreResult {
@@ -215,6 +248,21 @@ export async function* handleChat(
 ): AsyncGenerator<AgentChatChunk> {
   const start = Date.now();
   ensureCollegeId(collegeId);
+
+  // 0. Spend-limit gate. Fires once at request entry; mid-stream is NOT
+  // re-gated (per L4 AC). On 429, yield a single error chunk and end the
+  // stream cleanly so the SSE controller can write `event: error` rather
+  // than aborting after headers were already flushed.
+  let spendCheck: SpendCheckResult;
+  try {
+    spendCheck = await assertWithinSpendLimit(collegeId);
+  } catch (e) {
+    if (e instanceof AppError && e.statusCode === 429) {
+      yield { type: 'error', error: e.message };
+      return;
+    }
+    throw e;
+  }
 
   // 1. Load (or start) conversation
   let convoDoc = null;
@@ -366,6 +414,7 @@ export async function* handleChat(
       durationMs: finalResponse.durationMs,
       auditId,
       conversationId: resolvedConvoId!,
+      budgetWarning: toBudgetWarning(spendCheck),
     },
   };
 }
@@ -380,6 +429,11 @@ export async function handleForecastNarrative(
 
   const projection = await forecastMonthEnd(collegeId, monthAnchor);
   const signals = await forForecast(collegeId);
+
+  // Spend-limit gate (L4). Fires before the live LLM call. Throws
+  // AppError(429) when the college is over budget; warning state is
+  // attached to the response below for the frontend banner.
+  const spendCheck = await assertWithinSpendLimit(collegeId);
 
   // PII-free aggregates only — no masking required for forecast.
   const messages = buildForecastNarrativeMessages({
@@ -424,6 +478,7 @@ export async function handleForecastNarrative(
     },
     narrative,
     generatedAt: new Date(),
+    budgetWarning: toBudgetWarning(spendCheck),
   };
 }
 
@@ -453,6 +508,10 @@ export async function handleRiskScores(
       factors: e.score.factors,
     }));
   }
+
+  // Spend-limit gate (L4). Only fires when narratives are requested —
+  // the deterministic-score path above does NOT call the LLM, so no gate.
+  await assertWithinSpendLimit(collegeId);
 
   // Bounded-concurrency LLM narratives
   const narrativeResults = await withBoundedConcurrency(
@@ -560,6 +619,10 @@ export async function handleSituations(
   userId: string,
 ): Promise<Situation[]> {
   ensureCollegeId(collegeId);
+
+  // Spend-limit gate (L4). Fires at request entry; an over-budget tenant
+  // cannot consume LLM cycles even if there happen to be no candidates.
+  await assertWithinSpendLimit(collegeId);
 
   // 1. Deterministic candidates
   const allCandidates = await gatherCandidates(collegeId);
@@ -728,6 +791,11 @@ export async function handleReminderDrafts(
   studentIds: string[],
 ): Promise<ReminderDraft[]> {
   ensureCollegeId(collegeId);
+
+  // Spend-limit gate (L4). Fires once at request entry, BEFORE the
+  // bounded-concurrency LLM batch — atomic semantics: either all drafts
+  // get attempted, or the entire batch is blocked.
+  await assertWithinSpendLimit(collegeId);
 
   // 1. Per-student context (raw guardian PII)
   const contexts = await Promise.all(

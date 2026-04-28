@@ -49,12 +49,12 @@ Docs:
 
 | # | Task | Type | Depends | Tests | Status |
 |---|---|---|---|---:|---|
-| L1 | College schema: aiSpendLimits nested field + validation | Code | — | 8+ | Pending |
-| L2 | LLMUsageSnapshot model + indexes | Code | — | 6+ | Pending |
+| L1 | College schema: aiSpendLimits nested field + validation | Code | — | 8+ | Done |
+| L2 | LLMUsageSnapshot model + indexes | Code | — | 6+ | Done |
 | L3 | spend-limits service + 60s in-process cache | Code | L1 | 14+ | Done |
-| L4 | Pre-call gate integrated into agent endpoints | Code | L3 | 10+ | Pending |
-| L5 | Weekly summary cron worker (Mon 06:00) | Code | L1, L2 | 8+ | Pending |
-| L6 | PATCH /api/colleges/:id/ai-spend-limits + Zod | Code | L3 | 8+ (e2e) | Pending |
+| L4 | Pre-call gate integrated into agent endpoints | Code | L3 | 10+ | Done |
+| L5 | Weekly summary cron worker (Mon 06:00) | Code | L1, L2 | 8+ | Done |
+| L6 | PATCH /api/colleges/:id/ai-spend-limits + Zod | Code | L3 | 8+ (e2e) | Done |
 | L7 | College Management UI section + dashboard budget banner | Code | L6 | build-clean | Pending |
 | L8 | API reference + QA/deploy checklist | Doc | L4, L5, L6, L7 | — | Pending |
 

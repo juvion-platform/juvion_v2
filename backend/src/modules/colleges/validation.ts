@@ -23,3 +23,22 @@ export const createCollegeSchema = z.object({
 });
 
 export const updateCollegeSchema = createCollegeSchema.partial();
+
+/**
+ * L6 — body validator for `PATCH /api/colleges/:id/ai-spend-limits`.
+ *
+ * Both fields are optional (partial update). At least one must be present —
+ * an empty body is rejected to avoid no-op writes that would still emit an
+ * AuditLog row with `changes: []`.
+ *
+ * Field constraints mirror the College schema:
+ *   - weeklyInr        ≥ 0
+ *   - alertThresholdPct ∈ [1, 100]
+ */
+export const updateAiSpendLimitsSchema = z.object({
+  weeklyInr: z.number().min(0).optional(),
+  alertThresholdPct: z.number().min(1).max(100).optional(),
+}).refine(
+  (data) => data.weeklyInr !== undefined || data.alertThresholdPct !== undefined,
+  { message: 'At least one of weeklyInr or alertThresholdPct must be provided' },
+);

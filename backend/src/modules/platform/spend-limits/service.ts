@@ -124,7 +124,15 @@ export async function assertWithinSpendLimit(collegeId: string): Promise<SpendCh
   if (pct >= 100) {
     // eslint-disable-next-line no-console
     console.warn(`[llm-budget:blocked] college=${collegeId} spent=${spent} limit=${limits.weeklyInr} pct=${pct.toFixed(1)}`);
-    throw new AppError(429, 'Weekly LLM budget exceeded');
+    // Detail shape: `{ spent: number, limit: number, pct: number, resetsAt: string }`.
+    // The errorHandler surfaces this in the 429 body so the frontend banner
+    // can hydrate without a follow-up request. Plan §1.5 + L4 AC #6.
+    throw new AppError(429, 'Weekly LLM budget exceeded', {
+      spent,
+      limit: limits.weeklyInr,
+      pct,
+      resetsAt: resetsAt.toISOString(),
+    });
   }
 
   const warning = pct >= limits.alertThresholdPct;
