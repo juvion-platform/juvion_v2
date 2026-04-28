@@ -1,7 +1,8 @@
-import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getStats, getWorkflowStats } from '../services/admissions';
-import { UserPlus, Users, Gift, GraduationCap, ArrowLeft, TrendingUp, GitBranch } from 'lucide-react';
+import { UserPlus, Users, Gift, GraduationCap, TrendingUp, GitBranch } from 'lucide-react';
+import Breadcrumbs from '../components/ui/Breadcrumbs';
 
 import InquiriesPage from './admissions/InquiriesPage';
 import InquiryFormPage from './admissions/InquiryFormPage';
@@ -125,20 +126,14 @@ function AdmissionsHome() {
 }
 
 function SubPageWrapper({ children }: { children: React.ReactNode }) {
-  const navigate = useNavigate();
   const location = useLocation();
   const path = location.pathname;
-  const isSubPage = path !== '/admissions' && path !== '/admissions/';
-  // Hide wrapper back button on pages that have their own navigation (form pages)
+  // Hide breadcrumb on pages that have their own navigation (form pages).
   const hasOwnNav = path.includes('/new') || path.includes('/edit');
 
   return (
     <div>
-      {isSubPage && !hasOwnNav && (
-        <button onClick={() => navigate('/admissions')} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4">
-          <ArrowLeft size={16} className="text-gray-400" /> Back to Admissions
-        </button>
-      )}
+      {!hasOwnNav && <Breadcrumbs className="mb-4" />}
       {children}
     </div>
   );

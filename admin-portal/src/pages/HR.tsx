@@ -1,7 +1,8 @@
-import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getHRStats } from '../services/hr';
-import { ArrowLeft, Users, CalendarDays, Clock, Wallet, Star, GraduationCap, Briefcase, BookOpen, Scale, LogOut, Award, ClipboardList, UserPlus } from 'lucide-react';
+import { Users, CalendarDays, Clock, Wallet, Star, GraduationCap, Briefcase, BookOpen, Scale, LogOut, Award, ClipboardList, UserPlus } from 'lucide-react';
+import Breadcrumbs from '../components/ui/Breadcrumbs';
 
 import EmployeesPage from './hr/EmployeesPage';
 import LeaveTypesPage from './hr/LeaveTypesPage';
@@ -202,18 +203,9 @@ function HRHome() {
 }
 
 function SubPageWrapper({ children }: { children: React.ReactNode }) {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const path = location.pathname;
-  const isSubPage = path !== '/hr' && path !== '/hr/';
-
   return (
     <div>
-      {isSubPage && (
-        <button onClick={() => navigate('/hr')} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4">
-          <ArrowLeft size={16} className="text-gray-400" /> Back to HR
-        </button>
-      )}
+      <Breadcrumbs className="mb-4" />
       {children}
     </div>
   );

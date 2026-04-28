@@ -63,6 +63,7 @@ import {
   type AgentChatFinal,
   type ApprovalResult,
   type ApprovedDraft,
+  type BudgetWarning,
   type ForecastWithNarrative,
   type ReminderDraft,
   type RiskScoreResult,
@@ -70,6 +71,7 @@ import {
   type SituationAction,
   type SituationActionType,
 } from '../../services/finance-agent';
+import BudgetBanner from '../../components/finance/BudgetBanner';
 import { useAuthStore } from '../../stores/authStore';
 
 // ── Helpers ───────────────────────────────────────────────────────────
@@ -311,18 +313,46 @@ function AIForecastBanner({
   highRiskCount,
   atRiskAmount,
   onViewRisk,
+  degraded = false,
+  onWarning,
+  on429,
 }: {
   monthAnchor: Date;
   highRiskCount: number;
   atRiskAmount: number;
   onViewRisk: () => void;
+  /** When true, suppress LLM-narrative copy; deterministic projection stays. */
+  degraded?: boolean;
+  /** Surface the optional `budgetWarning` payload to the parent dashboard. */
+  onWarning?: (w: BudgetWarning | null) => void;
+  /** Surface a 429 status from the forecast call to the parent dashboard. */
+  on429?: () => void;
 }) {
   const monthAnchorIso = monthAnchor.toISOString();
   const query = useQuery<ForecastWithNarrative>({
     queryKey: ['fee-forecast', monthAnchorIso],
     queryFn: () => getForecastNarrative(monthAnchor),
     staleTime: 5 * 60 * 1000,
+    retry: false,
   });
+
+  // L7b — bubble `budgetWarning` up to the dashboard so it can hydrate the
+  // <BudgetBanner /> from the same payload. Re-fires on every render where
+  // the field changes; `useEffect` deps cover the value (or its absence).
+  const warningPayload = query.data?.budgetWarning;
+  useEffect(() => {
+    if (!onWarning) return;
+    onWarning(warningPayload ?? null);
+  }, [onWarning, warningPayload]);
+
+  // L7b — surface 429 from the forecast call to the parent so the page can
+  // flip into degraded mode. Axios stuffs the status under `response.status`.
+  const errorStatus =
+    (query.error as { response?: { status?: number } } | undefined)?.response
+      ?.status;
+  useEffect(() => {
+    if (errorStatus === 429 && on429) on429();
+  }, [errorStatus, on429]);
 
   if (query.isLoading) {
     return (
@@ -351,6 +381,10 @@ function AIForecastBanner({
   }
 
   const { projection, narrative } = query.data;
+  // Degraded mode hides the narrative ("driver text") but keeps the
+  // deterministic projection band visible — the numbers don't depend on
+  // the LLM and shouldn't disappear when the budget is tight.
+  const showNarrative = !degraded && Boolean(narrative);
   const confidencePct = Math.round(projection.confidence * 100);
 
   return (
@@ -369,7 +403,7 @@ function AIForecastBanner({
             by month-end{' '}
             <span className="text-emerald-700/70">({confidencePct}% confidence)</span>.
           </div>
-          {narrative && (
+          {showNarrative && (
             <div className="mt-1.5 text-xs text-emerald-800/90 whitespace-pre-wrap">
               <span className="font-semibold mr-1">{'\u2726'} Drivers:</span>
               {narrative}
@@ -803,7 +837,7 @@ function errorMessageForStatus(status: number | undefined, fallback: string): st
  *   - The active AbortController is held in a ref and torn down on
  *     unmount or when the user clears the thread.
  */
-function AICommandBar() {
+function AICommandBar({ degraded = false }: { degraded?: boolean }) {
   const collegeId = useAuthStore((s) => s.collegeId);
   const convoStorageKey = collegeId ? `finance-agent-convo:${collegeId}` : null;
 
@@ -1001,14 +1035,21 @@ function AICommandBar() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onFocus={() => setIsOpen(true)}
-            placeholder='Ask anything or give a command — "show fee defaulters", "draft reminder", "who is at risk"…'
-            className="flex-1 bg-transparent outline-none text-sm text-slate-800 placeholder:text-slate-400"
+            placeholder={
+              degraded
+                ? 'AI assistant disabled — weekly budget exceeded.'
+                : 'Ask anything or give a command — "show fee defaulters", "draft reminder", "who is at risk"…'
+            }
+            disabled={degraded}
+            aria-disabled={degraded}
+            className="flex-1 bg-transparent outline-none text-sm text-slate-800 placeholder:text-slate-400 disabled:cursor-not-allowed disabled:text-slate-400"
           />
           {input.trim() ? (
             <button
               type="submit"
               aria-label="Send"
-              className="flex-shrink-0 h-8 w-8 rounded-lg bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white flex items-center justify-center hover:shadow-md"
+              disabled={degraded}
+              className="flex-shrink-0 h-8 w-8 rounded-lg bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white flex items-center justify-center hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Send size={14} />
             </button>
@@ -1018,19 +1059,21 @@ function AICommandBar() {
             </kbd>
           )}
         </form>
-        {/* Suggestion chips */}
-        <div className="flex flex-wrap gap-1.5 px-4 pb-3 border-t border-slate-50 pt-2">
-          {CHAT_SUGGESTIONS.map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => send(s)}
-              className="text-[11px] font-medium text-violet-700 bg-violet-50 hover:bg-violet-100 px-2.5 py-1 rounded-full whitespace-nowrap transition-colors"
-            >
-              {s}
-            </button>
-          ))}
-        </div>
+        {/* Suggestion chips — hidden in degraded mode (no calls allowed). */}
+        {!degraded && (
+          <div className="flex flex-wrap gap-1.5 px-4 pb-3 border-t border-slate-50 pt-2">
+            {CHAT_SUGGESTIONS.map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => send(s)}
+                className="text-[11px] font-medium text-violet-700 bg-violet-50 hover:bg-violet-100 px-2.5 py-1 rounded-full whitespace-nowrap transition-colors"
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Inline chat thread */}
@@ -1509,8 +1552,11 @@ function SituationCardSkeleton() {
  */
 function SituationCards({
   onDraftReminder,
+  degraded = false,
 }: {
   onDraftReminder?: (studentIds: string[]) => void;
+  /** When true, the entire panel is hidden — situations are LLM-derived. */
+  degraded?: boolean;
 }) {
   const queryClient = useQueryClient();
   const query = useQuery<Situation[]>({
@@ -1518,7 +1564,12 @@ function SituationCards({
     queryFn: getSituations,
     staleTime: 5 * 60 * 1000,
     retry: false,
+    enabled: !degraded,
   });
+
+  // L7b — degraded mode (e.g. weekly LLM budget hit) hides this panel
+  // entirely. `enabled: !degraded` above also stops the network call.
+  if (degraded) return null;
 
   const [toast, setToast] = useState<SituationToastState | null>(null);
   const [dismissTarget, setDismissTarget] = useState<Situation | null>(null);
@@ -2320,6 +2371,12 @@ export default function FeeDashboardPage() {
   const queryClient = useQueryClient();
   const hasAccess = useAuthStore((s) => s.hasPermission('finance', 'read'));
 
+  // L7b — degraded mode for the LLM-spend gate. Flips to true when any
+  // agent endpoint returns 429; stays true for the session (the budget
+  // resets on a Monday, not on a refresh — this is intentional).
+  const [budgetExceeded, setBudgetExceeded] = useState<boolean>(false);
+  const [budgetWarning, setBudgetWarning] = useState<BudgetWarning | null>(null);
+
   const [monthAnchor, setMonthAnchor] = useState<Date>(new Date());
   const monthStart = useMemo(() => firstOfMonth(monthAnchor), [monthAnchor]);
   const monthEnd = useMemo(() => lastOfMonth(monthAnchor), [monthAnchor]);
@@ -2474,8 +2531,14 @@ export default function FeeDashboardPage() {
 
   return (
     <div className="max-w-7xl mx-auto pb-10">
+      {/* L7b — Budget banner (warning at ≥ alert threshold, exceeded at 100%).
+          Hydrated from the forecast query's `budgetWarning` payload via
+          AIForecastBanner's onWarning callback. Renders nothing when no
+          signal is present. */}
+      <BudgetBanner warning={budgetWarning} exceeded={budgetExceeded} />
+
       {/* AI command bar */}
-      <AICommandBar />
+      <AICommandBar degraded={budgetExceeded} />
 
       {/* Page header */}
       <div className="flex items-end justify-between mb-4">
@@ -2509,12 +2572,16 @@ export default function FeeDashboardPage() {
       )}
 
       {/* AI forecast banner — self-fetches /forecast-narrative; renders its
-          own loading / success / error states. */}
+          own loading / success / error states. Also acts as the v1 source
+          of `budgetWarning` and the 429 detector for degraded mode. */}
       <AIForecastBanner
         monthAnchor={monthAnchor}
         highRiskCount={overdueOver30d.length}
         atRiskAmount={overdueOver30dTotal}
         onViewRisk={scrollToRiskList}
+        degraded={budgetExceeded}
+        onWarning={setBudgetWarning}
+        on429={() => setBudgetExceeded(true)}
       />
 
       {/* Compact stats row */}
@@ -2545,8 +2612,12 @@ export default function FeeDashboardPage() {
 
       {/* Agent findings — LLM-picked situation cards. Self-fetches via
           React Query (5-min stale time). `onDraftReminder` opens the
-          A10 side panel filtered to this card's students. */}
-      <SituationCards onDraftReminder={openDraftPanel} />
+          A10 side panel filtered to this card's students. Suppressed in
+          degraded mode (entire panel is LLM-derived). */}
+      <SituationCards
+        onDraftReminder={openDraftPanel}
+        degraded={budgetExceeded}
+      />
 
       {/* Risk list */}
       <div

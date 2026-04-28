@@ -36,6 +36,23 @@ export interface AgentChatContext {
   visibleDefaulterIds?: string[];
 }
 
+/**
+ * Per-call budget warning payload (L4/L7 — llm-spend-limits).
+ *
+ * Backend mirror: `BudgetWarning` in `finance-agent/service.ts`. Surfaces
+ * the rolling 7-day spend snapshot when the college has crossed its
+ * `alertThresholdPct` but is still under the hard limit. Absent on
+ * success-without-warning responses.
+ */
+export interface BudgetWarning {
+  spent: number;
+  limit: number;
+  /** 0..100 */
+  pct: number;
+  /** ISO timestamp; next Monday 00:00 UTC. */
+  resetsAt: string;
+}
+
 export interface AgentChatFinal {
   provider: 'claude' | 'openai';
   model: string;
@@ -45,6 +62,7 @@ export interface AgentChatFinal {
   durationMs: number;
   auditId: string;
   conversationId: string;
+  budgetWarning?: BudgetWarning;
 }
 
 export type StreamQueryEvent =
@@ -250,6 +268,12 @@ export interface ForecastWithNarrative {
   narrative: string | null;
   /** ISO timestamp of when the response was assembled on the server. */
   generatedAt: string;
+  /**
+   * Optional warning payload — present when the college's rolling 7-day
+   * LLM spend has crossed its alert threshold but stayed under 100%.
+   * The dashboard's <BudgetBanner /> hydrates from this field.
+   */
+  budgetWarning?: BudgetWarning;
 }
 
 /**

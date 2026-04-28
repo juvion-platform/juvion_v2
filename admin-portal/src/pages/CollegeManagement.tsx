@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Building2, Plus, Search, Edit2, Trash2, ArrowLeft} from 'lucide-react';
+import { Building2, Plus, Search, Edit2, Trash2, ArrowLeft, Sparkles} from 'lucide-react';
 import api from '../services/api';
+import { updateAISpendLimits, type AISpendLimitsUpdateResponse } from '../services/colleges';
+import { useAuthStore } from '../stores/authStore';
 
 interface College {
   _id: string;
@@ -16,7 +18,21 @@ interface College {
   settings: Record<string, unknown>;
   status: string;
   createdAt: string;
+  /** L7a — admin-managed AI spend limits. Optional on the wire (existing
+   * colleges may not have it persisted yet; defaults are populated by
+   * Mongoose at read time). */
+  aiSpendLimits?: { weeklyInr: number; alertThresholdPct: number };
 }
+
+// Roles allowed to edit `aiSpendLimits` — mirrors the backend `platformUpdateGate`
+// (super_admin / admin / principal). Finance officers etc. see the section but
+// the inputs + save button are disabled.
+const SPEND_LIMITS_EDIT_ROLES = new Set(['super_admin', 'admin', 'principal']);
+
+// Default alert threshold when nothing has been persisted on the College
+// document yet. Mirrors `DEFAULT_ALERT_THRESHOLD_PCT` in the backend
+// spend-limits service.
+const DEFAULT_ALERT_THRESHOLD_PCT = 80;
 
 interface Stats {
   total: number;
@@ -32,6 +48,200 @@ const EMPTY_FORM = {
   subscription: { plan: 'basic' as string, status: 'active' as string },
   status: 'active',
 };
+
+// ── AI Spend Limits sub-section (L7a) ─────────────────────────────────
+//
+// Rendered inside the edit modal once a College has an _id (saving spend
+// limits requires a known college; the section is hidden in create-mode).
+// Owns its own form state and mutation so the parent's `saveMut` stays
+// focused on the College profile fields.
+
+interface SpendUsageBarProps { spent: number; limit: number; pct: number }
+
+function SpendUsageBar({ spent, limit, pct }: SpendUsageBarProps) {
+  // Tone: green < 80%, amber 80-99%, red >= 100%. When `limit === 0`
+  // (bypass mode) we render a neutral "—" bar with informational copy.
+  const bypass = limit === 0;
+  const clamped = Math.max(0, Math.min(100, pct));
+  let barColor = 'bg-emerald-500';
+  if (!bypass && pct >= 100) barColor = 'bg-red-500';
+  else if (!bypass && pct >= 80) barColor = 'bg-amber-500';
+
+  return (
+    <div>
+      <div className="flex items-center justify-between text-xs mb-1">
+        <span className="font-semibold text-gray-700">
+          {bypass ? 'No limit set' : `₹${spent.toLocaleString('en-IN')} of ₹${limit.toLocaleString('en-IN')} used`}
+        </span>
+        {!bypass && (
+          <span className="text-gray-500">{Math.round(pct)}%</span>
+        )}
+      </div>
+      <div className="h-2 w-full rounded-full bg-gray-100 overflow-hidden">
+        <div
+          className={`h-full ${bypass ? 'bg-gray-300' : barColor} transition-all`}
+          style={{ width: `${bypass ? 0 : clamped}%` }}
+        />
+      </div>
+      <p className="text-[11px] text-gray-500 mt-1">
+        Resets every Monday 00:00 UTC. {bypass
+          ? 'Set a weekly budget to start tracking AI usage.'
+          : pct >= 100
+            ? 'Hard limit reached — AI calls are blocked until reset or admin override.'
+            : pct >= 80
+              ? 'Approaching weekly limit.'
+              : 'Within budget.'}
+      </p>
+    </div>
+  );
+}
+
+interface SpendLimitsSectionProps { college: College }
+
+function SpendLimitsSection({ college }: SpendLimitsSectionProps) {
+  const userRole = useAuthStore((s) => s.user?.role);
+  const canEdit = !!userRole && SPEND_LIMITS_EDIT_ROLES.has(userRole);
+
+  // Hydrate from the College doc (or backend defaults) on first render.
+  // After save, we hydrate from the mutation response so the bar reflects
+  // the freshly invalidated spend snapshot in one round-trip.
+  const initialWeeklyInr = college.aiSpendLimits?.weeklyInr ?? 0;
+  const initialThresholdPct =
+    college.aiSpendLimits?.alertThresholdPct ?? DEFAULT_ALERT_THRESHOLD_PCT;
+
+  const [weeklyInr, setWeeklyInr] = useState<number>(initialWeeklyInr);
+  const [thresholdPct, setThresholdPct] = useState<number>(initialThresholdPct);
+  const [currentSpend, setCurrentSpend] = useState<{ spent: number; limit: number; pct: number }>({
+    spent: 0,
+    limit: initialWeeklyInr,
+    pct: 0,
+  });
+  const [toast, setToast] = useState<{ kind: 'success' | 'error'; message: string } | null>(null);
+
+  const mut = useMutation<AISpendLimitsUpdateResponse, Error>({
+    mutationFn: () =>
+      updateAISpendLimits(college._id, {
+        weeklyInr,
+        alertThresholdPct: thresholdPct,
+      }),
+    onSuccess: (data) => {
+      // Hydrate from the response so the usage bar updates immediately.
+      setWeeklyInr(data.aiSpendLimits.weeklyInr);
+      setThresholdPct(data.aiSpendLimits.alertThresholdPct);
+      setCurrentSpend(data.currentSpend);
+      setToast({ kind: 'success', message: 'AI spend limits saved.' });
+      window.setTimeout(() => setToast(null), 3000);
+    },
+    onError: (err) => {
+      const msg =
+        (err as { response?: { data?: { error?: string } } })?.response?.data?.error ||
+        err.message ||
+        'Failed to save AI spend limits.';
+      setToast({ kind: 'error', message: msg });
+      window.setTimeout(() => setToast(null), 4000);
+    },
+  });
+
+  // Disable save when nothing changed and no error is showing — avoids
+  // emitting an empty audit log row (backend rejects empty bodies anyway).
+  const isDirty =
+    weeklyInr !== initialWeeklyInr || thresholdPct !== initialThresholdPct;
+
+  return (
+    <div className="border-t border-gray-200 pt-4 mt-2">
+      <div className="flex items-center gap-2 mb-1">
+        <Sparkles size={16} className="text-violet-600" />
+        <h3 className="text-sm font-semibold text-gray-700">AI Spend Limits</h3>
+      </div>
+      <p className="text-xs text-gray-500 mb-3">
+        Caps the rolling 7-day cost of AI agent calls for this college. The
+        warning banner fires at the alert threshold; calls are blocked once
+        the limit is reached.
+      </p>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Weekly budget (₹)
+          </label>
+          <input
+            type="number"
+            min={0}
+            step={1}
+            value={weeklyInr}
+            disabled={!canEdit || mut.isPending}
+            onChange={(e) =>
+              setWeeklyInr(Math.max(0, Number(e.target.value) || 0))
+            }
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-200 focus:border-teal-400 outline-none disabled:bg-gray-50 disabled:text-gray-500"
+            placeholder="0 = no limit"
+          />
+          <p className="text-[11px] text-gray-500 mt-1">
+            0 disables the gate; AI calls flow without a cost cap.
+          </p>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Alert threshold (%)
+          </label>
+          <input
+            type="number"
+            min={1}
+            max={100}
+            step={1}
+            value={thresholdPct}
+            disabled={!canEdit || mut.isPending}
+            onChange={(e) => {
+              const n = Number(e.target.value) || 0;
+              setThresholdPct(Math.max(1, Math.min(100, n)));
+            }}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-200 focus:border-teal-400 outline-none disabled:bg-gray-50 disabled:text-gray-500"
+          />
+          <p className="text-[11px] text-gray-500 mt-1">
+            Default 80%. Triggers the dashboard banner and SRE log.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-4">
+        <SpendUsageBar
+          spent={currentSpend.spent}
+          limit={currentSpend.limit || weeklyInr}
+          pct={currentSpend.pct}
+        />
+      </div>
+
+      <div className="flex items-center justify-between mt-3">
+        {toast ? (
+          <span
+            data-testid="spend-limits-toast"
+            className={`text-xs font-semibold ${
+              toast.kind === 'success' ? 'text-emerald-700' : 'text-red-700'
+            }`}
+          >
+            {toast.message}
+          </span>
+        ) : (
+          <span className="text-xs text-gray-400">
+            {canEdit
+              ? isDirty
+                ? 'Unsaved changes'
+                : ' '
+              : 'Read-only — admins / principals only.'}
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={() => mut.mutate()}
+          disabled={!canEdit || !isDirty || mut.isPending}
+          className="px-3 py-1.5 text-xs font-semibold text-white bg-violet-600 rounded-lg hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {mut.isPending ? 'Saving…' : 'Save AI limits'}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function CollegeManagement() {
   const qc = useQueryClient();
@@ -310,6 +520,10 @@ export default function CollegeManagement() {
                     </select>
                   </div>
                 </div>
+
+                {/* L7a — AI Spend Limits section. Only meaningful when
+                    editing a saved college (we need the _id to PATCH). */}
+                {editing && <SpendLimitsSection college={editing} />}
               </div>
 
               <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">

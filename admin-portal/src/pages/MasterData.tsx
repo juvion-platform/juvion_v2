@@ -1,5 +1,6 @@
-import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
-import { Building2, GraduationCap, GitBranch, BadgeCheck, ArrowLeft } from 'lucide-react';
+import { Routes, Route, useNavigate } from 'react-router-dom';
+import { Building2, GraduationCap, GitBranch, BadgeCheck } from 'lucide-react';
+import Breadcrumbs from '../components/ui/Breadcrumbs';
 
 import DepartmentsPage from './master-data/DepartmentsPage';
 import ProgrammesPage from './master-data/ProgrammesPage';
@@ -36,16 +37,9 @@ function MasterDataHome() {
 }
 
 function SubPageWrapper({ children }: { children: React.ReactNode }) {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const isHome = location.pathname === '/master-data' || location.pathname === '/master-data/';
-
-  if (isHome) return null;
   return (
     <div>
-      <button onClick={() => navigate('/master-data')} className="flex items-center gap-1 text-sm text-gray-500 hover:text-primary-600 mb-4">
-        <ArrowLeft size={14} /> Back to Master Data
-      </button>
+      <Breadcrumbs className="mb-4" />
       {children}
     </div>
   );
