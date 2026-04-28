@@ -20,6 +20,10 @@ export interface ICollege extends Document {
   };
   settings: Record<string, unknown>;
   status: string;
+  aiSpendLimits?: {
+    weeklyInr: number;
+    alertThresholdPct: number;
+  };
 }
 
 const collegeSchema = new Schema<ICollege>(
@@ -43,6 +47,16 @@ const collegeSchema = new Schema<ICollege>(
     },
     settings: { type: Schema.Types.Mixed, default: {} },
     status: { type: String, default: 'active', enum: ['active', 'inactive', 'suspended'], index: true },
+    aiSpendLimits: {
+      type: new Schema(
+        {
+          weeklyInr: { type: Number, default: 0, min: 0 },
+          alertThresholdPct: { type: Number, default: 80, min: 1, max: 100 },
+        },
+        { _id: false },
+      ),
+      default: () => ({}),
+    },
   },
   { timestamps: true },
 );

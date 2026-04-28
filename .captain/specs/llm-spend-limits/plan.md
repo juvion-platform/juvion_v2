@@ -58,15 +58,7 @@ interface ILLMUsageSnapshot {
   weekEnd: Date;
   totalCostInr: number;
   totalCalls: number;
-  byType: {                   // call counts per type
-    forecast: number;
-    situations: number;
-    chat: number;
-    'risk-narrative': number;
-    'reminder-drafts': number;
-    'reminder-approve': number;
-    'situation-dismiss': number;
-  };
+  byType: Record<string, number>;  // call counts keyed by AgentAction.type — free-form to absorb new types without a schema change
   limitAtTime: number;        // captured snapshot of weeklyInr
   alertThresholdAtTime: number;
   createdAt: Date;
