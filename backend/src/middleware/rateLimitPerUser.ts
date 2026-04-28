@@ -1,4 +1,4 @@
-import rateLimit, { Options } from 'express-rate-limit';
+import rateLimit, { Options, ipKeyGenerator } from 'express-rate-limit';
 import { Request, Response, NextFunction } from 'express';
 
 /**
@@ -43,7 +43,12 @@ export function createUserRateLimit(
       // If no user (pre-auth or public route), return a constant key
       // combined with IP so we don't share a single unauth bucket across
       // everyone on the internet. See pass-through branch below.
-      return userId ?? `__unauth_${req.ip ?? 'unknown'}`;
+      //
+      // Use express-rate-limit's `ipKeyGenerator` helper so IPv6 clients
+      // get bucketed by /64 subnet rather than full address — otherwise
+      // an IPv6 client with many addresses could bypass the limit.
+      // See https://express-rate-limit.github.io/ERR_ERL_KEY_GEN_IPV6/
+      return userId ?? `__unauth_${ipKeyGenerator(req.ip ?? 'unknown')}`;
     },
     // Don't count requests that we deliberately skip (unauth path).
     skip: (req: Request): boolean => {
