@@ -4,6 +4,18 @@ import { authorize } from '../../middleware/authorize';
 import { validate } from '../../middleware/validate';
 import { createUserRateLimit } from '../../middleware/rateLimitPerUser';
 import * as ctrl from './controller';
+import {
+  photoUpload,
+  multerErrorHandler,
+  // Existing student handlers (compat shims pointing at studentPhotoHandlers).
+  uploadPhotoHandler,
+  deletePhotoHandler,
+  getPhotoUrlHandler,
+  // G3 — per-entity handler bundles for faculty/staff/parents.
+  facultyPhotoHandlers,
+  staffPhotoHandlers,
+  parentPhotoHandlers,
+} from './photo-controller';
 import { searchPeopleController } from './search-controller';
 import { searchQuerySchema } from './search-validation';
 import {
@@ -51,12 +63,54 @@ router.post('/students', authorize('people', 'create'), validate(createStudentSc
 router.put('/students/:id', authorize('people', 'update'), validate(updateStudentSchema), ctrl.updateStudent);
 router.delete('/students/:id', authorize('people', 'delete'), ctrl.deleteStudent);
 
+// Student photos — multipart upload + presigned-url fetch
+// (multer error handler installed BETWEEN upload middleware and the
+// handler so size / mime errors map cleanly to AppError(400)).
+router.post(
+  '/students/:id/photo',
+  authorize('people', 'update'),
+  photoUpload.single('file'),
+  multerErrorHandler,
+  uploadPhotoHandler,
+);
+router.delete(
+  '/students/:id/photo',
+  authorize('people', 'update'),
+  deletePhotoHandler,
+);
+router.get(
+  '/students/:id/photo-url',
+  authorize('people', 'read'),
+  getPhotoUrlHandler,
+);
+
 // Faculty
 router.get('/faculty', authorize('people', 'read'), ctrl.listFaculty);
 router.get('/faculty/:id', authorize('people', 'read'), ctrl.getFaculty);
 router.post('/faculty', authorize('people', 'create'), validate(createFacultySchema), ctrl.createFaculty);
 router.put('/faculty/:id', authorize('people', 'update'), validate(updateFacultySchema), ctrl.updateFaculty);
 router.delete('/faculty/:id', authorize('people', 'delete'), ctrl.deleteFaculty);
+
+// Faculty photos — multipart upload + presigned-url fetch
+// (multer error handler installed BETWEEN upload middleware and the
+// handler so size / mime errors map cleanly to AppError(400)).
+router.post(
+  '/faculty/:id/photo',
+  authorize('people', 'update'),
+  photoUpload.single('file'),
+  multerErrorHandler,
+  facultyPhotoHandlers.upload,
+);
+router.delete(
+  '/faculty/:id/photo',
+  authorize('people', 'update'),
+  facultyPhotoHandlers.remove,
+);
+router.get(
+  '/faculty/:id/photo-url',
+  authorize('people', 'read'),
+  facultyPhotoHandlers.getUrl,
+);
 
 // Staff
 router.get('/staff', authorize('people', 'read'), ctrl.listStaff);
@@ -65,12 +119,50 @@ router.post('/staff', authorize('people', 'create'), validate(createStaffSchema)
 router.put('/staff/:id', authorize('people', 'update'), validate(updateStaffSchema), ctrl.updateStaff);
 router.delete('/staff/:id', authorize('people', 'delete'), ctrl.deleteStaff);
 
+// Staff photos — multipart upload + presigned-url fetch
+router.post(
+  '/staff/:id/photo',
+  authorize('people', 'update'),
+  photoUpload.single('file'),
+  multerErrorHandler,
+  staffPhotoHandlers.upload,
+);
+router.delete(
+  '/staff/:id/photo',
+  authorize('people', 'update'),
+  staffPhotoHandlers.remove,
+);
+router.get(
+  '/staff/:id/photo-url',
+  authorize('people', 'read'),
+  staffPhotoHandlers.getUrl,
+);
+
 // Parents
 router.get('/parents', authorize('people', 'read'), ctrl.listParents);
 router.get('/parents/:id', authorize('people', 'read'), ctrl.getParent);
 router.post('/parents', authorize('people', 'create'), validate(createParentSchema), ctrl.createParent);
 router.put('/parents/:id', authorize('people', 'update'), validate(updateParentSchema), ctrl.updateParent);
 router.delete('/parents/:id', authorize('people', 'delete'), ctrl.deleteParent);
+
+// Parent photos — multipart upload + presigned-url fetch
+router.post(
+  '/parents/:id/photo',
+  authorize('people', 'update'),
+  photoUpload.single('file'),
+  multerErrorHandler,
+  parentPhotoHandlers.upload,
+);
+router.delete(
+  '/parents/:id/photo',
+  authorize('people', 'update'),
+  parentPhotoHandlers.remove,
+);
+router.get(
+  '/parents/:id/photo-url',
+  authorize('people', 'read'),
+  parentPhotoHandlers.getUrl,
+);
 
 // Organizations
 router.get('/organizations', authorize('people', 'read'), ctrl.listOrganizations);

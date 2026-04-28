@@ -7,6 +7,7 @@ import Badge from '../../components/ui/Badge';
 import {
   DetailSection, DetailField, DetailBool, formatDate, extractPerson,
 } from '../../components/ui/DetailView';
+import PersonPhotoBlock from '../../components/people/PersonPhotoBlock';
 
 /**
  * Parent detail page — read-only view with inline edit toggle.
@@ -237,6 +238,16 @@ export default function ParentDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Profile photo — visible in both view and edit modes so the
+          parent is identifiable immediately on load. */}
+      {id && (
+        <PersonPhotoBlock
+          entityType="parents"
+          entityId={id}
+          personName={person.name}
+        />
+      )}
 
       {editMode ? (
         // ── Edit mode ─────────────────────────────────────
