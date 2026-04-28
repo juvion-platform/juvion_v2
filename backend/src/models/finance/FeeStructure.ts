@@ -36,4 +36,26 @@ const schema = new Schema<IFeeStructure>({
 
 schema.index({ collegeId: 1, academicYearId: 1, programmeId: 1 });
 
+// One fee structure per (collegeId, academicYearId, programmeId, branchId,
+// category, quota, year). Mongo treats missing-field === null on a unique
+// index, so two rows with branchId=null OR category=null collide as
+// expected (no manual normalisation needed).
+//
+// The `priorVersionId` + status='superseded' fields exist on the schema for
+// a future supersede workflow; today no code path creates supersede pairs,
+// so the all-statuses unique index is safe. When supersede lands, switch
+// this to a partial filter expression that excludes superseded/archived.
+schema.index(
+  {
+    collegeId: 1,
+    academicYearId: 1,
+    programmeId: 1,
+    branchId: 1,
+    category: 1,
+    quota: 1,
+    year: 1,
+  },
+  { unique: true, name: 'feestructure_combination_unique' },
+);
+
 export const FeeStructure = model<IFeeStructure>('FeeStructure', schema);

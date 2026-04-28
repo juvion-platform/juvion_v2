@@ -25,11 +25,23 @@ const emptyComponent = (): Component => ({ name: '', amount: '', isRefundable: f
 
 const emptyForm = { academicYearId: '', programmeId: '', branchId: '', category: '', quota: 'convener', year: '' };
 
+/** Pull a human-readable message from an axios error / generic Error. */
+function extractErrorMessage(err: unknown): string {
+  const e = err as { response?: { data?: { error?: string; message?: string } }; message?: string };
+  return (
+    e?.response?.data?.error ??
+    e?.response?.data?.message ??
+    e?.message ??
+    'Something went wrong. Please try again.'
+  );
+}
+
 export default function FeeStructuresPage() {
   const qc = useQueryClient();
   const [page, setPage] = useState(1);
   const [form, setForm] = useState(emptyForm);
   const [components, setComponents] = useState<Component[]>([emptyComponent()]);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({ queryKey: ['fee-structures', page], queryFn: () => listFeeStructures(page, 20) });
   const { data: academicYears } = useQuery({ queryKey: ['academic-years-all'], queryFn: () => listAcademicYears(1, 100) });
@@ -39,6 +51,7 @@ export default function FeeStructuresPage() {
 
   const vem = useViewEditMode<any>({
     onOpenEntity: (row) => {
+      setSaveError(null);
       setForm({
         academicYearId: row.academicYearId?._id || row.academicYearId || '',
         programmeId: row.programmeId?._id || row.programmeId || '',
@@ -54,17 +67,27 @@ export default function FeeStructuresPage() {
       }
     },
     onOpenCreate: () => {
+      setSaveError(null);
       setForm(emptyForm);
       setComponents([emptyComponent()]);
     },
     onClose: () => {
+      setSaveError(null);
       setForm(emptyForm);
       setComponents([emptyComponent()]);
     },
   });
 
-  const createMut = useMutation({ mutationFn: createFeeStructure, onSuccess: () => { qc.invalidateQueries({ queryKey: ['fee-structures'] }); vem.close(); } });
-  const updateMut = useMutation({ mutationFn: ({ id, data }: any) => updateFeeStructure(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['fee-structures'] }); vem.close(); } });
+  const createMut = useMutation({
+    mutationFn: createFeeStructure,
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['fee-structures'] }); vem.close(); },
+    onError: (err) => setSaveError(extractErrorMessage(err)),
+  });
+  const updateMut = useMutation({
+    mutationFn: ({ id, data }: any) => updateFeeStructure(id, data),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['fee-structures'] }); vem.close(); },
+    onError: (err) => setSaveError(extractErrorMessage(err)),
+  });
   const deleteMut = useMutation({ mutationFn: deleteFeeStructure, onSuccess: () => { qc.invalidateQueries({ queryKey: ['fee-structures'] }); } });
 
   const totalAmount = components.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
@@ -77,6 +100,7 @@ export default function FeeStructuresPage() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setSaveError(null);
     const payload: any = {
       ...form,
       year: Number(form.year),
@@ -132,6 +156,11 @@ export default function FeeStructuresPage() {
 
       <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('Fee Structure')}>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {saveError && !vem.isView && (
+            <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {saveError}
+            </div>
+          )}
           <fieldset disabled={vem.isView} className="border-0 p-0 m-0 space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
