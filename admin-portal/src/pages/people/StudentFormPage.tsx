@@ -60,6 +60,19 @@ function pinNoticeCopy(reason: string | undefined): string {
   }
 }
 
+/** Discriminated union covering both the create + edit auto-pin notices. */
+type PinNoticeState =
+  | { kind: 'soft-fail'; pin: FeePinNotice; studentId?: string }
+  | { kind: 'success'; pin: FeePinNotice; studentId?: string }
+  | { kind: 'fee-axis-changed'; studentId: string; changedFields: string[] };
+
+/** Human-readable label for fee-axis fields surfaced in the post-edit banner. */
+const FEE_AXIS_LABELS: Record<string, string> = {
+  branchId: 'Branch',
+  category: 'Category',
+  quota: 'Quota',
+};
+
 export default function StudentFormPage() {
   const { id } = useParams();
   const isEdit = !!id;
@@ -73,8 +86,24 @@ export default function StudentFormPage() {
    * behaviour). If it soft-failed (`attempted && !success`), we hold
    * the navigation, render an amber banner explaining what to do, and
    * let the operator click through.
+   *
+   * On successful update we additionally check whether any fee-axis
+   * fields (branchId / category / quota) drifted vs the snapshot we
+   * captured when the form first loaded. If they did, the backend
+   * (per the existing T11 stale-pin detection) will have just marked
+   * the active pin staleSince — we mirror that here with a banner and
+   * a deep-link to the student detail page where FeePinsPanel handles
+   * the manual re-pin.
    */
-  const [pinNotice, setPinNotice] = useState<{ kind: 'success' | 'soft-fail'; pin: FeePinNotice; studentId?: string } | null>(null);
+  const [pinNotice, setPinNotice] = useState<PinNoticeState | null>(null);
+  /**
+   * Snapshot of the fee-axis fields at form-load time (edit mode only).
+   * Captured ONCE in the same effect that hydrates `form` from the
+   * fetched `existing` student. Used both to render a pre-save info
+   * notice when the operator touches one of these fields, and to
+   * decide whether to hold the post-save navigation.
+   */
+  const [initialFeeAxes, setInitialFeeAxes] = useState<{ branchId: string; category: string; quota: string } | null>(null);
 
   const { data: existing, isLoading: loadingExisting } = useQuery({
     queryKey: ['student', id],
@@ -120,8 +149,31 @@ export default function StudentFormPage() {
         line1: addr.line1 || '', line2: addr.line2 || '', city: addr.city || '',
         state: addr.state || '', pincode: addr.pincode || '',
       });
+      // Snapshot fee-axis fields so we can detect drift later. Done in
+      // the same effect so the snapshot is a faithful copy of what's in
+      // the form on first paint.
+      setInitialFeeAxes({
+        branchId: existing.branchId?._id || existing.branchId || '',
+        category: existing.category || '',
+        quota: existing.quota || '',
+      });
     }
   }, [existing]);
+
+  /**
+   * Pre-save hint. Computes which of the 3 fee-axis fields drifted
+   * vs `initialFeeAxes`. Empty list when nothing changed (or in
+   * create mode where there's no snapshot).
+   */
+  const changedFeeAxes: string[] = (() => {
+    if (!initialFeeAxes) return [];
+    const out: string[] = [];
+    if (form.branchId !== initialFeeAxes.branchId) out.push('branchId');
+    if (form.category !== initialFeeAxes.category) out.push('category');
+    if (form.quota !== initialFeeAxes.quota) out.push('quota');
+    return out;
+  })();
+  const willTriggerStalePin = isEdit && changedFeeAxes.length > 0;
 
   const createMut = useMutation({
     mutationFn: createStudent,
@@ -142,7 +194,19 @@ export default function StudentFormPage() {
   });
   const updateMut = useMutation({
     mutationFn: ({ id, data }: any) => updateStudent(id, data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['students'] }); qc.invalidateQueries({ queryKey: ['student', id] }); navigate('/people/students'); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['students'] });
+      qc.invalidateQueries({ queryKey: ['student', id] });
+      // Mirror create flow: if a fee-axis (branch / category / quota)
+      // changed, the backend has just marked the active pin stale. Hold
+      // navigation and surface the prompt so the operator routes to the
+      // detail page to re-pin.
+      if (id && changedFeeAxes.length > 0) {
+        setPinNotice({ kind: 'fee-axis-changed', studentId: id, changedFields: changedFeeAxes });
+        return;
+      }
+      navigate('/people/students');
+    },
   });
 
   function handleSubmit(e: React.FormEvent) {
@@ -230,6 +294,59 @@ export default function StudentFormPage() {
       {(validationError || error) && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
           {validationError || (error as any)?.response?.data?.error || (error as any)?.response?.data?.details?.map((d: any) => d.message).join(', ') || 'Something went wrong.'}
+        </div>
+      )}
+
+      {willTriggerStalePin && !pinNotice && (
+        <div role="status" className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          <div className="flex items-start gap-2">
+            <AlertTriangle size={15} className="text-amber-600 mt-0.5 flex-shrink-0" />
+            <div>
+              You changed{' '}
+              <span className="font-semibold">
+                {changedFeeAxes.map((f) => FEE_AXIS_LABELS[f] ?? f).join(', ')}
+              </span>{' '}
+              — saving will mark the current fee pin stale. You'll be prompted to re-pin
+              the student's fee structure on the next page.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pinNotice && pinNotice.kind === 'fee-axis-changed' && (
+        <div role="alert" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle size={18} className="text-amber-600 mt-0.5 flex-shrink-0" />
+            <div className="flex-1 text-sm">
+              <p className="font-semibold text-amber-900">
+                Fee structure may need re-pinning.
+              </p>
+              <p className="text-amber-800 mt-1">
+                You changed{' '}
+                <span className="font-semibold">
+                  {pinNotice.changedFields.map((f) => FEE_AXIS_LABELS[f] ?? f).join(', ')}
+                </span>{' '}
+                — the current fee pin no longer matches the student's attributes and has
+                been flagged stale. Open the student to review the pin and apply the
+                matching fee structure.
+              </p>
+              <div className="mt-3 flex gap-2">
+                <Link
+                  to={`/people/students/${pinNotice.studentId}`}
+                  className="px-3 py-1.5 bg-amber-600 text-white text-xs font-medium rounded-md hover:bg-amber-700"
+                >
+                  Open student to re-pin
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => navigate('/people/students')}
+                  className="px-3 py-1.5 bg-white text-amber-800 text-xs font-medium rounded-md border border-amber-300 hover:bg-amber-100"
+                >
+                  Skip for now
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
