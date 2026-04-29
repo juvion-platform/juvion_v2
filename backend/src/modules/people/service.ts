@@ -5,6 +5,7 @@ import { Faculty } from '../../models/people/Faculty';
 import { Staff } from '../../models/people/Staff';
 import { Parent } from '../../models/people/Parent';
 import { Organization } from '../../models/people/Organization';
+import { AcademicYear } from '../../models/academic-structure/AcademicYear';
 import { paginate } from '../../shared/pagination';
 import { createAuditLog } from '../../shared/audit';
 import { AppError } from '../../middleware/errorHandler';
@@ -321,7 +322,7 @@ export async function createStudent(collegeId: string, data: any, performedBy: s
     status: data.status || 'active',
     onboardingStatus: data.onboardingStatus || 'not_started',
   };
-  ['category', 'quota', 'rollNumber', 'regulationId', 'programmeId', 'branchId', 'batchId', 'primaryParentId', 'feeResponsibleParentId'].forEach(k => { if (data[k]) studentFields[k] = data[k]; });
+  ['category', 'quota', 'rollNumber', 'regulationId', 'programmeId', 'branchId', 'batchId', 'primaryParentId', 'feeResponsibleParentId', 'studyYearAtAdmission'].forEach(k => { if (data[k] !== undefined) studentFields[k] = data[k]; });
   Object.assign(studentFields, buildStudentOnboardingFields(data));
   studentFields.onboardingChecklist = mergedChecklist;
   const doc = await Student.create(studentFields);
@@ -331,8 +332,92 @@ export async function createStudent(collegeId: string, data: any, performedBy: s
     [],
     [data.primaryParentId, data.feeResponsibleParentId].filter(Boolean),
   );
+
+  // Auto-pin the matching fee structure on enrollment.
+  //
+  // Soft-fail: if the college has not yet configured a matching
+  // FeeStructureInstance for the student's combination, we DO NOT roll
+  // back the create — admins can manually pin later via the existing
+  // fee-configuration tooling. The result is surfaced on the response so
+  // the frontend can render a "no fee structure pinned yet" badge.
+  //
+  // Skipped entirely when programmeId is absent (incomplete profiles).
+  const feePin: {
+    attempted: boolean;
+    success: boolean;
+    reason?: string;
+    pinId?: string;
+    feeStructureInstanceId?: string;
+    yearOfStudy?: number;
+  } = { attempted: false, success: false };
+
+  if (!doc.programmeId) {
+    feePin.reason = 'no-programme-id';
+  } else {
+    // Resolve the academic year for the pin. Caller may pass it
+    // explicitly via data.academicYearId; otherwise use the college's
+    // current academic year (`isCurrent: true`). If neither exists, the
+    // pin is skipped — admin must set up the AcademicYear or pin
+    // manually later.
+    let academicYearId: mongoose.Types.ObjectId | undefined;
+    if (data.academicYearId && mongoose.Types.ObjectId.isValid(String(data.academicYearId))) {
+      academicYearId = new mongoose.Types.ObjectId(String(data.academicYearId));
+    } else {
+      const current = await AcademicYear.findOne({ collegeId, isCurrent: true })
+        .select({ _id: 1 })
+        .lean();
+      if (current) academicYearId = current._id as mongoose.Types.ObjectId;
+    }
+
+    if (!academicYearId) {
+      feePin.reason = 'no-academic-year';
+    } else {
+      feePin.attempted = true;
+      // studyYearAtAdmission captures lateral-entry students (Year 2/3 admit).
+      const yearOfStudy = doc.studyYearAtAdmission ?? 1;
+      feePin.yearOfStudy = yearOfStudy;
+      try {
+        const pin = await feePinService.pinYear(String(doc._id), yearOfStudy, {
+          pinnedBy: performedBy,
+          reason: 'initial',
+          academicYearId,
+        });
+        feePin.success = true;
+        feePin.pinId = String(pin._id);
+        feePin.feeStructureInstanceId = String(pin.feeStructureInstanceId);
+      } catch (e) {
+        const err = e as { name?: string; message?: string };
+        if (err?.name === 'FeeStructureNotFoundError') {
+          feePin.reason = 'no-matching-fee-structure';
+          // eslint-disable-next-line no-console
+          console.warn(
+            `[student-auto-pin] no match for student=${String(doc._id)} ` +
+              `programme=${String(doc.programmeId)} year=${yearOfStudy}: ` +
+              `${err.message ?? ''}`,
+          );
+        } else {
+          feePin.reason = `error: ${err?.message ?? 'unknown'}`;
+          // eslint-disable-next-line no-console
+          console.error(
+            `[student-auto-pin] unexpected error for student=${String(doc._id)}:`,
+            e,
+          );
+        }
+      }
+    }
+  }
+
   await createAuditLog({ collegeId, entityType: 'Student', entityId: String(doc._id), entityName: data.name, action: 'create', changes: [], performedBy });
-  return { ...doc.toObject(), person: person.toObject() };
+  // Build a single-shape return — start from the in-memory doc, then
+  // splice in the feePins[] from a fresh fetch if the auto-pin landed
+  // (pinYear writes via student.save() but our in-memory `doc` reference
+  // is stale by then).
+  const studentObj = doc.toObject();
+  if (feePin.success) {
+    const fresh = await Student.findById(doc._id).select({ feePins: 1 }).lean();
+    if (fresh?.feePins) studentObj.feePins = fresh.feePins as typeof studentObj.feePins;
+  }
+  return { ...studentObj, person: person.toObject(), feePin };
 }
 
 export async function updateStudent(collegeId: string, id: string, data: any, performedBy: string): Promise<any> {
