@@ -77,6 +77,59 @@ export default function StudentDetailPage() {
     enabled: !!id,
   });
 
+  // ── Hooks block ──
+  // EVERY hook must run unconditionally on every render — the early
+  // returns below skip the rest of the body, so any hook placed AFTER
+  // them would change call order between loading/loaded paints and
+  // crash with "Rendered more hooks than during the previous render".
+  // We tolerate `s` being undefined inside these memos and short-circuit.
+  const mismatches = useMemo(() => {
+    if (!s) return [];
+    const active = pickActivePin(pinsQuery.data?.pins ?? []);
+    const fsi = pinFsi(active);
+    if (!fsi) return [];
+    const out: { field: string; student: string; pinned: string }[] = [];
+
+    const studentProgId = idOf(s.programmeId) ?? idOf(s.programme);
+    const pinProgId = idOf(fsi.programmeId);
+    if (studentProgId && pinProgId && studentProgId !== pinProgId) {
+      out.push({
+        field: 'Programme',
+        student: nameOf(s.programmeId ?? s.programme, s.programmeId?.name ?? s.programme?.name),
+        pinned: nameOf(fsi.programmeId),
+      });
+    }
+
+    const studentBranchId = idOf(s.branchId) ?? idOf(s.branch);
+    const pinBranchId = idOf(fsi.branchId);
+    if (studentBranchId && pinBranchId && studentBranchId !== pinBranchId) {
+      out.push({
+        field: 'Branch',
+        student: nameOf(s.branchId ?? s.branch, s.branchId?.name ?? s.branch?.name),
+        pinned: nameOf(fsi.branchId),
+      });
+    }
+
+    const studentCategory = (s.category as string | null | undefined) ?? null;
+    const pinCategory = fsi.category ?? null;
+    if (studentCategory && pinCategory && studentCategory !== pinCategory) {
+      out.push({ field: 'Category', student: studentCategory, pinned: pinCategory });
+    }
+
+    const studentQuota = (s.quota as string | null | undefined) ?? null;
+    const pinQuota = fsi.quota ?? null;
+    if (studentQuota && pinQuota && studentQuota !== pinQuota) {
+      out.push({ field: 'Quota', student: studentQuota, pinned: pinQuota });
+    }
+
+    return out;
+  }, [pinsQuery.data, s]);
+  const activePinExists = useMemo(
+    () => pickActivePin(pinsQuery.data?.pins ?? []) !== undefined,
+    [pinsQuery.data],
+  );
+
+  // ── Early returns (after all hooks have run) ──
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20 text-gray-400">
@@ -109,59 +162,6 @@ export default function StudentDetailPage() {
   const batchName = s.batchId?.name ?? s.batch?.name;
   const primaryParentName = s.primaryParentId?.name ?? s.primaryParentPerson?.name;
   const feeParentName = s.feeResponsibleParentId?.name ?? s.feeResponsibleParentPerson?.name;
-
-  // Compare the student's fee-axis attributes against the active pin's
-  // FeeStructureInstance. Each row of `mismatches` describes a single
-  // disagreement so the UI can render a precise "X (student) → Y (pinned)"
-  // line. A non-empty list means the student doc and the pinned fee
-  // structure have drifted — typically because the student's attributes
-  // changed without a re-pin afterwards.
-  const mismatches = useMemo(() => {
-    const active = pickActivePin(pinsQuery.data?.pins ?? []);
-    const fsi = pinFsi(active);
-    if (!fsi) return [];
-    const out: { field: string; student: string; pinned: string }[] = [];
-
-    const studentProgId = idOf(s.programmeId) ?? idOf(s.programme);
-    const pinProgId = idOf(fsi.programmeId);
-    if (studentProgId && pinProgId && studentProgId !== pinProgId) {
-      out.push({
-        field: 'Programme',
-        student: nameOf(s.programmeId ?? s.programme, programmeName),
-        pinned: nameOf(fsi.programmeId),
-      });
-    }
-
-    const studentBranchId = idOf(s.branchId) ?? idOf(s.branch);
-    const pinBranchId = idOf(fsi.branchId);
-    // Branch is allowed to be null on either side (wildcard); only flag a
-    // hard conflict (both set + different).
-    if (studentBranchId && pinBranchId && studentBranchId !== pinBranchId) {
-      out.push({
-        field: 'Branch',
-        student: nameOf(s.branchId ?? s.branch, branchName),
-        pinned: nameOf(fsi.branchId),
-      });
-    }
-
-    const studentCategory = (s.category as string | null | undefined) ?? null;
-    const pinCategory = fsi.category ?? null;
-    if (studentCategory && pinCategory && studentCategory !== pinCategory) {
-      out.push({ field: 'Category', student: studentCategory, pinned: pinCategory });
-    }
-
-    const studentQuota = (s.quota as string | null | undefined) ?? null;
-    const pinQuota = fsi.quota ?? null;
-    if (studentQuota && pinQuota && studentQuota !== pinQuota) {
-      out.push({ field: 'Quota', student: studentQuota, pinned: pinQuota });
-    }
-
-    return out;
-  }, [pinsQuery.data, s, programmeName, branchName]);
-  const activePinExists = useMemo(
-    () => pickActivePin(pinsQuery.data?.pins ?? []) !== undefined,
-    [pinsQuery.data],
-  );
 
   return (
     <div className="max-w-5xl mx-auto space-y-4">
