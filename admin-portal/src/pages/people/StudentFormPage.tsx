@@ -3,7 +3,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getStudent, createStudent, listParents, updateStudent } from '../../services/people';
 import { listRegulations, listProgrammes, listBranches, listBatches } from '../../services/academics';
-import { ArrowLeft, Save, Loader2 } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
 const STATUSES = ['prospective', 'active', 'year_back', 'detained', 'graduated', 'exited', 'alumni'] as const;
 const QUOTAS = ['convener', 'management', 'nri'] as const;
@@ -30,6 +30,36 @@ const emptyForm = {
 const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none transition-colors";
 const lbl = "block text-sm font-medium text-gray-700 mb-1";
 
+/**
+ * Shape of `feePin` returned by createStudent (backend service —
+ * see `auto-pin matching fee structure on student enrollment`
+ * commit). Soft-fail by design: when no matching FeeStructureInstance
+ * exists, the student is still created and `feePin.success === false`
+ * with a structured `reason` for the UI to surface.
+ */
+type FeePinNotice = {
+  attempted: boolean;
+  success: boolean;
+  reason?: string;
+  pinId?: string;
+  feeStructureInstanceId?: string;
+  yearOfStudy?: number;
+};
+
+/** Map a soft-fail reason to copy that helps the operator act on it. */
+function pinNoticeCopy(reason: string | undefined): string {
+  switch (reason) {
+    case 'no-matching-fee-structure':
+      return 'No matching fee structure was found for this student’s combination. Configure the structure in Finance › Fee Structures, then pin the student manually.';
+    case 'no-academic-year':
+      return 'No active academic year is set for this college. Set the current academic year and pin the student manually after.';
+    case 'no-programme-id':
+      return 'No programme was assigned, so no fee structure was pinned.';
+    default:
+      return reason ? `Auto-pin skipped: ${reason}` : 'Auto-pin did not complete.';
+  }
+}
+
 export default function StudentFormPage() {
   const { id } = useParams();
   const isEdit = !!id;
@@ -37,6 +67,14 @@ export default function StudentFormPage() {
   const qc = useQueryClient();
   const [form, setForm] = useState(emptyForm);
   const [validationError, setValidationError] = useState('');
+  /**
+   * On successful create the backend returns a `feePin` field. If the
+   * auto-pin succeeded we navigate immediately (current happy-path
+   * behaviour). If it soft-failed (`attempted && !success`), we hold
+   * the navigation, render an amber banner explaining what to do, and
+   * let the operator click through.
+   */
+  const [pinNotice, setPinNotice] = useState<{ kind: 'success' | 'soft-fail'; pin: FeePinNotice; studentId?: string } | null>(null);
 
   const { data: existing, isLoading: loadingExisting } = useQuery({
     queryKey: ['student', id],
@@ -87,7 +125,20 @@ export default function StudentFormPage() {
 
   const createMut = useMutation({
     mutationFn: createStudent,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['students'] }); qc.invalidateQueries({ queryKey: ['people-stats'] }); navigate('/people/students'); },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['students'] });
+      qc.invalidateQueries({ queryKey: ['people-stats'] });
+      const pin = data?.feePin as FeePinNotice | undefined;
+      // Hold navigation when the auto-pin was attempted and soft-failed
+      // — the operator needs to know there's a follow-up before leaving
+      // this page. Happy path (success or "skipped, no programmeId")
+      // navigates immediately as before.
+      if (pin?.attempted && pin.success === false) {
+        setPinNotice({ kind: 'soft-fail', pin, studentId: data?._id });
+        return;
+      }
+      navigate('/people/students');
+    },
   });
   const updateMut = useMutation({
     mutationFn: ({ id, data }: any) => updateStudent(id, data),
@@ -179,6 +230,44 @@ export default function StudentFormPage() {
       {(validationError || error) && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
           {validationError || (error as any)?.response?.data?.error || (error as any)?.response?.data?.details?.map((d: any) => d.message).join(', ') || 'Something went wrong.'}
+        </div>
+      )}
+
+      {pinNotice && pinNotice.kind === 'soft-fail' && (
+        <div role="alert" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle size={18} className="text-amber-600 mt-0.5 flex-shrink-0" />
+            <div className="flex-1 text-sm">
+              <p className="font-semibold text-amber-900">Student created, but no fee structure was pinned.</p>
+              <p className="text-amber-800 mt-1">{pinNoticeCopy(pinNotice.pin.reason)}</p>
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => navigate('/people/students')}
+                  className="px-3 py-1.5 bg-amber-600 text-white text-xs font-medium rounded-md hover:bg-amber-700"
+                >
+                  Continue to Students
+                </button>
+                {pinNotice.studentId && (
+                  <Link
+                    to={`/people/students/${pinNotice.studentId}`}
+                    className="px-3 py-1.5 bg-white text-amber-800 text-xs font-medium rounded-md border border-amber-300 hover:bg-amber-100"
+                  >
+                    Open student
+                  </Link>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pinNotice && pinNotice.kind === 'success' && (
+        <div role="status" className="mb-4 rounded-lg border border-green-300 bg-green-50 p-3">
+          <div className="flex items-center gap-2 text-sm text-green-800">
+            <CheckCircle2 size={16} className="text-green-600 flex-shrink-0" />
+            <span>Fee structure pinned for Year {pinNotice.pin.yearOfStudy ?? 1}.</span>
+          </div>
         </div>
       )}
 
