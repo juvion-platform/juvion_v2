@@ -41,11 +41,11 @@ export interface CanonicalFeeCategory {
 /**
  * Standard Indian college reservation / fee-distinction categories.
  *
- * Selection rationale: covers the majority of fee structures we see in
- * the field. Colleges with state-specific minority categories (e.g.
- * Jain Minority, Sikh Minority) add their own via the admin CRUD page;
- * the seed deliberately does NOT ship those because they vary per
- * college / state board.
+ * Includes Andhra Pradesh / Telangana state-board BC sub-categories
+ * (BC-A through BC-E) since these states' rank cards print the
+ * sub-letter, and matching FeeStructureInstances need to align with
+ * what the EAMCET / JEE-rank-card lists. Generic "OBC" is kept for
+ * states without sub-categories.
  *
  * Codes are SHORT, UPPERCASE, conventional — match what state admission
  * boards print on rank cards (so officers don't have to translate).
@@ -60,7 +60,37 @@ export const CANONICAL_FEE_CATEGORIES: ReadonlyArray<CanonicalFeeCategory> = [
   {
     code: 'OBC',
     name: 'Other Backward Classes',
-    description: 'Central / state OBC list as applicable; reservation fee structure.',
+    description: 'Central / state OBC list as applicable; for states without BC-A..E sub-categories.',
+    status: 'active',
+  },
+  {
+    code: 'BC-A',
+    name: 'Backward Class A',
+    description: 'AP / TS state-board BC-A sub-category.',
+    status: 'active',
+  },
+  {
+    code: 'BC-B',
+    name: 'Backward Class B',
+    description: 'AP / TS state-board BC-B sub-category.',
+    status: 'active',
+  },
+  {
+    code: 'BC-C',
+    name: 'Backward Class C',
+    description: 'AP / TS state-board BC-C sub-category.',
+    status: 'active',
+  },
+  {
+    code: 'BC-D',
+    name: 'Backward Class D',
+    description: 'AP / TS state-board BC-D sub-category.',
+    status: 'active',
+  },
+  {
+    code: 'BC-E',
+    name: 'Backward Class E',
+    description: 'AP / TS state-board BC-E sub-category (includes minority groups).',
     status: 'active',
   },
   {
