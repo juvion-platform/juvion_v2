@@ -122,7 +122,7 @@ export default function StudentFormPage() {
   // Same FeeCategory catalog the FeeStructures form pulls from. Keeping the
   // student.category dropdown sourced from this list prevents the typo class
   // of "OC" vs "oc" that would silently break fee-pin matching downstream.
-  const { data: feeCategoriesData } = useQuery({ queryKey: ['fee-categories-all'], queryFn: () => listFeeCategories(1, 200) });
+  const { data: feeCategoriesData } = useQuery({ queryKey: ['fee-categories-all'], queryFn: () => listFeeCategories(1, 100) });
   // Edit mode only — pull the active fee pin + populated FSI so we can show
   // the operator the CURRENT pinned fee structure inline. Same query key as
   // <FeePinsPanel />, so React Query dedupes if the user lands here from
