@@ -3,7 +3,9 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getStudent, createStudent, listParents, updateStudent } from '../../services/people';
 import { listRegulations, listProgrammes, listBranches, listBatches } from '../../services/academics';
-import { ArrowLeft, Save, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { listFeeCategories } from '../../services/fee-categories';
+import { getStudentPins, type IFeePin, type PopulatedFeeStructureInstance } from '../../services/fee-configuration';
+import { ArrowLeft, Save, Loader2, AlertTriangle, CheckCircle2, ExternalLink, IndianRupee } from 'lucide-react';
 
 const STATUSES = ['prospective', 'active', 'year_back', 'detained', 'graduated', 'exited', 'alumni'] as const;
 const QUOTAS = ['convener', 'management', 'nri'] as const;
@@ -29,6 +31,7 @@ const emptyForm = {
 
 const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none transition-colors";
 const lbl = "block text-sm font-medium text-gray-700 mb-1";
+const manageLink = "inline-flex items-center gap-0.5 text-xs text-primary-500 hover:text-primary-700 font-medium ml-1";
 
 /**
  * Shape of `feePin` returned by createStudent (backend service —
@@ -116,6 +119,19 @@ export default function StudentFormPage() {
   const { data: branchesData } = useQuery({ queryKey: ['branches'], queryFn: () => listBranches(1, 200) });
   const { data: batchesData } = useQuery({ queryKey: ['batches'], queryFn: () => listBatches(1, 200) });
   const { data: parentsData } = useQuery({ queryKey: ['parents-ref', 'all'], queryFn: () => listParents(1, 200) });
+  // Same FeeCategory catalog the FeeStructures form pulls from. Keeping the
+  // student.category dropdown sourced from this list prevents the typo class
+  // of "OC" vs "oc" that would silently break fee-pin matching downstream.
+  const { data: feeCategoriesData } = useQuery({ queryKey: ['fee-categories-all'], queryFn: () => listFeeCategories(1, 200) });
+  // Edit mode only — pull the active fee pin + populated FSI so we can show
+  // the operator the CURRENT pinned fee structure inline. Same query key as
+  // <FeePinsPanel />, so React Query dedupes if the user lands here from
+  // the detail page.
+  const { data: pinsData } = useQuery({
+    queryKey: ['student-pins', id],
+    queryFn: () => getStudentPins(id!),
+    enabled: isEdit,
+  });
 
   useEffect(() => {
     if (existing) {
@@ -159,6 +175,25 @@ export default function StudentFormPage() {
       });
     }
   }, [existing]);
+
+  /**
+   * Active fee pin (most recent non-archived) + the populated
+   * FeeStructureInstance behind it. Computed once per pinsData refresh
+   * so the Academic Details fee-summary card has a stable reference.
+   * Helpers are inlined (tiny, shared with StudentDetailPage's drift
+   * indicator).
+   */
+  const activePin: IFeePin | undefined = (() => {
+    const pins = pinsData?.pins ?? [];
+    const live = pins.filter((p) => !p.archivedAt);
+    if (live.length === 0) return undefined;
+    return [...live].sort((a, b) => (b.yearOfStudy ?? 0) - (a.yearOfStudy ?? 0))[0];
+  })();
+  const activePinFsi: PopulatedFeeStructureInstance | undefined = (() => {
+    if (!activePin) return undefined;
+    const f = activePin.feeStructureInstanceId;
+    return typeof f === 'object' && f !== null ? f : undefined;
+  })();
 
   /**
    * Pre-save hint. Computes which of the 3 fee-axis fields drifted
@@ -435,6 +470,53 @@ export default function StudentFormPage() {
             <h3 className="font-semibold text-navy-dark">Academic Details</h3>
             <p className="text-xs text-gray-500 mt-0.5">Enrollment and academic information</p>
           </div>
+          {/* Current-pin context strip. Edit mode only, when a pin exists.
+              Shows the operator the CURRENT pinned fee structure so they
+              know what they're about to drift from when changing branch /
+              category / quota. Sits ABOVE the input grid so the reference
+              is visible while editing. */}
+          {isEdit && activePin && activePinFsi && (
+            <div className="px-5 pt-4 pb-1">
+              <div className={`rounded-lg border ${willTriggerStalePin ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-slate-50'} p-3 text-sm`}>
+                <div className="flex items-start gap-2">
+                  <IndianRupee size={14} className={`mt-0.5 ${willTriggerStalePin ? 'text-amber-600' : 'text-slate-500'} flex-shrink-0`} />
+                  <div className="flex-1 min-w-0">
+                    <div className={`font-medium ${willTriggerStalePin ? 'text-amber-900' : 'text-slate-700'}`}>
+                      Current fee structure (Year {activePin.yearOfStudy})
+                      {willTriggerStalePin && (
+                        <span className="ml-2 text-xs font-normal text-amber-700">
+                          — saving will mark this stale
+                        </span>
+                      )}
+                    </div>
+                    <div className={`text-xs mt-0.5 ${willTriggerStalePin ? 'text-amber-800' : 'text-slate-600'}`}>
+                      <span className="font-semibold">{activePinFsi.name ?? activePinFsi.code ?? 'Fee Structure'}</span>
+                      <span className="mx-2">·</span>
+                      <span className="font-bold">
+                        {`₹${(activePinFsi.totalAmount ?? 0).toLocaleString('en-IN')}`}
+                      </span>
+                    </div>
+                    <div className={`text-xs mt-1 ${willTriggerStalePin ? 'text-amber-800' : 'text-slate-500'}`}>
+                      Quota:{' '}
+                      <span className="font-mono">{activePinFsi.quota ?? 'any'}</span>
+                      <span className="mx-1.5">·</span>
+                      Category:{' '}
+                      <span className="font-mono">{activePinFsi.category ?? 'any'}</span>
+                      <span className="mx-1.5">·</span>
+                      Branch:{' '}
+                      <span className="font-mono">
+                        {typeof activePinFsi.branchId === 'object' && activePinFsi.branchId
+                          ? (activePinFsi.branchId.name ?? '<set>')
+                          : activePinFsi.branchId
+                          ? '<set>'
+                          : 'any'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
           <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-4">
             <div><label className={lbl}>Admission Year <span className="text-red-500">*</span></label><input required type="number" value={form.admissionYear} onChange={e => setForm(f => ({ ...f, admissionYear: e.target.value }))} className={inp} /></div>
             <div><label className={lbl}>Roll Number</label><input value={form.rollNumber} onChange={e => setForm(f => ({ ...f, rollNumber: e.target.value }))} className={inp} /></div>
@@ -467,7 +549,22 @@ export default function StudentFormPage() {
               </select>
             </div>
             <div><label className={lbl}>Quota</label><select value={form.quota} onChange={e => setForm(f => ({ ...f, quota: e.target.value }))} className={inp}><option value="">Select...</option>{QUOTAS.map(q => <option key={q} value={q} className="capitalize">{q}</option>)}</select></div>
-            <div><label className={lbl}>Category</label><input value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className={inp} placeholder="e.g. OC, BC-A, SC, ST" /></div>
+            <div>
+              <label className={lbl}>
+                Category
+                <Link to="/finance/fee-management/fee-categories" target="_blank" className={manageLink}>
+                  + Manage <ExternalLink size={10} />
+                </Link>
+              </label>
+              <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className={inp}>
+                <option value="">Select category</option>
+                {(feeCategoriesData?.items ?? [])
+                  .filter((c: { status?: string }) => c.status !== 'inactive')
+                  .map((c: { _id: string; code: string; name: string }) => (
+                    <option key={c._id} value={c.code}>{c.code} — {c.name}</option>
+                  ))}
+              </select>
+            </div>
             <div><label className={lbl}>Status</label><select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className={inp}>{STATUSES.map(s => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}</select></div>
           </div>
         </section>
