@@ -117,6 +117,16 @@ export default function FeeStructuresPage() {
 
   const columns = [
     { key: 'programmeId', label: 'Programme', render: (r: any) => <span className="font-medium text-navy">{r.programmeId?.name || '—'}</span> },
+    // `branchId` is optional on FeeStructure — null/missing means the
+    // structure is a wildcard that matches any branch under the
+    // programme (see fee-pin-service preference rules). Render "any"
+    // for that case so the wildcard semantics are explicit, vs "—"
+    // which would just look like missing data.
+    { key: 'branchId', label: 'Branch', render: (r: any) => (
+      r.branchId?.name
+        ? <span className="text-gray-700">{r.branchId.name}</span>
+        : <span className="text-gray-400 italic">any</span>
+    ) },
     { key: 'academicYearId', label: 'Academic Year', render: (r: any) => <span>{r.academicYearId?.label || r.academicYearId?.code || '—'}</span> },
     { key: 'year', label: 'Year' },
     { key: 'quota', label: 'Quota', render: (r: any) => <Badge variant="info">{r.quota}</Badge> },
