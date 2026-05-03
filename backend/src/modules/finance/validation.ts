@@ -7,7 +7,11 @@ export const createFeeStructureSchema = z.object({
   programmeId: z.string().min(1),
   branchId: z.string().optional(),
   category: z.string().optional(),
-  quota: z.enum(['convener', 'management', 'nri']).optional(),
+  // Quota is now admin-managed via the FeeQuota CRUD
+  // (/api/finance/fee-quotas), so the validator must accept any
+  // catalog code — not a hardcoded subset. Same string-equality
+  // contract fee-pin-service relies on.
+  quota: z.string().optional(),
   year: z.number().int().min(1),
   components: z.array(z.object({
     name: z.string().min(1),
@@ -238,7 +242,8 @@ export const createFeeStructureInstanceSchema = z.object({
   programmeId: z.string().min(1),
   branchId: z.string().optional(),
   category: z.string().optional(),
-  quota: z.enum(['management', 'convener', 'nri', 'spot', 'lateral']).optional(),
+  // Admin-managed via FeeQuota CRUD — see createFeeStructureSchema.
+  quota: z.string().optional(),
   totalAmount: z.number().min(0).optional(),
 });
 

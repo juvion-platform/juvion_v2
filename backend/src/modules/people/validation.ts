@@ -54,7 +54,11 @@ export const updatePersonSchema = createPersonSchema.partial();
 export const createStudentSchema = basePersonSchema.extend({
   admissionYear: z.number().min(2000).max(2100),
   category: z.string().optional(),
-  quota: z.enum(['convener', 'management', 'nri']).optional(),
+  // Quota is admin-managed via the FeeQuota CRUD
+  // (/api/finance/fee-quotas), so the validator accepts any catalog
+  // code as a free string. Matching is by string equality in
+  // fee-pin-service.
+  quota: z.string().optional(),
   // Academic-structure references — optional on the body so blanks
   // are allowed; nullable so the form can clear them.
   programmeId: z.string().nullable().optional(),
