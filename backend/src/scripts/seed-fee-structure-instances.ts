@@ -42,7 +42,15 @@
  *     [--college-id=<id>] [--dry-run]
  */
 
+import path from 'path';
+
+import dotenv from 'dotenv';
 import mongoose, { Types } from 'mongoose';
+
+// Load backend/.env regardless of which directory the operator runs
+// the script from. `__dirname` is .../backend/src/scripts, so going
+// up two levels lands at .../backend/.env.
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 import { FeeStructureInstance } from '../models/finance/FeeStructureInstance';
 import { FeeComponent } from '../models/finance/FeeComponent';

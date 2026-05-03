@@ -26,7 +26,15 @@
  * can reuse the table without duplicating it.
  */
 
+import path from 'path';
+
+import dotenv from 'dotenv';
 import mongoose from 'mongoose';
+
+// Load backend/.env regardless of which directory the operator runs
+// the script from. `__dirname` is .../backend/src/scripts, so going
+// up two levels lands at .../backend/.env.
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 import { FeeCategory, FeeCategoryStatus } from '../models/finance/FeeCategory';
 import { College } from '../models/College';
