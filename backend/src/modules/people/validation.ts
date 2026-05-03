@@ -44,10 +44,24 @@ export const createPersonSchema = basePersonSchema;
 export const updatePersonSchema = createPersonSchema.partial();
 
 // ── Student ──────────────────────────────────────────
+//
+// IMPORTANT: every field the form sends MUST be declared here. Zod 3
+// strips unknown keys by default — any field not listed gets silently
+// dropped before the controller ever sees it. Missing programmeId /
+// branchId / regulationId / batchId / studyYearAtAdmission was the
+// root cause of "branch is not getting saved" (and would have been
+// the same for the other refs if anyone had relied on the API path).
 export const createStudentSchema = basePersonSchema.extend({
   admissionYear: z.number().min(2000).max(2100),
   category: z.string().optional(),
   quota: z.enum(['convener', 'management', 'nri']).optional(),
+  // Academic-structure references — optional on the body so blanks
+  // are allowed; nullable so the form can clear them.
+  programmeId: z.string().nullable().optional(),
+  branchId: z.string().nullable().optional(),
+  regulationId: z.string().nullable().optional(),
+  batchId: z.string().nullable().optional(),
+  studyYearAtAdmission: z.number().int().min(1).max(6).optional(),
   primaryParentId: z.string().nullable().optional(),
   feeResponsibleParentId: z.string().nullable().optional(),
   rollNumber: z.string().optional(),
