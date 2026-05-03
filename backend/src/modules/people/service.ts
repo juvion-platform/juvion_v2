@@ -476,49 +476,107 @@ export async function updateStudent(collegeId: string, id: string, data: any, pe
 
   await createAuditLog({ collegeId, entityType: 'Student', entityId: id, entityName: data.name || 'Student', action: 'update', changes: [], performedBy });
 
-  // T11 stale-pin detection. If any of the fee-axis fields changed, check
-  // the active pin for the student's current year-of-study: if the pin no
-  // longer matches the student's attributes, set `staleSince` so admins
-  // are prompted (via UI banner — T13) to re-pin manually.
+  // T11 + auto-rebind: if any fee-axis field changed (branch / category /
+  // quota), first attempt to automatically pin the matching
+  // FeeStructureInstance for the student's current year-of-study.
   //
-  // This is deliberately best-effort: failures here MUST NOT fail the
-  // student update. We log and move on.
+  // Happy path  → matching FSI found: old pin archived, new pin created.
+  //               feePinUpdate.autoRebound = true so the frontend shows a
+  //               green "fee structure updated" toast.
+  //
+  // Fallback    → FeeStructureNotFoundError (no active FSI for the new
+  //               combination): mark the existing pin stale and set
+  //               feePinUpdate.pinMarkedStale = true so the operator is
+  //               prompted to re-pin manually via FeePinsPanel.
+  //
+  // This block is deliberately best-effort: any failure MUST NOT cause
+  // the student update itself to throw.
   const feeAxisChanged =
     (data.branchId !== undefined && String(data.branchId) !== prevFeeAxes.branchId) ||
     (data.quota !== undefined && (data.quota ?? null) !== prevFeeAxes.quota) ||
     (data.category !== undefined && (data.category ?? null) !== prevFeeAxes.category);
 
+  const feePinUpdate: {
+    feeAxisChanged: boolean;
+    autoRebound: boolean;
+    newPinId?: string;
+    yearOfStudy?: number;
+    pinMarkedStale: boolean;
+    reason?: string;
+  } = { feeAxisChanged, autoRebound: false, pinMarkedStale: false };
+
   if (feeAxisChanged) {
     try {
       const yearOfStudy = await resolveYearOfStudyForStalePinCheck(id);
       if (yearOfStudy !== null) {
-        const validity = await feePinService.checkPinValidity(id, yearOfStudy);
-        if (!validity.valid && validity.currentPin) {
-          const now = new Date();
-          await Student.updateOne(
-            {
-              _id: id,
-              'feePins._id': validity.currentPin._id,
-            },
-            { $set: { 'feePins.$.staleSince': now } },
-          );
+        // Resolve the current AY for the pin-resolver (same lookup as
+        // the FSI seed and createStudent auto-pin path).
+        const currentAY = await AcademicYear.findOne({ collegeId, isCurrent: true })
+          .select({ _id: 1 })
+          .lean<{ _id: mongoose.Types.ObjectId } | null>();
+
+        let autoRebindSucceeded = false;
+        try {
+          // pinYear reads the student fresh from DB so it sees the
+          // just-committed branch/category/quota values.
+          const newPin = await feePinService.pinYear(id, yearOfStudy, {
+            pinnedBy: performedBy,
+            reason: 'data_correction',
+            academicYearId: currentAY?._id,
+            // Skip BullMQ enqueue to keep this path synchronous and
+            // avoid a Redis failure killing the student save.
+            enqueueCommitmentSheet: false,
+          });
+          feePinUpdate.autoRebound = true;
+          feePinUpdate.newPinId = String(newPin._id);
+          feePinUpdate.yearOfStudy = yearOfStudy;
+          autoRebindSucceeded = true;
           // eslint-disable-next-line no-console
           console.info(
-            `[fee-pin] marked stale student=${id} year=${yearOfStudy} reason=${validity.reason ?? 'unknown'}`,
+            `[fee-pin] auto-rebound student=${id} year=${yearOfStudy} pin=${String(newPin._id)}`,
           );
+        } catch (rebindErr) {
+          // Log unexpected errors; FeeStructureNotFoundError is
+          // expected and handled below.
+          const errName = (rebindErr as { name?: string }).name;
+          if (errName !== 'FeeStructureNotFoundError') {
+            // eslint-disable-next-line no-console
+            console.warn(
+              `[fee-pin] auto-rebind unexpected error for student=${id}:`,
+              rebindErr,
+            );
+          }
+        }
+
+        if (!autoRebindSucceeded) {
+          // No matching FSI — fall back to stale-marking so the
+          // operator is prompted to re-pin manually.
+          const validity = await feePinService.checkPinValidity(id, yearOfStudy);
+          if (!validity.valid && validity.currentPin) {
+            await Student.updateOne(
+              { _id: id, 'feePins._id': validity.currentPin._id },
+              { $set: { 'feePins.$.staleSince': new Date() } },
+            );
+            feePinUpdate.pinMarkedStale = true;
+            feePinUpdate.reason = validity.reason ?? 'no-matching-fee-structure';
+            // eslint-disable-next-line no-console
+            console.info(
+              `[fee-pin] marked stale student=${id} year=${yearOfStudy} reason=${feePinUpdate.reason}`,
+            );
+          }
         }
       }
     } catch (err) {
-      // Log, don't fail the update.
       // eslint-disable-next-line no-console
       console.warn(
-        `[fee-pin] stale-pin validity check failed for student=${id}:`,
+        `[fee-pin] auto-rebind/stale check failed for student=${id}:`,
         err,
       );
     }
   }
 
-  return getStudent(collegeId, id);
+  const freshStudent = await getStudent(collegeId, id);
+  return { ...freshStudent, feePinUpdate };
 }
 
 /**

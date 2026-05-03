@@ -67,7 +67,9 @@ function pinNoticeCopy(reason: string | undefined): string {
 type PinNoticeState =
   | { kind: 'soft-fail'; pin: FeePinNotice; studentId?: string }
   | { kind: 'success'; pin: FeePinNotice; studentId?: string }
-  | { kind: 'fee-axis-changed'; studentId: string; changedFields: string[] };
+  | { kind: 'fee-axis-changed'; studentId: string; changedFields: string[] }
+  /** Auto-rebind succeeded on save — new pin already applied, brief green toast. */
+  | { kind: 'rebind-success'; studentId: string; changedFields: string[]; yearOfStudy?: number };
 
 /** Human-readable label for fee-axis fields surfaced in the post-edit banner. */
 const FEE_AXIS_LABELS: Record<string, string> = {
@@ -229,17 +231,49 @@ export default function StudentFormPage() {
   });
   const updateMut = useMutation({
     mutationFn: ({ id, data }: any) => updateStudent(id, data),
-    onSuccess: () => {
+    onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['students'] });
       qc.invalidateQueries({ queryKey: ['student', id] });
-      // Mirror create flow: if a fee-axis (branch / category / quota)
-      // changed, the backend has just marked the active pin stale. Hold
-      // navigation and surface the prompt so the operator routes to the
-      // detail page to re-pin.
-      if (id && changedFeeAxes.length > 0) {
-        setPinNotice({ kind: 'fee-axis-changed', studentId: id, changedFields: changedFeeAxes });
-        return;
+      qc.invalidateQueries({ queryKey: ['student-pins', id] });
+
+      // Read the feePinUpdate payload the backend now returns on every
+      // student update. Three outcomes when feeAxisChanged:
+      //
+      //   autoRebound = true  → matching FSI found and applied automatically
+      //                          → green toast, then auto-navigate.
+      //
+      //   pinMarkedStale = true → no matching FSI found; old pin flagged
+      //                           → amber prompt to re-pin manually.
+      //
+      //   neither             → no fee-axis field changed; navigate silently.
+      type FeePinUpdate = {
+        feeAxisChanged?: boolean;
+        autoRebound?: boolean;
+        newPinId?: string;
+        yearOfStudy?: number;
+        pinMarkedStale?: boolean;
+        reason?: string;
+      };
+      const fpu = (data as { feePinUpdate?: FeePinUpdate } | undefined)?.feePinUpdate;
+
+      if (fpu?.feeAxisChanged) {
+        if (fpu.autoRebound) {
+          setPinNotice({
+            kind: 'rebind-success',
+            studentId: id!,
+            changedFields: changedFeeAxes,
+            yearOfStudy: fpu.yearOfStudy,
+          });
+          // Auto-navigate after the operator has a moment to read the banner.
+          setTimeout(() => navigate('/people/students'), 2500);
+          return;
+        }
+        if (fpu.pinMarkedStale) {
+          setPinNotice({ kind: 'fee-axis-changed', studentId: id!, changedFields: changedFeeAxes });
+          return;
+        }
       }
+
       navigate('/people/students');
     },
   });
@@ -341,8 +375,27 @@ export default function StudentFormPage() {
               <span className="font-semibold">
                 {changedFeeAxes.map((f) => FEE_AXIS_LABELS[f] ?? f).join(', ')}
               </span>{' '}
-              — saving will mark the current fee pin stale. You'll be prompted to re-pin
-              the student's fee structure on the next page.
+              — saving will automatically map the matching fee structure. If no match is
+              found you'll be prompted to re-pin manually.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pinNotice && pinNotice.kind === 'rebind-success' && (
+        <div role="status" className="mb-4 rounded-lg border border-green-300 bg-green-50 p-4">
+          <div className="flex items-start gap-3">
+            <CheckCircle2 size={18} className="text-green-600 mt-0.5 flex-shrink-0" />
+            <div className="flex-1 text-sm">
+              <p className="font-semibold text-green-900">Fee structure automatically updated.</p>
+              <p className="text-green-800 mt-1">
+                The matching fee structure has been re-pinned for Year{' '}
+                {pinNotice.yearOfStudy ?? 1} based on the updated{' '}
+                <span className="font-semibold">
+                  {pinNotice.changedFields.map((f) => FEE_AXIS_LABELS[f] ?? f).join(', ')}
+                </span>
+                . Returning to students list…
+              </p>
             </div>
           </div>
         </div>
@@ -354,16 +407,16 @@ export default function StudentFormPage() {
             <AlertTriangle size={18} className="text-amber-600 mt-0.5 flex-shrink-0" />
             <div className="flex-1 text-sm">
               <p className="font-semibold text-amber-900">
-                Fee structure may need re-pinning.
+                No matching fee structure found — manual re-pin needed.
               </p>
               <p className="text-amber-800 mt-1">
-                You changed{' '}
+                The update saved successfully, but no active fee structure was found for
+                the new{' '}
                 <span className="font-semibold">
                   {pinNotice.changedFields.map((f) => FEE_AXIS_LABELS[f] ?? f).join(', ')}
                 </span>{' '}
-                — the current fee pin no longer matches the student's attributes and has
-                been flagged stale. Open the student to review the pin and apply the
-                matching fee structure.
+                combination. Open the student to pin the correct fee structure manually,
+                or ask Finance to create a matching FeeStructureInstance first.
               </p>
               <div className="mt-3 flex gap-2">
                 <Link
