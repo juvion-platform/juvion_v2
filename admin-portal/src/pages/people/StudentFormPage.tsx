@@ -71,6 +71,23 @@ type PinNoticeState =
   /** Auto-rebind succeeded on save — new pin already applied, brief green toast. */
   | { kind: 'rebind-success'; studentId: string; changedFields: string[]; yearOfStudy?: number };
 
+/**
+ * Form tab keys. Mirrors the Profile / Academic split on
+ * StudentDetailPage so the create + edit and view experiences feel
+ * like the same surface. We don't have a "Fees" tab on the form
+ * because fee pinning is read-only here — the inline current-fee
+ * strip on the Academic tab is enough context for the operator.
+ */
+type FormTabKey = 'profile' | 'academic';
+interface FormTab {
+  key: FormTabKey;
+  label: string;
+}
+const FORM_TABS: ReadonlyArray<FormTab> = [
+  { key: 'profile', label: 'Profile' },
+  { key: 'academic', label: 'Academic Details' },
+];
+
 /** Human-readable label for fee-axis fields surfaced in the post-edit banner. */
 const FEE_AXIS_LABELS: Record<string, string> = {
   branchId: 'Branch',
@@ -109,6 +126,13 @@ export default function StudentFormPage() {
    * decide whether to hold the post-save navigation.
    */
   const [initialFeeAxes, setInitialFeeAxes] = useState<{ branchId: string; category: string; quota: string } | null>(null);
+  /**
+   * Active tab. Profile is the default landing surface — the most
+   * common edit is changing identity / lifecycle fields. Operators
+   * who came here specifically to change fee-axis fields can flip to
+   * Academic Details in one click.
+   */
+  const [formTab, setFormTab] = useState<FormTabKey>('profile');
 
   const { data: existing, isLoading: loadingExisting } = useQuery({
     queryKey: ['student', id],
@@ -282,6 +306,26 @@ export default function StudentFormPage() {
     e.preventDefault();
     setValidationError('');
 
+    // Tab-aware required-field check. Inactive-tab inputs are unmounted,
+    // so HTML5 `required` won't fire for them. We manually validate each
+    // tab's required fields and bounce the user to the offending tab so
+    // they see the empty input clearly rather than a silent submit.
+    if (!form.name) {
+      setFormTab('profile');
+      setValidationError('Name is required.');
+      return;
+    }
+    if (!form.phone) {
+      setFormTab('profile');
+      setValidationError('Phone is required.');
+      return;
+    }
+    if (!form.admissionYear) {
+      setFormTab('academic');
+      setValidationError('Admission Year is required.');
+      return;
+    }
+
     const checklistComplete = [
       form.profileVerified,
       form.documentsVerified,
@@ -292,10 +336,12 @@ export default function StudentFormPage() {
 
     if (form.onboardingStatus === 'completed') {
       if (!form.feeResponsibleParentId) {
+        setFormTab('profile');
         setValidationError('Fee responsible guardian is required before onboarding can be marked completed.');
         return;
       }
       if (!checklistComplete) {
+        setFormTab('profile');
         setValidationError('Complete the onboarding checklist before marking onboarding completed.');
         return;
       }
@@ -476,7 +522,48 @@ export default function StudentFormPage() {
         </div>
       )}
 
+      {/* Tabs nav. Mirrors StudentDetailPage so the create / edit and
+          view experiences feel like the same surface. The Academic
+          Details tab carries an amber dot in edit mode while the
+          operator has unsaved fee-axis changes pending — same signal
+          the inline current-fee strip uses. */}
+      <div className="sticky top-0 z-10 bg-gray-50/80 backdrop-blur border-b border-gray-200 -mx-2 px-2 mb-4">
+        <nav className="flex gap-1 overflow-x-auto" role="tablist" aria-label="Student form sections">
+          {FORM_TABS.map((t) => {
+            const isActive = formTab === t.key;
+            const showAmberDot = t.key === 'academic' && willTriggerStalePin;
+            return (
+              <button
+                key={t.key}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                aria-controls={`form-tabpanel-${t.key}`}
+                id={`form-tab-${t.key}`}
+                onClick={() => setFormTab(t.key)}
+                className={`relative px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+                  isActive
+                    ? 'border-primary-500 text-primary-700'
+                    : 'border-transparent text-gray-600 hover:text-gray-800 hover:border-gray-300'
+                }`}
+              >
+                {t.label}
+                {showAmberDot && (
+                  <span
+                    className="absolute top-2 right-1 inline-block h-2 w-2 rounded-full bg-amber-500"
+                    aria-label="Unsaved fee-axis change — needs review"
+                  />
+                )}
+              </button>
+            );
+          })}
+        </nav>
+      </div>
+
       <form id="student-form" onSubmit={handleSubmit} className="space-y-6">
+        {/* ── Profile tab ─────────────────────────────────────────── */}
+        {formTab === 'profile' && (
+          <div role="tabpanel" id="form-tabpanel-profile" aria-labelledby="form-tab-profile" className="space-y-6">
         {/* Personal Information */}
         <section className="bg-white rounded-xl border shadow-sm">
           <div className="px-5 py-4 border-b bg-navy/[0.03] rounded-t-xl">
@@ -516,7 +603,12 @@ export default function StudentFormPage() {
             <div><label className={lbl}>Pincode</label><input value={form.pincode} onChange={e => setForm(f => ({ ...f, pincode: e.target.value }))} className={inp} maxLength={6} /></div>
           </div>
         </section>
+          </div>
+        )}
 
+        {/* ── Academic Details tab ────────────────────────────────── */}
+        {formTab === 'academic' && (
+          <div role="tabpanel" id="form-tabpanel-academic" aria-labelledby="form-tab-academic" className="space-y-6">
         {/* Academic Details */}
         <section className="bg-white rounded-xl border shadow-sm">
           <div className="px-5 py-4 border-b bg-navy/[0.03] rounded-t-xl">
@@ -621,7 +713,12 @@ export default function StudentFormPage() {
             <div><label className={lbl}>Status</label><select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className={inp}>{STATUSES.map(s => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}</select></div>
           </div>
         </section>
+          </div>
+        )}
 
+        {/* ── Profile tab (continued: Guardians + Onboarding) ─────── */}
+        {formTab === 'profile' && (
+          <div role="tabpanel" id="form-tabpanel-profile-2" aria-labelledby="form-tab-profile" className="space-y-6">
         <section className="bg-white rounded-xl border shadow-sm">
           <div className="px-5 py-4 border-b bg-navy/[0.03] rounded-t-xl">
             <h3 className="font-semibold text-navy-dark">Guardian Linkage</h3>
@@ -686,6 +783,8 @@ export default function StudentFormPage() {
             </div>
           </div>
         </section>
+          </div>
+        )}
 
         {/* Bottom save */}
         <div className="flex justify-end">
