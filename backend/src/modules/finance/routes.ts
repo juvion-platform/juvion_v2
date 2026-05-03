@@ -356,6 +356,9 @@ router.delete('/reports/:id', authorize('finance', 'delete'), ctrl.deleteFinanci
 
 // ═══ W03: Fee Structure Instance Lifecycle ═══════════════════
 router.get('/fee-structure-instances', authorize('finance', 'read'), ctrl.listFeeStructureInstances);
+// Static path BEFORE the :id route — otherwise express matches
+// "preview-match" as :id="preview-match" and 404s.
+router.get('/fee-structure-instances/preview-match', authorize('finance', 'read'), feePinCtrl.previewMatchingFeeStructure);
 router.get('/fee-structure-instances/:id', authorize('finance', 'read'), ctrl.getFeeStructureInstance);
 router.post('/fee-structure-instances', authorize('finance', 'create'), validate(createFeeStructureInstanceSchema), ctrl.createFeeStructureInstance);
 router.post('/fee-structures/clone', authorize('finance', 'create'), validate(cloneFeeStructureSchema), ctrl.cloneFeeStructure);

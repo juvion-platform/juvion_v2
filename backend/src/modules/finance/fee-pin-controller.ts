@@ -196,3 +196,52 @@ export async function transferProgramme(
     next(err);
   }
 }
+
+/**
+ * GET /fee-structure-instances/preview-match — read-only preview that
+ * resolves the FeeStructureInstance that would be pinned for a given
+ * raw (programme, branch, quota, category, yearOfStudy) combination.
+ *
+ * Powers the live "matching fee structure" strip on the StudentFormPage
+ * Academic Details tab so operators see what a save would map to BEFORE
+ * clicking Save. Pure read; no audit log; no side effects.
+ */
+export async function previewMatchingFeeStructure(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const {
+      programmeId,
+      branchId,
+      quota,
+      category,
+      yearOfStudy,
+      academicYearId,
+    } = req.query as Record<string, string | undefined>;
+
+    if (!programmeId) {
+      throw new AppError(400, 'programmeId is required');
+    }
+
+    const yos = yearOfStudy ? Number(yearOfStudy) : 1;
+    if (!Number.isFinite(yos) || yos < 1) {
+      throw new AppError(400, 'yearOfStudy must be a positive integer');
+    }
+
+    const result = await feePinService.previewMatchingFeeStructureInstance({
+      collegeId: req.collegeId!,
+      programmeId,
+      branchId: branchId || null,
+      quota: quota || null,
+      category: category || null,
+      yearOfStudy: yos,
+      academicYearId: academicYearId || undefined,
+    });
+
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}

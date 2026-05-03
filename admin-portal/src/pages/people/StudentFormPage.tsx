@@ -4,7 +4,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getStudent, createStudent, listParents, updateStudent } from '../../services/people';
 import { listRegulations, listProgrammes, listBranches, listBatches } from '../../services/academics';
 import { listFeeCategories } from '../../services/fee-categories';
-import { getStudentPins, type IFeePin, type PopulatedFeeStructureInstance } from '../../services/fee-configuration';
+import {
+  getStudentPins,
+  previewMatchingFeeStructure,
+  type IFeePin,
+  type PopulatedFeeStructureInstance,
+} from '../../services/fee-configuration';
 import { ArrowLeft, Save, Loader2, AlertTriangle, CheckCircle2, ExternalLink, IndianRupee } from 'lucide-react';
 
 const STATUSES = ['prospective', 'active', 'year_back', 'detained', 'graduated', 'exited', 'alumni'] as const;
@@ -158,6 +163,50 @@ export default function StudentFormPage() {
     queryFn: () => getStudentPins(id!),
     enabled: isEdit,
   });
+
+  // Live "matching fee structure" preview. Re-fetches whenever any of
+  // the fee-axis fields the resolver scores against change. Disabled
+  // until the operator picks a programme — without one the resolver
+  // returns null anyway. Returns the FSI that *would* be pinned on
+  // save; null means no match exists for the current combination.
+  const previewYearOfStudy = (() => {
+    // Edit mode: prefer the current active pin's yearOfStudy so the
+    // preview is anchored to the right academic year.
+    if (isEdit && pinsData?.pins?.length) {
+      const live = pinsData.pins.filter((p) => !p.archivedAt);
+      if (live.length > 0) {
+        return [...live].sort((a, b) => (b.yearOfStudy ?? 0) - (a.yearOfStudy ?? 0))[0]!.yearOfStudy ?? 1;
+      }
+    }
+    return 1;
+  })();
+  const { data: previewData, isLoading: previewLoading } = useQuery({
+    queryKey: [
+      'fee-preview',
+      form.programmeId,
+      form.branchId || null,
+      form.quota || null,
+      form.category || null,
+      previewYearOfStudy,
+    ],
+    queryFn: () =>
+      previewMatchingFeeStructure({
+        programmeId: form.programmeId,
+        branchId: form.branchId || null,
+        quota: form.quota || null,
+        category: form.category || null,
+        yearOfStudy: previewYearOfStudy,
+      }),
+    enabled: !!form.programmeId,
+    // Preview is "fresh enough" for 30s — operators rarely toggle a
+    // field many times in a few seconds, and FSIs don't churn often.
+    staleTime: 30_000,
+  });
+  const previewFsi = previewData?.matched ? previewData.fsi : null;
+  // True iff the preview's FSI differs from the currently pinned FSI.
+  // Used to colour the strip — if the preview matches the current pin
+  // it's reassuring (green/blue), else it's a "this is what would
+  // change" notice (amber when fee-axis fields have drifted).
 
   useEffect(() => {
     if (existing) {
@@ -615,11 +664,16 @@ export default function StudentFormPage() {
             <h3 className="font-semibold text-navy-dark">Academic Details</h3>
             <p className="text-xs text-gray-500 mt-0.5">Enrollment and academic information</p>
           </div>
-          {/* Current-pin context strip. Edit mode only, when a pin exists.
-              Shows the operator the CURRENT pinned fee structure so they
-              know what they're about to drift from when changing branch /
-              category / quota. Sits ABOVE the input grid so the reference
-              is visible while editing. */}
+          {/* Fee-structure context strips. Two stacked strips appear above
+              the input grid:
+                1. CURRENT pin (edit mode + active pin exists) — what's
+                   on the student today.
+                2. PREVIEW match — the FSI that *would* be pinned given
+                   the current form selection. Updates live as the
+                   operator changes programme / branch / category /
+                   quota / etc.
+              The two stacked strips let the operator compare "what's
+              there" with "what saving will do" before clicking Save. */}
           {isEdit && activePin && activePinFsi && (
             <div className="px-5 pt-4 pb-1">
               <div className={`rounded-lg border ${willTriggerStalePin ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-slate-50'} p-3 text-sm`}>
@@ -630,7 +684,7 @@ export default function StudentFormPage() {
                       Current fee structure (Year {activePin.yearOfStudy})
                       {willTriggerStalePin && (
                         <span className="ml-2 text-xs font-normal text-amber-700">
-                          — saving will mark this stale
+                          — saving will switch this
                         </span>
                       )}
                     </div>
@@ -660,6 +714,90 @@ export default function StudentFormPage() {
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* PREVIEW strip — live "what saving would map to" indicator.
+              Appears whenever a programme is selected. Three states:
+                - loading: faint slate placeholder
+                - matched + same as current pin: green "matches current"
+                - matched + different from current pin (or create mode): blue "will be applied"
+                - no match: red "no matching fee structure" with hint
+              Skipped when there's no programme yet — the resolver
+              would just return null. */}
+          {form.programmeId && (
+            <div className="px-5 pt-2 pb-1">
+              {previewLoading ? (
+                <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3 text-xs text-slate-500 italic">
+                  Resolving matching fee structure…
+                </div>
+              ) : previewFsi ? (
+                (() => {
+                  const matchesCurrent =
+                    !!activePinFsi && String(previewFsi._id) === String(activePinFsi._id);
+                  const palette = matchesCurrent
+                    ? { border: 'border-emerald-300', bg: 'bg-emerald-50', icon: 'text-emerald-600', title: 'text-emerald-900', body: 'text-emerald-800', sub: 'text-emerald-700' }
+                    : { border: 'border-blue-300', bg: 'bg-blue-50', icon: 'text-blue-600', title: 'text-blue-900', body: 'text-blue-800', sub: 'text-blue-700' };
+                  const previewBranchName =
+                    typeof previewFsi.branchId === 'object' && previewFsi.branchId
+                      ? previewFsi.branchId.name ?? '<set>'
+                      : previewFsi.branchId
+                      ? '<set>'
+                      : 'any';
+                  return (
+                    <div className={`rounded-lg border ${palette.border} ${palette.bg} p-3 text-sm`}>
+                      <div className="flex items-start gap-2">
+                        <CheckCircle2 size={14} className={`mt-0.5 ${palette.icon} flex-shrink-0`} />
+                        <div className="flex-1 min-w-0">
+                          <div className={`font-medium ${palette.title}`}>
+                            Matching fee structure (Year {previewYearOfStudy})
+                            <span className={`ml-2 text-xs font-normal ${palette.sub}`}>
+                              {matchesCurrent
+                                ? '— same as current pin, no change on save'
+                                : isEdit
+                                ? '— saving will switch to this'
+                                : '— this will be applied on create'}
+                            </span>
+                          </div>
+                          <div className={`text-xs mt-0.5 ${palette.body}`}>
+                            <span className="font-semibold">{previewFsi.name ?? previewFsi.code ?? 'Fee Structure'}</span>
+                            <span className="mx-2">·</span>
+                            <span className="font-bold">
+                              {`₹${(previewFsi.totalAmount ?? 0).toLocaleString('en-IN')}`}
+                            </span>
+                          </div>
+                          <div className={`text-xs mt-1 ${palette.sub}`}>
+                            Quota:{' '}
+                            <span className="font-mono">{previewFsi.quota ?? 'any'}</span>
+                            <span className="mx-1.5">·</span>
+                            Category:{' '}
+                            <span className="font-mono">{previewFsi.category ?? 'any'}</span>
+                            <span className="mx-1.5">·</span>
+                            Branch:{' '}
+                            <span className="font-mono">{previewBranchName}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()
+              ) : (
+                <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle size={14} className="text-red-600 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-red-900">
+                        No matching fee structure for this combination
+                      </div>
+                      <div className="text-xs text-red-800 mt-0.5">
+                        {previewData?.reason === 'no-academic-year'
+                          ? 'No active academic year is set for this college. Set the current academic year before saving.'
+                          : 'Ask Finance to create a FeeStructureInstance for this programme + quota + category + branch combination, otherwise saving will leave the student without a fee pin.'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
           <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-4">

@@ -119,6 +119,51 @@ export const listFeeStructureInstances = (
     .get(`${FINANCE}/fee-structure-instances`, { params })
     .then((r) => r.data);
 
+// ─── Preview match ───────────────────────────────────────
+
+/**
+ * Read-only preview that resolves the FeeStructureInstance which would
+ * be pinned for a given raw combination. Powers the live "matching fee
+ * structure" strip on the StudentFormPage Academic Details tab.
+ *
+ * Server resolves `academicYearId` from the college's current AY when
+ * one is not passed.
+ */
+export interface PreviewMatchInput {
+  programmeId: string;
+  branchId?: string | null;
+  quota?: string | null;
+  category?: string | null;
+  yearOfStudy?: number;
+  academicYearId?: string;
+}
+
+export interface PreviewMatchResult {
+  matched: boolean;
+  fsi: PopulatedFeeStructureInstance | null;
+  academicYearId: string | null;
+  reason?: 'no-academic-year' | 'no-matching-fee-structure';
+}
+
+export const previewMatchingFeeStructure = (
+  input: PreviewMatchInput,
+): Promise<PreviewMatchResult> => {
+  // Strip empty / nullish so they don't go on the wire — the backend
+  // treats `branchId=` (empty string) the same as missing, but cleaner
+  // to omit the param entirely.
+  const params: Record<string, string | number> = {
+    programmeId: input.programmeId,
+  };
+  if (input.branchId) params.branchId = input.branchId;
+  if (input.quota) params.quota = input.quota;
+  if (input.category) params.category = input.category;
+  if (input.yearOfStudy) params.yearOfStudy = input.yearOfStudy;
+  if (input.academicYearId) params.academicYearId = input.academicYearId;
+  return api
+    .get(`${FINANCE}/fee-structure-instances/preview-match`, { params })
+    .then((r) => r.data);
+};
+
 // ─── Component Template ──────────────────────────────────
 
 export const getComponentTemplate = () =>
