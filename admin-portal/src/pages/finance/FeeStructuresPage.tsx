@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listFeeStructures, createFeeStructure, updateFeeStructure, deleteFeeStructure } from '../../services/finance';
 import { listAcademicYears, listProgrammes, listBranches } from '../../services/academics';
 import { listFeeCategories } from '../../services/fee-categories';
+import { listFeeQuotas } from '../../services/fee-quotas';
 import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
@@ -10,7 +11,6 @@ import { Plus, Pencil, Trash2, ExternalLink, Copy } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useViewEditMode } from '../../hooks/useViewEditMode';
 
-const QUOTAS = ['convener', 'management', 'nri'] as const;
 const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default";
 const lbl = "block text-sm font-medium text-gray-700 mb-1";
 const manageLink = "inline-flex items-center gap-0.5 text-xs text-primary-500 hover:text-primary-700 font-medium ml-1";
@@ -48,6 +48,7 @@ export default function FeeStructuresPage() {
   const { data: programmes } = useQuery({ queryKey: ['programmes-all'], queryFn: () => listProgrammes(1, 100) });
   const { data: branches } = useQuery({ queryKey: ['branches-all'], queryFn: () => listBranches(1, 100) });
   const { data: feeCategories } = useQuery({ queryKey: ['fee-categories-all'], queryFn: () => listFeeCategories(1, 100) });
+  const { data: feeQuotas } = useQuery({ queryKey: ['fee-quotas-all'], queryFn: () => listFeeQuotas(1, 100) });
 
   const vem = useViewEditMode<any>({
     onOpenEntity: (row) => {
@@ -199,9 +200,20 @@ export default function FeeStructuresPage() {
                   ))}
                 </select>
               </div>
-              <div><label className={lbl}>Quota *</label>
+              <div>
+                <label className={lbl}>
+                  Quota *
+                  <Link to="/finance/fee-management/fee-quotas" target="_blank" className={manageLink}>
+                    + Manage <ExternalLink size={10} />
+                  </Link>
+                </label>
                 <select required value={form.quota} onChange={e => setForm(f => ({ ...f, quota: e.target.value }))} className={inp}>
-                  {QUOTAS.map(q => <option key={q} value={q}>{q}</option>)}
+                  <option value="">Select quota</option>
+                  {(feeQuotas?.items ?? [])
+                    .filter((q: { status?: string }) => q.status !== 'inactive')
+                    .map((q: { _id: string; code: string; name: string }) => (
+                      <option key={q._id} value={q.code}>{q.code} — {q.name}</option>
+                    ))}
                 </select>
               </div>
               <div><label className={lbl}>Year *</label><input required type="number" min={1} value={form.year} onChange={e => setForm(f => ({ ...f, year: e.target.value }))} className={inp} /></div>

@@ -24,7 +24,10 @@ const schema = new Schema<IFeeStructureInstance>({
   programmeId: { type: Schema.Types.ObjectId, ref: 'Programme', required: true },
   branchId: { type: Schema.Types.ObjectId, ref: 'Branch' },
   category: { type: String },
-  quota: { type: String, enum: ['management', 'convener', 'nri', 'spot', 'lateral'] },
+  // No enum: quota codes come from the admin-managed FeeQuota CRUD
+  // (/api/finance/fee-quotas). Matched by string-equality against
+  // `Student.quota` in fee-pin-service — same contract as `category`.
+  quota: { type: String },
   status: { type: String, enum: ['draft', 'submitted', 'approved', 'active', 'superseded', 'archived', 'revision_required'], required: true, default: 'draft' },
   effectiveDate: Date,
   totalAmount: { type: Number, required: true, default: 0 },

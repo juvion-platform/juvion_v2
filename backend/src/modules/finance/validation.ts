@@ -913,6 +913,34 @@ export const updateFeeCategorySchema = z.object({
   status: feeCategoryStatusEnum.optional(),
 });
 
+// Per-college admission-quota catalog (convener, management, nri, …).
+// Drives the Quota dropdown on FeeStructure + Student forms; stored in
+// `Student.quota` and `FeeStructureInstance.quota` as the string `code`
+// (not an ObjectId) so the fee-pin-service quota-matching contract
+// stays string-equality.
+
+const feeQuotaStatusEnum = z.enum(['active', 'inactive']);
+
+export const createFeeQuotaSchema = z.object({
+  code: z.string().trim().min(1, 'Code is required'),
+  name: z.string().trim().min(1, 'Name is required'),
+  description: z.string().trim().optional(),
+  status: feeQuotaStatusEnum.optional(),
+});
+
+export const updateFeeQuotaSchema = z.object({
+  code: z.string().trim().min(1).optional(),
+  name: z.string().trim().min(1).optional(),
+  description: z.string().trim().optional(),
+  status: feeQuotaStatusEnum.optional(),
+});
+
+export const feeQuotaListQuerySchema = z.object({
+  page: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().positive().max(100).optional(),
+  status: feeQuotaStatusEnum.optional(),
+});
+
 export const feeCategoryListQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional(),
   limit: z.coerce.number().int().positive().max(100).optional(),

@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getStudent, createStudent, listParents, updateStudent } from '../../services/people';
 import { listRegulations, listProgrammes, listBranches, listBatches } from '../../services/academics';
 import { listFeeCategories } from '../../services/fee-categories';
+import { listFeeQuotas } from '../../services/fee-quotas';
 import {
   getStudentPins,
   previewMatchingFeeStructure,
@@ -15,7 +16,6 @@ import {
 import { ArrowLeft, Save, Loader2, AlertTriangle, CheckCircle2, ExternalLink, IndianRupee } from 'lucide-react';
 
 const STATUSES = ['prospective', 'active', 'year_back', 'detained', 'graduated', 'exited', 'alumni'] as const;
-const QUOTAS = ['convener', 'management', 'nri'] as const;
 const GENDERS = ['male', 'female', 'other'] as const;
 const ONBOARDING_STATUSES = ['not_started', 'in_progress', 'completed'] as const;
 
@@ -210,6 +210,10 @@ export default function StudentFormPage() {
   // student.category dropdown sourced from this list prevents the typo class
   // of "OC" vs "oc" that would silently break fee-pin matching downstream.
   const { data: feeCategoriesData } = useQuery({ queryKey: ['fee-categories-all'], queryFn: () => listFeeCategories(1, 100) });
+  // Same FeeQuota catalog the FeeStructures form pulls from. Keeping the
+  // student.quota dropdown sourced from CRUD lets admins extend the
+  // catalog (e.g. add 'spot' or a custom quota) without touching code.
+  const { data: feeQuotasData } = useQuery({ queryKey: ['fee-quotas-all'], queryFn: () => listFeeQuotas(1, 100) });
   // Edit mode only — pull the active fee pin + populated FSI so we can show
   // the operator the CURRENT pinned fee structure inline. Same query key as
   // <FeePinsPanel />, so React Query dedupes if the user lands here from
@@ -922,7 +926,22 @@ export default function StudentFormPage() {
                 {(batchesData?.items || []).map((bt: any) => <option key={bt._id} value={bt._id}>{bt.code || bt._id}</option>)}
               </select>
             </div>
-            <div><label className={lbl}>Quota</label><select value={form.quota} onChange={e => setForm(f => ({ ...f, quota: e.target.value }))} className={inp}><option value="">Select...</option>{QUOTAS.map(q => <option key={q} value={q} className="capitalize">{q}</option>)}</select></div>
+            <div>
+              <label className={lbl}>
+                Quota
+                <Link to="/finance/fee-management/fee-quotas" target="_blank" className={manageLink}>
+                  + Manage <ExternalLink size={10} />
+                </Link>
+              </label>
+              <select value={form.quota} onChange={e => setForm(f => ({ ...f, quota: e.target.value }))} className={inp}>
+                <option value="">Select quota</option>
+                {(feeQuotasData?.items ?? [])
+                  .filter((q: { status?: string }) => q.status !== 'inactive')
+                  .map((q: { _id: string; code: string; name: string }) => (
+                    <option key={q._id} value={q.code}>{q.code} — {q.name}</option>
+                  ))}
+              </select>
+            </div>
             <div>
               <label className={lbl}>
                 Category

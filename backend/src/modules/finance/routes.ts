@@ -11,6 +11,7 @@ import * as feePinAuditCtrl from './fee-pin-audit-controller';
 import * as feeAnalyticsCtrl from './fee-analytics-controller';
 import * as feeHoldsCtrl from './fee-holds-controller';
 import * as feeCategoryCtrl from './fee-category-controller';
+import * as feeQuotaCtrl from './fee-quota-controller';
 import {
   createFeeStructureSchema, updateFeeStructureSchema,
   createStudentFeeAccountSchema, updateStudentFeeAccountSchema,
@@ -152,6 +153,9 @@ import {
   pauseEscalationSchema,
   createFeeCategorySchema,
   updateFeeCategorySchema,
+  createFeeQuotaSchema,
+  updateFeeQuotaSchema,
+  feeQuotaListQuerySchema,
   feeCategoryListQuerySchema,
 } from './validation';
 
@@ -735,6 +739,45 @@ router.delete(
   authorize('finance', 'delete'),
   feeConfigRateLimit,
   feeCategoryCtrl.deleteFeeCategory,
+);
+
+// ═══ Fee Quota CRUD ════════════════════════════════════════════════
+// Per-college admission-quota catalog (convener, management, nri, …).
+// Drives the Quota dropdown on FeeStructure + Student forms. Stored
+// as a string `code` on Student.quota / FSI.quota — see
+// fee-pin-service for the string-equality matching contract.
+router.get(
+  '/fee-quotas',
+  authorize('finance', 'read'),
+  feeConfigRateLimit,
+  validate(feeQuotaListQuerySchema, 'query'),
+  feeQuotaCtrl.listFeeQuotas,
+);
+router.post(
+  '/fee-quotas',
+  authorize('finance', 'create'),
+  feeConfigRateLimit,
+  validate(createFeeQuotaSchema),
+  feeQuotaCtrl.createFeeQuota,
+);
+router.get(
+  '/fee-quotas/:id',
+  authorize('finance', 'read'),
+  feeConfigRateLimit,
+  feeQuotaCtrl.getFeeQuota,
+);
+router.patch(
+  '/fee-quotas/:id',
+  authorize('finance', 'update'),
+  feeConfigRateLimit,
+  validate(updateFeeQuotaSchema),
+  feeQuotaCtrl.updateFeeQuota,
+);
+router.delete(
+  '/fee-quotas/:id',
+  authorize('finance', 'delete'),
+  feeConfigRateLimit,
+  feeQuotaCtrl.deleteFeeQuota,
 );
 
 export default router;
