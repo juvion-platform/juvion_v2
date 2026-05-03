@@ -45,6 +45,7 @@
 import mongoose, { Types } from 'mongoose';
 
 import { FeeStructureInstance } from '../models/finance/FeeStructureInstance';
+import { FeeComponent } from '../models/finance/FeeComponent';
 import { College } from '../models/College';
 import { Programme } from '../models/academic-structure/Programme';
 import { AcademicYear } from '../models/academic-structure/AcademicYear';
@@ -102,8 +103,35 @@ export interface SeedResult {
   academicYearId: string | null;
   inserted: number;
   skipped: number;
+  /** New: FSI rows that received a freshly-seeded component breakdown. */
+  componentsInserted: number;
+  /** New: FSI rows skipped because a component breakdown already existed. */
+  componentsSkipped: number;
   reason?: string;
 }
+
+/**
+ * Realistic component split for a generated FSI. Percentages sum to 1.0;
+ * any rounding remainder is absorbed into Tuition so the per-component
+ * sum matches `totalAmount` exactly.
+ *
+ * Order matters: we render in `displayOrder` ascending so Tuition shows
+ * first on student-facing breakdowns.
+ */
+interface ComponentTemplate {
+  name: string;
+  componentType: 'tuition' | 'development' | 'lab' | 'exam' | 'library' | 'caution_deposit';
+  pct: number;
+  isRefundable: boolean;
+}
+const COMPONENT_TEMPLATES: ReadonlyArray<ComponentTemplate> = [
+  { name: 'Tuition Fee',        componentType: 'tuition',         pct: 0.60, isRefundable: false },
+  { name: 'Development Fee',    componentType: 'development',     pct: 0.10, isRefundable: false },
+  { name: 'Lab Fee',            componentType: 'lab',             pct: 0.10, isRefundable: false },
+  { name: 'Examination Fee',    componentType: 'exam',            pct: 0.05, isRefundable: false },
+  { name: 'Library Fee',        componentType: 'library',         pct: 0.03, isRefundable: false },
+  { name: 'Caution Deposit',    componentType: 'caution_deposit', pct: 0.12, isRefundable: true  },
+];
 
 export interface SeedOptions {
   dryRun?: boolean;
@@ -135,6 +163,8 @@ export async function seedFeeStructureInstancesForCollege(
     academicYearId: null,
     inserted: 0,
     skipped: 0,
+    componentsInserted: 0,
+    componentsSkipped: 0,
   };
 
   if (!mongoose.Types.ObjectId.isValid(collegeId)) {
@@ -213,7 +243,65 @@ export async function seedFeeStructureInstancesForCollege(
   if (toInsert.length > 0) {
     await FeeStructureInstance.insertMany(toInsert, { ordered: false });
   }
+
+  // Seed component breakdown for every active FSI under this (college, AY)
+  // that doesn't have one yet. Idempotent — existing breakdowns are left
+  // alone (admin-curated overrides win). Covers both rows we just
+  // inserted and any pre-existing ones from previous seed runs.
+  const allActiveFsis = await FeeStructureInstance.find(
+    { collegeId: cid, academicYearId: ay._id, status: 'active' },
+    { _id: 1, totalAmount: 1, collegeId: 1 },
+  ).lean<Array<{ _id: Types.ObjectId; totalAmount: number; collegeId: Types.ObjectId }>>();
+
+  for (const fsi of allActiveFsis) {
+    // eslint-disable-next-line no-await-in-loop
+    const seeded = await seedComponentsForFsi(fsi._id, fsi.collegeId, fsi.totalAmount);
+    if (seeded > 0) result.componentsInserted += 1;
+    else result.componentsSkipped += 1;
+  }
   return result;
+}
+
+/**
+ * Insert the canonical per-component breakdown for a single FSI if no
+ * components exist yet. Returns the number of components inserted; 0
+ * means the FSI already had a breakdown (admin-curated or previously
+ * seeded) and we left it alone.
+ *
+ * Tuition absorbs any rounding remainder so the components sum to
+ * `totalAmount` exactly — auditors hate when "₹37,500 = ₹22,500 +
+ * ₹3,750 + ..." is off by ₹50.
+ */
+async function seedComponentsForFsi(
+  feeStructureInstanceId: Types.ObjectId,
+  collegeId: Types.ObjectId,
+  totalAmount: number,
+): Promise<number> {
+  if (!totalAmount || totalAmount <= 0) return 0;
+  const existingCount = await FeeComponent.countDocuments({
+    feeStructureInstanceId,
+    collegeId,
+  });
+  if (existingCount > 0) return 0;
+
+  const docs = COMPONENT_TEMPLATES.map((t, i) => ({
+    collegeId,
+    feeStructureInstanceId,
+    name: t.name,
+    componentType: t.componentType,
+    amount: roundToHundreds(totalAmount * t.pct),
+    isRefundable: t.isRefundable,
+    isConditional: false,
+    displayOrder: i + 1,
+  }));
+  // Tuition absorbs the rounding remainder.
+  const sumOthers = docs.slice(1).reduce((s, c) => s + c.amount, 0);
+  const tuitionAmount = totalAmount - sumOthers;
+  if (tuitionAmount <= 0) return 0; // shouldn't happen with sane inputs
+  docs[0]!.amount = tuitionAmount;
+
+  await FeeComponent.insertMany(docs, { ordered: false });
+  return docs.length;
 }
 
 export interface SeedAllResult {
@@ -280,7 +368,8 @@ async function main() {
       // eslint-disable-next-line no-console
       console.log(
         `[seed-fee-structure-instances] ${args.dryRun ? 'DRY-RUN ' : ''}` +
-          `collegeId=${r.collegeId} inserted=${r.inserted} skipped=${r.skipped}` +
+          `collegeId=${r.collegeId} inserted=${r.inserted} skipped=${r.skipped} ` +
+          `componentsInserted=${r.componentsInserted} componentsSkipped=${r.componentsSkipped}` +
           (r.reason ? ` reason=${r.reason}` : ''),
       );
     } else {
@@ -292,6 +381,13 @@ async function main() {
       );
       const totalInserted = all.perCollege.reduce((s, r) => s + r.inserted, 0);
       const totalSkipped = all.perCollege.reduce((s, r) => s + r.skipped, 0);
+      const totalComponentsInserted = all.perCollege.reduce((s, r) => s + r.componentsInserted, 0);
+      const totalComponentsSkipped = all.perCollege.reduce((s, r) => s + r.componentsSkipped, 0);
+      // eslint-disable-next-line no-console
+      console.log(
+        `[seed-fee-structure-instances] componentsInserted=${totalComponentsInserted} ` +
+          `componentsSkipped=${totalComponentsSkipped}`,
+      );
       // eslint-disable-next-line no-console
       console.log(
         `[seed-fee-structure-instances] inserted=${totalInserted} skipped=${totalSkipped}`,

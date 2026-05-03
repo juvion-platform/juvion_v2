@@ -164,6 +164,40 @@ export const previewMatchingFeeStructure = (
     .then((r) => r.data);
 };
 
+// ─── Fee Components (per-FSI breakdown) ─────────────────
+
+export type FeeComponentType =
+  | 'tuition'
+  | 'hostel'
+  | 'transport'
+  | 'lab'
+  | 'exam'
+  | 'library'
+  | 'development'
+  | 'caution_deposit'
+  | 'other';
+
+export interface IFeeComponent {
+  _id: string;
+  feeStructureInstanceId: string;
+  name: string;
+  amount: number;
+  isRefundable: boolean;
+  componentType: FeeComponentType;
+  isConditional: boolean;
+  displayOrder?: number;
+}
+
+export const listFeeComponents = (
+  feeStructureInstanceId: string,
+  limit = 50,
+): Promise<{ items: IFeeComponent[]; total?: number; page?: number; pages?: number }> =>
+  api
+    .get(`${FINANCE}/fee-components`, {
+      params: { feeStructureInstanceId, limit },
+    })
+    .then((r) => r.data);
+
 // ─── Component Template ──────────────────────────────────
 
 export const getComponentTemplate = () =>

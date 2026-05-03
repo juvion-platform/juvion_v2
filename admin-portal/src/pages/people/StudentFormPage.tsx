@@ -7,8 +7,10 @@ import { listFeeCategories } from '../../services/fee-categories';
 import {
   getStudentPins,
   previewMatchingFeeStructure,
+  listFeeComponents,
   type IFeePin,
   type PopulatedFeeStructureInstance,
+  type IFeeComponent,
 } from '../../services/fee-configuration';
 import { ArrowLeft, Save, Loader2, AlertTriangle, CheckCircle2, ExternalLink, IndianRupee } from 'lucide-react';
 
@@ -100,6 +102,60 @@ const FEE_AXIS_LABELS: Record<string, string> = {
   quota: 'Quota',
 };
 
+/**
+ * Compact component-breakdown table rendered inline inside a fee-strip.
+ * One row per FeeComponent: name (with a "Refundable" pill where
+ * applicable) and the rupee amount, right-aligned. The footer row
+ * shows the sum so operators can sanity-check it against the headline
+ * total.
+ *
+ * `palette` keys mirror the parent strip's theme so the table blends
+ * in (slate / blue / emerald). When the parent has no components yet
+ * we render a one-liner empty state instead — avoids a confusing blank
+ * gap below the headline total.
+ */
+function ComponentBreakdown({
+  components,
+  palette,
+}: {
+  components: IFeeComponent[];
+  palette: { sub: string; body: string; row: string; pill: string };
+}) {
+  if (components.length === 0) {
+    return (
+      <div className={`mt-2 text-xs italic ${palette.sub}`}>
+        No component breakdown configured — only the total amount is set.
+      </div>
+    );
+  }
+  const sum = components.reduce((s, c) => s + (c.amount || 0), 0);
+  return (
+    <div className={`mt-2 rounded border ${palette.row} divide-y text-xs`}>
+      {components.map((c) => (
+        <div key={c._id} className="flex items-center justify-between px-2 py-1">
+          <div className={`${palette.body} flex items-center gap-1.5`}>
+            <span className="font-medium">{c.name}</span>
+            {c.isRefundable && (
+              <span className={`text-[10px] uppercase tracking-wide font-medium px-1 rounded ${palette.pill}`}>
+                refundable
+              </span>
+            )}
+          </div>
+          <div className={`${palette.body} font-mono tabular-nums`}>
+            {`₹${(c.amount ?? 0).toLocaleString('en-IN')}`}
+          </div>
+        </div>
+      ))}
+      <div className={`flex items-center justify-between px-2 py-1 ${palette.sub} font-semibold`}>
+        <div>Total</div>
+        <div className="font-mono tabular-nums">
+          {`₹${sum.toLocaleString('en-IN')}`}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function StudentFormPage() {
   const { id } = useParams();
   const isEdit = !!id;
@@ -164,6 +220,23 @@ export default function StudentFormPage() {
     enabled: isEdit,
   });
 
+  // Active pin + populated FSI. Hoisted above the preview / component
+  // queries below so they can reference `activePinFsi` for the
+  // "matches current pin" comparison and for fetching the breakdown
+  // of the currently-pinned FSI. Helpers inlined (tiny, shared with
+  // StudentDetailPage's drift indicator).
+  const activePin: IFeePin | undefined = (() => {
+    const pins = pinsData?.pins ?? [];
+    const live = pins.filter((p) => !p.archivedAt);
+    if (live.length === 0) return undefined;
+    return [...live].sort((a, b) => (b.yearOfStudy ?? 0) - (a.yearOfStudy ?? 0))[0];
+  })();
+  const activePinFsi: PopulatedFeeStructureInstance | undefined = (() => {
+    if (!activePin) return undefined;
+    const f = activePin.feeStructureInstanceId;
+    return typeof f === 'object' && f !== null ? f : undefined;
+  })();
+
   // Live "matching fee structure" preview. Re-fetches whenever any of
   // the fee-axis fields the resolver scores against change. Disabled
   // until the operator picks a programme — without one the resolver
@@ -208,6 +281,27 @@ export default function StudentFormPage() {
   // it's reassuring (green/blue), else it's a "this is what would
   // change" notice (amber when fee-axis fields have drifted).
 
+  // Fetch component breakdown for the current pinned FSI and the
+  // preview FSI. Two separate queries so React Query can cache each
+  // independently — when the preview's FSI matches the current pin
+  // the second query is a cache hit and re-uses the first's data.
+  const currentPinFsiId = activePinFsi?._id;
+  const previewFsiId = previewFsi?._id;
+  const { data: currentComponentsData } = useQuery({
+    queryKey: ['fee-components', currentPinFsiId],
+    queryFn: () => listFeeComponents(currentPinFsiId!),
+    enabled: !!currentPinFsiId,
+    staleTime: 60_000,
+  });
+  const { data: previewComponentsData } = useQuery({
+    queryKey: ['fee-components', previewFsiId],
+    queryFn: () => listFeeComponents(previewFsiId!),
+    enabled: !!previewFsiId,
+    staleTime: 60_000,
+  });
+  const currentComponents = currentComponentsData?.items ?? [];
+  const previewComponents = previewComponentsData?.items ?? [];
+
   useEffect(() => {
     if (existing) {
       const p = existing.person || existing.personId || {};
@@ -250,25 +344,6 @@ export default function StudentFormPage() {
       });
     }
   }, [existing]);
-
-  /**
-   * Active fee pin (most recent non-archived) + the populated
-   * FeeStructureInstance behind it. Computed once per pinsData refresh
-   * so the Academic Details fee-summary card has a stable reference.
-   * Helpers are inlined (tiny, shared with StudentDetailPage's drift
-   * indicator).
-   */
-  const activePin: IFeePin | undefined = (() => {
-    const pins = pinsData?.pins ?? [];
-    const live = pins.filter((p) => !p.archivedAt);
-    if (live.length === 0) return undefined;
-    return [...live].sort((a, b) => (b.yearOfStudy ?? 0) - (a.yearOfStudy ?? 0))[0];
-  })();
-  const activePinFsi: PopulatedFeeStructureInstance | undefined = (() => {
-    if (!activePin) return undefined;
-    const f = activePin.feeStructureInstanceId;
-    return typeof f === 'object' && f !== null ? f : undefined;
-  })();
 
   /**
    * Pre-save hint. Computes which of the 3 fee-axis fields drifted
@@ -711,6 +786,14 @@ export default function StudentFormPage() {
                           : 'any'}
                       </span>
                     </div>
+                    <ComponentBreakdown
+                      components={currentComponents}
+                      palette={
+                        willTriggerStalePin
+                          ? { sub: 'text-amber-700', body: 'text-amber-900', row: 'border-amber-200 divide-amber-200 bg-white/60', pill: 'bg-amber-100 text-amber-800' }
+                          : { sub: 'text-slate-500', body: 'text-slate-700', row: 'border-slate-200 divide-slate-200 bg-white', pill: 'bg-slate-200 text-slate-700' }
+                      }
+                    />
                   </div>
                 </div>
               </div>
@@ -776,6 +859,14 @@ export default function StudentFormPage() {
                             Branch:{' '}
                             <span className="font-mono">{previewBranchName}</span>
                           </div>
+                          <ComponentBreakdown
+                            components={previewComponents}
+                            palette={
+                              matchesCurrent
+                                ? { sub: 'text-emerald-700', body: 'text-emerald-900', row: 'border-emerald-200 divide-emerald-200 bg-white/60', pill: 'bg-emerald-100 text-emerald-800' }
+                                : { sub: 'text-blue-700', body: 'text-blue-900', row: 'border-blue-200 divide-blue-200 bg-white/60', pill: 'bg-blue-100 text-blue-800' }
+                            }
+                          />
                         </div>
                       </div>
                     </div>
