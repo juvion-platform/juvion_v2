@@ -2,14 +2,15 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listFeeStructures, createFeeStructure, updateFeeStructure, deleteFeeStructure } from '../../services/finance';
 import { listAcademicYears, listProgrammes, listBranches } from '../../services/academics';
+import { listFeeCategories } from '../../services/fee-categories';
+import { listFeeQuotas } from '../../services/fee-quotas';
 import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
-import { Plus, Pencil, Trash2, ExternalLink } from 'lucide-react';
+import { Plus, Pencil, Trash2, ExternalLink, Copy } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useViewEditMode } from '../../hooks/useViewEditMode';
 
-const QUOTAS = ['convener', 'management', 'nri'] as const;
 const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default";
 const lbl = "block text-sm font-medium text-gray-700 mb-1";
 const manageLink = "inline-flex items-center gap-0.5 text-xs text-primary-500 hover:text-primary-700 font-medium ml-1";
@@ -24,19 +25,34 @@ const emptyComponent = (): Component => ({ name: '', amount: '', isRefundable: f
 
 const emptyForm = { academicYearId: '', programmeId: '', branchId: '', category: '', quota: 'convener', year: '' };
 
+/** Pull a human-readable message from an axios error / generic Error. */
+function extractErrorMessage(err: unknown): string {
+  const e = err as { response?: { data?: { error?: string; message?: string } }; message?: string };
+  return (
+    e?.response?.data?.error ??
+    e?.response?.data?.message ??
+    e?.message ??
+    'Something went wrong. Please try again.'
+  );
+}
+
 export default function FeeStructuresPage() {
   const qc = useQueryClient();
   const [page, setPage] = useState(1);
   const [form, setForm] = useState(emptyForm);
   const [components, setComponents] = useState<Component[]>([emptyComponent()]);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({ queryKey: ['fee-structures', page], queryFn: () => listFeeStructures(page, 20) });
   const { data: academicYears } = useQuery({ queryKey: ['academic-years-all'], queryFn: () => listAcademicYears(1, 100) });
   const { data: programmes } = useQuery({ queryKey: ['programmes-all'], queryFn: () => listProgrammes(1, 100) });
   const { data: branches } = useQuery({ queryKey: ['branches-all'], queryFn: () => listBranches(1, 100) });
+  const { data: feeCategories } = useQuery({ queryKey: ['fee-categories-all'], queryFn: () => listFeeCategories(1, 100) });
+  const { data: feeQuotas } = useQuery({ queryKey: ['fee-quotas-all'], queryFn: () => listFeeQuotas(1, 100) });
 
   const vem = useViewEditMode<any>({
     onOpenEntity: (row) => {
+      setSaveError(null);
       setForm({
         academicYearId: row.academicYearId?._id || row.academicYearId || '',
         programmeId: row.programmeId?._id || row.programmeId || '',
@@ -52,17 +68,27 @@ export default function FeeStructuresPage() {
       }
     },
     onOpenCreate: () => {
+      setSaveError(null);
       setForm(emptyForm);
       setComponents([emptyComponent()]);
     },
     onClose: () => {
+      setSaveError(null);
       setForm(emptyForm);
       setComponents([emptyComponent()]);
     },
   });
 
-  const createMut = useMutation({ mutationFn: createFeeStructure, onSuccess: () => { qc.invalidateQueries({ queryKey: ['fee-structures'] }); vem.close(); } });
-  const updateMut = useMutation({ mutationFn: ({ id, data }: any) => updateFeeStructure(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['fee-structures'] }); vem.close(); } });
+  const createMut = useMutation({
+    mutationFn: createFeeStructure,
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['fee-structures'] }); vem.close(); },
+    onError: (err) => setSaveError(extractErrorMessage(err)),
+  });
+  const updateMut = useMutation({
+    mutationFn: ({ id, data }: any) => updateFeeStructure(id, data),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['fee-structures'] }); vem.close(); },
+    onError: (err) => setSaveError(extractErrorMessage(err)),
+  });
   const deleteMut = useMutation({ mutationFn: deleteFeeStructure, onSuccess: () => { qc.invalidateQueries({ queryKey: ['fee-structures'] }); } });
 
   const totalAmount = components.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
@@ -75,6 +101,7 @@ export default function FeeStructuresPage() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setSaveError(null);
     const payload: any = {
       ...form,
       year: Number(form.year),
@@ -90,6 +117,16 @@ export default function FeeStructuresPage() {
 
   const columns = [
     { key: 'programmeId', label: 'Programme', render: (r: any) => <span className="font-medium text-navy">{r.programmeId?.name || '—'}</span> },
+    // `branchId` is optional on FeeStructure — null/missing means the
+    // structure is a wildcard that matches any branch under the
+    // programme (see fee-pin-service preference rules). Render "any"
+    // for that case so the wildcard semantics are explicit, vs "—"
+    // which would just look like missing data.
+    { key: 'branchId', label: 'Branch', render: (r: any) => (
+      r.branchId?.name
+        ? <span className="text-gray-700">{r.branchId.name}</span>
+        : <span className="text-gray-400 italic">any</span>
+    ) },
     { key: 'academicYearId', label: 'Academic Year', render: (r: any) => <span>{r.academicYearId?.label || r.academicYearId?.code || '—'}</span> },
     { key: 'year', label: 'Year' },
     { key: 'quota', label: 'Quota', render: (r: any) => <Badge variant="info">{r.quota}</Badge> },
@@ -97,6 +134,7 @@ export default function FeeStructuresPage() {
     { key: 'actions', label: '', render: (r: any) => (
       <div className="flex gap-1">
         <button onClick={(e) => { e.stopPropagation(); vem.openForEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
+        <button onClick={(e) => { e.stopPropagation(); vem.openForCopy(r); }} className="p-1 rounded hover:bg-blue-50" title="Copy as new"><Copy size={15} className="text-blue-500" /></button>
         <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this fee structure?')) deleteMut.mutate(r._id); }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
       </div>
     )},
@@ -129,6 +167,11 @@ export default function FeeStructuresPage() {
 
       <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('Fee Structure')}>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {saveError && !vem.isView && (
+            <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {saveError}
+            </div>
+          )}
           <fieldset disabled={vem.isView} className="border-0 p-0 m-0 space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -158,10 +201,29 @@ export default function FeeStructuresPage() {
                   ))}
                 </select>
               </div>
-              <div><label className={lbl}>Category *</label><input required value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className={inp} placeholder="e.g. Tuition" /></div>
-              <div><label className={lbl}>Quota *</label>
+              <div>
+                <label className={lbl}>Category * {!vem.isView && <Link to="/finance/fee-management/fee-categories" target="_blank" className={manageLink}>+ Manage <ExternalLink size={10} /></Link>}</label>
+                <select required value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className={inp}>
+                  <option value="">Select category</option>
+                  {(feeCategories?.items || []).map((cat: any) => (
+                    <option key={cat._id} value={cat.code}>{cat.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className={lbl}>
+                  Quota *
+                  <Link to="/finance/fee-management/fee-quotas" target="_blank" className={manageLink}>
+                    + Manage <ExternalLink size={10} />
+                  </Link>
+                </label>
                 <select required value={form.quota} onChange={e => setForm(f => ({ ...f, quota: e.target.value }))} className={inp}>
-                  {QUOTAS.map(q => <option key={q} value={q}>{q}</option>)}
+                  <option value="">Select quota</option>
+                  {(feeQuotas?.items ?? [])
+                    .filter((q: { status?: string }) => q.status !== 'inactive')
+                    .map((q: { _id: string; code: string; name: string }) => (
+                      <option key={q._id} value={q.code}>{q.code} — {q.name}</option>
+                    ))}
                 </select>
               </div>
               <div><label className={lbl}>Year *</label><input required type="number" min={1} value={form.year} onChange={e => setForm(f => ({ ...f, year: e.target.value }))} className={inp} /></div>

@@ -10,6 +10,8 @@ import * as feeTemplateCtrl from './fee-component-template-controller';
 import * as feePinAuditCtrl from './fee-pin-audit-controller';
 import * as feeAnalyticsCtrl from './fee-analytics-controller';
 import * as feeHoldsCtrl from './fee-holds-controller';
+import * as feeCategoryCtrl from './fee-category-controller';
+import * as feeQuotaCtrl from './fee-quota-controller';
 import {
   createFeeStructureSchema, updateFeeStructureSchema,
   createStudentFeeAccountSchema, updateStudentFeeAccountSchema,
@@ -149,6 +151,12 @@ import {
   holdsListQuerySchema,
   waiveHoldSchema,
   pauseEscalationSchema,
+  createFeeCategorySchema,
+  updateFeeCategorySchema,
+  createFeeQuotaSchema,
+  updateFeeQuotaSchema,
+  feeQuotaListQuerySchema,
+  feeCategoryListQuerySchema,
 } from './validation';
 
 const router = Router();
@@ -352,6 +360,9 @@ router.delete('/reports/:id', authorize('finance', 'delete'), ctrl.deleteFinanci
 
 // ═══ W03: Fee Structure Instance Lifecycle ═══════════════════
 router.get('/fee-structure-instances', authorize('finance', 'read'), ctrl.listFeeStructureInstances);
+// Static path BEFORE the :id route — otherwise express matches
+// "preview-match" as :id="preview-match" and 404s.
+router.get('/fee-structure-instances/preview-match', authorize('finance', 'read'), feePinCtrl.previewMatchingFeeStructure);
 router.get('/fee-structure-instances/:id', authorize('finance', 'read'), ctrl.getFeeStructureInstance);
 router.post('/fee-structure-instances', authorize('finance', 'create'), validate(createFeeStructureInstanceSchema), ctrl.createFeeStructureInstance);
 router.post('/fee-structures/clone', authorize('finance', 'create'), validate(cloneFeeStructureSchema), ctrl.cloneFeeStructure);
@@ -689,6 +700,84 @@ router.get(
   authorize('finance', 'read'),
   feeConfigRateLimit,
   feePinAuditCtrl.getInvariants,
+);
+
+// ═══ Fee Category CRUD ═══════════════════════════════════════════
+// Per-college reservation-category catalog (OC, OBC, SC, ST, NRI, …).
+// Drives the FeeStructure form's Category dropdown. Stored as a string
+// `code` in FeeStructure.category — see fee-pin-service for the
+// string-equality matching contract that downstream callers rely on.
+router.get(
+  '/fee-categories',
+  authorize('finance', 'read'),
+  feeConfigRateLimit,
+  validate(feeCategoryListQuerySchema, 'query'),
+  feeCategoryCtrl.listFeeCategories,
+);
+router.post(
+  '/fee-categories',
+  authorize('finance', 'create'),
+  feeConfigRateLimit,
+  validate(createFeeCategorySchema),
+  feeCategoryCtrl.createFeeCategory,
+);
+router.get(
+  '/fee-categories/:id',
+  authorize('finance', 'read'),
+  feeConfigRateLimit,
+  feeCategoryCtrl.getFeeCategory,
+);
+router.patch(
+  '/fee-categories/:id',
+  authorize('finance', 'update'),
+  feeConfigRateLimit,
+  validate(updateFeeCategorySchema),
+  feeCategoryCtrl.updateFeeCategory,
+);
+router.delete(
+  '/fee-categories/:id',
+  authorize('finance', 'delete'),
+  feeConfigRateLimit,
+  feeCategoryCtrl.deleteFeeCategory,
+);
+
+// ═══ Fee Quota CRUD ════════════════════════════════════════════════
+// Per-college admission-quota catalog (convener, management, nri, …).
+// Drives the Quota dropdown on FeeStructure + Student forms. Stored
+// as a string `code` on Student.quota / FSI.quota — see
+// fee-pin-service for the string-equality matching contract.
+router.get(
+  '/fee-quotas',
+  authorize('finance', 'read'),
+  feeConfigRateLimit,
+  validate(feeQuotaListQuerySchema, 'query'),
+  feeQuotaCtrl.listFeeQuotas,
+);
+router.post(
+  '/fee-quotas',
+  authorize('finance', 'create'),
+  feeConfigRateLimit,
+  validate(createFeeQuotaSchema),
+  feeQuotaCtrl.createFeeQuota,
+);
+router.get(
+  '/fee-quotas/:id',
+  authorize('finance', 'read'),
+  feeConfigRateLimit,
+  feeQuotaCtrl.getFeeQuota,
+);
+router.patch(
+  '/fee-quotas/:id',
+  authorize('finance', 'update'),
+  feeConfigRateLimit,
+  validate(updateFeeQuotaSchema),
+  feeQuotaCtrl.updateFeeQuota,
+);
+router.delete(
+  '/fee-quotas/:id',
+  authorize('finance', 'delete'),
+  feeConfigRateLimit,
+  feeQuotaCtrl.deleteFeeQuota,
 );
 
 export default router;

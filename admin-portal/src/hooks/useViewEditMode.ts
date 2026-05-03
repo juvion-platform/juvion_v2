@@ -8,6 +8,7 @@ import { useCallback, useState } from 'react';
  *   closed  ─openForView(row)→  view
  *           ─openForEdit(row)→  edit
  *           ─openForCreate() →  create
+ *           ─openForCopy(row)→  create (form prefilled from row, entity=null)
  *
  *   view    ─switchToEdit()  →  edit    (keeps same entity)
  *   any     ─close()         →  closed
@@ -22,6 +23,7 @@ import { useCallback, useState } from 'react';
  *
  * <DataTable onRowClick={vem.openForView} ... />
  * <button onClick={vem.openForCreate}>+ New</button>
+ * <button onClick={() => vem.openForCopy(row)}>Copy</button>
  *
  * <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('Department')}>
  *   <fieldset disabled={vem.isView} className="border-0 p-0 m-0 space-y-4">
@@ -80,6 +82,18 @@ export interface ViewEditModeApi<T> {
   /** Open the modal in create mode (from the page's "+ New" button). */
   openForCreate: () => void;
   /**
+   * Open the modal in CREATE mode but prefill the form from a source row
+   * — used for "duplicate this record" UX. Calls `onOpenEntity` (NOT
+   * `onOpenCreate`) so the page populates its form state from the row,
+   * then sets `mode='create'` and `entity=null` so the submit handler
+   * routes through the create path rather than update.
+   *
+   * The submit-time predicate `vem.isEdit && vem.entity` stays false here
+   * because `entity` is null — pages don't need bespoke logic to detect
+   * a copy.
+   */
+  openForCopy: (entity: T) => void;
+  /**
    * Transition view → edit, keeping the current entity. No-op outside view.
    *
    * Accepts the React synthetic event from the button's `onClick` so it can
@@ -132,6 +146,16 @@ export function useViewEditMode<T>(opts: UseViewEditModeOpts<T> = {}): ViewEditM
     setMode('create');
   }, [onOpenCreate]);
 
+  const openForCopy = useCallback((e: T) => {
+    // Prefill form from the source row — same path as view/edit. We do NOT
+    // call onOpenCreate here, which would clobber the values we just set.
+    onOpenEntity?.(e);
+    // entity stays null so the page's submit handler picks the create path
+    // (`vem.isEdit && vem.entity` is false → falls through to createMut).
+    setEntity(null);
+    setMode('create');
+  }, [onOpenEntity]);
+
   const switchToEdit = useCallback((e?: React.SyntheticEvent) => {
     // See the `switchToEdit` doc in the type definition above for the full
     // explanation. TL;DR: preventDefault blocks the browser from treating
@@ -170,6 +194,7 @@ export function useViewEditMode<T>(opts: UseViewEditModeOpts<T> = {}): ViewEditM
     openForView,
     openForEdit,
     openForCreate,
+    openForCopy,
     switchToEdit,
     close,
     titleFor,

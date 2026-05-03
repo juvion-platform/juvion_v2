@@ -42,6 +42,7 @@ import {
   IFeeStructureInstance,
 } from '../../models/finance/FeeStructureInstance';
 import { Batch } from '../../models/academic-structure/Batch';
+import { AcademicYear } from '../../models/academic-structure/AcademicYear';
 import { enqueueFeeCommitmentJob } from '../../workers/fee-commitment.worker';
 
 // ── Types ─────────────────────────────────────────────────────────────
@@ -259,6 +260,110 @@ export async function resolveMatchingFeeStructureInstance(
     return b.approvedAt - a.approvedAt;
   });
   return scored[0]!.doc;
+}
+
+// ── previewMatchingFeeStructureInstance ──────────────────────────────
+
+/**
+ * Read-only preview: given a raw combination of (programme, branch,
+ * quota, category, yearOfStudy) for a college, return the
+ * FeeStructureInstance that *would* be pinned without actually
+ * pinning anything.
+ *
+ * Powers the live fee-preview strip on the StudentFormPage Academic
+ * Details tab — the operator sees which fee structure their current
+ * selection maps to BEFORE clicking Save.
+ *
+ * No side effects. The returned FSI has `branchId` and `programmeId`
+ * populated so the frontend can render human names without a follow-up
+ * lookup.
+ *
+ * Resolves the current AcademicYear (`isCurrent: true`) automatically
+ * when one is not passed — mirrors the auto-pin path.
+ */
+export interface PreviewMatchInput {
+  collegeId: Types.ObjectId | string;
+  programmeId: Types.ObjectId | string;
+  branchId?: Types.ObjectId | string | null;
+  quota?: string | null;
+  category?: string | null;
+  yearOfStudy?: number;
+  academicYearId?: Types.ObjectId | string;
+}
+
+export interface PreviewMatchResult {
+  matched: boolean;
+  fsi: IFeeStructureInstance | null;
+  academicYearId: string | null;
+  reason?: 'no-academic-year' | 'no-matching-fee-structure';
+}
+
+export async function previewMatchingFeeStructureInstance(
+  input: PreviewMatchInput,
+): Promise<PreviewMatchResult> {
+  // Resolve the academic year. If the caller passed one, use it.
+  // Otherwise look up the college's current AY (same lookup the FSI
+  // seed and auto-pin path use).
+  let academicYearId: Types.ObjectId | undefined;
+  if (input.academicYearId) {
+    academicYearId = asObjectId(input.academicYearId);
+  } else {
+    const ay = await AcademicYear.findOne({
+      collegeId: asObjectId(input.collegeId),
+      isCurrent: true,
+    })
+      .select({ _id: 1 })
+      .lean<{ _id: Types.ObjectId } | null>();
+    academicYearId = ay?._id;
+  }
+
+  if (!academicYearId) {
+    return {
+      matched: false,
+      fsi: null,
+      academicYearId: null,
+      reason: 'no-academic-year',
+    };
+  }
+
+  // Build a Student-shaped partial that
+  // `resolveMatchingFeeStructureInstance` can score against. Only the
+  // fee-axis fields it actually reads need to be present.
+  const studentLike = {
+    collegeId: asObjectId(input.collegeId),
+    programmeId: asObjectId(input.programmeId),
+    branchId: input.branchId ? asObjectId(input.branchId) : undefined,
+    quota: input.quota ?? undefined,
+    category: input.category ?? undefined,
+  } as unknown as IStudent;
+
+  const fsi = await resolveMatchingFeeStructureInstance(
+    studentLike,
+    input.yearOfStudy ?? 1,
+    { academicYearId },
+  );
+
+  if (!fsi) {
+    return {
+      matched: false,
+      fsi: null,
+      academicYearId: String(academicYearId),
+      reason: 'no-matching-fee-structure',
+    };
+  }
+
+  // Re-fetch with population so the frontend can show human names
+  // for branch / programme without a second round-trip.
+  const populated = await FeeStructureInstance.findById(fsi._id)
+    .populate('branchId', 'name code')
+    .populate('programmeId', 'name code')
+    .lean();
+
+  return {
+    matched: true,
+    fsi: (populated ?? fsi) as IFeeStructureInstance,
+    academicYearId: String(academicYearId),
+  };
 }
 
 // ── pinYear ───────────────────────────────────────────────────────────

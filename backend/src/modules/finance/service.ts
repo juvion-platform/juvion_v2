@@ -122,14 +122,50 @@ export async function getFeeStructure(collegeId: string, id: string) {
   return doc;
 }
 
+/**
+ * The duplicate-combination 409 message surfaced when the unique index
+ * (`feestructure_combination_unique`) rejects a create or update. Used
+ * by both create and update paths.
+ */
+const FEE_STRUCTURE_DUPLICATE_MSG =
+  'A fee structure with this combination already exists. Change Academic Year, Programme, Branch, Category, Quota, or Year.';
+
+/** True iff the error is the FeeStructure unique-index violation. */
+function isFeeStructureDuplicateError(err: unknown): boolean {
+  const e = err as { code?: number; codeName?: string; keyPattern?: Record<string, unknown> };
+  if (e?.code !== 11000) return false;
+  // The dedicated index has a stable name so we can be specific. Fall
+  // back to the field-set heuristic if the driver doesn't surface name.
+  if (e.keyPattern && 'academicYearId' in e.keyPattern && 'programmeId' in e.keyPattern && 'year' in e.keyPattern) {
+    return true;
+  }
+  return false;
+}
+
 export async function createFeeStructure(collegeId: string, data: any, who: string) {
-  const doc = await FeeStructure.create({ ...data, collegeId });
+  let doc;
+  try {
+    doc = await FeeStructure.create({ ...data, collegeId });
+  } catch (err) {
+    if (isFeeStructureDuplicateError(err)) {
+      throw new AppError(409, FEE_STRUCTURE_DUPLICATE_MSG);
+    }
+    throw err;
+  }
   await createAuditLog({ collegeId, entityType: 'FeeStructure', entityId: String(doc._id), entityName: `Fee Structure Y${data.year}`, action: 'create', changes: [], performedBy: who });
   return doc;
 }
 
 export async function updateFeeStructure(collegeId: string, id: string, data: any, who: string) {
-  const doc = await FeeStructure.findOneAndUpdate({ _id: id, collegeId }, data, { new: true });
+  let doc;
+  try {
+    doc = await FeeStructure.findOneAndUpdate({ _id: id, collegeId }, data, { new: true });
+  } catch (err) {
+    if (isFeeStructureDuplicateError(err)) {
+      throw new AppError(409, FEE_STRUCTURE_DUPLICATE_MSG);
+    }
+    throw err;
+  }
   if (!doc) throw new AppError(404, 'Fee structure not found');
   await createAuditLog({ collegeId, entityType: 'FeeStructure', entityId: id, entityName: `Fee Structure Y${doc.year}`, action: 'update', changes: [], performedBy: who });
   return doc;

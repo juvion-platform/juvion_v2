@@ -7,7 +7,11 @@ export const createFeeStructureSchema = z.object({
   programmeId: z.string().min(1),
   branchId: z.string().optional(),
   category: z.string().optional(),
-  quota: z.enum(['convener', 'management', 'nri']).optional(),
+  // Quota is now admin-managed via the FeeQuota CRUD
+  // (/api/finance/fee-quotas), so the validator must accept any
+  // catalog code — not a hardcoded subset. Same string-equality
+  // contract fee-pin-service relies on.
+  quota: z.string().optional(),
   year: z.number().int().min(1),
   components: z.array(z.object({
     name: z.string().min(1),
@@ -238,7 +242,8 @@ export const createFeeStructureInstanceSchema = z.object({
   programmeId: z.string().min(1),
   branchId: z.string().optional(),
   category: z.string().optional(),
-  quota: z.enum(['management', 'convener', 'nri', 'spot', 'lateral']).optional(),
+  // Admin-managed via FeeQuota CRUD — see createFeeStructureSchema.
+  quota: z.string().optional(),
   totalAmount: z.number().min(0).optional(),
 });
 
@@ -889,4 +894,60 @@ export const waiveHoldSchema = z.object({
 
 export const pauseEscalationSchema = z.object({
   pausedUntil: z.coerce.date(),
+});
+
+// ═══ Fee Category ═══════════════════════════════════════════════
+// Per-college reservation-category catalog (OC, OBC, SC, ST, NRI, …).
+// Drives the `Category` dropdown on FeeStructure forms; stored in
+// `FeeStructure.category` as the string `code` (not an ObjectId) so the
+// fee-pin-service category-matching contract stays string-equality.
+
+const feeCategoryStatusEnum = z.enum(['active', 'inactive']);
+
+export const createFeeCategorySchema = z.object({
+  code: z.string().trim().min(1, 'Code is required'),
+  name: z.string().trim().min(1, 'Name is required'),
+  description: z.string().trim().optional(),
+  status: feeCategoryStatusEnum.optional(),
+});
+
+export const updateFeeCategorySchema = z.object({
+  code: z.string().trim().min(1).optional(),
+  name: z.string().trim().min(1).optional(),
+  description: z.string().trim().optional(),
+  status: feeCategoryStatusEnum.optional(),
+});
+
+// Per-college admission-quota catalog (convener, management, nri, …).
+// Drives the Quota dropdown on FeeStructure + Student forms; stored in
+// `Student.quota` and `FeeStructureInstance.quota` as the string `code`
+// (not an ObjectId) so the fee-pin-service quota-matching contract
+// stays string-equality.
+
+const feeQuotaStatusEnum = z.enum(['active', 'inactive']);
+
+export const createFeeQuotaSchema = z.object({
+  code: z.string().trim().min(1, 'Code is required'),
+  name: z.string().trim().min(1, 'Name is required'),
+  description: z.string().trim().optional(),
+  status: feeQuotaStatusEnum.optional(),
+});
+
+export const updateFeeQuotaSchema = z.object({
+  code: z.string().trim().min(1).optional(),
+  name: z.string().trim().min(1).optional(),
+  description: z.string().trim().optional(),
+  status: feeQuotaStatusEnum.optional(),
+});
+
+export const feeQuotaListQuerySchema = z.object({
+  page: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().positive().max(100).optional(),
+  status: feeQuotaStatusEnum.optional(),
+});
+
+export const feeCategoryListQuerySchema = z.object({
+  page: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().positive().max(100).optional(),
+  status: feeCategoryStatusEnum.optional(),
 });

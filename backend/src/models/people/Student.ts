@@ -138,7 +138,11 @@ const schema = new Schema<IStudent>({
     required: false,
   },
   category: String,
-  quota: { type: String, enum: ['convener', 'management', 'nri'] },
+  // No enum: quota codes are admin-managed via the FeeQuota CRUD
+  // (/api/finance/fee-quotas). String matches `FeeQuota.code` and
+  // is matched by string-equality against `FeeStructureInstance.quota`
+  // — same contract as `category`. See models/finance/FeeQuota.ts.
+  quota: { type: String },
   regulationId: { type: Schema.Types.ObjectId, ref: 'Regulation' },
   programmeId: { type: Schema.Types.ObjectId, ref: 'Programme' },
   branchId: { type: Schema.Types.ObjectId, ref: 'Branch' },

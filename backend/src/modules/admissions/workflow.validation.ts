@@ -111,7 +111,8 @@ export const addToWaitlistSchema = z.object({
   branchId: z.string().min(1),
   waitlistPosition: z.number().min(1),
   meritScore: z.number().min(0),
-  quota: z.enum(['convener', 'management', 'nri', 'spot']),
+  // Quota is admin-managed via FeeQuota CRUD; accept any catalog code.
+  quota: z.string().min(1),
   expiresAt: z.string().optional(),
 });
 
@@ -154,7 +155,8 @@ export const updateCancellationSchema = z.object({
 
 // ═══ W01 Business Logic Schemas ═══════════════════════════
 
-export const generateMeritListSchema = z.object({ allotmentRoundId: z.string().min(1), academicYearId: z.string().min(1), programmeId: z.string().min(1), branchId: z.string().optional(), quota: z.enum(['management', 'convener', 'nri', 'lateral']), criteria: z.object({ sortBy: z.string().min(1), tieBreaker: z.string().optional() }) });
+// Quota is admin-managed via FeeQuota CRUD; accept any catalog code.
+export const generateMeritListSchema = z.object({ allotmentRoundId: z.string().min(1), academicYearId: z.string().min(1), programmeId: z.string().min(1), branchId: z.string().optional(), quota: z.string().min(1), criteria: z.object({ sortBy: z.string().min(1), tieBreaker: z.string().optional() }) });
 export const approveCancellationSchema = z.object({ approvedBy: z.string().min(1) });
 export const uploadDocumentSchema = z.object({ documentType: z.string().min(1), fileUrl: z.string().min(1) });
 export const createSpotRoundSchema = z.object({ academicYearId: z.string().min(1), name: z.string().min(1), startDate: z.string().min(1), endDate: z.string().min(1), eligibilityCriteria: z.string().optional(), maxSeats: z.number().optional() });

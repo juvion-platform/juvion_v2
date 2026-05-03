@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listApplicants, createApplicant, updateApplicant } from '../../services/admissions';
+import { listFeeQuotas } from '../../services/fee-quotas';
 import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
@@ -11,7 +12,6 @@ const STATUS_COLOR: Record<string, string> = {
   offered: 'warning', accepted: 'success', fee_paid: 'success', enrolled: 'success', withdrawn: 'danger', rejected: 'danger',
 };
 const STATUSES = ['draft', 'submitted', 'under_review', 'eligible', 'ineligible', 'offered', 'accepted', 'fee_paid', 'enrolled', 'withdrawn', 'rejected'] as const;
-const QUOTAS = ['convener', 'management', 'nri', 'spot'] as const;
 const CATEGORIES = ['OC', 'BC-A', 'BC-B', 'BC-C', 'BC-D', 'BC-E', 'SC', 'ST', 'EWS'] as const;
 const GENDERS = ['male', 'female', 'other'] as const;
 const INTER_STREAMS = ['MPC', 'BiPC', 'MEC', 'CEC', 'other'] as const;
@@ -43,6 +43,13 @@ export default function ApplicantsPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['applicants', page, filterStatus],
     queryFn: () => listApplicants(page, 20, filterStatus || undefined),
+  });
+  // FeeQuota catalog — drives the Quota dropdown so admins extending
+  // the catalog (via /finance/fee-management/fee-quotas) see new
+  // quotas immediately on the applicant form too.
+  const { data: feeQuotas } = useQuery({
+    queryKey: ['fee-quotas-all'],
+    queryFn: () => listFeeQuotas(1, 100),
   });
 
   const createMut = useMutation({ mutationFn: createApplicant, onSuccess: () => { qc.invalidateQueries({ queryKey: ['applicants'] }); qc.invalidateQueries({ queryKey: ['admissions-stats'] }); closeModal(); } });
@@ -198,7 +205,16 @@ export default function ApplicantsPage() {
           {tab === 'programme' && (
             <div className="grid grid-cols-2 gap-4">
               <div><label className={lbl}>Programme *</label><input value={form.programmeApplied} onChange={e => setForm((f: any) => ({ ...f, programmeApplied: e.target.value }))} className={inp} placeholder="e.g. B.Tech" /></div>
-              <div><label className={lbl}>Quota *</label><select required value={form.quota} onChange={e => setForm((f: any) => ({ ...f, quota: e.target.value }))} className={inp}>{QUOTAS.map(q => <option key={q} value={q}>{q}</option>)}</select></div>
+              <div><label className={lbl}>Quota *</label>
+                <select required value={form.quota} onChange={e => setForm((f: any) => ({ ...f, quota: e.target.value }))} className={inp}>
+                  <option value="">Select quota</option>
+                  {(feeQuotas?.items ?? [])
+                    .filter((q: { status?: string }) => q.status !== 'inactive')
+                    .map((q: { _id: string; code: string; name: string }) => (
+                      <option key={q._id} value={q.code}>{q.code} — {q.name}</option>
+                    ))}
+                </select>
+              </div>
               <div><label className={lbl}>Branch Pref 1</label><input value={form.branchPreference1} onChange={e => setForm((f: any) => ({ ...f, branchPreference1: e.target.value }))} className={inp} placeholder="e.g. CSE" /></div>
               <div><label className={lbl}>Category</label><select value={form.category} onChange={e => setForm((f: any) => ({ ...f, category: e.target.value }))} className={inp}><option value="">Select...</option>{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
               <div><label className={lbl}>Branch Pref 2</label><input value={form.branchPreference2} onChange={e => setForm((f: any) => ({ ...f, branchPreference2: e.target.value }))} className={inp} /></div>

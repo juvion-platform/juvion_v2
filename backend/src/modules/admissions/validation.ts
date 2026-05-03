@@ -64,7 +64,8 @@ export const createApplicantSchema = z.object({
   branchPreference1: z.string().optional(),
   branchPreference2: z.string().optional(),
   branchPreference3: z.string().optional(),
-  quota: z.enum(['convener', 'management', 'nri', 'spot']),
+  // Quota is admin-managed via FeeQuota CRUD; accept any catalog code.
+  quota: z.string().min(1),
   category: z.enum(['OC', 'BC-A', 'BC-B', 'BC-C', 'BC-D', 'BC-E', 'SC', 'ST', 'EWS']).optional(),
   // Entrance exams
   eamcetRank: z.number().optional(),
@@ -83,7 +84,8 @@ export const updateApplicantSchema = createApplicantSchema.partial();
 export const convertInquirySchema = z.object({
   programmeApplied: z.string().optional(),
   branchPreference1: z.string().optional(),
-  quota: z.enum(['convener', 'management', 'nri', 'spot']),
+  // Quota is admin-managed via FeeQuota CRUD; accept any catalog code.
+  quota: z.string().min(1),
   category: z.enum(['OC', 'BC-A', 'BC-B', 'BC-C', 'BC-D', 'BC-E', 'SC', 'ST', 'EWS']).optional(),
 });
 
