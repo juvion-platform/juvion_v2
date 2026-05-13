@@ -209,6 +209,62 @@ the routes already accept any value within the 12-category enum.
 
 ---
 
+## Phase D1 — Teaching & Research sub-collections (SHIPPED)
+
+Three Phase-D sub-collections wired end-to-end. These cover the
+NAAC-criteria gaps that the document store doesn't reach: faculty
+workload (2.2 / 2.6), research guidance (3.4.2), and authored
+works (3.3).
+
+### D1.1: Three models (DONE)
+**Files:** `backend/src/models/people/FacultySubjectAssignment.ts`, `FacultyResearchScholar.ts`, `FacultyBook.ts`
+**Done:**
+- `FacultySubjectAssignment` — subjectCode, subjectName, optional subjectId ref, academicYear, semester, role (instructor/co-instructor/lab-incharge/tutorial), weeklyHours, studentCount, status (planned/active/completed). Indexed on (collegeId, facultyId, archivedAt) for the panel and (collegeId, academicYear, semester) for future workload analytics.
+- `FacultyResearchScholar` — scholarName, scholarType (phd/mtech/mphil/undergrad_project), topic, registrationYear, completionYear, status (ongoing/completed/discontinued/awarded), coGuide, university, thesisLink (Shodhganga). NAAC 3.4.2 directly counts off `status: 'awarded'`.
+- `FacultyBook` — title, role (author/co_author/editor/co_editor/translator), bookType (textbook/monograph/edited_volume/chapter), publisher, ISBN, year, edition, pages, level (international/national/regional), coAuthors, DOI. The `level` field is what NAAC 3.3 specifically asks for.
+
+All three carry `archivedAt` for soft delete (matches the FacultyDocument pattern).
+
+### D1.2: Combined service (DONE)
+**Files:** `backend/src/modules/people/faculty-teaching-service.ts`
+**Done:** Single file with `makeCrud<TDoc extends Document>()` factory producing identical list / getOne / create / update / archive shape for all three entities. Each operation runs `loadFacultyScoped` first so a leaked facultyId can't cross tenants. Three named exports — `subjectAssignments`, `researchScholars`, `books` — each a CRUD bundle for the respective collection. No verification workflow needed (these are institution-self-certified).
+
+### D1.3: Combined controller (DONE)
+**Files:** `backend/src/modules/people/faculty-teaching-controller.ts`
+**Done:** `makeHandlers(bundle)` produces an Express handler set for any CRUD bundle. Three named exports: `subjectHandlers`, `scholarHandlers`, `bookHandlers`. Type signature `CrudBundle` uses `Promise<unknown>` on read paths so the union works across all three entity types.
+
+### D1.4: 15 routes (DONE)
+**Files:** `backend/src/modules/people/routes.ts`
+**Done:** Standard CRUD 5-tuple × 3 entities under `/api/people/faculty/:facultyId/{subjects,scholars,books}{,/:id}`. All gated by `authorize('people', <action>)`.
+
+### D1.5: Frontend service + panel (DONE)
+**Files:** `admin-portal/src/services/faculty-teaching.ts`, `admin-portal/src/components/people/FacultyTeachingPanel.tsx`
+**Done:**
+- `faculty-teaching.ts` service with strict types per entity (FacultySubjectAssignmentDoc, FacultyResearchScholarDoc, FacultyBookDoc).
+- `FacultyTeachingPanel` renders three stacked sections (Subjects taught, Research scholars guided, Books authored / edited). Each section: list table with NAAC-relevant columns + "Add" button + Edit / Archive actions per row. Modal forms per entity capture the full schema.
+- Status pills are color-coded (emerald for active/awarded, blue for planned/ongoing, slate for completed, red for discontinued).
+- React Query keys are per-entity per-faculty so panels refresh independently.
+
+### D1.6: Detail-page wiring (DONE)
+**Files:** `admin-portal/src/pages/people/FacultyDetailPage.tsx`
+**Done:**
+- New tab "Teaching & Research" between "Research IDs" and "Documents".
+- Combined badge: sum of subjects + scholars + books counts. So operators see "is anything tracked for this faculty?" at a glance even from another tab.
+- The Faculty detail page now has six tabs total — long but each carries distinct value.
+
+Backend smoke test: `POST /faculty/:fid/subjects` with `{ subjectCode: 'CS302', subjectName: 'Operating Systems', academicYear: '2025-26', semester: 5, role: 'instructor', weeklyHours: 4, studentCount: 62, status: 'active' }` → 201 with persisted row; `GET` round-trips.
+
+### D1.7: What still belongs in Phase D
+**Status:** Pending (lower priority)
+**Notes:** The original Phase D scope mentioned ~20 sub-collections covering teaching loads, examination duties, work experience, awards, etc. The three shipped here are the highest-NAAC-leverage ones. Future Phase D items as separate sub-phases:
+- D2: Examination duties (NAAC 2.5.2) — invigilation, paper-setting, valuation roles per AY
+- D3: Awards & recognitions (in-house). Note: external awards already covered by Phase B2 `award_letter` document type — D3 is for NON-document-backed recognitions.
+- D4: External committee memberships (BoS, BoG, expert panels) at other institutions
+- D5: Consultancy work (NAAC 3.2.1) — clients, value, period, project description
+- D6: Sponsored research projects (NAAC 3.1 / 3.2). Note: separate from Phase B sub-collections (Publications / Patents / Projects) which carry the NAAC research-output fields.
+
+---
+
 ## Phase E — NAAC report + AI verification agent (v2)
 
 ### E.1: NAAC evidence report (M10)

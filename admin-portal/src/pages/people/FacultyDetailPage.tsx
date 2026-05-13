@@ -4,12 +4,16 @@ import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Pencil, Loader2, AlertCircle, MapPin, Phone, Clock } from 'lucide-react';
 import { getFaculty } from '../../services/people';
 import { listFacultyDocuments } from '../../services/faculty-documents';
+import {
+  listFacultySubjects, listFacultyScholars, listFacultyBooks,
+} from '../../services/faculty-teaching';
 import Badge from '../../components/ui/Badge';
 import {
   DetailSection, DetailField, DetailBool, formatDate, extractPerson,
 } from '../../components/ui/DetailView';
 import PersonPhotoBlock from '../../components/people/PersonPhotoBlock';
 import FacultyDocumentsPanel from '../../components/people/FacultyDocumentsPanel';
+import FacultyTeachingPanel from '../../components/people/FacultyTeachingPanel';
 
 /**
  * Read-only view for a single Faculty member. Edit navigates to the
@@ -92,12 +96,13 @@ const EXTERNAL_ID_GROUPS: ReadonlyArray<{
   },
 ];
 
-type DetailTabKey = 'profile' | 'employment' | 'bio' | 'research' | 'documents';
+type DetailTabKey = 'profile' | 'employment' | 'bio' | 'research' | 'documents' | 'teaching';
 const DETAIL_TABS: ReadonlyArray<{ key: DetailTabKey; label: string }> = [
   { key: 'profile',    label: 'Profile' },
   { key: 'employment', label: 'Employment' },
   { key: 'bio',        label: 'Bio & Office' },
   { key: 'research',   label: 'Research IDs' },
+  { key: 'teaching',   label: 'Teaching & Research' },
   { key: 'documents',  label: 'Documents' },
 ];
 
@@ -151,6 +156,29 @@ export default function FacultyDetailPage() {
   });
   const documentCount = docsData?.items?.length ?? 0;
 
+  // Teaching & research counts — drives a combined badge on the
+  // Teaching tab so operators see "is anything tracked for this
+  // faculty?" at a glance.
+  const { data: subjectsData } = useQuery({
+    queryKey: ['faculty-subjects', id],
+    queryFn: () => listFacultySubjects(id!),
+    enabled: !!id,
+  });
+  const { data: scholarsData } = useQuery({
+    queryKey: ['faculty-scholars', id],
+    queryFn: () => listFacultyScholars(id!),
+    enabled: !!id,
+  });
+  const { data: booksData } = useQuery({
+    queryKey: ['faculty-books', id],
+    queryFn: () => listFacultyBooks(id!),
+    enabled: !!id,
+  });
+  const teachingCount =
+    (subjectsData?.items?.length ?? 0) +
+    (scholarsData?.items?.length ?? 0) +
+    (booksData?.items?.length ?? 0);
+
   return (
     <div className="max-w-5xl mx-auto space-y-4">
       <div className="flex items-start justify-between">
@@ -190,6 +218,7 @@ export default function FacultyDetailPage() {
             const tabBadge =
               t.key === 'research' && populatedIdCount > 0 ? String(populatedIdCount) :
               t.key === 'documents' && documentCount > 0 ? String(documentCount) :
+              t.key === 'teaching' && teachingCount > 0 ? String(teachingCount) :
               null;
             return (
               <button
@@ -372,6 +401,13 @@ export default function FacultyDetailPage() {
               and switch to the Bio &amp; Office tab to add it.
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── Teaching & Research tab ──────────────────────────────── */}
+      {tab === 'teaching' && id && (
+        <div role="tabpanel" id="tabpanel-teaching" aria-labelledby="tab-teaching">
+          <FacultyTeachingPanel facultyId={id} />
         </div>
       )}
 

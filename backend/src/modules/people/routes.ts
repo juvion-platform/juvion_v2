@@ -17,6 +17,7 @@ import {
   parentPhotoHandlers,
 } from './photo-controller';
 import * as facultyDocCtrl from './faculty-document-controller';
+import * as facultyTeachingCtrl from './faculty-teaching-controller';
 import { searchPeopleController } from './search-controller';
 import { searchQuerySchema } from './search-validation';
 import {
@@ -184,6 +185,95 @@ router.delete(
   '/faculty/:facultyId/documents/:docId',
   authorize('people', 'delete'),
   facultyDocCtrl.archiveFacultyDocumentHandler,
+);
+
+// ─── Faculty teaching & research sub-collections (Phase D) ───────────
+// Three sub-collections per faculty member, each with identical CRUD
+// shape:
+//   /faculty/:facultyId/subjects   — NAAC 2.2 / 2.6 (what they teach)
+//   /faculty/:facultyId/scholars   — NAAC 3.4.2 (PhDs / M.Tech guided)
+//   /faculty/:facultyId/books      — NAAC 3.3 (books authored / edited)
+// No verification workflow — these are institution-self-certified rows.
+
+// Subjects taught
+router.get(
+  '/faculty/:facultyId/subjects',
+  authorize('people', 'read'),
+  facultyTeachingCtrl.subjectHandlers.list,
+);
+router.post(
+  '/faculty/:facultyId/subjects',
+  authorize('people', 'update'),
+  facultyTeachingCtrl.subjectHandlers.create,
+);
+router.get(
+  '/faculty/:facultyId/subjects/:id',
+  authorize('people', 'read'),
+  facultyTeachingCtrl.subjectHandlers.getOne,
+);
+router.patch(
+  '/faculty/:facultyId/subjects/:id',
+  authorize('people', 'update'),
+  facultyTeachingCtrl.subjectHandlers.update,
+);
+router.delete(
+  '/faculty/:facultyId/subjects/:id',
+  authorize('people', 'delete'),
+  facultyTeachingCtrl.subjectHandlers.archive,
+);
+
+// Research scholars guided
+router.get(
+  '/faculty/:facultyId/scholars',
+  authorize('people', 'read'),
+  facultyTeachingCtrl.scholarHandlers.list,
+);
+router.post(
+  '/faculty/:facultyId/scholars',
+  authorize('people', 'update'),
+  facultyTeachingCtrl.scholarHandlers.create,
+);
+router.get(
+  '/faculty/:facultyId/scholars/:id',
+  authorize('people', 'read'),
+  facultyTeachingCtrl.scholarHandlers.getOne,
+);
+router.patch(
+  '/faculty/:facultyId/scholars/:id',
+  authorize('people', 'update'),
+  facultyTeachingCtrl.scholarHandlers.update,
+);
+router.delete(
+  '/faculty/:facultyId/scholars/:id',
+  authorize('people', 'delete'),
+  facultyTeachingCtrl.scholarHandlers.archive,
+);
+
+// Books authored / edited
+router.get(
+  '/faculty/:facultyId/books',
+  authorize('people', 'read'),
+  facultyTeachingCtrl.bookHandlers.list,
+);
+router.post(
+  '/faculty/:facultyId/books',
+  authorize('people', 'update'),
+  facultyTeachingCtrl.bookHandlers.create,
+);
+router.get(
+  '/faculty/:facultyId/books/:id',
+  authorize('people', 'read'),
+  facultyTeachingCtrl.bookHandlers.getOne,
+);
+router.patch(
+  '/faculty/:facultyId/books/:id',
+  authorize('people', 'update'),
+  facultyTeachingCtrl.bookHandlers.update,
+);
+router.delete(
+  '/faculty/:facultyId/books/:id',
+  authorize('people', 'delete'),
+  facultyTeachingCtrl.bookHandlers.archive,
 );
 
 // Staff
