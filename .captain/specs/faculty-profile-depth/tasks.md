@@ -110,6 +110,48 @@ commit).
 
 ---
 
+## Phase B2 — Full 12-category credential catalog (SHIPPED)
+
+24 doc types across the 12 NAAC categories now live in
+`DOC_TYPES` inside `FacultyDocumentsPanel.tsx`. The backend was
+unchanged — `documentType` is open string at the model layer and
+the routes already accept any value within the 12-category enum.
+
+### B2.1: 24-row DOC_TYPES table (DONE)
+**Files:** `admin-portal/src/components/people/FacultyDocumentsPanel.tsx`
+**Done:** complete list per B1.7 — identity (3), education (5), certification (3), experience (1, 1:N), current_employment (2), training (2, 1:N), award (1, 1:N), membership (1, 1:N), administrative (1, 1:N), hr_payroll (3), self_declaration (2). PhD certificate kept inside the education group.
+
+### B2.2: 1:1 vs 1:N card semantics (DONE)
+**Done:** 1:N cards (experience, training, awards, memberships, administrative) carry a "multi" pill on the header. Card body shows every non-archived doc as a row + an "+ Add another" affordance. 1:1 cards show the latest doc only and chain `upload + archive(old)` in the frontend so "Replace" is one-click for the operator. Archive-on-replace is best-effort — if archival fails the UI shows both docs with individual Archive buttons.
+
+### B2.3: Category accordion layout (DONE)
+**Done:** Each category is a collapsible `<section>`. Default-expanded: the first two categories + any category that has at least one uploaded doc (auto-expand-on-data via `queueMicrotask`). Header shows category name + populated count badge + (N uploaded · M types). Inside the category, cards lay out in a 2-column grid on `md+`.
+
+### B2.4: Compact card visuals (DONE)
+**Done:** Light cards (one row of border, no shadow) so 24 cards across 12 categories fit reasonably in the viewport with all expanded. Status badges are 10px monospace pills, action icons are 12px.
+
+---
+
+## Phase B3 — Verification workflow (next session)
+
+### B3.1: Approve / reject endpoints
+**Status:** Pending
+**Notes:** Two new routes — `POST /faculty/:facultyId/documents/:docId/approve` and `.../reject` (with reason). Service writes `verificationStatus`, `verifiedAt`, `verifiedBy` (from `req.user.id`). Audit log a `verify` event. RBAC: `people.update` minimum, but consider a finer-grained `faculty_documents.verify` permission.
+
+### B3.2: Admin verification queue page
+**Status:** Pending
+**Notes:** New page at `/people/faculty/verification-queue`. Lists all docs with `verificationStatus = 'pending'` across all faculty, college-scoped. Each row: faculty name, doc title, category, uploaded date, View / Approve / Reject buttons.
+
+### B3.3: Doc-row inline approve/reject in the panel
+**Status:** Pending
+**Notes:** On `FacultyDocumentsPanel`, when the caller has the verify permission, show inline Approve / Reject actions on each pending row.
+
+### B3.4: Audit log surface on the doc detail
+**Status:** Pending
+**Notes:** Modal showing "uploaded by X on date, approved by Y on date, notes: ..." — pulls from M11 audit log.
+
+---
+
 ## Phase C — External participation + verification
 
 ### C.1: Base `ExternalParticipation` schema with `verificationStatus`
