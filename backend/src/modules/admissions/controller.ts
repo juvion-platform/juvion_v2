@@ -165,3 +165,21 @@ export async function previewAssignmentRule(req: AuthRequest, res: Response, nex
     res.json(await svc.previewAssignmentRule(req.collegeId!, body.inquiry ?? {}));
   } catch (e) { next(e); }
 }
+
+// ─── Strategic Gap 5 Phase B — CRM dashboard ─────────────────────
+
+export async function crmPipelineStats(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await svc.getCRMPipelineStats(req.collegeId!)); } catch (e) { next(e); }
+}
+
+export async function crmFunnelStats(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await svc.getCRMFunnelStats(req.collegeId!)); } catch (e) { next(e); }
+}
+
+export async function crmOfficerStats(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await svc.getCRMOfficerStats(req.collegeId!)); } catch (e) { next(e); }
+}
+
+export async function crmSourceStats(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await svc.getCRMSourceStats(req.collegeId!)); } catch (e) { next(e); }
+}

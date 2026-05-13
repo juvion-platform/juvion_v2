@@ -1,7 +1,7 @@
 import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getStats, getWorkflowStats } from '../services/admissions';
-import { UserPlus, Users, Gift, GraduationCap, TrendingUp, GitBranch } from 'lucide-react';
+import { UserPlus, Users, Gift, GraduationCap, TrendingUp, GitBranch, Activity, Workflow } from 'lucide-react';
 import Breadcrumbs from '../components/ui/Breadcrumbs';
 
 import InquiriesPage from './admissions/InquiriesPage';
@@ -13,6 +13,8 @@ import OffersPage from './admissions/OffersPage';
 import DocumentsPage from './admissions/DocumentsPage';
 import EnrollmentsPage from './admissions/EnrollmentsPage';
 import WorkflowPage from './admissions/WorkflowPage';
+import AssignmentRulesPage from './admissions/AssignmentRulesPage';
+import CRMDashboardPage from './admissions/CRMDashboardPage';
 
 const PHASE_CARDS = [
   { to: 'inquiries', icon: UserPlus, label: 'Inquiries', desc: 'Lead tracking & follow-ups', iconBg: 'bg-primary-50 text-primary-600', border: 'border-primary-200 hover:border-primary-400', statKey: 'inquiries' },
@@ -56,6 +58,38 @@ function AdmissionsHome() {
             </button>
           );
         })}
+      </div>
+
+      {/* CRM ops strip — Gap 5 Phase B */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <button
+          onClick={() => navigate('crm')}
+          className="rounded-2xl border border-indigo-200 bg-gradient-to-r from-indigo-50 to-white px-5 py-4 text-left hover:shadow-md transition"
+        >
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-indigo-100 p-2.5 text-indigo-600">
+              <Activity size={20} />
+            </div>
+            <div>
+              <div className="font-semibold text-navy">CRM Dashboard</div>
+              <div className="text-xs text-gray-500">Pipeline, funnel, officer KPIs, UTM attribution</div>
+            </div>
+          </div>
+        </button>
+        <button
+          onClick={() => navigate('assignment-rules')}
+          className="rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-white px-5 py-4 text-left hover:shadow-md transition"
+        >
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-amber-100 p-2.5 text-amber-600">
+              <Workflow size={20} />
+            </div>
+            <div>
+              <div className="font-semibold text-navy">Assignment Rules</div>
+              <div className="text-xs text-gray-500">Auto-route new inquiries to officers by attribute</div>
+            </div>
+          </div>
+        </button>
       </div>
 
       <button
@@ -154,6 +188,8 @@ export default function Admissions() {
         <Route path="documents" element={<DocumentsPage />} />
         <Route path="enrollments" element={<EnrollmentsPage />} />
         <Route path="workflow" element={<WorkflowPage />} />
+        <Route path="assignment-rules" element={<AssignmentRulesPage />} />
+        <Route path="crm" element={<CRMDashboardPage />} />
       </Routes>
     </SubPageWrapper>
   );

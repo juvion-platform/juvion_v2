@@ -60,9 +60,60 @@ export async function getInquiry(collegeId: string, id: string) {
 }
 
 export async function createInquiry(collegeId: string, data: any, performedBy: string) {
+  // Strategic Gap 5 Phase B — auto-routing hook.
+  //
+  // If the caller didn't supply an assignedOfficerId, evaluate enabled
+  // AssignmentRules in priority order. First match wins and stamps
+  // assignedOfficerId, clusterHeadId, assignedByRuleId. The matched
+  // rule's counters (matchCount, lastMatchedAt) bump atomically.
+  //
+  // Best-effort: rule evaluation failures (e.g. a malformed rule) are
+  // logged but don't abort the inquiry create. The inquiry lands
+  // unrouted and the admin queue picks it up.
+  if (!data.assignedOfficerId) {
+    try {
+      const matchedRule = await applyAssignmentRulesOnCreate(collegeId, data);
+      if (matchedRule) {
+        data.assignedOfficerId = matchedRule.assignedOfficerId;
+        if (matchedRule.clusterHeadId) data.clusterHeadId = matchedRule.clusterHeadId;
+        data.assignedByRuleId = matchedRule._id;
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[inquiry-auto-route] rule evaluation failed for college=${collegeId}:`,
+        (err as Error).message,
+      );
+    }
+  }
   const doc = await Inquiry.create({ ...data, collegeId });
   await createAuditLog({ collegeId, entityType: 'Inquiry', entityId: String(doc._id), entityName: data.name, action: 'create', changes: [], performedBy });
   return doc;
+}
+
+/**
+ * Internal: find the first-matching enabled rule and bump its
+ * counters. Returns the matched rule (or null). Separated from
+ * `previewAssignmentRule` because preview is read-only — this
+ * version performs the side-effects of an actual assignment.
+ */
+async function applyAssignmentRulesOnCreate(
+  collegeId: string,
+  inquiryPayload: Record<string, unknown>,
+): Promise<IAssignmentRule | null> {
+  const rules = await AssignmentRule.find({ collegeId, enabled: true }).sort({ priority: 1, createdAt: 1 });
+  for (const rule of rules) {
+    if (evaluateAssignmentRule(rule, inquiryPayload)) {
+      // Bump match counters atomically. Even if this fails (e.g.
+      // race condition), the assignment itself still succeeds.
+      AssignmentRule.updateOne(
+        { _id: rule._id, collegeId },
+        { $inc: { matchCount: 1 }, $set: { lastMatchedAt: new Date() } },
+      ).catch(() => { /* swallow — assignment is the primary concern */ });
+      return rule;
+    }
+  }
+  return null;
 }
 
 export async function updateInquiry(collegeId: string, id: string, data: any, performedBy: string) {
@@ -399,3 +450,195 @@ export async function previewAssignmentRule(
   return { rule: null, matched: false };
 }
 
+
+// ─── Strategic Gap 5 Phase B — CRM dashboard aggregations ────────────
+
+/**
+ * Pipeline by status — total inquiry count grouped by status.
+ * Drives the funnel-stage bars on the dashboard. Returns
+ * status → count and a grand total.
+ */
+export async function getCRMPipelineStats(collegeId: string): Promise<{
+  total: number;
+  byStatus: Record<string, number>;
+}> {
+  const rows = await Inquiry.aggregate<{ _id: string; count: number }>([
+    { $match: { collegeId: new mongoose.Types.ObjectId(collegeId) } },
+    { $group: { _id: '$status', count: { $sum: 1 } } },
+  ]);
+  const byStatus: Record<string, number> = {};
+  let total = 0;
+  for (const row of rows) {
+    byStatus[row._id ?? 'unknown'] = row.count;
+    total += row.count;
+  }
+  return { total, byStatus };
+}
+
+/**
+ * Funnel-stage conversion — counts at each major funnel stage
+ * (new → contacted → mql → sql → converted). Lets the dashboard
+ * compute stage-to-stage conversion rates.
+ */
+export async function getCRMFunnelStats(collegeId: string): Promise<{
+  stages: Array<{ stage: string; count: number; statuses: string[] }>;
+}> {
+  // Group the 28 fine-grained statuses into 5 funnel stages.
+  const STAGE_BUCKETS: Array<{ stage: string; statuses: string[] }> = [
+    { stage: 'new',         statuses: ['new', 'enrichment_pending'] },
+    { stage: 'engaged',     statuses: ['first_contact_attempt', 'contacted', 'follow_up', 'follow_up_overdue', 'interested', 'sent_brochure'] },
+    { stage: 'mql',         statuses: ['mql', 'visit_scheduled', 'visit_completed', 'visited', 'counsellor_meeting_scheduled', 'counsellor_meeting_done', 'parent_meeting_done'] },
+    { stage: 'sql',         statuses: ['sql', 'qualified', 'eligibility_pending', 'fee_quoted'] },
+    { stage: 'converted',   statuses: ['converted'] },
+  ];
+  const rows = await Inquiry.aggregate<{ _id: string; count: number }>([
+    { $match: { collegeId: new mongoose.Types.ObjectId(collegeId) } },
+    { $group: { _id: '$status', count: { $sum: 1 } } },
+  ]);
+  const byStatus = new Map<string, number>(rows.map((r) => [r._id, r.count]));
+  return {
+    stages: STAGE_BUCKETS.map((bucket) => ({
+      stage: bucket.stage,
+      statuses: bucket.statuses,
+      count: bucket.statuses.reduce((s, st) => s + (byStatus.get(st) ?? 0), 0),
+    })),
+  };
+}
+
+/**
+ * Per-officer KPIs — assignments + conversion rate. Joins to Person
+ * collection to surface the officer name.
+ */
+export async function getCRMOfficerStats(collegeId: string): Promise<{
+  officers: Array<{
+    officerId: string;
+    name: string;
+    assigned: number;
+    converted: number;
+    conversionRate: number;
+  }>;
+  unassigned: number;
+}> {
+  const rows = await Inquiry.aggregate<{
+    _id: { officerId: any; status: string };
+    count: number;
+  }>([
+    { $match: { collegeId: new mongoose.Types.ObjectId(collegeId) } },
+    {
+      $group: {
+        _id: { officerId: '$assignedOfficerId', status: '$status' },
+        count: { $sum: 1 },
+      },
+    },
+  ]);
+  // Roll up per officer.
+  const byOfficer = new Map<string, { assigned: number; converted: number }>();
+  let unassigned = 0;
+  for (const row of rows) {
+    if (!row._id.officerId) {
+      unassigned += row.count;
+      continue;
+    }
+    const oid = String(row._id.officerId);
+    const cur = byOfficer.get(oid) ?? { assigned: 0, converted: 0 };
+    cur.assigned += row.count;
+    if (row._id.status === 'converted') cur.converted += row.count;
+    byOfficer.set(oid, cur);
+  }
+  // Look up names — single round-trip rather than N.
+  const officerIds = Array.from(byOfficer.keys()).map((id) => new mongoose.Types.ObjectId(id));
+  const persons = officerIds.length > 0
+    ? await mongoose.connection.db?.collection('persons').find(
+        { _id: { $in: officerIds } },
+        { projection: { _id: 1, name: 1 } },
+      ).toArray() ?? []
+    : [];
+  const personNames = new Map<string, string>(
+    persons.map((p) => [String(p._id), (p as { name?: string }).name ?? '(unnamed)']),
+  );
+  return {
+    officers: Array.from(byOfficer.entries())
+      .map(([oid, stats]) => ({
+        officerId: oid,
+        name: personNames.get(oid) ?? '(unknown officer)',
+        assigned: stats.assigned,
+        converted: stats.converted,
+        conversionRate: stats.assigned > 0 ? Math.round((stats.converted / stats.assigned) * 100) : 0,
+      }))
+      .sort((a, b) => b.assigned - a.assigned),
+    unassigned,
+  };
+}
+
+/**
+ * UTM-attribution rollup — counts grouped by utmCampaign + source,
+ * with conversion counts. Drives the "where did our enrollments
+ * come from?" report.
+ */
+export async function getCRMSourceStats(collegeId: string): Promise<{
+  bySource: Array<{ source: string | null; inquiries: number; converted: number; conversionRate: number }>;
+  byUtmCampaign: Array<{ utmCampaign: string | null; inquiries: number; converted: number; conversionRate: number }>;
+}> {
+  const cid = new mongoose.Types.ObjectId(collegeId);
+
+  const sourceRows = await Inquiry.aggregate<{
+    _id: { source: string | null; converted: boolean };
+    count: number;
+  }>([
+    { $match: { collegeId: cid } },
+    {
+      $group: {
+        _id: { source: '$source', converted: { $eq: ['$status', 'converted'] } },
+        count: { $sum: 1 },
+      },
+    },
+  ]);
+  const bySourceMap = new Map<string | null, { inquiries: number; converted: number }>();
+  for (const r of sourceRows) {
+    const k = r._id.source;
+    const cur = bySourceMap.get(k) ?? { inquiries: 0, converted: 0 };
+    cur.inquiries += r.count;
+    if (r._id.converted) cur.converted += r.count;
+    bySourceMap.set(k, cur);
+  }
+
+  const campaignRows = await Inquiry.aggregate<{
+    _id: { utmCampaign: string | null; converted: boolean };
+    count: number;
+  }>([
+    { $match: { collegeId: cid, utmCampaign: { $exists: true, $ne: null } } },
+    {
+      $group: {
+        _id: { utmCampaign: '$utmCampaign', converted: { $eq: ['$status', 'converted'] } },
+        count: { $sum: 1 },
+      },
+    },
+  ]);
+  const byCampaignMap = new Map<string | null, { inquiries: number; converted: number }>();
+  for (const r of campaignRows) {
+    const k = r._id.utmCampaign;
+    const cur = byCampaignMap.get(k) ?? { inquiries: 0, converted: 0 };
+    cur.inquiries += r.count;
+    if (r._id.converted) cur.converted += r.count;
+    byCampaignMap.set(k, cur);
+  }
+
+  function toRows<T>(
+    map: Map<string | null, { inquiries: number; converted: number }>,
+    key: keyof T,
+  ): T[] {
+    return Array.from(map.entries())
+      .map(([k, v]) => ({
+        [key]: k,
+        inquiries: v.inquiries,
+        converted: v.converted,
+        conversionRate: v.inquiries > 0 ? Math.round((v.converted / v.inquiries) * 100) : 0,
+      } as unknown as T))
+      .sort((a, b) => (b as any).inquiries - (a as any).inquiries);
+  }
+
+  return {
+    bySource: toRows<{ source: string | null; inquiries: number; converted: number; conversionRate: number }>(bySourceMap, 'source'),
+    byUtmCampaign: toRows<{ utmCampaign: string | null; inquiries: number; converted: number; conversionRate: number }>(byCampaignMap, 'utmCampaign'),
+  };
+}
