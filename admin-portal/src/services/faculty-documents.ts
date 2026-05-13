@@ -129,3 +129,43 @@ export const archiveFacultyDocument = (
   api
     .delete(`${BASE}/faculty/${facultyId}/documents/${docId}`)
     .then((r) => r.data);
+
+// ─── Phase B3 — verification workflow ────────────────────────────────
+
+export const approveFacultyDocument = (
+  facultyId: string,
+  docId: string,
+  notes?: string,
+): Promise<FacultyDocumentDoc> =>
+  api
+    .post(`${BASE}/faculty/${facultyId}/documents/${docId}/approve`, { notes })
+    .then((r) => r.data);
+
+export const rejectFacultyDocument = (
+  facultyId: string,
+  docId: string,
+  reason: string,
+): Promise<FacultyDocumentDoc> =>
+  api
+    .post(`${BASE}/faculty/${facultyId}/documents/${docId}/reject`, { reason })
+    .then((r) => r.data);
+
+/**
+ * The queue endpoint populates `facultyId` with the faculty
+ * sub-document (with personId → name) so the UI can render
+ * faculty name + employee code per row without a per-row
+ * round-trip.
+ */
+export interface PendingFacultyDoc extends Omit<FacultyDocumentDoc, 'facultyId'> {
+  facultyId:
+    | string
+    | {
+        _id: string;
+        employeeCode?: string;
+        designation?: string;
+        personId?: { _id?: string; name?: string };
+      };
+}
+
+export const listPendingFacultyDocuments = (): Promise<{ items: PendingFacultyDoc[] }> =>
+  api.get(`${BASE}/faculty-document-queue`).then((r) => r.data);

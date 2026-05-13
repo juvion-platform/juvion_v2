@@ -28,6 +28,9 @@ import {
   getFacultyDocumentViewUrl,
   updateFacultyDocumentMetadata,
   archiveFacultyDocument,
+  approveFacultyDocument,
+  rejectFacultyDocument,
+  listPendingFacultyDocuments,
   type UpdateDocumentMetadataOpts,
 } from './faculty-document-service';
 import type { FacultyDocumentCategory } from '../../models/people/FacultyDocument';
@@ -224,6 +227,68 @@ export async function archiveFacultyDocumentHandler(
     const { facultyId, docId } = req.params as { facultyId: string; docId: string };
     const result = await archiveFacultyDocument(req.collegeId!, facultyId, docId);
     res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── Phase B3 — verification handlers ────────────────────────────────
+
+export async function approveFacultyDocumentHandler(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { facultyId, docId } = req.params as { facultyId: string; docId: string };
+    const body = (req.body || {}) as Record<string, unknown>;
+    const notes = typeof body.notes === 'string' ? body.notes : undefined;
+    const doc = await approveFacultyDocument(
+      req.collegeId!,
+      facultyId,
+      docId,
+      performedBy(req),
+      notes,
+    );
+    res.json(doc);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function rejectFacultyDocumentHandler(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { facultyId, docId } = req.params as { facultyId: string; docId: string };
+    const body = (req.body || {}) as Record<string, unknown>;
+    const reason = typeof body.reason === 'string' ? body.reason : '';
+    if (!reason.trim()) {
+      throw new AppError(400, 'A rejection reason is required (body.reason).');
+    }
+    const doc = await rejectFacultyDocument(
+      req.collegeId!,
+      facultyId,
+      docId,
+      performedBy(req),
+      reason,
+    );
+    res.json(doc);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function listPendingFacultyDocumentsHandler(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const items = await listPendingFacultyDocuments(req.collegeId!);
+    res.json({ items });
   } catch (err) {
     next(err);
   }

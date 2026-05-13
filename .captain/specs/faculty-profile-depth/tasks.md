@@ -132,23 +132,55 @@ the routes already accept any value within the 12-category enum.
 
 ---
 
-## Phase B3 — Verification workflow (next session)
+## Phase B3 — Verification workflow (SHIPPED)
 
-### B3.1: Approve / reject endpoints
-**Status:** Pending
-**Notes:** Two new routes — `POST /faculty/:facultyId/documents/:docId/approve` and `.../reject` (with reason). Service writes `verificationStatus`, `verifiedAt`, `verifiedBy` (from `req.user.id`). Audit log a `verify` event. RBAC: `people.update` minimum, but consider a finer-grained `faculty_documents.verify` permission.
+### B3.1: Approve / reject endpoints + listPending (DONE)
+**Files:** `backend/src/modules/people/faculty-document-service.ts`, `faculty-document-controller.ts`, `routes.ts`
+**Done:**
+- `approveFacultyDocument(...)` — flips status to `approved`, stamps `verifiedAt` + `verifiedBy` (when caller ID is a real ObjectId), idempotent on already-approved, refuses to re-approve a `rejected` doc.
+- `rejectFacultyDocument(...)` — flips to `rejected`, REQUIRES `reason` (stored in `verificationNotes`).
+- `listPendingFacultyDocuments(collegeId)` — admin queue, oldest-first, populates `facultyId.personId.name` for the queue UI.
+- Audit log: reuses generic `approve` / `reject` actions with `entityType: 'FacultyDocument'` as the discriminator. Adds entries like "Admin approved <doc title>".
+- Routes (all `authorize('people', 'update')` or `'read'`):
+    - `GET    /api/people/faculty-document-queue` — non-parameterised path so it never collides with `/faculty/:facultyId/documents/:docId`.
+    - `POST   /api/people/faculty/:facultyId/documents/:docId/approve`
+    - `POST   /api/people/faculty/:facultyId/documents/:docId/reject`
 
-### B3.2: Admin verification queue page
-**Status:** Pending
-**Notes:** New page at `/people/faculty/verification-queue`. Lists all docs with `verificationStatus = 'pending'` across all faculty, college-scoped. Each row: faculty name, doc title, category, uploaded date, View / Approve / Reject buttons.
+### B3.2: Admin verification queue page (DONE)
+**Files:** `admin-portal/src/pages/people/FacultyDocumentQueuePage.tsx`
+**Done:** Lives at `/people/faculty/document-queue`. Lists every pending doc college-wide, oldest first. Category-filter chips show queue depth per category. Empty state celebrates with a green "All caught up" panel. Each row carries inline View / Approve / Reject (Reject opens a prompt for the reason).
 
-### B3.3: Doc-row inline approve/reject in the panel
-**Status:** Pending
-**Notes:** On `FacultyDocumentsPanel`, when the caller has the verify permission, show inline Approve / Reject actions on each pending row.
+### B3.3: Inline approve/reject on per-faculty panel (DONE)
+**Files:** `admin-portal/src/components/people/FacultyDocumentsPanel.tsx`
+**Done:** When a doc's `verificationStatus === 'pending'`, the row gets ✓ (approve) and ✗ (reject) buttons next to View / Archive. Reject uses `window.prompt` to capture the reason and surfaces inline errors. Auto-invalidates the per-faculty doc query on success.
 
-### B3.4: Audit log surface on the doc detail
+### B3.4: Cross-link from panel to queue (DONE)
+**Files:** `admin-portal/src/components/people/FacultyDocumentsPanel.tsx`
+**Done:** The info banner at the top of the Documents tab now carries a "Verification queue →" button so admins discover the college-wide queue without hunting for it in the nav.
+
+### B3.5: Routing (DONE)
+**Files:** `admin-portal/src/pages/People.tsx`
+**Done:** Added `<Route path="faculty/document-queue" ... />` BEFORE the `faculty/:id` route so the static path never gets eaten by the `:id` matcher.
+
+---
+
+## Phase B4 — Audit-log surface (next session, optional)
+
+### B4.1: Audit-history modal on each doc row
 **Status:** Pending
-**Notes:** Modal showing "uploaded by X on date, approved by Y on date, notes: ..." — pulls from M11 audit log.
+**Notes:** Click a doc title → modal shows "uploaded by X on date · approved by Y on date · notes: ..." — pulls from M11 audit log via a new `GET /faculty/:facultyId/documents/:docId/audit` endpoint that filters by `entityType: 'FacultyDocument', entityId: docId`.
+
+### B4.2: Verification SLA badges
+**Status:** Pending
+**Notes:** Highlight queue rows older than 7 days in amber, older than 30 days in red. Add a "long-pending" filter chip.
+
+### B4.3: Bulk approve / reject
+**Status:** Pending
+**Notes:** Checkbox column on the queue page + "Approve selected (N)" / "Reject selected (N)" actions. Reject would prompt once for a shared reason.
+
+### B4.4: Finer-grained RBAC
+**Status:** Pending
+**Notes:** Today every `people.update` holder can approve. Phase B4 could add `faculty_documents.verify` as a separate permission so HoDs can approve their own department's docs without granting them full faculty-edit rights.
 
 ---
 

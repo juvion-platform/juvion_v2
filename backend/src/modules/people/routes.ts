@@ -116,8 +116,26 @@ router.get(
 // ─── Faculty credential documents (Strategic Gap 1 Phase B) ──────────
 // Generic credential-evidence store: PhD certificate, PAN, experience
 // certs, FDP certificates, awards, etc. — all 12 categories share this
-// surface. v1 ships the CRUD + view-URL endpoints; the verification
-// approve/reject endpoints come in Phase C.
+// surface. Phase B2 ships CRUD + view-URL; Phase B3 (now) ships the
+// verification workflow.
+//
+// Pending-queue endpoint at a non-parameterised path so it never
+// collides with /faculty/:facultyId/documents/:docId routing.
+router.get(
+  '/faculty-document-queue',
+  authorize('people', 'read'),
+  facultyDocCtrl.listPendingFacultyDocumentsHandler,
+);
+router.post(
+  '/faculty/:facultyId/documents/:docId/approve',
+  authorize('people', 'update'),
+  facultyDocCtrl.approveFacultyDocumentHandler,
+);
+router.post(
+  '/faculty/:facultyId/documents/:docId/reject',
+  authorize('people', 'update'),
+  facultyDocCtrl.rejectFacultyDocumentHandler,
+);
 router.get(
   '/faculty/:facultyId/documents',
   authorize('people', 'read'),

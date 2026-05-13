@@ -31,6 +31,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   FileText, Upload, Loader2, CheckCircle2, Clock, XCircle,
   AlertTriangle, ExternalLink, Trash2, ChevronDown, ChevronRight,
+  Check, X,
 } from 'lucide-react';
 
 import {
@@ -38,6 +39,8 @@ import {
   uploadFacultyDocument,
   getFacultyDocumentViewUrl,
   archiveFacultyDocument,
+  approveFacultyDocument,
+  rejectFacultyDocument,
   FacultyDocumentDoc,
   FacultyDocumentCategory,
 } from '../../services/faculty-documents';
@@ -231,16 +234,24 @@ export default function FacultyDocumentsPanel({ facultyId }: FacultyDocumentsPan
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
-        <p className="font-medium">
-          Credential documents — {docs.length} uploaded across {DOC_TYPES.length} supported types
-        </p>
-        <p className="text-xs text-blue-800 mt-1">
-          Upload PDF / JPEG / PNG / WebP up to 10 MB. Uploads land as
-          <span className="font-mono mx-1">pending verification</span>
-          until an administrator approves them. Phase B3 wires the
-          approve / reject workflow.
-        </p>
+      <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900 flex items-start justify-between gap-3">
+        <div>
+          <p className="font-medium">
+            Credential documents — {docs.length} uploaded across {DOC_TYPES.length} supported types
+          </p>
+          <p className="text-xs text-blue-800 mt-1">
+            Upload PDF / JPEG / PNG / WebP up to 10 MB. Uploads land as
+            <span className="font-mono mx-1">pending verification</span>
+            until an administrator approves them — use the inline ✓ / ✗ on
+            pending rows, or visit the full college-wide queue.
+          </p>
+        </div>
+        <a
+          href="/people/faculty/document-queue"
+          className="flex-shrink-0 inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-700 bg-white hover:bg-blue-100 rounded border border-blue-200 whitespace-nowrap"
+        >
+          Verification queue →
+        </a>
       </div>
 
       {isLoading && (
@@ -370,6 +381,30 @@ function DocumentCard({ facultyId, spec, docs, onMutated }: DocumentCardProps) {
     }
   }
 
+  async function handleApprove(doc: FacultyDocumentDoc) {
+    if (!window.confirm(`Mark "${doc.title}" as verified? This creates an audit-log entry.`)) return;
+    try {
+      await approveFacultyDocument(facultyId, doc._id);
+      onMutated();
+    } catch (e: any) {
+      setError(e?.response?.data?.error || e?.message || 'Approve failed');
+    }
+  }
+
+  async function handleReject(doc: FacultyDocumentDoc) {
+    const reason = window.prompt(
+      `Reject "${doc.title}"?\n\nProvide a reason so the faculty member knows what to fix on re-upload:`,
+      '',
+    );
+    if (!reason || !reason.trim()) return;
+    try {
+      await rejectFacultyDocument(facultyId, doc._id, reason.trim());
+      onMutated();
+    } catch (e: any) {
+      setError(e?.response?.data?.error || e?.message || 'Reject failed');
+    }
+  }
+
   const isEmpty = docs.length === 0;
 
   return (
@@ -427,6 +462,26 @@ function DocumentCard({ facultyId, spec, docs, onMutated }: DocumentCardProps) {
                     >
                       <ExternalLink size={12} />
                     </button>
+                    {doc.verificationStatus === 'pending' && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => handleApprove(doc)}
+                          title="Approve / mark verified"
+                          className="p-1 rounded hover:bg-emerald-50 text-emerald-700"
+                        >
+                          <Check size={12} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleReject(doc)}
+                          title="Reject (requires reason)"
+                          className="p-1 rounded hover:bg-amber-50 text-amber-700"
+                        >
+                          <X size={12} />
+                        </button>
+                      </>
+                    )}
                     <button
                       type="button"
                       onClick={() => handleArchive(doc)}

@@ -34,6 +34,7 @@ import {
   FACULTY_DOCUMENT_CATEGORIES,
 } from '../../models/people/FacultyDocument';
 import { AppError } from '../../middleware/errorHandler';
+import { createAuditLog } from '../../shared/audit';
 import {
   putObject,
   deleteObject,
@@ -338,4 +339,124 @@ export async function archiveFacultyDocument(
   doc.archivedAt = archivedAt;
   await doc.save();
   return { archived: true, archivedAt };
+}
+
+// ─── Phase B3 — verification workflow ────────────────────────────────
+
+/**
+ * Admin approves a document. Flips `verificationStatus` to 'approved',
+ * stamps `verifiedAt` + `verifiedBy`, and writes an audit-log entry so
+ * the NAAC evidence trail is intact ("who approved this PhD certificate
+ * on what date").
+ *
+ * The doc MUST currently be `pending` to be approved. Re-approving an
+ * already-approved doc is a no-op (idempotent) — but switching from
+ * `rejected` back to `approved` requires going through Pending first
+ * (operator re-uploads or admin manually clears the rejection). This
+ * matches CampX's verification pattern from the comparison doc §6.3.
+ */
+export async function approveFacultyDocument(
+  collegeId: string,
+  facultyId: string,
+  documentId: string,
+  performedBy: string,
+  notes?: string,
+): Promise<IFacultyDocument> {
+  const doc = await getFacultyDocument(collegeId, facultyId, documentId);
+  if (doc.verificationStatus === 'approved') return doc; // idempotent
+  if (doc.verificationStatus === 'rejected') {
+    throw new AppError(
+      409,
+      'Document is currently rejected. The faculty member must re-upload before re-approval, or an admin must clear the rejection first.',
+    );
+  }
+  doc.verificationStatus = 'approved';
+  doc.verifiedAt = new Date();
+  // performedBy can be a Person ObjectId string (from JWT) OR a free-text
+  // username for system / dev callers. Only set verifiedBy when it looks
+  // like a real ObjectId so we don't pollute the ref field.
+  if (Types.ObjectId.isValid(performedBy)) {
+    doc.verifiedBy = new Types.ObjectId(performedBy);
+  }
+  if (notes !== undefined) doc.verificationNotes = notes.trim();
+  await doc.save();
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'FacultyDocument',
+    entityId: String(doc._id),
+    entityName: doc.title,
+    // Reusing the generic 'approve' action — entityType is the
+    // discriminator. Adds an entry to the M11 audit timeline like
+    // "Admin approved <doc title> on <date>".
+    action: 'approve',
+    changes: [],
+    performedBy,
+  });
+
+  return doc;
+}
+
+/**
+ * Admin rejects a document. Same shape as approve but flips to
+ * `rejected` and REQUIRES a `reason` so the faculty member can
+ * understand what to fix on re-upload.
+ */
+export async function rejectFacultyDocument(
+  collegeId: string,
+  facultyId: string,
+  documentId: string,
+  performedBy: string,
+  reason: string,
+): Promise<IFacultyDocument> {
+  if (!reason || !reason.trim()) {
+    throw new AppError(400, 'A rejection reason is required.');
+  }
+  const doc = await getFacultyDocument(collegeId, facultyId, documentId);
+  if (doc.verificationStatus === 'rejected') return doc; // idempotent
+  doc.verificationStatus = 'rejected';
+  doc.verifiedAt = new Date();
+  if (Types.ObjectId.isValid(performedBy)) {
+    doc.verifiedBy = new Types.ObjectId(performedBy);
+  }
+  doc.verificationNotes = reason.trim();
+  await doc.save();
+
+  await createAuditLog({
+    collegeId,
+    entityType: 'FacultyDocument',
+    entityId: String(doc._id),
+    entityName: doc.title,
+    action: 'reject',
+    changes: [],
+    performedBy,
+  });
+
+  return doc;
+}
+
+/**
+ * Admin queue: list every pending document across the college, in
+ * upload-order (oldest first so the queue drains FIFO). Page-level
+ * pagination skipped for v1 — the queue is bounded by the number of
+ * faculty × document types, which is well under 10k for any
+ * realistic college.
+ *
+ * Populates `facultyId` so the queue UI can render faculty name +
+ * employee code without a second round-trip per row.
+ */
+export async function listPendingFacultyDocuments(
+  collegeId: string,
+): Promise<IFacultyDocument[]> {
+  return FacultyDocument.find({
+    collegeId: new Types.ObjectId(collegeId),
+    verificationStatus: 'pending',
+    archivedAt: null,
+  })
+    .sort({ createdAt: 1 })
+    .populate({
+      path: 'facultyId',
+      select: 'employeeCode personId designation',
+      populate: { path: 'personId', select: 'name' },
+    });
 }
