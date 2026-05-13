@@ -4,6 +4,7 @@ import { authorize } from '../../middleware/authorize';
 import { validate } from '../../middleware/validate';
 import * as ctrl from './controller';
 import * as bulkImportCtrl from './bulk-import-controller';
+import * as configCtrl from './config-controller';
 import {
   createAnnouncementSchema, updateAnnouncementSchema,
   createCircularSchema, updateCircularSchema,
@@ -124,6 +125,54 @@ router.delete(
   '/bulk-imports/:id',
   authorize('platform', 'delete'),
   bulkImportCtrl.archiveImportJobHandler,
+);
+
+// ─── Strategic Gap 3 — Schema-driven configuration surface ───────────
+// Routing convention mirrors the bulk-import pattern: static endpoints
+// before parameterised ones so they aren't eaten by the catch-all.
+// Express matches in declaration order:
+//   /config/types          (literal)            → list registered types
+//   /config/:type/schema   (literal 2nd seg)    → fetch one schema
+//   /config/:type          (1 dynamic seg)      → list entries
+//   /config/:type/:id      (2 dynamic segs)     → entry CRUD
+// `:identifier` is required for multi-cardinality types (e.g. notif-
+// templates), ignored for single (e.g. institution-feature-flags) —
+// the upsert handler resolves the singleton via a sentinel.
+router.get(
+  '/config/types',
+  authorize('platform', 'read'),
+  configCtrl.listTypesHandler,
+);
+router.get(
+  '/config/:type/schema',
+  authorize('platform', 'read'),
+  configCtrl.getSchemaHandler,
+);
+router.get(
+  '/config/:type',
+  authorize('platform', 'read'),
+  configCtrl.listEntriesHandler,
+);
+router.get(
+  '/config/:type/:identifier',
+  authorize('platform', 'read'),
+  configCtrl.getEntryHandler,
+);
+// Upsert: singleton form (no identifier) and identified form.
+router.put(
+  '/config/:type',
+  authorize('platform', 'update'),
+  configCtrl.upsertEntryHandler,
+);
+router.put(
+  '/config/:type/:identifier',
+  authorize('platform', 'update'),
+  configCtrl.upsertEntryHandler,
+);
+router.delete(
+  '/config/:type/:identifier',
+  authorize('platform', 'delete'),
+  configCtrl.deleteEntryHandler,
 );
 
 export default router;

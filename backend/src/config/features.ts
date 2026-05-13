@@ -58,3 +58,66 @@ export const features: Features = {
     return isEmailNotificationsEnabled();
   },
 };
+
+// ─── Strategic Gap 3 — per-college overlay ───────────────────────────
+//
+// Env vars are the platform-wide default. `institution-feature-flags`
+// (stored in `ConfigEntry`) can OVERRIDE those defaults per college.
+// Callers that need the per-college effective view use this async
+// loader; the synchronous env-only API above stays valid for code
+// paths that haven't been threaded with a `collegeId` yet.
+//
+// We import lazily inside the function so this module stays cycle-
+// free and can be imported from anywhere (including the platform
+// service that owns the model).
+
+export interface CollegeFeatures extends Features {
+  readonly smsNotifications: boolean;
+  readonly whatsappNotifications: boolean;
+  readonly juviAiSuggestions: boolean;
+  readonly parentPortal: boolean;
+  readonly financeBlocksExams: boolean;
+  readonly bulkImportPortal: boolean;
+}
+
+/**
+ * Read the effective feature flags for a specific college. Reads the
+ * DB-stored `institution-feature-flags` ConfigEntry overlay; falls
+ * back to env-var defaults for any flag the college has not explicitly
+ * toggled. Safe to call from any service-layer code path.
+ *
+ * No caching in Phase A — every call is one indexed Mongo round-trip.
+ * Phase B can add a short-TTL in-memory cache if call sites get hot.
+ */
+export async function getCollegeFeatures(collegeId: string): Promise<CollegeFeatures> {
+  // Lazy import to keep this module dependency-light and break cycles
+  // (config-service imports the ConfigEntry model which Mongoose may
+  // not yet have registered at this module's load time).
+  const { getEffectiveSingletonValues } = await import('../modules/platform/config-service');
+
+  let overlay: Record<string, unknown> = {};
+  try {
+    overlay = await getEffectiveSingletonValues(collegeId, 'institution-feature-flags');
+  } catch {
+    // Config registry not initialised yet (e.g. in early-boot scripts).
+    // Fall through to env-only defaults.
+    overlay = {};
+  }
+
+  const flag = (key: string, envFallback: boolean): boolean => {
+    const v = overlay[key];
+    if (typeof v === 'boolean') return v;
+    return envFallback;
+  };
+
+  return {
+    optionalAllotmentProposals: flag('optionalAllotmentProposals', isOptionalAllotmentEnabled()),
+    emailNotifications:         flag('emailNotifications',         isEmailNotificationsEnabled()),
+    smsNotifications:           flag('smsNotifications',           false),
+    whatsappNotifications:      flag('whatsappNotifications',      false),
+    juviAiSuggestions:          flag('juviAiSuggestions',          true),
+    parentPortal:               flag('parentPortal',               false),
+    financeBlocksExams:         flag('financeBlocksExams',         false),
+    bulkImportPortal:           flag('bulkImportPortal',           true),
+  };
+}
