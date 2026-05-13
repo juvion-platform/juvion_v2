@@ -126,6 +126,18 @@ router.get(
   authorize('people', 'read'),
   facultyDocCtrl.listPendingFacultyDocumentsHandler,
 );
+// Bulk verify endpoints — also under a non-parameterised prefix so
+// they never collide with /faculty/:facultyId/documents/:docId.
+router.post(
+  '/faculty-documents/bulk-approve',
+  authorize('people', 'update'),
+  facultyDocCtrl.bulkApproveFacultyDocumentsHandler,
+);
+router.post(
+  '/faculty-documents/bulk-reject',
+  authorize('people', 'update'),
+  facultyDocCtrl.bulkRejectFacultyDocumentsHandler,
+);
 router.post(
   '/faculty/:facultyId/documents/:docId/approve',
   authorize('people', 'update'),
@@ -135,6 +147,11 @@ router.post(
   '/faculty/:facultyId/documents/:docId/reject',
   authorize('people', 'update'),
   facultyDocCtrl.rejectFacultyDocumentHandler,
+);
+router.get(
+  '/faculty/:facultyId/documents/:docId/audit',
+  authorize('people', 'read'),
+  facultyDocCtrl.getFacultyDocumentAuditHandler,
 );
 router.get(
   '/faculty/:facultyId/documents',

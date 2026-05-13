@@ -31,6 +31,9 @@ import {
   approveFacultyDocument,
   rejectFacultyDocument,
   listPendingFacultyDocuments,
+  getFacultyDocumentAuditHistory,
+  bulkApproveFacultyDocuments,
+  bulkRejectFacultyDocuments,
   type UpdateDocumentMetadataOpts,
 } from './faculty-document-service';
 import type { FacultyDocumentCategory } from '../../models/people/FacultyDocument';
@@ -289,6 +292,83 @@ export async function listPendingFacultyDocumentsHandler(
   try {
     const items = await listPendingFacultyDocuments(req.collegeId!);
     res.json({ items });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── Phase B4 — audit history + bulk verify handlers ─────────────────
+
+export async function getFacultyDocumentAuditHandler(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { facultyId, docId } = req.params as { facultyId: string; docId: string };
+    const items = await getFacultyDocumentAuditHistory(
+      req.collegeId!,
+      facultyId,
+      docId,
+    );
+    res.json({ items });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function bulkApproveFacultyDocumentsHandler(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const body = (req.body || {}) as { docIds?: unknown; notes?: unknown };
+    if (!Array.isArray(body.docIds) || body.docIds.length === 0) {
+      throw new AppError(400, 'docIds[] is required and must be non-empty');
+    }
+    const docIds = body.docIds.filter((d): d is string => typeof d === 'string');
+    if (docIds.length === 0) {
+      throw new AppError(400, 'docIds[] must contain string ids');
+    }
+    const notes = typeof body.notes === 'string' ? body.notes : undefined;
+    const result = await bulkApproveFacultyDocuments(
+      req.collegeId!,
+      docIds,
+      performedBy(req),
+      notes,
+    );
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function bulkRejectFacultyDocumentsHandler(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const body = (req.body || {}) as { docIds?: unknown; reason?: unknown };
+    if (!Array.isArray(body.docIds) || body.docIds.length === 0) {
+      throw new AppError(400, 'docIds[] is required and must be non-empty');
+    }
+    const docIds = body.docIds.filter((d): d is string => typeof d === 'string');
+    if (docIds.length === 0) {
+      throw new AppError(400, 'docIds[] must contain string ids');
+    }
+    const reason = typeof body.reason === 'string' ? body.reason : '';
+    if (!reason.trim()) {
+      throw new AppError(400, 'A rejection reason is required (body.reason).');
+    }
+    const result = await bulkRejectFacultyDocuments(
+      req.collegeId!,
+      docIds,
+      performedBy(req),
+      reason,
+    );
+    res.json(result);
   } catch (err) {
     next(err);
   }

@@ -164,23 +164,33 @@ the routes already accept any value within the 12-category enum.
 
 ---
 
-## Phase B4 — Audit-log surface (next session, optional)
+## Phase B4 — Audit-log surface (SHIPPED minus RBAC)
 
-### B4.1: Audit-history modal on each doc row
-**Status:** Pending
-**Notes:** Click a doc title → modal shows "uploaded by X on date · approved by Y on date · notes: ..." — pulls from M11 audit log via a new `GET /faculty/:facultyId/documents/:docId/audit` endpoint that filters by `entityType: 'FacultyDocument', entityId: docId`.
+### B4.1: Audit-history modal on each doc row (DONE)
+**Files:** `backend/src/modules/people/faculty-document-service.ts`, `faculty-document-controller.ts`, `routes.ts`, `admin-portal/src/components/people/FacultyDocumentAuditModal.tsx`, `FacultyDocumentsPanel.tsx`
+**Done:**
+- New endpoint `GET /api/people/faculty/:facultyId/documents/:docId/audit` returns every AuditLog row for `entityType: 'FacultyDocument' + entityId: docId`, newest first. Multi-tenant scoped — `loadFacultyScoped` runs first.
+- New `<FacultyDocumentAuditModal />` renders a vertical timeline with action pills (Uploaded / Metadata edited / Approved / Rejected / Archived), timestamps, performedBy, and any field changes from `changes[]`.
+- Each doc row in `FacultyDocumentsPanel` gains a 🕓 History icon button that opens the modal scoped to that doc.
 
-### B4.2: Verification SLA badges
-**Status:** Pending
-**Notes:** Highlight queue rows older than 7 days in amber, older than 30 days in red. Add a "long-pending" filter chip.
+### B4.2: Verification SLA badges (DONE)
+**Files:** `admin-portal/src/pages/people/FacultyDocumentQueuePage.tsx`
+**Done:** Helpers `daysPending(createdAt)` + `slaBadgeFor(days)` compute amber (>7d) and red (>30d) badges. Fresh items (<7d) render no badge so the queue stays scannable. Badge appears under the upload date column.
 
-### B4.3: Bulk approve / reject
-**Status:** Pending
-**Notes:** Checkbox column on the queue page + "Approve selected (N)" / "Reject selected (N)" actions. Reject would prompt once for a shared reason.
+### B4.3: Long-pending filter chips (DONE)
+**Done:** Two new filter chips alongside the category filter — "7d+ pending (N)" amber and "Overdue 30d+ (N)" red. SLA filter is orthogonal to category filter; both compose.
 
-### B4.4: Finer-grained RBAC
-**Status:** Pending
-**Notes:** Today every `people.update` holder can approve. Phase B4 could add `faculty_documents.verify` as a separate permission so HoDs can approve their own department's docs without granting them full faculty-edit rights.
+### B4.4: Bulk approve / reject (DONE)
+**Files:** `backend/src/modules/people/faculty-document-service.ts`, `faculty-document-controller.ts`, `routes.ts`, `admin-portal/src/services/faculty-documents.ts`, `FacultyDocumentQueuePage.tsx`
+**Done:**
+- Backend: `bulkApproveFacultyDocuments(collegeId, docIds, performedBy, notes?)` and `bulkRejectFacultyDocuments(collegeId, docIds, performedBy, reason)` iterate ids and dispatch the per-doc service so the audit trail stays row-grained. Result shape: `{ approved/rejected: N, failures: [{ docId, error }] }` — failures don't abort the batch.
+- Routes: `POST /api/people/faculty-documents/bulk-approve` and `.../bulk-reject` (non-parameterised so they never collide with `/faculty/:facultyId/documents/:docId`).
+- UI: master checkbox in column 0, per-row checkboxes, toolbar appears when selection is non-empty showing "Approve N / Reject N / Clear". Reject prompts once for a shared reason that's applied verbatim to every doc. Selection auto-clears after a successful bulk call.
+- Filter-aware: hidden-by-filter selected ids are tracked separately so a stale id can't sneak into a bulk action — the toolbar shows "N selected (M hidden by filter)" when relevant.
+
+### B4.5: Finer-grained RBAC (DEFERRED)
+**Status:** Pending — risky for a single session.
+**Notes:** Today every `people.update` holder can approve. Adding a discrete `faculty_documents.verify` permission would let HoDs approve their own department's docs without granting them full faculty-edit rights. Requires changes across the auth middleware, the permission registry, and every callsite that gates faculty document mutations. Best handled as a focused RBAC PR.
 
 ---
 

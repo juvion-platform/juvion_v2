@@ -31,7 +31,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   FileText, Upload, Loader2, CheckCircle2, Clock, XCircle,
   AlertTriangle, ExternalLink, Trash2, ChevronDown, ChevronRight,
-  Check, X,
+  Check, X, History,
 } from 'lucide-react';
 
 import {
@@ -44,6 +44,7 @@ import {
   FacultyDocumentDoc,
   FacultyDocumentCategory,
 } from '../../services/faculty-documents';
+import FacultyDocumentAuditModal from './FacultyDocumentAuditModal';
 
 // ─── Doc type catalog ─────────────────────────────────────────────────
 
@@ -331,6 +332,9 @@ function DocumentCard({ facultyId, spec, docs, onMutated }: DocumentCardProps) {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Currently-open audit modal — null when closed. We key on docId so
+  // the same card can host History for any of its 1:N rows.
+  const [auditFor, setAuditFor] = useState<{ docId: string; title: string } | null>(null);
 
   // For 1:1, "Replace" semantics: upload new first, then archive the
   // previous best-effort. If archive fails (transient Mongo / network
@@ -462,6 +466,14 @@ function DocumentCard({ facultyId, spec, docs, onMutated }: DocumentCardProps) {
                     >
                       <ExternalLink size={12} />
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setAuditFor({ docId: doc._id, title: doc.title })}
+                      title="History / audit trail"
+                      className="p-1 rounded hover:bg-slate-100 text-slate-600"
+                    >
+                      <History size={12} />
+                    </button>
                     {doc.verificationStatus === 'pending' && (
                       <>
                         <button
@@ -528,6 +540,15 @@ function DocumentCard({ facultyId, spec, docs, onMutated }: DocumentCardProps) {
           }}
         />
       </div>
+      {auditFor && (
+        <FacultyDocumentAuditModal
+          facultyId={facultyId}
+          docId={auditFor.docId}
+          docTitle={auditFor.title}
+          open={true}
+          onClose={() => setAuditFor(null)}
+        />
+      )}
     </div>
   );
 }

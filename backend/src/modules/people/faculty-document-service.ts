@@ -34,7 +34,8 @@ import {
   FACULTY_DOCUMENT_CATEGORIES,
 } from '../../models/people/FacultyDocument';
 import { AppError } from '../../middleware/errorHandler';
-import { createAuditLog } from '../../shared/audit';
+import { AuditLog, createAuditLog } from '../../shared/audit';
+import type { IAuditLog } from '../../shared/audit';
 import {
   putObject,
   deleteObject,
@@ -459,4 +460,126 @@ export async function listPendingFacultyDocuments(
       select: 'employeeCode personId designation',
       populate: { path: 'personId', select: 'name' },
     });
+}
+
+// ─── Phase B4 — audit history + bulk verify ──────────────────────────
+
+/**
+ * Audit history for a single document. Pulls every AuditLog row keyed
+ * by entityType='FacultyDocument' + entityId=<docId>, sorted newest
+ * first. Includes the upload, every metadata edit, and every approve
+ * / reject. Used by the audit-history modal on the Documents tab.
+ *
+ * We re-confirm Faculty ownership (loadFacultyScoped) so a leaked
+ * docId on its own can't read audit history from another tenant.
+ */
+export async function getFacultyDocumentAuditHistory(
+  collegeId: string,
+  facultyId: string,
+  documentId: string,
+): Promise<IAuditLog[]> {
+  await getFacultyDocument(collegeId, facultyId, documentId);
+  return AuditLog.find({
+    collegeId: new Types.ObjectId(collegeId),
+    entityType: 'FacultyDocument',
+    entityId: documentId,
+  }).sort({ timestamp: -1 });
+}
+
+export interface BulkVerifyResult {
+  approved?: number;
+  rejected?: number;
+  failures: Array<{ docId: string; error: string }>;
+}
+
+/**
+ * Bulk approve: iterate the provided doc ids and call the per-doc
+ * service for each. Idempotent + safe — failures are collected per
+ * row rather than aborting the whole batch. Audit log entries are
+ * still written per doc (one row per approval), so the trail stays
+ * row-grained.
+ */
+export async function bulkApproveFacultyDocuments(
+  collegeId: string,
+  docIds: string[],
+  performedBy: string,
+  notes?: string,
+): Promise<BulkVerifyResult> {
+  const result: BulkVerifyResult = { approved: 0, failures: [] };
+  // Look up all docs in one round-trip so we can dispatch per-doc
+  // approval with the right facultyId on each.
+  const docs = await FacultyDocument.find({
+    _id: { $in: docIds.filter(Types.ObjectId.isValid).map((d) => new Types.ObjectId(d)) },
+    collegeId: new Types.ObjectId(collegeId),
+    archivedAt: null,
+  }).select({ _id: 1, facultyId: 1 });
+  const byId = new Map<string, IFacultyDocument>(
+    docs.map((d) => [String(d._id), d as IFacultyDocument]),
+  );
+  for (const docId of docIds) {
+    const doc = byId.get(docId);
+    if (!doc) {
+      result.failures.push({ docId, error: 'Document not found' });
+      continue;
+    }
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      await approveFacultyDocument(
+        collegeId,
+        String(doc.facultyId),
+        docId,
+        performedBy,
+        notes,
+      );
+      result.approved! += 1;
+    } catch (err) {
+      result.failures.push({ docId, error: (err as Error).message ?? 'approve failed' });
+    }
+  }
+  return result;
+}
+
+/**
+ * Bulk reject: same shape but requires a shared `reason` that lands
+ * on every rejected doc's verificationNotes.
+ */
+export async function bulkRejectFacultyDocuments(
+  collegeId: string,
+  docIds: string[],
+  performedBy: string,
+  reason: string,
+): Promise<BulkVerifyResult> {
+  if (!reason || !reason.trim()) {
+    throw new AppError(400, 'A rejection reason is required.');
+  }
+  const result: BulkVerifyResult = { rejected: 0, failures: [] };
+  const docs = await FacultyDocument.find({
+    _id: { $in: docIds.filter(Types.ObjectId.isValid).map((d) => new Types.ObjectId(d)) },
+    collegeId: new Types.ObjectId(collegeId),
+    archivedAt: null,
+  }).select({ _id: 1, facultyId: 1 });
+  const byId = new Map<string, IFacultyDocument>(
+    docs.map((d) => [String(d._id), d as IFacultyDocument]),
+  );
+  for (const docId of docIds) {
+    const doc = byId.get(docId);
+    if (!doc) {
+      result.failures.push({ docId, error: 'Document not found' });
+      continue;
+    }
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      await rejectFacultyDocument(
+        collegeId,
+        String(doc.facultyId),
+        docId,
+        performedBy,
+        reason,
+      );
+      result.rejected! += 1;
+    } catch (err) {
+      result.failures.push({ docId, error: (err as Error).message ?? 'reject failed' });
+    }
+  }
+  return result;
 }

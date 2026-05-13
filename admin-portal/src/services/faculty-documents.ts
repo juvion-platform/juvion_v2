@@ -169,3 +169,47 @@ export interface PendingFacultyDoc extends Omit<FacultyDocumentDoc, 'facultyId'>
 
 export const listPendingFacultyDocuments = (): Promise<{ items: PendingFacultyDoc[] }> =>
   api.get(`${BASE}/faculty-document-queue`).then((r) => r.data);
+
+// ─── Phase B4 — audit history + bulk verify ──────────────────────────
+
+export interface FacultyDocumentAuditEntry {
+  _id: string;
+  collegeId: string;
+  entityType: 'FacultyDocument';
+  entityId: string;
+  entityName: string;
+  action: string; // 'create' | 'update' | 'approve' | 'reject' | ...
+  changes: Array<{ field?: string; oldValue?: unknown; newValue?: unknown }>;
+  performedBy: string;
+  timestamp: string;
+}
+
+export const getFacultyDocumentAuditHistory = (
+  facultyId: string,
+  docId: string,
+): Promise<{ items: FacultyDocumentAuditEntry[] }> =>
+  api
+    .get(`${BASE}/faculty/${facultyId}/documents/${docId}/audit`)
+    .then((r) => r.data);
+
+export interface BulkVerifyResult {
+  approved?: number;
+  rejected?: number;
+  failures: Array<{ docId: string; error: string }>;
+}
+
+export const bulkApproveFacultyDocuments = (
+  docIds: string[],
+  notes?: string,
+): Promise<BulkVerifyResult> =>
+  api
+    .post(`${BASE}/faculty-documents/bulk-approve`, { docIds, notes })
+    .then((r) => r.data);
+
+export const bulkRejectFacultyDocuments = (
+  docIds: string[],
+  reason: string,
+): Promise<BulkVerifyResult> =>
+  api
+    .post(`${BASE}/faculty-documents/bulk-reject`, { docIds, reason })
+    .then((r) => r.data);
