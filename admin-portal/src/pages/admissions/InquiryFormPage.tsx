@@ -5,9 +5,25 @@ import { getInquiry, createInquiry, updateInquiry } from '../../services/admissi
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 
 const SOURCES = ['website', 'walk-in', 'referral', 'whatsapp', 'newspaper', 'social_media', 'education_fair', 'phone'] as const;
-const STATUSES = ['new', 'contacted', 'follow_up', 'interested', 'visit_scheduled', 'visited', 'qualified', 'converted', 'lost'] as const;
+// Strategic Gap 5 Phase A — 27-value prospect-status taxonomy. Mirrors
+// the Inquiry model + Zod schema. All legacy values stay valid.
+const STATUSES = [
+  'new', 'enrichment_pending',
+  'first_contact_attempt', 'contacted', 'no_response', 'callback_requested',
+  'wrong_number', 'do_not_contact',
+  'follow_up', 'follow_up_overdue', 'interested', 'sent_brochure',
+  'mql', 'sql',
+  'visit_scheduled', 'visit_completed', 'visited',
+  'counsellor_meeting_scheduled', 'counsellor_meeting_done',
+  'parent_meeting_done',
+  'qualified', 'eligibility_pending', 'fee_quoted',
+  'converted', 'lost', 'disqualified', 'dormant',
+  'duplicate_merged',
+] as const;
 const INTER_STREAMS = ['MPC', 'BiPC', 'MEC', 'CEC', 'other'] as const;
 const GENDERS = ['male', 'female', 'other'] as const;
+const MQL_SQL = ['mql', 'sql', 'disqualified'] as const;
+const LEAD_GRADES = ['hot', 'warm', 'cold', 'dormant'] as const;
 
 const emptyForm = {
   name: '', fatherName: '', phone: '', altPhone: '', email: '',
@@ -16,6 +32,12 @@ const emptyForm = {
   tenthPercentage: '', interPercentage: '', interStream: '', previousCollege: '',
   source: 'walk-in' as string, programmeInterest: '', branchInterest: '',
   status: 'new' as string, leadScore: '', notes: '', followUpDate: '', assignedTo: '',
+  // ─── Strategic Gap 5 — CRM fields ───────────────────────────────
+  utmSource: '', utmMedium: '', utmCampaign: '', utmTerm: '', utmContent: '',
+  mqlSqlClassification: '' as '' | 'mql' | 'sql' | 'disqualified',
+  leadGrade: '' as '' | 'hot' | 'warm' | 'cold' | 'dormant',
+  emailVerified: false,
+  mobileVerified: false,
 };
 
 export default function InquiryFormPage() {
@@ -58,6 +80,16 @@ export default function InquiryFormPage() {
         notes: existing.notes || '',
         followUpDate: existing.followUpDate ? existing.followUpDate.substring(0, 10) : '',
         assignedTo: existing.assignedTo || '',
+        // ─── Strategic Gap 5 CRM fields ─────────────────────────────
+        utmSource: existing.utmSource || '',
+        utmMedium: existing.utmMedium || '',
+        utmCampaign: existing.utmCampaign || '',
+        utmTerm: existing.utmTerm || '',
+        utmContent: existing.utmContent || '',
+        mqlSqlClassification: existing.mqlSqlClassification || '',
+        leadGrade: existing.leadGrade || '',
+        emailVerified: !!existing.emailVerified,
+        mobileVerified: !!existing.mobileVerified,
       });
     }
   }, [existing]);
@@ -86,7 +118,13 @@ export default function InquiryFormPage() {
     if (payload.tenthPercentage) payload.tenthPercentage = Number(payload.tenthPercentage); else delete payload.tenthPercentage;
     if (payload.interPercentage) payload.interPercentage = Number(payload.interPercentage); else delete payload.interPercentage;
     if (payload.leadScore) payload.leadScore = Number(payload.leadScore); else delete payload.leadScore;
+    // Booleans need preservation — the empty-string filter below
+    // would strip `false`. Re-attach after the filter.
+    const emailVerified = !!payload.emailVerified;
+    const mobileVerified = !!payload.mobileVerified;
     Object.keys(payload).forEach(k => { if (payload[k] === '') delete payload[k]; });
+    payload.emailVerified = emailVerified;
+    payload.mobileVerified = mobileVerified;
     if (isEdit) updateMut.mutate({ id, data: payload });
     else createMut.mutate(payload);
   }
@@ -291,6 +329,70 @@ export default function InquiryFormPage() {
             <div>
               <label className={lbl}>Notes</label>
               <textarea rows={3} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} className={inp} placeholder="Conversation notes, remarks, special requirements..." />
+            </div>
+          </div>
+        </section>
+
+        {/* ── Section 6: CRM (Strategic Gap 5) ─────────── */}
+        <section className="bg-white rounded-xl border shadow-sm">
+          <div className="px-5 py-4 border-b bg-navy/[0.03] rounded-t-xl">
+            <h3 className="font-semibold text-navy-dark">CRM & Attribution</h3>
+            <p className="text-xs text-gray-500 mt-0.5">UTM marketing source, funnel classification, verification flags. Match-rate reporting depends on these.</p>
+          </div>
+          <div className="p-5 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className={lbl}>MQL / SQL classification</label>
+                <select value={form.mqlSqlClassification} onChange={e => setForm(f => ({ ...f, mqlSqlClassification: e.target.value as typeof form.mqlSqlClassification }))} className={inp}>
+                  <option value="">— (unclassified)</option>
+                  {MQL_SQL.map(v => <option key={v} value={v}>{v.toUpperCase()}</option>)}
+                </select>
+                <p className="text-[10px] text-gray-400 mt-1">Orthogonal to lead grade. MQL = showed intent. SQL = officer-confirmed eligibility + intent-to-apply.</p>
+              </div>
+              <div>
+                <label className={lbl}>Lead grade</label>
+                <select value={form.leadGrade} onChange={e => setForm(f => ({ ...f, leadGrade: e.target.value as typeof form.leadGrade }))} className={inp}>
+                  <option value="">—</option>
+                  {LEAD_GRADES.map(v => <option key={v} value={v} className="capitalize">{v}</option>)}
+                </select>
+                <p className="text-[10px] text-gray-400 mt-1">Hot / warm / cold / dormant — separate from MQL/SQL.</p>
+              </div>
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+                  <input type="checkbox" checked={form.emailVerified} onChange={e => setForm(f => ({ ...f, emailVerified: e.target.checked }))} className="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+                  Email verified
+                </label>
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+                  <input type="checkbox" checked={form.mobileVerified} onChange={e => setForm(f => ({ ...f, mobileVerified: e.target.checked }))} className="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+                  Mobile verified
+                </label>
+              </div>
+            </div>
+            <div>
+              <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">UTM attribution</h4>
+              <p className="text-[11px] text-gray-500 mb-3">Marketing-campaign source the prospect arrived through. Auto-captured from landing-page URL on web form submits; backfilled by marketing for other channels.</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className={lbl}>UTM source</label>
+                  <input value={form.utmSource} onChange={e => setForm(f => ({ ...f, utmSource: e.target.value }))} className={inp} placeholder="e.g. google, facebook, naukri" />
+                </div>
+                <div>
+                  <label className={lbl}>UTM medium</label>
+                  <input value={form.utmMedium} onChange={e => setForm(f => ({ ...f, utmMedium: e.target.value }))} className={inp} placeholder="e.g. cpc, organic, referral" />
+                </div>
+                <div>
+                  <label className={lbl}>UTM campaign</label>
+                  <input value={form.utmCampaign} onChange={e => setForm(f => ({ ...f, utmCampaign: e.target.value }))} className={inp} placeholder="e.g. summer2025_btech" />
+                </div>
+                <div>
+                  <label className={lbl}>UTM term</label>
+                  <input value={form.utmTerm} onChange={e => setForm(f => ({ ...f, utmTerm: e.target.value }))} className={inp} placeholder="Keyword / ad-group term" />
+                </div>
+                <div className="md:col-span-2">
+                  <label className={lbl}>UTM content</label>
+                  <input value={form.utmContent} onChange={e => setForm(f => ({ ...f, utmContent: e.target.value }))} className={inp} placeholder="Ad variant / creative ID" />
+                </div>
+              </div>
             </div>
           </div>
         </section>

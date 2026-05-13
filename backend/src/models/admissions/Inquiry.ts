@@ -29,6 +29,37 @@ export interface IInquiry extends Document {
   // W01 intake enhancements
   aadhaarNumber?: string;
   languagePreference?: string;
+
+  // ─── Strategic Gap 5 — CRM depth (Phase A) ─────────────────────────
+  // UTM source attribution (mirrors what marketing-attribution tools
+  // pass via query params on the institution's landing pages).
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  utmTerm?: string;
+  utmContent?: string;
+
+  // MQL/SQL classification — orthogonal to leadGrade (hot/warm/cold).
+  // 'mql' = Marketing Qualified Lead (showed intent), 'sql' = Sales
+  // Qualified Lead (admissions officer confirmed eligibility +
+  // intent-to-apply), 'disqualified' = explicit no.
+  mqlSqlClassification?: 'mql' | 'sql' | 'disqualified';
+
+  // Verification flags — admin-gated booleans flipped after confirmation.
+  emailVerified?: boolean;
+  mobileVerified?: boolean;
+
+  // Officer-tier hierarchy. `assignedOfficerId` is a Person ref —
+  // canonical replacement for the legacy `assignedTo` string.
+  // `clusterHeadId` captures the within-tier hierarchy (officer's
+  // cluster head, not the same as department head).
+  assignedOfficerId?: Schema.Types.ObjectId;
+  clusterHeadId?: Schema.Types.ObjectId;
+
+  // Which assignment rule (if any) routed this inquiry to the
+  // current officer. Lets the admin trace "why did this lead land
+  // with officer X?"
+  assignedByRuleId?: Schema.Types.ObjectId;
 }
 
 const schema = new Schema<IInquiry>({
@@ -58,8 +89,52 @@ const schema = new Schema<IInquiry>({
   branchInterest: String,
   // Tracking
   date: { type: Date, default: Date.now },
-  status: { type: String, enum: ['new', 'contacted', 'follow_up', 'interested', 'visit_scheduled', 'visited', 'qualified', 'converted', 'lost'], default: 'new' },
-  leadScore: Number,
+  // Expanded status taxonomy — Strategic Gap 5. Mirrors CampX's
+  // prospect-stage depth so the funnel-stage filters can split the
+  // pipeline cleanly. The original 9 values stay valid; the new
+  // values surface intermediate states (no-response, callback,
+  // counsellor-meeting-scheduled, fee-quoted-pending, etc.).
+  status: {
+    type: String,
+    enum: [
+      // Top of funnel — fresh lead
+      'new',
+      'enrichment_pending',
+      // Initial outreach
+      'first_contact_attempt',
+      'contacted',
+      'no_response',
+      'callback_requested',
+      'wrong_number',
+      'do_not_contact',
+      // Engagement / nurturing
+      'follow_up',
+      'follow_up_overdue',
+      'interested',
+      'sent_brochure',
+      'mql',           // Marketing Qualified Lead
+      'sql',           // Sales Qualified Lead
+      // Visit + counselling
+      'visit_scheduled',
+      'visit_completed',
+      'visited',       // legacy alias for visit_completed
+      'counsellor_meeting_scheduled',
+      'counsellor_meeting_done',
+      'parent_meeting_done',
+      // Qualification + offer
+      'qualified',
+      'eligibility_pending',
+      'fee_quoted',
+      // Outcomes
+      'converted',
+      'lost',
+      'disqualified',
+      'dormant',
+      'duplicate_merged',
+    ],
+    default: 'new',
+  },
+  leadScore: { type: Number, min: 0, max: 100 },
   notes: String,
   followUpDate: Date,
   assignedTo: String,
@@ -75,9 +150,43 @@ const schema = new Schema<IInquiry>({
   // W01 intake enhancements
   aadhaarNumber: String,
   languagePreference: String,
+
+  // ─── Strategic Gap 5 — CRM depth (Phase A) ───────────────────────
+  // UTM source attribution. Captured from the landing-page URL on
+  // inquiry-form submit (or backfilled by the marketing team when
+  // they reconcile attribution).
+  utmSource: { type: String, trim: true },
+  utmMedium: { type: String, trim: true },
+  utmCampaign: { type: String, trim: true },
+  utmTerm: { type: String, trim: true },
+  utmContent: { type: String, trim: true },
+
+  // Funnel classification. Orthogonal to `leadGrade`.
+  mqlSqlClassification: {
+    type: String,
+    enum: ['mql', 'sql', 'disqualified'],
+  },
+
+  // Verification flags.
+  emailVerified: { type: Boolean, default: false },
+  mobileVerified: { type: Boolean, default: false },
+
+  // Officer hierarchy. `assignedOfficerId` is the canonical Person
+  // ref; `assignedTo` (string) is kept for backward compat — newly
+  // created inquiries should write `assignedOfficerId` exclusively.
+  assignedOfficerId: { type: Schema.Types.ObjectId, ref: 'Person' },
+  clusterHeadId: { type: Schema.Types.ObjectId, ref: 'Person' },
+  assignedByRuleId: { type: Schema.Types.ObjectId, ref: 'AssignmentRule' },
 }, { timestamps: true });
 
 schema.index({ collegeId: 1, status: 1 });
 schema.index({ collegeId: 1, phone: 1 });
+// Phase A — new indexes powering the CRM dashboard:
+// "who's working what" + "show me my pipeline by status".
+schema.index({ collegeId: 1, assignedOfficerId: 1, status: 1 });
+// "MQLs ready for SQL hand-off" + funnel reporting.
+schema.index({ collegeId: 1, mqlSqlClassification: 1 });
+// UTM attribution reports: "which campaign brought how many SQLs?"
+schema.index({ collegeId: 1, utmCampaign: 1 });
 
 export const Inquiry = model<IInquiry>('Inquiry', schema);
