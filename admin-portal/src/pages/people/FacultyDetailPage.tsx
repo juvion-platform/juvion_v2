@@ -6,6 +6,7 @@ import { getFaculty } from '../../services/people';
 import { listFacultyDocuments } from '../../services/faculty-documents';
 import {
   listFacultySubjects, listFacultyScholars, listFacultyBooks,
+  listFacultyPublications, listFacultyPatents, listFacultyProjects,
 } from '../../services/faculty-teaching';
 import Badge from '../../components/ui/Badge';
 import {
@@ -14,6 +15,7 @@ import {
 import PersonPhotoBlock from '../../components/people/PersonPhotoBlock';
 import FacultyDocumentsPanel from '../../components/people/FacultyDocumentsPanel';
 import FacultyTeachingPanel from '../../components/people/FacultyTeachingPanel';
+import FacultyResearchOutputsPanel from '../../components/people/FacultyResearchOutputsPanel';
 
 /**
  * Read-only view for a single Faculty member. Edit navigates to the
@@ -96,13 +98,14 @@ const EXTERNAL_ID_GROUPS: ReadonlyArray<{
   },
 ];
 
-type DetailTabKey = 'profile' | 'employment' | 'bio' | 'research' | 'documents' | 'teaching';
+type DetailTabKey = 'profile' | 'employment' | 'bio' | 'research' | 'teaching' | 'outputs' | 'documents';
 const DETAIL_TABS: ReadonlyArray<{ key: DetailTabKey; label: string }> = [
   { key: 'profile',    label: 'Profile' },
   { key: 'employment', label: 'Employment' },
   { key: 'bio',        label: 'Bio & Office' },
   { key: 'research',   label: 'Research IDs' },
-  { key: 'teaching',   label: 'Teaching & Research' },
+  { key: 'teaching',   label: 'Teaching' },
+  { key: 'outputs',    label: 'Research Outputs' },
   { key: 'documents',  label: 'Documents' },
 ];
 
@@ -179,6 +182,27 @@ export default function FacultyDetailPage() {
     (scholarsData?.items?.length ?? 0) +
     (booksData?.items?.length ?? 0);
 
+  // Research-outputs counts (Phase B original spec).
+  const { data: publicationsData } = useQuery({
+    queryKey: ['faculty-publications', id],
+    queryFn: () => listFacultyPublications(id!),
+    enabled: !!id,
+  });
+  const { data: patentsData } = useQuery({
+    queryKey: ['faculty-patents', id],
+    queryFn: () => listFacultyPatents(id!),
+    enabled: !!id,
+  });
+  const { data: projectsData } = useQuery({
+    queryKey: ['faculty-projects', id],
+    queryFn: () => listFacultyProjects(id!),
+    enabled: !!id,
+  });
+  const outputsCount =
+    (publicationsData?.items?.length ?? 0) +
+    (patentsData?.items?.length ?? 0) +
+    (projectsData?.items?.length ?? 0);
+
   return (
     <div className="max-w-5xl mx-auto space-y-4">
       <div className="flex items-start justify-between">
@@ -219,6 +243,7 @@ export default function FacultyDetailPage() {
               t.key === 'research' && populatedIdCount > 0 ? String(populatedIdCount) :
               t.key === 'documents' && documentCount > 0 ? String(documentCount) :
               t.key === 'teaching' && teachingCount > 0 ? String(teachingCount) :
+              t.key === 'outputs' && outputsCount > 0 ? String(outputsCount) :
               null;
             return (
               <button
@@ -404,10 +429,17 @@ export default function FacultyDetailPage() {
         </div>
       )}
 
-      {/* ── Teaching & Research tab ──────────────────────────────── */}
+      {/* ── Teaching tab ─────────────────────────────────────────── */}
       {tab === 'teaching' && id && (
         <div role="tabpanel" id="tabpanel-teaching" aria-labelledby="tab-teaching">
           <FacultyTeachingPanel facultyId={id} />
+        </div>
+      )}
+
+      {/* ── Research Outputs tab ─────────────────────────────────── */}
+      {tab === 'outputs' && id && (
+        <div role="tabpanel" id="tabpanel-outputs" aria-labelledby="tab-outputs">
+          <FacultyResearchOutputsPanel facultyId={id} />
         </div>
       )}
 

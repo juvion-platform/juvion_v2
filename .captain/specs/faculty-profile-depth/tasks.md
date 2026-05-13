@@ -32,23 +32,43 @@
 
 ---
 
-## Phase B — Research outputs (next session)
+## Phase B — Research outputs (SHIPPED)
 
-### B.1: `FacultyPublication` model with NAAC fields
-**Status:** Pending — superseded in part by Phase B1 (Bio & Office + generic FacultyDocument store).
-**Notes:** Fields: `title`, `authors`, `authorPosition`, `journal`, `year`, `volume`, `issue`, `pages`, `doi`, `indexingService` (scopus|wos|ugcCare|none), `quartile` (Q1|Q2|Q3|Q4|null), `impactPercentile` (number), `level` (international|national|regional), `sdgMapping` (string[], multi-select from UN SDG 1–17).
+### B.1: `FacultyPublication` model with NAAC fields (DONE)
+**Files:** `backend/src/models/people/FacultyPublication.ts`
+**Done:** Fields exactly per the spec — title, authors (string), authorPosition (free-text to support "first" / "corresponding" / "3 of 5"), type (journal/conference/book_chapter/symposium), journal, publisher, year, volume, issue, pages, doi, publicationDate, indexingService (scopus/wos/ugc_care/other_indexed/none), quartile (Q1-Q4), impactPercentile (0-100), level (international/national/regional), sdgMapping (string[] using UN codes sdg_1..sdg_17), citationCount, notes, archivedAt. Indexes on (collegeId, facultyId, archivedAt) for the panel and (collegeId, indexingService, year DESC) for NAAC-window reports.
 
-### B.2: Publications CRUD service + routes
-**Status:** Pending (depends: B.1)
+### B.2: `FacultyPatent` model + CRUD (DONE)
+**Files:** `backend/src/models/people/FacultyPatent.ts`
+**Done:** Fields: title, inventors (string), inventorRole (sole_inventor/first_inventor/co_inventor), jurisdiction (free-text), applicationNumber, patentNumber, ipcClassification, filingDate, publicationDate, grantDate, status (filed/published/granted/abandoned/expired), assignee (defaults to institution), abstract, notes, archivedAt. Indexes on (collegeId, facultyId, archivedAt) and (collegeId, status, jurisdiction).
 
-### B.3: Publications panel on FacultyDetailPage
-**Status:** Pending (depends: B.2)
+### B.3: `FacultyProject` model + CRUD (DONE)
+**Files:** `backend/src/models/people/FacultyProject.ts`
+**Done:** Fields: title, fundingAgency, agencyType (government_national/government_state/industry/international/non_government/internal — NAAC discriminator), investigatorRole (pi/co_pi/investigator), coInvestigators (string), sanctionAmount (INR), sanctionOrderNumber, sanctionOrderUrl, sanctionDate, startDate, endDate, durationMonths, status (proposed/ongoing/completed/terminated), abstract, outcomes, notes, archivedAt.
 
-### B.4: `FacultyPatent` model + CRUD + panel
-**Status:** Pending
+### B.4: Service + controller + routes (DONE)
+**Files:** `backend/src/modules/people/faculty-teaching-service.ts`, `faculty-teaching-controller.ts`, `routes.ts`
+**Done:** Extended the existing Phase D1 `makeCrud` factory with three new CRUD bundles (`publications`, `patents`, `projects`) and three new handler sets. 15 new routes under `/api/people/faculty/:facultyId/{publications,patents,projects}{,/:id}` — standard list/create/get/patch/archive 5-tuple per entity. All gated by `authorize('people', <action>)`.
 
-### B.5: `FacultyProject` model + CRUD + panel
-**Status:** Pending
+### B.5: Frontend panel (DONE)
+**Files:** `admin-portal/src/services/faculty-teaching.ts`, `admin-portal/src/components/people/FacultyResearchOutputsPanel.tsx`
+**Done:**
+- Service client extended with 3 entity types + 4 functions per (list/create/update/archive).
+- New `<FacultyResearchOutputsPanel />` renders three stacked sections (Publications, Patents, Sponsored projects). Each section: list table with NAAC-relevant columns + Add button + Edit / Archive actions per row.
+- Publication table shows: title + journal + DOI link, year, indexing pill (color-coded per service), quartile pill (color-coded Q1 emerald → Q4 slate), level, author position.
+- Patent table shows: title + inventor role, app # / patent #, jurisdiction, filing date, status pill.
+- Project table shows: title + funding agency, agency type, role, sanction amount (INR formatted with Intl.NumberFormat), period, status. Includes a "Total sanctioned" footer summing across rows.
+- Modals are heavier than Phase D1: Publication modal has a dedicated "NAAC scoring fields" sub-card with indexing + quartile + percentile + level + SDG multi-select chip-grid (17 SDG options). Patent modal includes IPC classification + 3 separate date fields. Project modal includes 6 agency types + sanction order link + outcomes.
+
+### B.6: Detail-page wiring (DONE)
+**Files:** `admin-portal/src/pages/people/FacultyDetailPage.tsx`
+**Done:**
+- 7th tab "Research Outputs" between "Teaching" and "Documents".
+- Renamed existing "Teaching & Research" tab to just "Teaching" since the new tab is where the research outputs actually live.
+- Combined badge sums publications + patents + projects counts.
+
+Backend smoke test:
+  POST /faculty/<id>/publications with quartile=Q1, indexingService=scopus, impactPercentile=92, sdgMapping=['sdg_4','sdg_9'] → 201 with full payload persisted; GET round-trips all NAAC scoring fields.
 
 ---
 

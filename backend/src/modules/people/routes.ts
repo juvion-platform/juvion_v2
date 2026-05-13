@@ -276,6 +276,94 @@ router.delete(
   facultyTeachingCtrl.bookHandlers.archive,
 );
 
+// ─── Faculty research outputs (Phase B — original spec) ──────────────
+// Three NAAC-shaped collections under each faculty member:
+//   /faculty/:facultyId/publications  — papers, conference + journal
+//   /faculty/:facultyId/patents       — IP filings
+//   /faculty/:facultyId/projects      — sponsored research
+// Same 5-route CRUD shape per entity. NAAC criteria 3.1–3.4.
+
+// Publications
+router.get(
+  '/faculty/:facultyId/publications',
+  authorize('people', 'read'),
+  facultyTeachingCtrl.publicationHandlers.list,
+);
+router.post(
+  '/faculty/:facultyId/publications',
+  authorize('people', 'update'),
+  facultyTeachingCtrl.publicationHandlers.create,
+);
+router.get(
+  '/faculty/:facultyId/publications/:id',
+  authorize('people', 'read'),
+  facultyTeachingCtrl.publicationHandlers.getOne,
+);
+router.patch(
+  '/faculty/:facultyId/publications/:id',
+  authorize('people', 'update'),
+  facultyTeachingCtrl.publicationHandlers.update,
+);
+router.delete(
+  '/faculty/:facultyId/publications/:id',
+  authorize('people', 'delete'),
+  facultyTeachingCtrl.publicationHandlers.archive,
+);
+
+// Patents
+router.get(
+  '/faculty/:facultyId/patents',
+  authorize('people', 'read'),
+  facultyTeachingCtrl.patentHandlers.list,
+);
+router.post(
+  '/faculty/:facultyId/patents',
+  authorize('people', 'update'),
+  facultyTeachingCtrl.patentHandlers.create,
+);
+router.get(
+  '/faculty/:facultyId/patents/:id',
+  authorize('people', 'read'),
+  facultyTeachingCtrl.patentHandlers.getOne,
+);
+router.patch(
+  '/faculty/:facultyId/patents/:id',
+  authorize('people', 'update'),
+  facultyTeachingCtrl.patentHandlers.update,
+);
+router.delete(
+  '/faculty/:facultyId/patents/:id',
+  authorize('people', 'delete'),
+  facultyTeachingCtrl.patentHandlers.archive,
+);
+
+// Projects
+router.get(
+  '/faculty/:facultyId/projects',
+  authorize('people', 'read'),
+  facultyTeachingCtrl.projectHandlers.list,
+);
+router.post(
+  '/faculty/:facultyId/projects',
+  authorize('people', 'update'),
+  facultyTeachingCtrl.projectHandlers.create,
+);
+router.get(
+  '/faculty/:facultyId/projects/:id',
+  authorize('people', 'read'),
+  facultyTeachingCtrl.projectHandlers.getOne,
+);
+router.patch(
+  '/faculty/:facultyId/projects/:id',
+  authorize('people', 'update'),
+  facultyTeachingCtrl.projectHandlers.update,
+);
+router.delete(
+  '/faculty/:facultyId/projects/:id',
+  authorize('people', 'delete'),
+  facultyTeachingCtrl.projectHandlers.archive,
+);
+
 // Staff
 router.get('/staff', authorize('people', 'read'), ctrl.listStaff);
 router.get('/staff/:id', authorize('people', 'read'), ctrl.getStaff);

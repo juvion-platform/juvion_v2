@@ -31,6 +31,12 @@ import {
   IFacultyResearchScholar,
 } from '../../models/people/FacultyResearchScholar';
 import { FacultyBook, IFacultyBook } from '../../models/people/FacultyBook';
+import {
+  FacultyPublication,
+  IFacultyPublication,
+} from '../../models/people/FacultyPublication';
+import { FacultyPatent, IFacultyPatent } from '../../models/people/FacultyPatent';
+import { FacultyProject, IFacultyProject } from '../../models/people/FacultyProject';
 import { AppError } from '../../middleware/errorHandler';
 
 // ─── Shared helpers ───────────────────────────────────────────────────
@@ -143,3 +149,14 @@ export const researchScholars = makeCrud<IFacultyResearchScholar>(
 );
 
 export const books = makeCrud<IFacultyBook>(FacultyBook, 'Book');
+
+// ─── Phase B (original spec) — Research-output CRUD bundles ──────────
+
+export const publications = makeCrud<IFacultyPublication>(
+  FacultyPublication,
+  'Publication',
+);
+
+export const patents = makeCrud<IFacultyPatent>(FacultyPatent, 'Patent');
+
+export const projects = makeCrud<IFacultyProject>(FacultyProject, 'Project');

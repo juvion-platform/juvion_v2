@@ -184,3 +184,182 @@ export const archiveFacultyBook = (
   id: string,
 ): Promise<{ archived: true; archivedAt: string }> =>
   api.delete(`${booksBase(facultyId)}/${id}`).then((r) => r.data);
+
+// ─── Publications (Phase B original spec — NAAC research outputs) ───
+
+export type FacultyPublicationIndexing =
+  | 'scopus' | 'wos' | 'ugc_care' | 'other_indexed' | 'none';
+export type FacultyPublicationQuartile = 'Q1' | 'Q2' | 'Q3' | 'Q4';
+export type FacultyPublicationLevel = 'international' | 'national' | 'regional';
+export type FacultyPublicationType =
+  | 'journal' | 'conference' | 'book_chapter' | 'symposium';
+
+export interface FacultyPublicationDoc {
+  _id: string;
+  collegeId: string;
+  facultyId: string;
+  title: string;
+  authors: string;
+  authorPosition: string;
+  type: FacultyPublicationType;
+  journal: string;
+  publisher?: string;
+  year: number;
+  volume?: string;
+  issue?: string;
+  pages?: string;
+  doi?: string;
+  publicationDate?: string;
+  indexingService: FacultyPublicationIndexing;
+  quartile?: FacultyPublicationQuartile;
+  impactPercentile?: number;
+  level: FacultyPublicationLevel;
+  sdgMapping?: string[];
+  citationCount?: number;
+  notes?: string;
+  archivedAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+const pubBase = (fid: string) => `${BASE}/faculty/${fid}/publications`;
+
+export const listFacultyPublications = (
+  facultyId: string,
+): Promise<{ items: FacultyPublicationDoc[] }> =>
+  api.get(pubBase(facultyId)).then((r) => r.data);
+
+export const createFacultyPublication = (
+  facultyId: string,
+  data: Partial<FacultyPublicationDoc>,
+): Promise<FacultyPublicationDoc> =>
+  api.post(pubBase(facultyId), data).then((r) => r.data);
+
+export const updateFacultyPublication = (
+  facultyId: string,
+  id: string,
+  patch: Partial<FacultyPublicationDoc>,
+): Promise<FacultyPublicationDoc> =>
+  api.patch(`${pubBase(facultyId)}/${id}`, patch).then((r) => r.data);
+
+export const archiveFacultyPublication = (
+  facultyId: string,
+  id: string,
+): Promise<{ archived: true; archivedAt: string }> =>
+  api.delete(`${pubBase(facultyId)}/${id}`).then((r) => r.data);
+
+// ─── Patents ──────────────────────────────────────────────────────
+
+export type FacultyPatentStatus =
+  | 'filed' | 'published' | 'granted' | 'abandoned' | 'expired';
+export type FacultyPatentInventorRole =
+  | 'sole_inventor' | 'first_inventor' | 'co_inventor';
+
+export interface FacultyPatentDoc {
+  _id: string;
+  collegeId: string;
+  facultyId: string;
+  title: string;
+  inventors: string;
+  inventorRole: FacultyPatentInventorRole;
+  jurisdiction: string;
+  applicationNumber: string;
+  patentNumber?: string;
+  ipcClassification?: string;
+  filingDate: string;
+  publicationDate?: string;
+  grantDate?: string;
+  status: FacultyPatentStatus;
+  assignee?: string;
+  abstract?: string;
+  notes?: string;
+  archivedAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+const patBase = (fid: string) => `${BASE}/faculty/${fid}/patents`;
+
+export const listFacultyPatents = (
+  facultyId: string,
+): Promise<{ items: FacultyPatentDoc[] }> =>
+  api.get(patBase(facultyId)).then((r) => r.data);
+
+export const createFacultyPatent = (
+  facultyId: string,
+  data: Partial<FacultyPatentDoc>,
+): Promise<FacultyPatentDoc> =>
+  api.post(patBase(facultyId), data).then((r) => r.data);
+
+export const updateFacultyPatent = (
+  facultyId: string,
+  id: string,
+  patch: Partial<FacultyPatentDoc>,
+): Promise<FacultyPatentDoc> =>
+  api.patch(`${patBase(facultyId)}/${id}`, patch).then((r) => r.data);
+
+export const archiveFacultyPatent = (
+  facultyId: string,
+  id: string,
+): Promise<{ archived: true; archivedAt: string }> =>
+  api.delete(`${patBase(facultyId)}/${id}`).then((r) => r.data);
+
+// ─── Projects ─────────────────────────────────────────────────────
+
+export type FacultyProjectStatus =
+  | 'proposed' | 'ongoing' | 'completed' | 'terminated';
+export type FacultyProjectAgencyType =
+  | 'government_national' | 'government_state' | 'industry'
+  | 'international' | 'non_government' | 'internal';
+export type FacultyProjectInvestigatorRole = 'pi' | 'co_pi' | 'investigator';
+
+export interface FacultyProjectDoc {
+  _id: string;
+  collegeId: string;
+  facultyId: string;
+  title: string;
+  fundingAgency: string;
+  agencyType: FacultyProjectAgencyType;
+  investigatorRole: FacultyProjectInvestigatorRole;
+  coInvestigators?: string;
+  sanctionAmount: number;
+  sanctionOrderNumber?: string;
+  sanctionOrderUrl?: string;
+  sanctionDate?: string;
+  startDate: string;
+  endDate?: string;
+  durationMonths?: number;
+  status: FacultyProjectStatus;
+  abstract?: string;
+  outcomes?: string;
+  notes?: string;
+  archivedAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+const projBase = (fid: string) => `${BASE}/faculty/${fid}/projects`;
+
+export const listFacultyProjects = (
+  facultyId: string,
+): Promise<{ items: FacultyProjectDoc[] }> =>
+  api.get(projBase(facultyId)).then((r) => r.data);
+
+export const createFacultyProject = (
+  facultyId: string,
+  data: Partial<FacultyProjectDoc>,
+): Promise<FacultyProjectDoc> =>
+  api.post(projBase(facultyId), data).then((r) => r.data);
+
+export const updateFacultyProject = (
+  facultyId: string,
+  id: string,
+  patch: Partial<FacultyProjectDoc>,
+): Promise<FacultyProjectDoc> =>
+  api.patch(`${projBase(facultyId)}/${id}`, patch).then((r) => r.data);
+
+export const archiveFacultyProject = (
+  facultyId: string,
+  id: string,
+): Promise<{ archived: true; archivedAt: string }> =>
+  api.delete(`${projBase(facultyId)}/${id}`).then((r) => r.data);

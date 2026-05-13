@@ -21,6 +21,9 @@ import {
   subjectAssignments,
   researchScholars,
   books,
+  publications,
+  patents,
+  projects,
 } from './faculty-teaching-service';
 
 /**
@@ -80,3 +83,8 @@ function makeHandlers(bundle: CrudBundle) {
 export const subjectHandlers = makeHandlers(subjectAssignments);
 export const scholarHandlers = makeHandlers(researchScholars);
 export const bookHandlers = makeHandlers(books);
+
+// Phase B (original) — research outputs
+export const publicationHandlers = makeHandlers(publications);
+export const patentHandlers = makeHandlers(patents);
+export const projectHandlers = makeHandlers(projects);
