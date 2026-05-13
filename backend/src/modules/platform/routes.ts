@@ -3,6 +3,7 @@ import { authenticate } from '../../middleware/authenticate';
 import { authorize } from '../../middleware/authorize';
 import { validate } from '../../middleware/validate';
 import * as ctrl from './controller';
+import * as bulkImportCtrl from './bulk-import-controller';
 import {
   createAnnouncementSchema, updateAnnouncementSchema,
   createCircularSchema, updateCircularSchema,
@@ -83,5 +84,46 @@ router.get('/rbac-policies/:id', authorize('platform', 'read'), ctrl.getRbacPoli
 router.post('/rbac-policies', authorize('platform', 'create'), validate(createRbacPolicySchema), ctrl.createRbacPolicy);
 router.put('/rbac-policies/:id', authorize('platform', 'update'), validate(updateRbacPolicySchema), ctrl.updateRbacPolicy);
 router.delete('/rbac-policies/:id', authorize('platform', 'delete'), ctrl.deleteRbacPolicy);
+
+// ─── Bulk Imports (Strategic Gap 2 — BULKIMP sub-domain) ─────────────
+// Schema-driven CSV import surface. Static endpoint-types path BEFORE
+// the parameterised :id path so it never gets eaten by the matcher.
+router.get(
+  '/bulk-imports/entity-types',
+  authorize('platform', 'read'),
+  bulkImportCtrl.listEntityTypesHandler,
+);
+router.get(
+  '/bulk-imports',
+  authorize('platform', 'read'),
+  bulkImportCtrl.listImportJobsHandler,
+);
+router.post(
+  '/bulk-imports',
+  authorize('platform', 'create'),
+  bulkImportCtrl.importFileUpload.single('file'),
+  bulkImportCtrl.importMulterErrorHandler,
+  bulkImportCtrl.uploadImportHandler,
+);
+router.get(
+  '/bulk-imports/:id',
+  authorize('platform', 'read'),
+  bulkImportCtrl.getImportJobHandler,
+);
+router.get(
+  '/bulk-imports/:id/source-url',
+  authorize('platform', 'read'),
+  bulkImportCtrl.getImportJobSourceUrlHandler,
+);
+router.post(
+  '/bulk-imports/:id/commit',
+  authorize('platform', 'update'),
+  bulkImportCtrl.commitImportJobHandler,
+);
+router.delete(
+  '/bulk-imports/:id',
+  authorize('platform', 'delete'),
+  bulkImportCtrl.archiveImportJobHandler,
+);
 
 export default router;
