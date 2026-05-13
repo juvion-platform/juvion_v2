@@ -669,6 +669,14 @@ export async function createFaculty(collegeId: string, data: any, performedBy: s
   if (data.externalIds && typeof data.externalIds === 'object') {
     fields.externalIds = data.externalIds;
   }
+  // profileBio + office are Phase B1 content blocks. Same shape rule as
+  // externalIds — only persist when present and an object.
+  if (data.profileBio && typeof data.profileBio === 'object') {
+    fields.profileBio = data.profileBio;
+  }
+  if (data.office && typeof data.office === 'object') {
+    fields.office = data.office;
+  }
   const doc = await Faculty.create(fields);
   await createAuditLog({ collegeId, entityType: 'Faculty', entityId: String(doc._id), entityName: data.name, action: 'create', changes: [], performedBy });
   return { ...doc.toObject(), person: person.toObject() };
@@ -690,6 +698,13 @@ export async function updateFaculty(collegeId: string, id: string, data: any, pe
   // the path level so partial updates work as expected.
   if (data.externalIds !== undefined) {
     facFields.externalIds = data.externalIds;
+  }
+  // Same whole-object semantics for profileBio + office (Phase B1).
+  if (data.profileBio !== undefined) {
+    facFields.profileBio = data.profileBio;
+  }
+  if (data.office !== undefined) {
+    facFields.office = data.office;
   }
   if (Object.keys(facFields).length > 0) await Faculty.findByIdAndUpdate(id, { $set: facFields });
 

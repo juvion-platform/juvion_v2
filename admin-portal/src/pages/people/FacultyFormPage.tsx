@@ -98,12 +98,51 @@ const EXTERNAL_ID_GROUPS: ReadonlyArray<IdGroup> = [
   },
 ];
 
-type FormTabKey = 'profile' | 'academic' | 'research';
+type FormTabKey = 'profile' | 'academic' | 'research' | 'bio';
 const FORM_TABS: ReadonlyArray<{ key: FormTabKey; label: string }> = [
   { key: 'profile',  label: 'Profile' },
   { key: 'academic', label: 'Employment' },
+  { key: 'bio',      label: 'Bio & Office' },
   { key: 'research', label: 'Research IDs' },
 ];
+
+/**
+ * Bio + office form state. `expertiseTags`, `researchInterests`, and
+ * `teachingInterests` are comma-separated strings in the form; we
+ * split/join on the boundary so the backend always sees a string[].
+ * `languages` stays an array of pairs in form state so the operator
+ * can edit code + proficiency independently per row.
+ */
+interface LanguageRow {
+  code: string;
+  proficiency: 'native' | 'fluent' | 'conversational' | 'basic' | '';
+}
+const LANGUAGE_PROFICIENCIES: ReadonlyArray<LanguageRow['proficiency']> = ['native', 'fluent', 'conversational', 'basic'];
+
+interface BioForm {
+  summary: string;
+  tagline: string;
+  expertiseTags: string;       // comma-separated
+  researchInterests: string;   // comma-separated
+  teachingInterests: string;   // comma-separated
+  languages: LanguageRow[];
+}
+interface OfficeForm {
+  building: string;
+  cabinNumber: string;
+  phoneExtension: string;
+  weeklyHours: string;
+}
+const EMPTY_BIO: BioForm = { summary: '', tagline: '', expertiseTags: '', researchInterests: '', teachingInterests: '', languages: [] };
+const EMPTY_OFFICE: OfficeForm = { building: '', cabinNumber: '', phoneExtension: '', weeklyHours: '' };
+
+/** Comma-separated string ↔ trimmed-non-empty array. */
+function csvToArray(s: string): string[] {
+  return s.split(',').map((t) => t.trim()).filter((t) => t.length > 0);
+}
+function arrayToCsv(a?: string[]): string {
+  return (a ?? []).join(', ');
+}
 
 type ExternalIdsForm = Record<ExternalIdKey, string>;
 const EMPTY_EXTERNAL_IDS: ExternalIdsForm = Object.fromEntries(
@@ -129,6 +168,8 @@ export default function FacultyFormPage() {
   const qc = useQueryClient();
   const [form, setForm] = useState(emptyForm);
   const [externalIds, setExternalIds] = useState<ExternalIdsForm>(EMPTY_EXTERNAL_IDS);
+  const [bio, setBio] = useState<BioForm>(EMPTY_BIO);
+  const [office, setOffice] = useState<OfficeForm>(EMPTY_OFFICE);
   const [formTab, setFormTab] = useState<FormTabKey>('profile');
   const [validationError, setValidationError] = useState('');
 
@@ -169,6 +210,26 @@ export default function FacultyFormPage() {
         hydrated[key] = ex[key] ?? '';
       }
       setExternalIds(hydrated);
+      // Hydrate bio + office. Arrays-of-strings collapse to CSV for
+      // the textarea-friendly chip inputs.
+      const exBio = (existing.profileBio || {}) as Record<string, any>;
+      setBio({
+        summary: exBio.summary ?? '',
+        tagline: exBio.tagline ?? '',
+        expertiseTags: arrayToCsv(exBio.expertiseTags),
+        researchInterests: arrayToCsv(exBio.researchInterests),
+        teachingInterests: arrayToCsv(exBio.teachingInterests),
+        languages: Array.isArray(exBio.languages)
+          ? exBio.languages.map((l: any) => ({ code: l?.code ?? '', proficiency: l?.proficiency ?? '' }))
+          : [],
+      });
+      const exOffice = (existing.office || {}) as Record<string, any>;
+      setOffice({
+        building: exOffice.building ?? '',
+        cabinNumber: exOffice.cabinNumber ?? '',
+        phoneExtension: exOffice.phoneExtension ?? '',
+        weeklyHours: exOffice.weeklyHours ?? '',
+      });
     }
   }, [existing]);
 
@@ -241,6 +302,35 @@ export default function FacultyFormPage() {
       // null out the bag.
       payload.externalIds = {};
     }
+
+    // profileBio — only include populated fields. Empty arrays are
+    // dropped so the backend's $set doesn't store `[]` placeholders.
+    const bioPayload: Record<string, unknown> = {};
+    if (bio.summary.trim()) bioPayload.summary = bio.summary.trim();
+    if (bio.tagline.trim()) bioPayload.tagline = bio.tagline.trim();
+    const tags = csvToArray(bio.expertiseTags);
+    if (tags.length) bioPayload.expertiseTags = tags;
+    const ri = csvToArray(bio.researchInterests);
+    if (ri.length) bioPayload.researchInterests = ri;
+    const ti = csvToArray(bio.teachingInterests);
+    if (ti.length) bioPayload.teachingInterests = ti;
+    const langs = bio.languages
+      .filter((l) => l.code.trim().length > 0)
+      .map((l) => {
+        const out: Record<string, string> = { code: l.code.trim() };
+        if (l.proficiency) out.proficiency = l.proficiency;
+        return out;
+      });
+    if (langs.length) bioPayload.languages = langs;
+    if (Object.keys(bioPayload).length > 0) payload.profileBio = bioPayload;
+
+    // office — same pattern.
+    const officePayload: Record<string, string> = {};
+    if (office.building.trim()) officePayload.building = office.building.trim();
+    if (office.cabinNumber.trim()) officePayload.cabinNumber = office.cabinNumber.trim();
+    if (office.phoneExtension.trim()) officePayload.phoneExtension = office.phoneExtension.trim();
+    if (office.weeklyHours.trim()) officePayload.weeklyHours = office.weeklyHours.trim();
+    if (Object.keys(officePayload).length > 0) payload.office = officePayload;
 
     if (isEdit) updateMut.mutate({ id, data: payload });
     else createMut.mutate(payload);
@@ -383,6 +473,191 @@ export default function FacultyFormPage() {
                 <div><label className={lbl}>Specialization</label><input value={form.specialization} onChange={e => setForm(f => ({ ...f, specialization: e.target.value }))} className={inp} placeholder="e.g. Data Science, AI/ML" /></div>
                 <div><label className={lbl}>Contract Type</label><select value={form.contractType} onChange={e => setForm(f => ({ ...f, contractType: e.target.value }))} className={inp}>{CONTRACT_TYPES.map(c => <option key={c} value={c} className="capitalize">{c}</option>)}</select></div>
                 <div><label className={lbl}>Status</label><select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className={inp}>{STATUSES.map(s => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}</select></div>
+              </div>
+            </section>
+          </div>
+        )}
+
+        {/* ── Bio & Office tab ─────────────────────────────────────── */}
+        {formTab === 'bio' && (
+          <div role="tabpanel" id="form-tabpanel-bio" aria-labelledby="form-tab-bio" className="space-y-6">
+            <section className="bg-white rounded-xl border shadow-sm">
+              <div className="px-5 py-4 border-b bg-navy/[0.03] rounded-t-xl">
+                <h3 className="font-semibold text-navy-dark">Professional Bio</h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Public-facing summary that powers the college-website faculty
+                  directory and NAAC-evidence faculty profiles.
+                </p>
+              </div>
+              <div className="p-5 grid grid-cols-1 gap-4">
+                <div>
+                  <label className={lbl}>Tagline</label>
+                  <input
+                    value={bio.tagline}
+                    onChange={(e) => setBio((b) => ({ ...b, tagline: e.target.value }))}
+                    className={inp}
+                    placeholder="One-liner — e.g. 'NLP & deep-learning researcher with 12 years of industry experience.'"
+                  />
+                </div>
+                <div>
+                  <label className={lbl}>Summary</label>
+                  <textarea
+                    value={bio.summary}
+                    onChange={(e) => setBio((b) => ({ ...b, summary: e.target.value }))}
+                    className={inp + ' min-h-[120px] resize-y'}
+                    placeholder="Paragraph-length bio. Background, research focus, notable contributions, current work."
+                    rows={5}
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className={lbl}>Expertise tags</label>
+                    <input
+                      value={bio.expertiseTags}
+                      onChange={(e) => setBio((b) => ({ ...b, expertiseTags: e.target.value }))}
+                      className={inp}
+                      placeholder="Comma-separated, e.g. NLP, ML, Computer Vision"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">Comma-separated</p>
+                  </div>
+                  <div>
+                    <label className={lbl}>Research interests</label>
+                    <input
+                      value={bio.researchInterests}
+                      onChange={(e) => setBio((b) => ({ ...b, researchInterests: e.target.value }))}
+                      className={inp}
+                      placeholder="Comma-separated"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">Comma-separated</p>
+                  </div>
+                  <div>
+                    <label className={lbl}>Teaching interests</label>
+                    <input
+                      value={bio.teachingInterests}
+                      onChange={(e) => setBio((b) => ({ ...b, teachingInterests: e.target.value }))}
+                      className={inp}
+                      placeholder="Comma-separated"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">Comma-separated</p>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section className="bg-white rounded-xl border shadow-sm">
+              <div className="px-5 py-4 border-b bg-navy/[0.03] rounded-t-xl">
+                <h3 className="font-semibold text-navy-dark">Languages</h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Languages spoken with proficiency level — relevant for student
+                  mentor assignment and NAAC diversity reporting.
+                </p>
+              </div>
+              <div className="p-5 space-y-3">
+                {bio.languages.length === 0 && (
+                  <p className="text-sm text-gray-400 italic">No languages added yet.</p>
+                )}
+                {bio.languages.map((row, i) => (
+                  <div key={i} className="grid grid-cols-1 md:grid-cols-[2fr_2fr_auto] gap-3 items-end">
+                    <div>
+                      <label className={lbl}>Language</label>
+                      <input
+                        value={row.code}
+                        onChange={(e) =>
+                          setBio((b) => ({
+                            ...b,
+                            languages: b.languages.map((l, j) => j === i ? { ...l, code: e.target.value } : l),
+                          }))
+                        }
+                        className={inp}
+                        placeholder="e.g. English, Telugu, Hindi"
+                      />
+                    </div>
+                    <div>
+                      <label className={lbl}>Proficiency</label>
+                      <select
+                        value={row.proficiency}
+                        onChange={(e) =>
+                          setBio((b) => ({
+                            ...b,
+                            languages: b.languages.map((l, j) => j === i ? { ...l, proficiency: e.target.value as LanguageRow['proficiency'] } : l),
+                          }))
+                        }
+                        className={inp}
+                      >
+                        <option value="">—</option>
+                        {LANGUAGE_PROFICIENCIES.map((p) => (
+                          <option key={p} value={p} className="capitalize">{p}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setBio((b) => ({ ...b, languages: b.languages.filter((_, j) => j !== i) }))
+                      }
+                      className="px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded border border-red-200"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setBio((b) => ({
+                      ...b,
+                      languages: [...b.languages, { code: '', proficiency: '' }],
+                    }))
+                  }
+                  className="px-3 py-2 text-sm text-primary-600 hover:bg-primary-50 rounded border border-primary-200"
+                >
+                  + Add language
+                </button>
+              </div>
+            </section>
+
+            <section className="bg-white rounded-xl border shadow-sm">
+              <div className="px-5 py-4 border-b bg-navy/[0.03] rounded-t-xl">
+                <h3 className="font-semibold text-navy-dark">Office</h3>
+                <p className="text-xs text-gray-500 mt-0.5">Where students can find this faculty member.</p>
+              </div>
+              <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className={lbl}>Building</label>
+                  <input
+                    value={office.building}
+                    onChange={(e) => setOffice((o) => ({ ...o, building: e.target.value }))}
+                    className={inp}
+                    placeholder="e.g. Block A, CSE Wing"
+                  />
+                </div>
+                <div>
+                  <label className={lbl}>Cabin / room number</label>
+                  <input
+                    value={office.cabinNumber}
+                    onChange={(e) => setOffice((o) => ({ ...o, cabinNumber: e.target.value }))}
+                    className={inp}
+                    placeholder="e.g. A-204"
+                  />
+                </div>
+                <div>
+                  <label className={lbl}>Phone extension</label>
+                  <input
+                    value={office.phoneExtension}
+                    onChange={(e) => setOffice((o) => ({ ...o, phoneExtension: e.target.value }))}
+                    className={inp}
+                    placeholder="e.g. 4421"
+                  />
+                </div>
+                <div>
+                  <label className={lbl}>Weekly office hours</label>
+                  <input
+                    value={office.weeklyHours}
+                    onChange={(e) => setOffice((o) => ({ ...o, weeklyHours: e.target.value }))}
+                    className={inp}
+                    placeholder="e.g. Mon–Wed 11:00–13:00"
+                  />
+                </div>
               </div>
             </section>
           </div>

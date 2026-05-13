@@ -127,6 +127,29 @@ const facultyExternalIdsSchema = z.object({
   website: z.string().trim().optional(),
 });
 
+// Bio / professional summary — public-facing free-text profile block
+// added in Phase B1 of the Faculty Profile depth spec.
+const facultyLanguageSchema = z.object({
+  code: z.string().trim().min(1),
+  proficiency: z.enum(['native', 'fluent', 'conversational', 'basic']).optional(),
+});
+
+const facultyProfileBioSchema = z.object({
+  summary: z.string().trim().optional(),
+  tagline: z.string().trim().optional(),
+  expertiseTags: z.array(z.string().trim().min(1)).optional(),
+  researchInterests: z.array(z.string().trim().min(1)).optional(),
+  teachingInterests: z.array(z.string().trim().min(1)).optional(),
+  languages: z.array(facultyLanguageSchema).optional(),
+});
+
+const facultyOfficeSchema = z.object({
+  building: z.string().trim().optional(),
+  cabinNumber: z.string().trim().optional(),
+  phoneExtension: z.string().trim().optional(),
+  weeklyHours: z.string().trim().optional(),
+});
+
 export const createFacultySchema = basePersonSchema.extend({
   employeeCode: z.string().min(1, 'Employee code required'),
   designation: z.string().min(1, 'Designation required'),
@@ -138,6 +161,8 @@ export const createFacultySchema = basePersonSchema.extend({
   contractType: z.enum(['regular', 'contract', 'adjunct', 'visiting']).optional(),
   status: z.enum(['active', 'on_leave', 'separated']).optional(),
   externalIds: facultyExternalIdsSchema.optional(),
+  profileBio: facultyProfileBioSchema.optional(),
+  office: facultyOfficeSchema.optional(),
 });
 export const updateFacultySchema = createFacultySchema.partial();
 

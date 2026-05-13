@@ -16,6 +16,7 @@ import {
   staffPhotoHandlers,
   parentPhotoHandlers,
 } from './photo-controller';
+import * as facultyDocCtrl from './faculty-document-controller';
 import { searchPeopleController } from './search-controller';
 import { searchQuerySchema } from './search-validation';
 import {
@@ -110,6 +111,44 @@ router.get(
   '/faculty/:id/photo-url',
   authorize('people', 'read'),
   facultyPhotoHandlers.getUrl,
+);
+
+// ─── Faculty credential documents (Strategic Gap 1 Phase B) ──────────
+// Generic credential-evidence store: PhD certificate, PAN, experience
+// certs, FDP certificates, awards, etc. — all 12 categories share this
+// surface. v1 ships the CRUD + view-URL endpoints; the verification
+// approve/reject endpoints come in Phase C.
+router.get(
+  '/faculty/:facultyId/documents',
+  authorize('people', 'read'),
+  facultyDocCtrl.listFacultyDocumentsHandler,
+);
+router.post(
+  '/faculty/:facultyId/documents',
+  authorize('people', 'update'),
+  facultyDocCtrl.documentUpload.single('file'),
+  facultyDocCtrl.documentMulterErrorHandler,
+  facultyDocCtrl.uploadFacultyDocumentHandler,
+);
+router.get(
+  '/faculty/:facultyId/documents/:docId',
+  authorize('people', 'read'),
+  facultyDocCtrl.getFacultyDocumentHandler,
+);
+router.get(
+  '/faculty/:facultyId/documents/:docId/view',
+  authorize('people', 'read'),
+  facultyDocCtrl.getFacultyDocumentViewUrlHandler,
+);
+router.patch(
+  '/faculty/:facultyId/documents/:docId',
+  authorize('people', 'update'),
+  facultyDocCtrl.updateFacultyDocumentHandler,
+);
+router.delete(
+  '/faculty/:facultyId/documents/:docId',
+  authorize('people', 'delete'),
+  facultyDocCtrl.archiveFacultyDocumentHandler,
 );
 
 // Staff

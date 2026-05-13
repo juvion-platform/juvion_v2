@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Pencil, Loader2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Pencil, Loader2, AlertCircle, MapPin, Phone, Clock } from 'lucide-react';
 import { getFaculty } from '../../services/people';
+import { listFacultyDocuments } from '../../services/faculty-documents';
 import Badge from '../../components/ui/Badge';
 import {
   DetailSection, DetailField, DetailBool, formatDate, extractPerson,
 } from '../../components/ui/DetailView';
 import PersonPhotoBlock from '../../components/people/PersonPhotoBlock';
+import FacultyDocumentsPanel from '../../components/people/FacultyDocumentsPanel';
 
 /**
  * Read-only view for a single Faculty member. Edit navigates to the
@@ -90,11 +92,13 @@ const EXTERNAL_ID_GROUPS: ReadonlyArray<{
   },
 ];
 
-type DetailTabKey = 'profile' | 'employment' | 'research';
+type DetailTabKey = 'profile' | 'employment' | 'bio' | 'research' | 'documents';
 const DETAIL_TABS: ReadonlyArray<{ key: DetailTabKey; label: string }> = [
   { key: 'profile',    label: 'Profile' },
   { key: 'employment', label: 'Employment' },
+  { key: 'bio',        label: 'Bio & Office' },
   { key: 'research',   label: 'Research IDs' },
+  { key: 'documents',  label: 'Documents' },
 ];
 
 export default function FacultyDetailPage() {
@@ -132,11 +136,20 @@ export default function FacultyDetailPage() {
   const emergency = person.emergencyContact || {};
   const departmentName = f.departmentId?.name ?? f.department?.name;
   const externalIds = (f.externalIds || {}) as Record<string, string | undefined>;
+  const bio = (f.profileBio || {}) as Record<string, any>;
+  const office = (f.office || {}) as Record<string, string | undefined>;
   // Count populated IDs so we can show a badge on the Research tab —
   // gives operators a quick "is this faculty NAAC-ready?" signal.
   const populatedIdCount = EXTERNAL_ID_GROUPS.reduce((acc, g) => {
     return acc + g.fields.filter((field) => (externalIds[field.key] ?? '').toString().trim().length > 0).length;
   }, 0);
+  // Document count for the Documents tab badge.
+  const { data: docsData } = useQuery({
+    queryKey: ['faculty-documents', id],
+    queryFn: () => listFacultyDocuments(id!),
+    enabled: !!id,
+  });
+  const documentCount = docsData?.items?.length ?? 0;
 
   return (
     <div className="max-w-5xl mx-auto space-y-4">
@@ -174,7 +187,10 @@ export default function FacultyDetailPage() {
         <nav className="flex gap-1 overflow-x-auto" role="tablist" aria-label="Faculty detail sections">
           {DETAIL_TABS.map((t) => {
             const isActive = tab === t.key;
-            const showCount = t.key === 'research' && populatedIdCount > 0;
+            const tabBadge =
+              t.key === 'research' && populatedIdCount > 0 ? String(populatedIdCount) :
+              t.key === 'documents' && documentCount > 0 ? String(documentCount) :
+              null;
             return (
               <button
                 key={t.key}
@@ -191,12 +207,11 @@ export default function FacultyDetailPage() {
                 }`}
               >
                 {t.label}
-                {showCount && (
+                {tabBadge && (
                   <span
                     className="ml-1.5 inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-primary-100 text-primary-700"
-                    aria-label={`${populatedIdCount} of 33 IDs populated`}
                   >
-                    {populatedIdCount}
+                    {tabBadge}
                   </span>
                 )}
               </button>
@@ -252,6 +267,118 @@ export default function FacultyDetailPage() {
               </Badge>
             </DetailField>
           </DetailSection>
+        </div>
+      )}
+
+      {/* ── Bio & Office tab ─────────────────────────────────────── */}
+      {tab === 'bio' && (
+        <div role="tabpanel" id="tabpanel-bio" aria-labelledby="tab-bio" className="space-y-4">
+          {bio.tagline && (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 italic">
+              "{bio.tagline}"
+            </div>
+          )}
+          {bio.summary && (
+            <DetailSection title="Professional Bio" columns={2}>
+              <DetailField label="" value={bio.summary} wide />
+            </DetailSection>
+          )}
+          {(Array.isArray(bio.expertiseTags) && bio.expertiseTags.length > 0
+            || Array.isArray(bio.researchInterests) && bio.researchInterests.length > 0
+            || Array.isArray(bio.teachingInterests) && bio.teachingInterests.length > 0) && (
+            <DetailSection title="Interests & Expertise" columns={2}>
+              {Array.isArray(bio.expertiseTags) && bio.expertiseTags.length > 0 && (
+                <div className="mb-2">
+                  <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">Expertise</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {bio.expertiseTags.map((t: string) => (
+                      <span key={t} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary-50 text-primary-800 border border-primary-200">
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {Array.isArray(bio.researchInterests) && bio.researchInterests.length > 0 && (
+                <div className="mb-2">
+                  <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">Research interests</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {bio.researchInterests.map((t: string) => (
+                      <span key={t} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-800 border border-blue-200">
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {Array.isArray(bio.teachingInterests) && bio.teachingInterests.length > 0 && (
+                <div>
+                  <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">Teaching interests</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {bio.teachingInterests.map((t: string) => (
+                      <span key={t} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200">
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </DetailSection>
+          )}
+          {Array.isArray(bio.languages) && bio.languages.length > 0 && (
+            <DetailSection title="Languages" columns={3}>
+              {bio.languages.map((l: any, i: number) => (
+                <DetailField
+                  key={i}
+                  label={l.proficiency ? l.proficiency.charAt(0).toUpperCase() + l.proficiency.slice(1) : 'Spoken'}
+                  value={l.code}
+                />
+              ))}
+            </DetailSection>
+          )}
+          {(office.building || office.cabinNumber || office.phoneExtension || office.weeklyHours) && (
+            <DetailSection title="Office" columns={2}>
+              {(office.building || office.cabinNumber) && (
+                <DetailField label="Location">
+                  <span className="inline-flex items-center gap-1">
+                    <MapPin size={12} className="text-gray-400" />
+                    {[office.building, office.cabinNumber].filter(Boolean).join(', ')}
+                  </span>
+                </DetailField>
+              )}
+              {office.phoneExtension && (
+                <DetailField label="Phone extension">
+                  <span className="inline-flex items-center gap-1">
+                    <Phone size={12} className="text-gray-400" />
+                    {office.phoneExtension}
+                  </span>
+                </DetailField>
+              )}
+              {office.weeklyHours && (
+                <DetailField label="Office hours" wide>
+                  <span className="inline-flex items-center gap-1">
+                    <Clock size={12} className="text-gray-400" />
+                    {office.weeklyHours}
+                  </span>
+                </DetailField>
+              )}
+            </DetailSection>
+          )}
+          {!bio.summary && !bio.tagline && (!Array.isArray(bio.expertiseTags) || bio.expertiseTags.length === 0)
+            && (!Array.isArray(bio.languages) || bio.languages.length === 0)
+            && !office.building && !office.cabinNumber && !office.phoneExtension && !office.weeklyHours && (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+              No bio or office information yet. Click <span className="font-medium">Edit</span> above
+              and switch to the Bio &amp; Office tab to add it.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Documents tab ────────────────────────────────────────── */}
+      {tab === 'documents' && id && (
+        <div role="tabpanel" id="tabpanel-documents" aria-labelledby="tab-documents">
+          <FacultyDocumentsPanel facultyId={id} />
         </div>
       )}
 
