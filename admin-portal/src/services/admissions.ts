@@ -7,8 +7,20 @@ const WORKFLOW_BASE = '/admissions/workflow';
 export const getStats = () => api.get(`${BASE}/stats`).then(r => r.data);
 
 // ─── Inquiries ─────────────────────────────────────────
-export const listInquiries = (page = 1, limit = 20, status?: string) =>
-  api.get(`${BASE}/inquiries`, { params: { page, limit, status } }).then(r => r.data);
+export interface ListInquiriesOpts {
+  status?: string;
+  /** Lead-grade filter. 'hot_warm' covers both top tiers. */
+  grade?: 'hot' | 'warm' | 'cold' | 'dormant' | 'hot_warm';
+  /** 'newest' (default) or 'score' (highest leadScore first). */
+  sort?: 'newest' | 'score';
+}
+export const listInquiries = (page = 1, limit = 20, statusOrOpts?: string | ListInquiriesOpts) => {
+  // Back-compat: callers that already pass a status string keep working.
+  const opts: ListInquiriesOpts = typeof statusOrOpts === 'string'
+    ? { status: statusOrOpts }
+    : statusOrOpts ?? {};
+  return api.get(`${BASE}/inquiries`, { params: { page, limit, ...opts } }).then(r => r.data);
+};
 
 export const getInquiry = (id: string) =>
   api.get(`${BASE}/inquiries/${id}`).then(r => r.data);
@@ -205,3 +217,77 @@ export const getCRMOfficers = (): Promise<CRMOfficerStats> =>
   api.get(`${BASE}/crm/officers`).then((r) => r.data);
 export const getCRMSources = (): Promise<CRMSourceStats> =>
   api.get(`${BASE}/crm/sources`).then((r) => r.data);
+
+// ─── 001-ai-lead-scoring ───────────────────────────────────────────
+
+export type LeadGrade = 'hot' | 'warm' | 'cold' | 'dormant';
+
+export interface ScoreFactor {
+  label: string;
+  weight: number;
+  source: 'rule' | 'llm';
+}
+
+export interface ScoreRationale {
+  ruleScore: number;
+  llmScore: number | null;
+  blendedScore: number;
+  factors: ScoreFactor[];
+  lastInteractionInfluence?: { factor: string; shift: number };
+  llmSkipped?: boolean;
+  llmFallback?: boolean;
+  llmCostInr?: number;
+  computedAt: string;
+  modelVersion: string;
+}
+
+export interface LeadScoringStats {
+  range: 'today' | 'week' | 'month';
+  days: number;
+  totalScored: number;
+  llmScored: number;
+  rulesOnlyScored: number;
+  totalLlmCostInr: number;
+  avgLatencyMs: number;
+  gradeDistribution: { hot: number; warm: number; cold: number; dormant: number };
+  capReached: boolean;
+  modelVersion: string | null;
+  daily: Array<{
+    date: string;
+    totalScored: number;
+    llmScored: number;
+    rulesOnlyScored: number;
+    totalLlmCostInr: number;
+    gradeDistribution: { hot: number; warm: number; cold: number; dormant: number };
+    llmCapHit: boolean;
+  }>;
+}
+
+export interface RescoreResponse {
+  status: 'enqueued' | 'already_scored';
+  jobId: string;
+  lastScoredAt?: string;
+}
+
+export interface BatchScoreResponse {
+  enqueued: number;
+  requestedBy: string;
+  filterMatched: number;
+}
+
+export interface BatchScoreFilter {
+  status?: string;
+  source?: string;
+  leadGrade?: LeadGrade;
+  updatedSince?: string;
+  maxJobs?: number;
+}
+
+export const rescoreInquiry = (id: string): Promise<RescoreResponse> =>
+  api.post(`${BASE}/inquiries/${id}/rescore`).then((r) => r.data);
+
+export const batchScoreInquiries = (filter: BatchScoreFilter): Promise<BatchScoreResponse> =>
+  api.post(`${BASE}/lead-scoring/batch`, filter).then((r) => r.data);
+
+export const getLeadScoringStats = (range: 'today' | 'week' | 'month' = 'today'): Promise<LeadScoringStats> =>
+  api.get(`${BASE}/lead-scoring/stats`, { params: { range } }).then((r) => r.data);

@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import {
-  getCRMPipeline, getCRMFunnel, getCRMOfficers, getCRMSources,
-  type CRMFunnelStats, type CRMOfficerStats, type CRMSourceStats,
+  getCRMPipeline, getCRMFunnel, getCRMOfficers, getCRMSources, getLeadScoringStats,
+  type CRMFunnelStats, type CRMOfficerStats, type CRMSourceStats, type LeadScoringStats,
 } from '../../services/admissions';
-import { Users, TrendingUp, Globe, Filter, Sparkles, ArrowDownRight } from 'lucide-react';
+import { Users, TrendingUp, Globe, Filter, Sparkles, ArrowDownRight, Brain, AlertTriangle } from 'lucide-react';
 
 // ─── Visual constants ─────────────────────────────────────────────
 const STATUS_COLORS: Record<string, string> = {
@@ -234,11 +234,90 @@ function SourcesCard({ data }: { data: CRMSourceStats }) {
   );
 }
 
+// 001-ai-lead-scoring §Story 5 — AI scoring observability card.
+function LeadScoringCard({ stats }: { stats: LeadScoringStats }) {
+  const total = stats.totalScored;
+  const dist = stats.gradeDistribution;
+  const distEntries: Array<{ key: 'hot' | 'warm' | 'cold' | 'dormant'; color: string }> = [
+    { key: 'hot', color: 'bg-red-500' },
+    { key: 'warm', color: 'bg-orange-500' },
+    { key: 'cold', color: 'bg-gray-400' },
+    { key: 'dormant', color: 'bg-slate-300' },
+  ];
+  return (
+    <div className="bg-white rounded-xl border shadow-sm p-5">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Brain size={18} className="text-indigo-500" />
+          <h3 className="font-semibold text-navy">AI Lead Scoring</h3>
+        </div>
+        <span className="text-xs text-gray-500 capitalize">last {stats.days}d</span>
+      </div>
+      {stats.capReached && (
+        <div className="mb-3 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-start gap-2">
+          <AlertTriangle size={14} className="text-amber-600 mt-0.5 shrink-0" />
+          <div>
+            Daily LLM cap was hit at least once in this range. Excess leads received rules-only scores —
+            increase <code className="bg-amber-100 px-1 rounded">LEAD_SCORE_DAILY_LLM_CAP</code> if needed.
+          </div>
+        </div>
+      )}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+        <div className="bg-gray-50 rounded p-3">
+          <div className="text-xs text-gray-500">Scored</div>
+          <div className="text-xl font-bold text-navy">{total}</div>
+        </div>
+        <div className="bg-gray-50 rounded p-3">
+          <div className="text-xs text-gray-500">LLM / Rules</div>
+          <div className="text-sm font-semibold text-gray-800">
+            {stats.llmScored} <span className="text-gray-400">/ {stats.rulesOnlyScored}</span>
+          </div>
+        </div>
+        <div className="bg-gray-50 rounded p-3">
+          <div className="text-xs text-gray-500">LLM cost</div>
+          <div className="text-sm font-semibold text-gray-800">₹{stats.totalLlmCostInr.toFixed(2)}</div>
+        </div>
+        <div className="bg-gray-50 rounded p-3">
+          <div className="text-xs text-gray-500">Avg latency</div>
+          <div className="text-sm font-semibold text-gray-800">{Math.round(stats.avgLatencyMs)}ms</div>
+        </div>
+      </div>
+      <div>
+        <div className="text-xs font-medium text-gray-500 uppercase mb-2">Grade distribution</div>
+        {total === 0 ? (
+          <p className="text-sm text-gray-400">No scoring activity yet — create or import an inquiry to see scores roll in.</p>
+        ) : (
+          <div className="space-y-1.5">
+            {distEntries.map((e) => {
+              const count = dist[e.key];
+              const pctValue = total > 0 ? Math.round((count / total) * 100) : 0;
+              return (
+                <div key={e.key} className="flex items-center gap-3">
+                  <div className="text-xs text-gray-700 capitalize w-16 shrink-0">{e.key}</div>
+                  <div className="flex-1 bg-gray-100 rounded-full h-2.5 overflow-hidden">
+                    <div className={`h-full ${e.color}`} style={{ width: `${pctValue}%` }} />
+                  </div>
+                  <div className="text-sm tabular-nums text-gray-800 w-10 text-right">{count}</div>
+                  <div className="text-xs text-gray-400 w-10 text-right">{pctValue}%</div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+      {stats.modelVersion && (
+        <div className="mt-3 pt-2 border-t text-[11px] text-gray-400">model: {stats.modelVersion}</div>
+      )}
+    </div>
+  );
+}
+
 export default function CRMDashboardPage() {
   const { data: pipeline, isLoading: pipelineLoading } = useQuery({ queryKey: ['crm-pipeline'], queryFn: getCRMPipeline });
   const { data: funnel, isLoading: funnelLoading } = useQuery({ queryKey: ['crm-funnel'], queryFn: getCRMFunnel });
   const { data: officers, isLoading: officersLoading } = useQuery({ queryKey: ['crm-officers'], queryFn: getCRMOfficers });
   const { data: sources, isLoading: sourcesLoading } = useQuery({ queryKey: ['crm-sources'], queryFn: getCRMSources });
+  const { data: scoringStats } = useQuery({ queryKey: ['lead-scoring-stats', 'week'], queryFn: () => getLeadScoringStats('week') });
 
   const totalAssigned = officers?.officers.reduce((acc, o) => acc + o.assigned, 0) || 0;
   const totalConverted = officers?.officers.reduce((acc, o) => acc + o.converted, 0) || 0;
@@ -290,6 +369,7 @@ export default function CRMDashboardPage() {
         {funnel && <FunnelCard data={funnel} />}
         {officers && <OfficersCard data={officers} />}
         {sources && <SourcesCard data={sources} />}
+        {scoringStats && <LeadScoringCard stats={scoringStats} />}
       </div>
     </div>
   );
