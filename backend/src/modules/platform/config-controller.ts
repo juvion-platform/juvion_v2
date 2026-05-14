@@ -73,3 +73,29 @@ export async function deleteEntryHandler(req: AuthRequest, res: Response, next: 
     res.json(result);
   } catch (e) { next(e); }
 }
+
+// ─── Strategic Gap 8 — ERPNext / Frappe HR bridge ─────────────────
+import * as bridge from './erpnext-bridge';
+
+export async function getERPNextStatus(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    res.json(await bridge.getBridgeStatus(req.collegeId!));
+  } catch (e) { next(e); }
+}
+
+export async function updateERPNextConfig(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const cfg = await bridge.updateBridgeConfig(
+      req.collegeId!,
+      req.body,
+      req.user?.name || 'unknown',
+    );
+    res.json(cfg);
+  } catch (e) { next(e); }
+}
+
+export async function testERPNextConnection(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    res.json(await bridge.testConnection(req.collegeId!));
+  } catch (e) { next(e); }
+}

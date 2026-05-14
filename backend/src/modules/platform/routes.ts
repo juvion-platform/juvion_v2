@@ -175,4 +175,12 @@ router.delete(
   configCtrl.deleteEntryHandler,
 );
 
+// ─── Strategic Gap 8 — ERPNext / Frappe HR bridge ──────────────────
+// Per-college integration config + status surface. The decision doc
+// at .captain/specs/frappe-hr-bridge/decision.md captures the build-
+// vs-buy call. Phase A: scaffolding only; outbound HTTP is stubbed.
+router.get ('/integrations/erpnext',       authorize('platform', 'read'),   configCtrl.getERPNextStatus);
+router.put ('/integrations/erpnext',       authorize('platform', 'update'), configCtrl.updateERPNextConfig);
+router.post('/integrations/erpnext/test',  authorize('platform', 'update'), configCtrl.testERPNextConnection);
+
 export default router;
