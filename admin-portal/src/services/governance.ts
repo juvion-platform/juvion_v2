@@ -64,3 +64,61 @@ export const updateGoal = (id: string, data: any) =>
   api.put(`${BASE}/goals/${id}`, data).then(r => r.data);
 export const deleteGoal = (id: string) =>
   api.delete(`${BASE}/goals/${id}`).then(r => r.data);
+
+// ─── Strategic Gap 4 — Declarative Report Engine ──────────────────
+
+export interface ReportParam {
+  key: string;
+  label: string;
+  type: 'string' | 'number' | 'date' | 'select' | 'boolean';
+  required?: boolean;
+  default?: unknown;
+  options?: { value: string; label: string }[];
+  helpText?: string;
+}
+
+export interface ReportColumn {
+  key: string;
+  label: string;
+  type: 'string' | 'number' | 'date' | 'percent' | 'currency';
+}
+
+export interface ReportDefinition {
+  code: string;
+  label: string;
+  category: string;
+  description: string;
+  parameters: ReportParam[];
+  columns: ReportColumn[];
+  implementationStatus: 'implemented' | 'phase_b';
+}
+
+export interface ReportRun {
+  _id: string;
+  collegeId: string;
+  definitionCode: string;
+  parameters: Record<string, unknown>;
+  status: 'queued' | 'running' | 'success' | 'failed' | 'unimplemented';
+  result?: unknown[];
+  resultCount: number;
+  summary?: Record<string, unknown>;
+  unimplementedReason?: string;
+  error?: string;
+  executedAt?: string;
+  durationMs?: number;
+  requestedBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const listReportDefinitions = (): Promise<{ definitions: ReportDefinition[] }> =>
+  api.get(`${BASE}/reports/definitions`).then((r) => r.data);
+
+export const listReportRuns = (page = 1, limit = 20, definitionCode?: string) =>
+  api.get(`${BASE}/reports/runs`, { params: { page, limit, definitionCode } }).then((r) => r.data);
+
+export const getReportRun = (id: string): Promise<ReportRun> =>
+  api.get(`${BASE}/reports/runs/${id}`).then((r) => r.data);
+
+export const runReport = (code: string, parameters: Record<string, unknown>): Promise<ReportRun> =>
+  api.post(`${BASE}/reports/run/${code}`, { parameters }).then((r) => r.data);
