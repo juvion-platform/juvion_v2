@@ -106,28 +106,28 @@ export async function shutdownQueues(): Promise<void> {
 // ─── Queue names (constants) ────────────────────────────────
 export const QUEUE_NAMES = {
   // Admissions
-  LEAD_SCORING: 'admissions:lead-scoring',
-  DOCUMENT_OCR: 'admissions:document-ocr',
-  ELIGIBILITY_CHECK: 'admissions:eligibility-check',
-  BULK_IMPORT: 'admissions:bulk-import',
-  FEE_REMINDER: 'admissions:fee-reminder',
-  OFFER_EXPIRY: 'admissions:offer-expiry',
-  PROVISIONING: 'admissions:provisioning',
+  LEAD_SCORING: 'admissions_lead_scoring',
+  DOCUMENT_OCR: 'admissions_document_ocr',
+  ELIGIBILITY_CHECK: 'admissions_eligibility_check',
+  BULK_IMPORT: 'admissions_bulk_import',
+  FEE_REMINDER: 'admissions_fee_reminder',
+  OFFER_EXPIRY: 'admissions_offer_expiry',
+  PROVISIONING: 'admissions_provisioning',
 
   // Notifications
-  NOTIFICATION: 'platform:notification',
-  WHATSAPP: 'platform:whatsapp',
-  SMS: 'platform:sms',
-  EMAIL: 'platform:email',
+  NOTIFICATION: 'platform_notification',
+  WHATSAPP: 'platform_whatsapp',
+  SMS: 'platform_sms',
+  EMAIL: 'platform_email',
 
   // Platform — LLM spend governance (llm-spend-limits L5)
-  LLM_USAGE_WEEKLY: 'platform:llm-usage-weekly',
+  LLM_USAGE_WEEKLY: 'platform_llm_usage_weekly',
 
   // Campus ops
-  CAMPUS_PROPOSAL_EXPIRY: 'campus:proposal-expiry',
+  CAMPUS_PROPOSAL_EXPIRY: 'campus_proposal_expiry',
 
   // Finance
-  FEE_COMMITMENT: 'finance:fee-commitment',
-  FEE_PIN_AUDIT: 'finance:fee-pin-audit',
-  FEE_ALERTS_CRON: 'finance:fee-alerts-cron',
+  FEE_COMMITMENT: 'finance_fee_commitment',
+  FEE_PIN_AUDIT: 'finance_fee_pin_audit',
+  FEE_ALERTS_CRON: 'finance_fee_alerts_cron',
 } as const;
