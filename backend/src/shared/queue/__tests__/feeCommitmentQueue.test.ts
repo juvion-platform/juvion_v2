@@ -57,9 +57,9 @@ describe('FEE_COMMITMENT queue registration', () => {
   });
 
   it('uses a finance-namespaced queue name', () => {
-    // Mirrors existing patterns like `admissions:fee-reminder`,
-    // `admissions:provisioning`, `campus:proposal-expiry`.
-    expect(QUEUE_NAMES.FEE_COMMITMENT).toBe('finance:fee-commitment');
+    // Mirrors existing patterns like `admissions_fee_reminder`,
+    // `admissions_provisioning`, `campus_proposal_expiry`.
+    expect(QUEUE_NAMES.FEE_COMMITMENT).toBe('finance_fee_commitment');
   });
 });
 

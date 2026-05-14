@@ -60,8 +60,8 @@ This checklist is the **operational handoff** for deploying the Fee Collection A
   - [ ] `FeeReminder.deliveryStatus` includes `'skipped_paid'`
 
 - [ ] **BullMQ queues registered on app start:**
-  - [ ] `QUEUE_NAMES.FEE_ALERTS_CRON === 'finance:fee-alerts-cron'`
-  - [ ] `platform:sms`, `platform:email`, `platform:whatsapp` existing queues untouched
+  - [ ] `QUEUE_NAMES.FEE_ALERTS_CRON === 'finance_fee_alerts_cron'`
+  - [ ] `platform_sms`, `platform_email`, `platform_whatsapp` existing queues untouched
 
 - [ ] **Stub workers registered (non-prod) or explicitly disabled (prod):**
   - [ ] `STUB_DELIVERY` env var: `true` / unset for pilot/staging; `false` for production
