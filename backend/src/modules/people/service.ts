@@ -764,6 +764,9 @@ export async function createStaff(collegeId: string, data: any, performedBy: str
     staffType: data.staffType, status: data.status || 'active',
   };
   if (data.departmentId) fields.departmentId = data.departmentId;
+  // Strategic Gap 7 — sub-persona + cluster-head pass-through.
+  if (data.personaCode) fields.personaCode = data.personaCode;
+  if (Array.isArray(data.clusterHeadOfPersonIds)) fields.clusterHeadOfPersonIds = data.clusterHeadOfPersonIds;
   const doc = await Staff.create(fields);
   await createAuditLog({ collegeId, entityType: 'Staff', entityId: String(doc._id), entityName: data.name, action: 'create', changes: [], performedBy });
   return { ...doc.toObject(), person: person.toObject() };
@@ -778,7 +781,10 @@ export async function updateStaff(collegeId: string, id: string, data: any, perf
   if (Object.keys(personFields).length > 0) await Person.findByIdAndUpdate(s.personId, { $set: personFields });
 
   const staffFields: any = {};
-  ['employeeCode', 'designation', 'staffType', 'status', 'departmentId'].forEach(k => { if (data[k] !== undefined) staffFields[k] = data[k]; });
+  // Strategic Gap 7 — include personaCode + clusterHeadOfPersonIds in the
+  // allowed-update list. Same defensive pattern: only keys explicitly
+  // listed make it to the DB.
+  ['employeeCode', 'designation', 'staffType', 'status', 'departmentId', 'personaCode', 'clusterHeadOfPersonIds'].forEach(k => { if (data[k] !== undefined) staffFields[k] = data[k]; });
   if (Object.keys(staffFields).length > 0) await Staff.findByIdAndUpdate(id, { $set: staffFields });
 
   await createAuditLog({ collegeId, entityType: 'Staff', entityId: id, entityName: data.name || 'Staff', action: 'update', changes: [], performedBy });

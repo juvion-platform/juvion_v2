@@ -4,6 +4,28 @@ const BASE = '/people';
 
 export const getStats = () => api.get(`${BASE}/stats`).then(r => r.data);
 
+// ── Strategic Gap 7 — Persona catalog ────────────────────────────
+export interface PersonaDescriptor {
+  code: string;
+  family: string;
+  label: string;
+  description: string;
+  primaryModule: string;
+  defaultRole: string;
+  tier: 1 | 2 | 3;
+  parentCode?: string;
+  permissionsHint?: string;
+}
+
+export interface PersonaCatalog {
+  all: PersonaDescriptor[];
+  l1_l2: PersonaDescriptor[];
+  l3: PersonaDescriptor[];
+}
+
+export const listPersonas = (): Promise<PersonaCatalog> =>
+  api.get(`${BASE}/personas`).then((r) => r.data);
+
 // ── Persons (raw) ───────────────────────────────────
 export const listPersons = (page = 1, limit = 20, search?: string) =>
   api.get(`${BASE}/persons`, { params: { page, limit, search } }).then(r => r.data);

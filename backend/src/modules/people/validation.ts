@@ -172,6 +172,13 @@ export const createStaffSchema = basePersonSchema.extend({
   designation: z.string().min(1, 'Designation required'),
   staffType: z.string().min(1, 'Staff type required'),
   status: z.enum(['active', 'on_leave', 'separated']).optional(),
+  // ─── Strategic Gap 7 — sub-persona + cluster-head ─────────
+  // Canonical persona code from shared/rbac/personas.ts. Free-form
+  // string here (rather than a Zod enum) so adding a new persona
+  // doesn't require editing this file too — the catalog endpoint
+  // is the source of truth the UI consumes.
+  personaCode: z.string().trim().optional(),
+  clusterHeadOfPersonIds: z.array(z.string()).optional(),
 });
 export const updateStaffSchema = createStaffSchema.partial();
 

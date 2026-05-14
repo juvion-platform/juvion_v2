@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getStats, listPersons, deletePerson } from '../services/people';
-import { Users, GraduationCap, Briefcase, UserCheck, Building2, Search, Trash2, Pencil, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Users, GraduationCap, Briefcase, UserCheck, Building2, Search, Trash2, Pencil, ChevronLeft, ChevronRight, IdCard } from 'lucide-react';
 import Breadcrumbs from '../components/ui/Breadcrumbs';
 import DataTable from '../components/ui/DataTable';
 
@@ -19,6 +19,7 @@ import FacultyDetailPage from './people/FacultyDetailPage';
 import FacultyDocumentQueuePage from './people/FacultyDocumentQueuePage';
 import StaffDetailPage from './people/StaffDetailPage';
 import ParentDetailPage from './people/ParentDetailPage';
+import PersonaCatalogPage from './people/PersonaCatalogPage';
 
 const CARDS = [
   { to: 'students', icon: GraduationCap, label: 'Students', desc: 'Student profiles & enrollment', iconBg: 'bg-primary-50 text-primary-600', border: 'border-primary-200 hover:border-primary-400', statKey: 'students' },
@@ -26,6 +27,7 @@ const CARDS = [
   { to: 'staff', icon: Briefcase, label: 'Staff', desc: 'Non-teaching staff', iconBg: 'bg-teal-50 text-teal-600', border: 'border-teal-200 hover:border-teal-400', statKey: 'staff' },
   { to: 'parents', icon: UserCheck, label: 'Parents', desc: 'Guardian profiles & contacts', iconBg: 'bg-orange-50 text-orange-500', border: 'border-orange-200 hover:border-orange-400', statKey: 'parents' },
   { to: 'organizations', icon: Building2, label: 'Organizations', desc: 'Partner & external orgs', iconBg: 'bg-primary-100 text-primary-700', border: 'border-primary-200 hover:border-primary-400', statKey: 'organizations' },
+  { to: 'personas', icon: IdCard, label: 'Persona Catalog', desc: 'Canonical persona/sub-persona codes', iconBg: 'bg-indigo-50 text-indigo-600', border: 'border-indigo-200 hover:border-indigo-400', statKey: 'personas' },
 ];
 
 const ROLE_ROUTE: Record<string, string> = {
@@ -239,6 +241,8 @@ export default function People() {
         <Route path="parents/:id" element={<ParentDetailPage />} />
         {/* Organizations */}
         <Route path="organizations" element={<OrganizationsPage />} />
+        {/* Strategic Gap 7 — Persona Catalog (read-only reference) */}
+        <Route path="personas" element={<PersonaCatalogPage />} />
       </Routes>
     </SubPageWrapper>
   );
