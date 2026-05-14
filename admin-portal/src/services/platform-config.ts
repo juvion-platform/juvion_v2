@@ -75,12 +75,71 @@ export const getConfigEntry = (type: string, identifier?: string): Promise<Confi
 
 export const upsertConfigEntry = (
   type: string,
-  body: { values: Record<string, unknown>; label?: string; enabled?: boolean },
+  body: {
+    values: Record<string, unknown>;
+    label?: string;
+    enabled?: boolean;
+    // 002-ai-assisted-config — opt-in lineage for AI-accepted fields.
+    aiAcceptedFields?: string[];
+    batchId?: string;
+  },
   identifier?: string,
 ): Promise<ConfigEntry> => {
   const url = identifier ? `${BASE}/${type}/${identifier}` : `${BASE}/${type}`;
   return api.put(url, body).then((r) => r.data);
 };
+
+// ─── 002-ai-assisted-config — suggest + stats ─────────────────────
+
+export interface ConfigSuggestion {
+  field: string;
+  suggestedValue: unknown;
+  confidence: number;
+  rationale: string;
+}
+
+export interface SuggestConfigResponse {
+  batchId: string;
+  suggestions: ConfigSuggestion[];
+  llmModel: string;
+  costInr: number;
+  generatedAt: string;
+  capReached?: boolean;
+  llmFallback?: boolean;
+  isDuplicate?: boolean;
+  reason?: string;
+}
+
+export const suggestConfig = (
+  type: string,
+  context?: {
+    collegeProfile?: Record<string, unknown>;
+    currentValues?: Record<string, unknown>;
+  },
+): Promise<SuggestConfigResponse> =>
+  api.post(`${BASE}/${type}/suggest`, context ? { context } : {}).then((r) => r.data);
+
+export interface ConfigSuggestStats {
+  range: 'today' | 'week' | 'month';
+  totalSuggested: number;
+  accepted: number;
+  rejected: number;
+  pending: number;
+  llmCostInr: number;
+  byConfigType: Array<{
+    configType: string;
+    total: number;
+    accepted: number;
+    rejected: number;
+    pending: number;
+    llmCostInr: number;
+  }>;
+}
+
+export const getConfigSuggestionStats = (
+  range: 'today' | 'week' | 'month' = 'today',
+): Promise<ConfigSuggestStats> =>
+  api.get(`${BASE}/suggestions/stats`, { params: { range } }).then((r) => r.data);
 
 export const deleteConfigEntry = (
   type: string,

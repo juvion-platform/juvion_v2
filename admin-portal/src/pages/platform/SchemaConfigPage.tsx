@@ -3,12 +3,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   listConfigTypes, listConfigEntries, upsertConfigEntry,
   deleteConfigEntry,
+  suggestConfig, getConfigSuggestionStats,
   type ConfigSchema, type ConfigField, type ConfigEntry,
+  type ConfigSuggestion, type SuggestConfigResponse,
 } from '../../services/platform-config';
 import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
-import { Settings, Plus, Pencil, Trash2, Save, Power, PowerOff, Sliders } from 'lucide-react';
+import SuggestionCard, { type SuggestionStatus } from '../../components/platform/SuggestionCard';
+import { Settings, Plus, Pencil, Trash2, Save, Power, PowerOff, Sliders, Sparkles, AlertTriangle } from 'lucide-react';
 
 const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none';
 const lbl = 'block text-sm font-medium text-gray-700 mb-1';
@@ -138,43 +141,152 @@ function defaultValuesFor(schema: ConfigSchema): Record<string, unknown> {
 }
 
 // ─── Single-cardinality renderer ──────────────────────────────────
+//
+// 002-ai-assisted-config §Story 2 — the Suggest button + inline
+// suggestion cards live on this editor for v1. Multi-cardinality
+// suggestions are deferred (per-row UX is too complex for this wave).
 
 interface SingleConfigEditorProps {
   schema: ConfigSchema;
   entry: ConfigEntry;
-  onSave: (values: Record<string, unknown>) => void;
+  onSave: (values: Record<string, unknown>, lineage: { aiAcceptedFields: string[]; batchId?: string }) => void;
   saving: boolean;
 }
 
 function SingleConfigEditor({ schema, entry, onSave, saving }: SingleConfigEditorProps) {
   const [values, setValues] = useState<Record<string, unknown>>(entry.values || {});
 
+  // 002 — suggestion state. Suggestions are per-field, keyed by field key.
+  // `statuses` tracks whether the admin accepted, rejected, or hasn't touched
+  // a given suggestion; only accepted ones go to aiAcceptedFields on save.
+  const [suggestionBatch, setSuggestionBatch] = useState<SuggestConfigResponse | null>(null);
+  const [statuses, setStatuses] = useState<Record<string, SuggestionStatus>>({});
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestError, setSuggestError] = useState<string | null>(null);
+
   // Reset when the entry changes (e.g. after save round-trip).
   useEffect(() => {
     setValues(entry.values || {});
+    setSuggestionBatch(null);
+    setStatuses({});
+    setSuggestError(null);
   }, [entry]);
+
+  async function handleSuggest() {
+    setSuggesting(true);
+    setSuggestError(null);
+    try {
+      const resp = await suggestConfig(schema.type, { currentValues: values });
+      setSuggestionBatch(resp);
+      // Initialise statuses as 'pending' for every suggestion in the batch.
+      const initial: Record<string, SuggestionStatus> = {};
+      for (const s of resp.suggestions) initial[s.field] = 'pending';
+      setStatuses(initial);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } }; message?: string };
+      setSuggestError(e.response?.data?.error || e.message || 'Suggest failed');
+    } finally {
+      setSuggesting(false);
+    }
+  }
+
+  function handleAccept(field: string) {
+    const s = suggestionBatch?.suggestions.find((x) => x.field === field);
+    if (!s) return;
+    setValues((prev) => ({ ...prev, [field]: s.suggestedValue }));
+    setStatuses((prev) => ({ ...prev, [field]: 'accepted' }));
+  }
+
+  function handleReject(field: string) {
+    setStatuses((prev) => ({ ...prev, [field]: 'rejected' }));
+  }
+
+  const aiAcceptedFields = Object.entries(statuses)
+    .filter(([, s]) => s === 'accepted')
+    .map(([f]) => f);
+
+  const fieldToSuggestion = useMemo(() => {
+    const map: Record<string, ConfigSuggestion> = {};
+    if (suggestionBatch) for (const s of suggestionBatch.suggestions) map[s.field] = s;
+    return map;
+  }, [suggestionBatch]);
 
   return (
     <div className="bg-white rounded-xl border shadow-sm p-6 max-w-3xl">
-      <div className="space-y-5">
-        {schema.fields.map((f) => (
-          <div key={f.key}>
-            <label className={lbl}>
-              {f.label}
-              {f.required && <span className="text-red-500"> *</span>}
-            </label>
-            <FieldRenderer
-              field={f}
-              value={values[f.key]}
-              onChange={(v) => setValues((prev) => ({ ...prev, [f.key]: v }))}
-            />
-            {f.helpText && <p className="text-xs text-gray-500 mt-1">{f.helpText}</p>}
-          </div>
-        ))}
-      </div>
-      <div className="flex justify-end mt-6 pt-4 border-t">
+      {/* Header — Suggest button + cap-reached / fallback banners */}
+      <div className="flex items-start justify-between gap-3 mb-5 pb-4 border-b">
+        <p className="text-sm text-gray-500">
+          Press <span className="font-semibold">Suggest</span> to have the AI propose defaults you can accept per-field.
+        </p>
         <button
-          onClick={() => onSave(values)}
+          type="button"
+          onClick={handleSuggest}
+          disabled={suggesting}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-indigo-300 text-indigo-700 bg-white hover:bg-indigo-50 text-sm disabled:opacity-50"
+        >
+          <Sparkles size={14} />
+          {suggesting ? 'Suggesting…' : 'Suggest'}
+        </button>
+      </div>
+
+      {suggestError && (
+        <div className="mb-4 px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+          {suggestError}
+        </div>
+      )}
+      {suggestionBatch?.capReached && (
+        <div className="mb-4 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-800 flex items-start gap-2">
+          <AlertTriangle size={14} className="text-amber-600 mt-0.5 shrink-0" />
+          <div>Daily AI suggestion cap reached for this college. Try again tomorrow or contact your admin to raise the cap.</div>
+        </div>
+      )}
+      {suggestionBatch?.llmFallback && (
+        <div className="mb-4 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-800">
+          AI couldn't produce structured suggestions this time. You can save without them or try Suggest again.
+        </div>
+      )}
+      {suggestionBatch?.isDuplicate && (
+        <div className="mb-4 px-3 py-2 rounded-lg bg-blue-50 border border-blue-200 text-sm text-blue-800">
+          Showing a recent batch (generated less than a minute ago). Press Save when you're ready.
+        </div>
+      )}
+
+      <div className="space-y-5">
+        {schema.fields.map((f) => {
+          const suggestion = fieldToSuggestion[f.key];
+          const status = statuses[f.key];
+          return (
+            <div key={f.key}>
+              <label className={lbl}>
+                {f.label}
+                {f.required && <span className="text-red-500"> *</span>}
+              </label>
+              <FieldRenderer
+                field={f}
+                value={values[f.key]}
+                onChange={(v) => setValues((prev) => ({ ...prev, [f.key]: v }))}
+              />
+              {f.helpText && <p className="text-xs text-gray-500 mt-1">{f.helpText}</p>}
+              {suggestion && status && (
+                <SuggestionCard
+                  suggestion={suggestion}
+                  status={status}
+                  onAccept={handleAccept}
+                  onReject={handleReject}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex justify-end items-center gap-3 mt-6 pt-4 border-t">
+        {aiAcceptedFields.length > 0 && (
+          <span className="text-xs text-indigo-600">
+            {aiAcceptedFields.length} AI suggestion{aiAcceptedFields.length === 1 ? '' : 's'} will be applied
+          </span>
+        )}
+        <button
+          onClick={() => onSave(values, { aiAcceptedFields, batchId: suggestionBatch?.batchId })}
           disabled={saving}
           className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50"
         >
@@ -183,6 +295,23 @@ function SingleConfigEditor({ schema, entry, onSave, saving }: SingleConfigEdito
         </button>
       </div>
     </div>
+  );
+}
+
+// ─── Inline cap-counter for the Single editor header ──────────────
+
+function SuggestUsageCounter() {
+  const { data } = useQuery({
+    queryKey: ['config-suggest-stats', 'today'],
+    queryFn: () => getConfigSuggestionStats('today'),
+    // Refresh quietly every 30s so the counter reflects the latest usage.
+    refetchInterval: 30_000,
+  });
+  if (!data) return null;
+  return (
+    <span className="text-xs text-gray-500">
+      AI suggestions today: <strong>{data.totalSuggested}</strong>
+    </span>
   );
 }
 
@@ -387,11 +516,19 @@ export default function SchemaConfigPage() {
 
   const upsertMut = useMutation({
     mutationFn: ({
-      type, values, identifier, enabled,
-    }: { type: string; values: Record<string, unknown>; identifier?: string; enabled?: boolean }) =>
-      upsertConfigEntry(type, { values, enabled }, identifier),
+      type, values, identifier, enabled, aiAcceptedFields, batchId,
+    }: {
+      type: string;
+      values: Record<string, unknown>;
+      identifier?: string;
+      enabled?: boolean;
+      aiAcceptedFields?: string[];
+      batchId?: string;
+    }) => upsertConfigEntry(type, { values, enabled, aiAcceptedFields, batchId }, identifier),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['platform-config-entries', activeType] });
+      // 002 — refresh the suggestion stats counter after save.
+      qc.invalidateQueries({ queryKey: ['config-suggest-stats', 'today'] });
       setModalOpen(false);
       setEditingEntry(null);
     },
@@ -421,9 +558,17 @@ export default function SchemaConfigPage() {
     setModalOpen(false);
   }
 
-  function handleSingleSave(values: Record<string, unknown>) {
+  function handleSingleSave(
+    values: Record<string, unknown>,
+    lineage: { aiAcceptedFields: string[]; batchId?: string },
+  ) {
     if (!activeSchema) return;
-    upsertMut.mutate({ type: activeSchema.type, values });
+    upsertMut.mutate({
+      type: activeSchema.type,
+      values,
+      aiAcceptedFields: lineage.aiAcceptedFields.length > 0 ? lineage.aiAcceptedFields : undefined,
+      batchId: lineage.batchId,
+    });
   }
 
   function handleMultiAdd() {
@@ -458,9 +603,12 @@ export default function SchemaConfigPage() {
       <div className="flex items-center gap-3 mb-5">
         <button onClick={backToHub} className="text-sm text-gray-500 hover:text-primary-600">← All config</button>
       </div>
-      <div className="mb-5">
-        <h2 className="text-xl font-bold text-navy">{activeSchema.label}</h2>
-        <p className="text-sm text-gray-500 mt-1">{activeSchema.description}</p>
+      <div className="mb-5 flex items-end justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold text-navy">{activeSchema.label}</h2>
+          <p className="text-sm text-gray-500 mt-1">{activeSchema.description}</p>
+        </div>
+        {activeSchema.cardinality === 'single' && <SuggestUsageCounter />}
       </div>
 
       {activeSchema.cardinality === 'single' && entries[0] ? (
