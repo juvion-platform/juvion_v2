@@ -64,6 +64,11 @@ export async function addJob(queueName: string, jobName: string, data: any, opts
   priority?: number;
   attempts?: number;
   backoff?: { type: 'exponential' | 'fixed'; delay: number };
+  // Optional BullMQ jobId — when provided, the queue rejects a second
+  // add() with the same jobId until the original job ages out. Used by
+  // the lead-scoring enqueue helper to dedup score requests within a
+  // short window (see 001-ai-lead-scoring spec §10.6).
+  jobId?: string;
 }) {
   const queue = getQueue(queueName);
   return queue.add(jobName, data, {
@@ -71,6 +76,7 @@ export async function addJob(queueName: string, jobName: string, data: any, opts
     priority: opts?.priority,
     attempts: opts?.attempts || 3,
     backoff: opts?.backoff || { type: 'exponential', delay: 2000 },
+    jobId: opts?.jobId,
     removeOnComplete: { age: 86400, count: 1000 },   // keep completed jobs for 24h, max 1000
     removeOnFail: { age: 604800, count: 5000 },      // keep failed jobs for 7 days, max 5000
   });
