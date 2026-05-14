@@ -1,5 +1,23 @@
 import { Schema, model, Document } from 'mongoose';
 
+// ─── 001-ai-lead-scoring — score rationale ────────────────────────
+// Snapshot of how the most recent score was computed. Read by the UI
+// (rationale card) and by audit logs. Worker writes this every time it
+// completes a scoring job. See `.sdd/specs/001-ai-lead-scoring/spec.md`
+// §10.1.
+export interface ScoreRationale {
+  ruleScore: number;
+  llmScore: number | null;
+  blendedScore: number;
+  factors: Array<{ label: string; weight: number; source: 'rule' | 'llm' }>;
+  lastInteractionInfluence?: { factor: string; shift: number };
+  llmSkipped?: boolean;
+  llmFallback?: boolean;
+  llmCostInr?: number;
+  computedAt: Date;
+  modelVersion: string;
+}
+
 export interface IInquiry extends Document {
   collegeId: Schema.Types.ObjectId;
   academicYearId?: Schema.Types.ObjectId;
@@ -60,6 +78,10 @@ export interface IInquiry extends Document {
   // current officer. Lets the admin trace "why did this lead land
   // with officer X?"
   assignedByRuleId?: Schema.Types.ObjectId;
+
+  // 001-ai-lead-scoring §10.1
+  scoreRationale?: ScoreRationale;
+  lastScoredAt?: Date;
 }
 
 const schema = new Schema<IInquiry>({
@@ -177,6 +199,34 @@ const schema = new Schema<IInquiry>({
   assignedOfficerId: { type: Schema.Types.ObjectId, ref: 'Person' },
   clusterHeadId: { type: Schema.Types.ObjectId, ref: 'Person' },
   assignedByRuleId: { type: Schema.Types.ObjectId, ref: 'AssignmentRule' },
+
+  // ─── 001-ai-lead-scoring fields ─────────────────────────────
+  scoreRationale: {
+    type: {
+      ruleScore: { type: Number, required: true },
+      llmScore: { type: Number, default: null },
+      blendedScore: { type: Number, required: true },
+      factors: [{
+        _id: false,
+        label: String,
+        weight: Number,
+        source: { type: String, enum: ['rule', 'llm'] },
+      }],
+      lastInteractionInfluence: {
+        _id: false,
+        factor: String,
+        shift: Number,
+      },
+      llmSkipped: { type: Boolean, default: false },
+      llmFallback: { type: Boolean, default: false },
+      llmCostInr: Number,
+      computedAt: Date,
+      modelVersion: String,
+    },
+    _id: false,
+    default: undefined,
+  },
+  lastScoredAt: { type: Date },
 }, { timestamps: true });
 
 schema.index({ collegeId: 1, status: 1 });
@@ -188,5 +238,11 @@ schema.index({ collegeId: 1, assignedOfficerId: 1, status: 1 });
 schema.index({ collegeId: 1, mqlSqlClassification: 1 });
 // UTM attribution reports: "which campaign brought how many SQLs?"
 schema.index({ collegeId: 1, utmCampaign: 1 });
+
+// 001-ai-lead-scoring §10.2 — power "sorted by score" lists,
+// grade filters, and the debounce lookup on lastScoredAt.
+schema.index({ collegeId: 1, leadScore: -1 });
+schema.index({ collegeId: 1, leadGrade: 1, leadScore: -1 });
+schema.index({ collegeId: 1, lastScoredAt: -1 });
 
 export const Inquiry = model<IInquiry>('Inquiry', schema);
