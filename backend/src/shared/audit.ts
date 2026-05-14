@@ -30,6 +30,8 @@ const AUDIT_ACTIONS: AuditAction[] = [
   'waitlist_promote', 'vacate_request', 'vacate_approve', 'vacate_reject',
   'approve', 'reject', 'submit', 'publish', 'archive',
   'ai_score_computed',
+  'ai_config_suggested',
+  'ai_config_applied',
 ];
 
 const auditLogSchema = new Schema<IAuditLog>({
@@ -39,7 +41,7 @@ const auditLogSchema = new Schema<IAuditLog>({
   entityName:  { type: String, required: true },
   studentId:   { type: Schema.Types.ObjectId, index: true },
   action:      { type: String, enum: AUDIT_ACTIONS, required: true },
-  changes:     [{ field: String, displayName: String, oldValue: Schema.Types.Mixed, newValue: Schema.Types.Mixed }],
+  changes:     [{ field: String, displayName: String, oldValue: Schema.Types.Mixed, newValue: Schema.Types.Mixed, source: String }],
   performedBy: { type: String, default: 'System' },
   timestamp:   { type: Date, default: Date.now, index: true },
 });
