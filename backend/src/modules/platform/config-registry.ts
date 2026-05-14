@@ -196,9 +196,132 @@ const notificationTemplates: ConfigSchema = {
   ],
 };
 
+// ─── Gap 6 — exam-administration master catalogs ──────────────────
+
+const namingSeries: ConfigSchema = {
+  type: 'naming-series',
+  label: 'Naming Series',
+  description:
+    'Auto-incremented certificate/document numbering. One entry per entity type (memo, PC, CGS, OD, accession). The runtime issuer reads `prefix`, current `counter`, and `format` to mint the next number.',
+  cardinality: 'multi',
+  identifierField: 'entityType',
+  fields: [
+    {
+      key: 'entityType',
+      label: 'Entity Type',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 'memo', label: 'Memorandum of Marks (memo)' },
+        { value: 'pc_certificate', label: 'Provisional Certificate (PC)' },
+        { value: 'cgs_certificate', label: 'Course Grade Sheet (CGS)' },
+        { value: 'od_certificate', label: 'Originating Degree (OD)' },
+        { value: 'accession_number', label: 'Library Accession Number' },
+      ],
+      helpText: 'Which document/record type this numbering applies to.',
+    },
+    {
+      key: 'prefix',
+      label: 'Prefix',
+      type: 'string',
+      placeholder: 'e.g. PC/2026/',
+      helpText: 'Static prefix prepended to every minted number.',
+    },
+    {
+      key: 'counter',
+      label: 'Next Number',
+      type: 'number',
+      required: true,
+      default: 1,
+      helpText: 'Current value of the counter. Incremented automatically on each mint.',
+    },
+    {
+      key: 'padding',
+      label: 'Zero-Padding Width',
+      type: 'number',
+      default: 4,
+      helpText: 'e.g. 4 → 0042. 0 = no padding.',
+    },
+    {
+      key: 'format',
+      label: 'Format Template',
+      type: 'string',
+      placeholder: '{prefix}{counter}',
+      helpText: 'Template using {prefix} and {counter}. Default: {prefix}{counter}.',
+    },
+  ],
+};
+
+const awardClassification: ConfigSchema = {
+  type: 'award-classification',
+  label: 'Award Classification',
+  description:
+    'CGPA/percentage thresholds with eligibility rules used to compute the final award class (Distinction, First Class, etc.) on the originating-degree certificate.',
+  cardinality: 'multi',
+  identifierField: 'code',
+  fields: [
+    {
+      key: 'code',
+      label: 'Classification Code',
+      type: 'string',
+      required: true,
+      placeholder: 'e.g. distinction',
+      helpText: 'Stable machine code. Lowercase + underscores.',
+    },
+    {
+      key: 'label',
+      label: 'Display Label',
+      type: 'string',
+      required: true,
+      placeholder: 'First Class with Distinction',
+    },
+    {
+      key: 'basis',
+      label: 'Basis',
+      type: 'select',
+      required: true,
+      default: 'cgpa',
+      options: [
+        { value: 'cgpa', label: 'CGPA' },
+        { value: 'percentage', label: 'Percentage' },
+      ],
+    },
+    {
+      key: 'minValue',
+      label: 'Minimum Value',
+      type: 'number',
+      required: true,
+      helpText: 'e.g. 7.5 (CGPA) or 75 (percentage). The award is granted when student ≥ this value.',
+    },
+    {
+      key: 'requiresNoBacklogHistory',
+      label: 'Requires No Backlog History',
+      type: 'boolean',
+      default: false,
+      helpText: 'When ON, only students who have never had a backlog (across all semesters) qualify.',
+    },
+    {
+      key: 'requiresPassInFirstAttempt',
+      label: 'Requires Pass in First Attempt',
+      type: 'boolean',
+      default: false,
+      helpText: 'When ON, only students who passed every course on first attempt qualify.',
+    },
+    {
+      key: 'rank',
+      label: 'Rank (lower = higher class)',
+      type: 'number',
+      default: 100,
+      helpText: 'When a student matches multiple classifications, the one with the LOWEST rank wins.',
+    },
+  ],
+};
+
 export const CONFIG_REGISTRY: readonly ConfigSchema[] = [
   institutionFeatureFlags,
   notificationTemplates,
+  namingSeries,
+  awardClassification,
 ];
 
 const CONFIG_INDEX = new Map<string, ConfigSchema>(
