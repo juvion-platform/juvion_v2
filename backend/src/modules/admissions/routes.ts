@@ -10,6 +10,7 @@ import {
   createExamScoreSchema, createCounselingSchema,
   createOfferSchema, updateOfferSchema,
   upsertDocChecklistSchema, createAdmissionSchema,
+  createAssignmentRuleSchema, updateAssignmentRuleSchema, previewAssignmentRuleSchema,
 } from './validation';
 
 const router = Router();
@@ -56,5 +57,15 @@ router.put('/documents/:applicantId', authorize('admissions', 'update'), validat
 router.get('/enrollments', authorize('admissions', 'read'), ctrl.listAdmissions);
 router.get('/enrollments/:id', authorize('admissions', 'read'), ctrl.getAdmission);
 router.post('/enrollments', authorize('admissions', 'create'), validate(createAdmissionSchema), ctrl.createAdmission);
+
+// ─── Strategic Gap 5 — AssignmentRule CRUD + preview ─────────────
+// Static `/preview` path BEFORE the `/:id` route so it never gets
+// matched as `:id="preview"`.
+router.post('/assignment-rules/preview', authorize('admissions', 'read'), validate(previewAssignmentRuleSchema), ctrl.previewAssignmentRule);
+router.get('/assignment-rules', authorize('admissions', 'read'), ctrl.listAssignmentRules);
+router.post('/assignment-rules', authorize('admissions', 'create'), validate(createAssignmentRuleSchema), ctrl.createAssignmentRule);
+router.get('/assignment-rules/:id', authorize('admissions', 'read'), ctrl.getAssignmentRule);
+router.put('/assignment-rules/:id', authorize('admissions', 'update'), validate(updateAssignmentRuleSchema), ctrl.updateAssignmentRule);
+router.delete('/assignment-rules/:id', authorize('admissions', 'delete'), ctrl.deleteAssignmentRule);
 
 export default router;

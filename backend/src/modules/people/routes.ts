@@ -16,6 +16,8 @@ import {
   staffPhotoHandlers,
   parentPhotoHandlers,
 } from './photo-controller';
+import * as facultyDocCtrl from './faculty-document-controller';
+import * as facultyTeachingCtrl from './faculty-teaching-controller';
 import { searchPeopleController } from './search-controller';
 import { searchQuerySchema } from './search-validation';
 import {
@@ -110,6 +112,256 @@ router.get(
   '/faculty/:id/photo-url',
   authorize('people', 'read'),
   facultyPhotoHandlers.getUrl,
+);
+
+// ─── Faculty credential documents (Strategic Gap 1 Phase B) ──────────
+// Generic credential-evidence store: PhD certificate, PAN, experience
+// certs, FDP certificates, awards, etc. — all 12 categories share this
+// surface. Phase B2 ships CRUD + view-URL; Phase B3 (now) ships the
+// verification workflow.
+//
+// Pending-queue endpoint at a non-parameterised path so it never
+// collides with /faculty/:facultyId/documents/:docId routing.
+router.get(
+  '/faculty-document-queue',
+  authorize('people', 'read'),
+  facultyDocCtrl.listPendingFacultyDocumentsHandler,
+);
+// Bulk verify endpoints — also under a non-parameterised prefix so
+// they never collide with /faculty/:facultyId/documents/:docId.
+router.post(
+  '/faculty-documents/bulk-approve',
+  authorize('people', 'update'),
+  facultyDocCtrl.bulkApproveFacultyDocumentsHandler,
+);
+router.post(
+  '/faculty-documents/bulk-reject',
+  authorize('people', 'update'),
+  facultyDocCtrl.bulkRejectFacultyDocumentsHandler,
+);
+router.post(
+  '/faculty/:facultyId/documents/:docId/approve',
+  authorize('people', 'update'),
+  facultyDocCtrl.approveFacultyDocumentHandler,
+);
+router.post(
+  '/faculty/:facultyId/documents/:docId/reject',
+  authorize('people', 'update'),
+  facultyDocCtrl.rejectFacultyDocumentHandler,
+);
+router.get(
+  '/faculty/:facultyId/documents/:docId/audit',
+  authorize('people', 'read'),
+  facultyDocCtrl.getFacultyDocumentAuditHandler,
+);
+router.get(
+  '/faculty/:facultyId/documents',
+  authorize('people', 'read'),
+  facultyDocCtrl.listFacultyDocumentsHandler,
+);
+router.post(
+  '/faculty/:facultyId/documents',
+  authorize('people', 'update'),
+  facultyDocCtrl.documentUpload.single('file'),
+  facultyDocCtrl.documentMulterErrorHandler,
+  facultyDocCtrl.uploadFacultyDocumentHandler,
+);
+router.get(
+  '/faculty/:facultyId/documents/:docId',
+  authorize('people', 'read'),
+  facultyDocCtrl.getFacultyDocumentHandler,
+);
+router.get(
+  '/faculty/:facultyId/documents/:docId/view',
+  authorize('people', 'read'),
+  facultyDocCtrl.getFacultyDocumentViewUrlHandler,
+);
+router.patch(
+  '/faculty/:facultyId/documents/:docId',
+  authorize('people', 'update'),
+  facultyDocCtrl.updateFacultyDocumentHandler,
+);
+router.delete(
+  '/faculty/:facultyId/documents/:docId',
+  authorize('people', 'delete'),
+  facultyDocCtrl.archiveFacultyDocumentHandler,
+);
+
+// ─── Faculty teaching & research sub-collections (Phase D) ───────────
+// Three sub-collections per faculty member, each with identical CRUD
+// shape:
+//   /faculty/:facultyId/subjects   — NAAC 2.2 / 2.6 (what they teach)
+//   /faculty/:facultyId/scholars   — NAAC 3.4.2 (PhDs / M.Tech guided)
+//   /faculty/:facultyId/books      — NAAC 3.3 (books authored / edited)
+// No verification workflow — these are institution-self-certified rows.
+
+// Subjects taught
+router.get(
+  '/faculty/:facultyId/subjects',
+  authorize('people', 'read'),
+  facultyTeachingCtrl.subjectHandlers.list,
+);
+router.post(
+  '/faculty/:facultyId/subjects',
+  authorize('people', 'update'),
+  facultyTeachingCtrl.subjectHandlers.create,
+);
+router.get(
+  '/faculty/:facultyId/subjects/:id',
+  authorize('people', 'read'),
+  facultyTeachingCtrl.subjectHandlers.getOne,
+);
+router.patch(
+  '/faculty/:facultyId/subjects/:id',
+  authorize('people', 'update'),
+  facultyTeachingCtrl.subjectHandlers.update,
+);
+router.delete(
+  '/faculty/:facultyId/subjects/:id',
+  authorize('people', 'delete'),
+  facultyTeachingCtrl.subjectHandlers.archive,
+);
+
+// Research scholars guided
+router.get(
+  '/faculty/:facultyId/scholars',
+  authorize('people', 'read'),
+  facultyTeachingCtrl.scholarHandlers.list,
+);
+router.post(
+  '/faculty/:facultyId/scholars',
+  authorize('people', 'update'),
+  facultyTeachingCtrl.scholarHandlers.create,
+);
+router.get(
+  '/faculty/:facultyId/scholars/:id',
+  authorize('people', 'read'),
+  facultyTeachingCtrl.scholarHandlers.getOne,
+);
+router.patch(
+  '/faculty/:facultyId/scholars/:id',
+  authorize('people', 'update'),
+  facultyTeachingCtrl.scholarHandlers.update,
+);
+router.delete(
+  '/faculty/:facultyId/scholars/:id',
+  authorize('people', 'delete'),
+  facultyTeachingCtrl.scholarHandlers.archive,
+);
+
+// Books authored / edited
+router.get(
+  '/faculty/:facultyId/books',
+  authorize('people', 'read'),
+  facultyTeachingCtrl.bookHandlers.list,
+);
+router.post(
+  '/faculty/:facultyId/books',
+  authorize('people', 'update'),
+  facultyTeachingCtrl.bookHandlers.create,
+);
+router.get(
+  '/faculty/:facultyId/books/:id',
+  authorize('people', 'read'),
+  facultyTeachingCtrl.bookHandlers.getOne,
+);
+router.patch(
+  '/faculty/:facultyId/books/:id',
+  authorize('people', 'update'),
+  facultyTeachingCtrl.bookHandlers.update,
+);
+router.delete(
+  '/faculty/:facultyId/books/:id',
+  authorize('people', 'delete'),
+  facultyTeachingCtrl.bookHandlers.archive,
+);
+
+// ─── Faculty research outputs (Phase B — original spec) ──────────────
+// Three NAAC-shaped collections under each faculty member:
+//   /faculty/:facultyId/publications  — papers, conference + journal
+//   /faculty/:facultyId/patents       — IP filings
+//   /faculty/:facultyId/projects      — sponsored research
+// Same 5-route CRUD shape per entity. NAAC criteria 3.1–3.4.
+
+// Publications
+router.get(
+  '/faculty/:facultyId/publications',
+  authorize('people', 'read'),
+  facultyTeachingCtrl.publicationHandlers.list,
+);
+router.post(
+  '/faculty/:facultyId/publications',
+  authorize('people', 'update'),
+  facultyTeachingCtrl.publicationHandlers.create,
+);
+router.get(
+  '/faculty/:facultyId/publications/:id',
+  authorize('people', 'read'),
+  facultyTeachingCtrl.publicationHandlers.getOne,
+);
+router.patch(
+  '/faculty/:facultyId/publications/:id',
+  authorize('people', 'update'),
+  facultyTeachingCtrl.publicationHandlers.update,
+);
+router.delete(
+  '/faculty/:facultyId/publications/:id',
+  authorize('people', 'delete'),
+  facultyTeachingCtrl.publicationHandlers.archive,
+);
+
+// Patents
+router.get(
+  '/faculty/:facultyId/patents',
+  authorize('people', 'read'),
+  facultyTeachingCtrl.patentHandlers.list,
+);
+router.post(
+  '/faculty/:facultyId/patents',
+  authorize('people', 'update'),
+  facultyTeachingCtrl.patentHandlers.create,
+);
+router.get(
+  '/faculty/:facultyId/patents/:id',
+  authorize('people', 'read'),
+  facultyTeachingCtrl.patentHandlers.getOne,
+);
+router.patch(
+  '/faculty/:facultyId/patents/:id',
+  authorize('people', 'update'),
+  facultyTeachingCtrl.patentHandlers.update,
+);
+router.delete(
+  '/faculty/:facultyId/patents/:id',
+  authorize('people', 'delete'),
+  facultyTeachingCtrl.patentHandlers.archive,
+);
+
+// Projects
+router.get(
+  '/faculty/:facultyId/projects',
+  authorize('people', 'read'),
+  facultyTeachingCtrl.projectHandlers.list,
+);
+router.post(
+  '/faculty/:facultyId/projects',
+  authorize('people', 'update'),
+  facultyTeachingCtrl.projectHandlers.create,
+);
+router.get(
+  '/faculty/:facultyId/projects/:id',
+  authorize('people', 'read'),
+  facultyTeachingCtrl.projectHandlers.getOne,
+);
+router.patch(
+  '/faculty/:facultyId/projects/:id',
+  authorize('people', 'update'),
+  facultyTeachingCtrl.projectHandlers.update,
+);
+router.delete(
+  '/faculty/:facultyId/projects/:id',
+  authorize('people', 'delete'),
+  facultyTeachingCtrl.projectHandlers.archive,
 );
 
 // Staff

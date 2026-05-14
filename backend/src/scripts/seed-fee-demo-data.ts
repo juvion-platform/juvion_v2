@@ -26,7 +26,13 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+
+import dotenv from 'dotenv';
 import mongoose from 'mongoose';
+
+// Load backend/.env regardless of which directory the operator runs
+// the script from. Same pattern as the other seed CLIs.
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 import { AppError } from '../middleware/errorHandler';
 import { College } from '../models/College';
@@ -241,7 +247,13 @@ async function purgeTaggedEntities(
     // so we look them up by a demo roll-number prefix that only this
     // script ever writes. Matches the 'DEMO-' prefix used below.
     Student.deleteMany({ collegeId, rollNumber: /^DEMO-/ }),
-    Person.deleteMany({ collegeId, name: /^Demo Student /i }),
+    // Person doesn't carry a metadata flag, so we key on the demo
+    // email domain — every Person this script writes uses
+    // `demo.student.NNN@demo.edu`. Both old (placeholder-name) and
+    // new (realistic-name) demo Persons share that domain, so this
+    // cleanup catches mixed-state DBs from before/after the
+    // realistic-name change.
+    Person.deleteMany({ collegeId, email: /@demo\.edu$/i }),
   ]);
 }
 
@@ -300,12 +312,56 @@ interface SeededStudent {
   programmeName: string;
 }
 
+/**
+ * Realistic Telugu/AP-Telangana student name pool. Picked deterministically
+ * by index so the same `--clear-first && re-seed` produces identical
+ * names — useful when comparing dashboard screenshots across runs.
+ *
+ * Pool size > BUCKETS total (50) so wrapping is rare. When it does
+ * wrap, `pickStudentName` appends a numeric suffix to disambiguate
+ * the email + display name (e.g. "Aarav Sharma 2") so unique-index
+ * constraints on Person.email never trip.
+ *
+ * Names are mixed-gender and span common South / North Indian
+ * surname families so the demo dashboard reflects realistic
+ * student-body composition rather than a single ethnic cluster.
+ */
+const STUDENT_NAME_POOL: ReadonlyArray<string> = [
+  'Aarav Sharma',     'Priya Reddy',      'Rahul Kumar',      'Sneha Patel',
+  'Karthik Rao',      'Divya Nair',       'Arjun Mehta',      'Ananya Gupta',
+  'Vikram Singh',     'Meera Joshi',      'Aditya Verma',     'Lavanya Reddy',
+  'Sai Krishna',      'Pooja Iyer',       'Nikhil Naidu',     'Harini Subramanian',
+  'Rohan Khanna',     'Kavya Menon',      'Manish Agarwal',   'Tanvi Pillai',
+  'Suresh Babu',      'Reshma Khan',      'Akhil Goud',       'Saritha Devi',
+  'Bharath Murthy',   'Aishwarya Bose',   'Chetan Pandey',    'Madhuri Choudhury',
+  'Deepak Tiwari',    'Nandini Banerjee', 'Gaurav Shah',      'Riya Saxena',
+  'Harsh Mishra',     'Swathi Goswami',   'Ishaan Yadav',     'Aparna Das',
+  'Jaideep Krishnan', 'Bhavana Pillai',   'Kiran Joshi',      'Jyothi Naidu',
+  'Krishna Sharma',   'Radhika Iyer',     'Rajesh Choudhury', 'Asha Subramaniam',
+  'Ravi Teja',        'Shruti Verma',     'Sandeep Goud',     'Anusha Patel',
+  'Saurabh Singh',    'Gauri Mehta',      'Siddharth Naidu',  'Nisha Khanna',
+  'Vishal Rao',       'Amrita Reddy',     'Yash Agarwal',     'Ishita Banerjee',
+  'Dheeraj Pandey',   'Aarti Goswami',    'Anand Murthy',     'Rhea Kapoor',
+];
+
+/**
+ * Returns a deterministic, well-formed Indian name for a given
+ * student index. Wrapping past the pool length appends a 1-based
+ * occurrence suffix so the resulting Person.email + Student.name
+ * stays unique even when more than 60 demo students are seeded.
+ */
+function pickStudentName(idx: number): string {
+  const base = STUDENT_NAME_POOL[(idx - 1) % STUDENT_NAME_POOL.length]!;
+  const round = Math.floor((idx - 1) / STUDENT_NAME_POOL.length);
+  return round === 0 ? base : `${base} ${round + 1}`;
+}
+
 async function createDemoStudent(
   ctx: StudentCreationCtx,
 ): Promise<SeededStudent> {
   const paddedIdx = String(ctx.idx).padStart(3, '0');
   const rollNumber = `DEMO-${ctx.programme.code}-${paddedIdx}`;
-  const name = `Demo Student ${paddedIdx}`;
+  const name = pickStudentName(ctx.idx);
   const person = await Person.create({
     collegeId: ctx.collegeId,
     name,
@@ -678,7 +734,7 @@ function buildDryRunPlan(csvPath: string): DryRunPlan {
     for (let i = 0; i < bucket.count; i++) {
       idx += 1;
       const rollNumber = `DEMO-DRY-${String(idx).padStart(3, '0')}`;
-      const name = `Demo Student ${String(idx).padStart(3, '0')}`;
+      const name = pickStudentName(idx);
       invoicesCreated += 1;
       let paidAmount = 0;
       let escalationStage = '';

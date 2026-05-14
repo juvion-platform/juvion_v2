@@ -6,6 +6,7 @@ import { CounselingAllotment } from '../../models/admissions/CounselingAllotment
 import { AdmissionOffer } from '../../models/admissions/AdmissionOffer';
 import { DocumentChecklist } from '../../models/admissions/DocumentChecklist';
 import { Admission } from '../../models/admissions/Admission';
+import { AssignmentRule, IAssignmentRule, IAssignmentRuleCondition } from '../../models/admissions/AssignmentRule';
 import { paginate } from '../../shared/pagination';
 import { createAuditLog } from '../../shared/audit';
 import { AppError } from '../../middleware/errorHandler';
@@ -117,6 +118,23 @@ export async function convertInquiryToApplicant(collegeId: string, inquiryId: st
     quota: extraData.quota || 'management',
     category: extraData.category,
     status: 'submitted',
+
+    // ─── Strategic Gap 5 — carry CRM data forward ────────────────
+    // UTM attribution stays with the funnel from prospect → admission
+    // so ROI reporting works end-to-end.
+    utmSource: inquiry.utmSource,
+    utmMedium: inquiry.utmMedium,
+    utmCampaign: inquiry.utmCampaign,
+    utmTerm: inquiry.utmTerm,
+    utmContent: inquiry.utmContent,
+    // Verification flags inherit; payment-verification stays false
+    // since fee hasn't been received yet at convert time.
+    emailVerified: inquiry.emailVerified,
+    mobileVerified: inquiry.mobileVerified,
+    // Officer hierarchy inherits — same officer keeps the prospect
+    // they qualified.
+    assignedOfficerId: inquiry.assignedOfficerId,
+    clusterHeadId: inquiry.clusterHeadId,
   };
 
   const applicant = await Applicant.create(applicantData);
@@ -277,5 +295,107 @@ export async function createAdmission(collegeId: string, data: any, performedBy:
   await Applicant.findByIdAndUpdate(data.applicantId, { status: 'enrolled' });
   await createAuditLog({ collegeId, entityType: 'Admission', entityId: String(doc._id), entityName: `Admission`, action: 'create', changes: [], performedBy });
   return doc;
+}
+
+// ─── Strategic Gap 5 — AssignmentRule CRUD + evaluator ───────────────
+
+export async function listAssignmentRules(collegeId: string) {
+  return AssignmentRule.find({ collegeId }).sort({ priority: 1, createdAt: 1 });
+}
+
+export async function getAssignmentRule(collegeId: string, id: string) {
+  const doc = await AssignmentRule.findOne({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Assignment rule not found');
+  return doc;
+}
+
+export async function createAssignmentRule(collegeId: string, data: any, performedBy: string) {
+  const doc = await AssignmentRule.create({ ...data, collegeId, createdBy: performedBy, matchCount: 0 });
+  await createAuditLog({ collegeId, entityType: 'AssignmentRule', entityId: String(doc._id), entityName: doc.name, action: 'create', changes: [], performedBy });
+  return doc;
+}
+
+export async function updateAssignmentRule(collegeId: string, id: string, data: any, performedBy: string) {
+  // Strip non-editable fields so a caller can't reset matchCount /
+  // bypass tenant scoping via PATCH.
+  delete data.collegeId;
+  delete data.createdBy;
+  delete data.matchCount;
+  delete data.lastMatchedAt;
+  const doc = await AssignmentRule.findOneAndUpdate({ _id: id, collegeId }, { $set: data }, { new: true });
+  if (!doc) throw new AppError(404, 'Assignment rule not found');
+  await createAuditLog({ collegeId, entityType: 'AssignmentRule', entityId: id, entityName: doc.name, action: 'update', changes: [], performedBy });
+  return doc;
+}
+
+export async function deleteAssignmentRule(collegeId: string, id: string, performedBy: string) {
+  const doc = await AssignmentRule.findOneAndDelete({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Assignment rule not found');
+  await createAuditLog({ collegeId, entityType: 'AssignmentRule', entityId: id, entityName: doc.name, action: 'delete', changes: [], performedBy });
+  return { deleted: true };
+}
+
+/**
+ * Evaluate one rule's conditions against an inquiry-like input.
+ * Returns true iff EVERY condition matches (logical AND across the
+ * conditions array, same semantics as CampX's rule engine).
+ */
+function evaluateAssignmentRule(
+  rule: IAssignmentRule,
+  inquiry: Record<string, unknown>,
+): boolean {
+  for (const cond of rule.conditions) {
+    const lhs = (inquiry as Record<string, unknown>)[cond.field];
+    const op: IAssignmentRuleCondition['operator'] = cond.operator;
+    const rhs = cond.value;
+    switch (op) {
+      case 'equals':
+        if (lhs !== rhs) return false;
+        break;
+      case 'not_equals':
+        if (lhs === rhs) return false;
+        break;
+      case 'in':
+        if (!Array.isArray(rhs) || !rhs.includes(lhs as string)) return false;
+        break;
+      case 'gt':
+        if (!(typeof lhs === 'number' && typeof rhs === 'number' && lhs > rhs)) return false;
+        break;
+      case 'gte':
+        if (!(typeof lhs === 'number' && typeof rhs === 'number' && lhs >= rhs)) return false;
+        break;
+      case 'lt':
+        if (!(typeof lhs === 'number' && typeof rhs === 'number' && lhs < rhs)) return false;
+        break;
+      case 'lte':
+        if (!(typeof lhs === 'number' && typeof rhs === 'number' && lhs <= rhs)) return false;
+        break;
+      case 'contains':
+        if (typeof lhs !== 'string' || typeof rhs !== 'string' || !lhs.toLowerCase().includes(rhs.toLowerCase())) return false;
+        break;
+    }
+  }
+  return true;
+}
+
+/**
+ * Dry-run an inquiry payload against all enabled rules and return
+ * the first match (in priority order). Used by the admin UI to
+ * preview "if this inquiry came in, which rule would catch it?"
+ * Does NOT mutate the inquiry — separate from the create-time
+ * router hook (which is a Phase B concern; wiring it into
+ * createInquiry needs a careful audit-log + transaction story).
+ */
+export async function previewAssignmentRule(
+  collegeId: string,
+  inquiry: Record<string, unknown>,
+): Promise<{ rule: IAssignmentRule | null; matched: boolean }> {
+  const rules = await AssignmentRule.find({ collegeId, enabled: true }).sort({ priority: 1, createdAt: 1 });
+  for (const rule of rules) {
+    if (evaluateAssignmentRule(rule, inquiry)) {
+      return { rule, matched: true };
+    }
+  }
+  return { rule: null, matched: false };
 }
 

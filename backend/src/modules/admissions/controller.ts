@@ -136,3 +136,32 @@ export async function createAdmission(req: AuthRequest, res: Response, next: Nex
 export async function dashboardStats(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await svc.getDashboardStats(req.collegeId!)); } catch (e) { next(e); }
 }
+
+// ─── Strategic Gap 5 — AssignmentRule CRUD + preview ─────────────
+
+export async function listAssignmentRules(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await svc.listAssignmentRules(req.collegeId!)); } catch (e) { next(e); }
+}
+
+export async function getAssignmentRule(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await svc.getAssignmentRule(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }
+}
+
+export async function createAssignmentRule(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await svc.createAssignmentRule(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+
+export async function updateAssignmentRule(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await svc.updateAssignmentRule(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
+}
+
+export async function deleteAssignmentRule(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await svc.deleteAssignmentRule(req.collegeId!, req.params.id as string, who(req))); } catch (e) { next(e); }
+}
+
+export async function previewAssignmentRule(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const body = (req.body || {}) as { inquiry?: Record<string, unknown> };
+    res.json(await svc.previewAssignmentRule(req.collegeId!, body.inquiry ?? {}));
+  } catch (e) { next(e); }
+}

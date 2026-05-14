@@ -77,13 +77,92 @@ export const createStudentSchema = basePersonSchema.extend({
 export const updateStudentSchema = createStudentSchema.partial();
 
 // ── Faculty ──────────────────────────────────────────
+
+// External-credential identifiers — Strategic Gap 1 (Faculty Profile
+// depth). 33 NAAC-relevant IDs across 5 logical groups. Every field
+// is OPTIONAL — institutions populate over time. The validator MUST
+// list every key the model accepts, otherwise Zod's strip-on-parse
+// behaviour silently drops them (see the branchId bug for the same
+// class of failure). See models/people/Faculty.ts for the field
+// list of record.
+const facultyExternalIdsSchema = z.object({
+  // Indian regulators / portals
+  aicte: z.string().trim().optional(),
+  aishe: z.string().trim().optional(),
+  shodhganga: z.string().trim().optional(),
+  irins: z.string().trim().optional(),
+  vidwan: z.string().trim().optional(),
+  // International research
+  orcid: z.string().trim().optional(),
+  scopus: z.string().trim().optional(),
+  webOfScience: z.string().trim().optional(),
+  researchGate: z.string().trim().optional(),
+  googleScholar: z.string().trim().optional(),
+  researcherId: z.string().trim().optional(),
+  clarivate: z.string().trim().optional(),
+  academia: z.string().trim().optional(),
+  semanticScholar: z.string().trim().optional(),
+  publons: z.string().trim().optional(),
+  ssrn: z.string().trim().optional(),
+  elsevierReviewer: z.string().trim().optional(),
+  // Editorial / review
+  springerReviewer: z.string().trim().optional(),
+  // MOOC / learning
+  swayam: z.string().trim().optional(),
+  nptel: z.string().trim().optional(),
+  nptelLearner: z.string().trim().optional(),
+  atal: z.string().trim().optional(),
+  // Code platforms
+  github: z.string().trim().optional(),
+  hackerRank: z.string().trim().optional(),
+  hackerEarth: z.string().trim().optional(),
+  leetCode: z.string().trim().optional(),
+  replit: z.string().trim().optional(),
+  codeChef: z.string().trim().optional(),
+  exercism: z.string().trim().optional(),
+  codecademy: z.string().trim().optional(),
+  // Social & web
+  linkedIn: z.string().trim().optional(),
+  youtube: z.string().trim().optional(),
+  website: z.string().trim().optional(),
+});
+
+// Bio / professional summary — public-facing free-text profile block
+// added in Phase B1 of the Faculty Profile depth spec.
+const facultyLanguageSchema = z.object({
+  code: z.string().trim().min(1),
+  proficiency: z.enum(['native', 'fluent', 'conversational', 'basic']).optional(),
+});
+
+const facultyProfileBioSchema = z.object({
+  summary: z.string().trim().optional(),
+  tagline: z.string().trim().optional(),
+  expertiseTags: z.array(z.string().trim().min(1)).optional(),
+  researchInterests: z.array(z.string().trim().min(1)).optional(),
+  teachingInterests: z.array(z.string().trim().min(1)).optional(),
+  languages: z.array(facultyLanguageSchema).optional(),
+});
+
+const facultyOfficeSchema = z.object({
+  building: z.string().trim().optional(),
+  cabinNumber: z.string().trim().optional(),
+  phoneExtension: z.string().trim().optional(),
+  weeklyHours: z.string().trim().optional(),
+});
+
 export const createFacultySchema = basePersonSchema.extend({
   employeeCode: z.string().min(1, 'Employee code required'),
   designation: z.string().min(1, 'Designation required'),
   specialization: z.string().optional(),
   qualification: z.string().optional(),
+  // Academic structure refs — same lesson as the Student schema fix
+  // (branchId silently dropped). Must be declared or Zod strips.
+  departmentId: z.string().nullable().optional(),
   contractType: z.enum(['regular', 'contract', 'adjunct', 'visiting']).optional(),
   status: z.enum(['active', 'on_leave', 'separated']).optional(),
+  externalIds: facultyExternalIdsSchema.optional(),
+  profileBio: facultyProfileBioSchema.optional(),
+  office: facultyOfficeSchema.optional(),
 });
 export const updateFacultySchema = createFacultySchema.partial();
 

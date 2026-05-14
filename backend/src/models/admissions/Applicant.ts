@@ -73,6 +73,28 @@ export interface IApplicant extends Document {
   nriVisaValidity?: Date;
   scholarshipEligible?: boolean;
   scholarshipScheme?: string;
+
+  // ─── Strategic Gap 5 — CRM depth (Phase A) ─────────────────────────
+  // UTM attribution carried forward from the source Inquiry when
+  // converted. Useful for ROI reporting per marketing campaign:
+  // "we spent ₹X on UTM source/medium/campaign → got N enrollments".
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  utmTerm?: string;
+  utmContent?: string;
+
+  // Verification flags. emailVerified + mobileVerified carry forward
+  // from Inquiry; applicationFeeVerified is admission-stage only.
+  emailVerified?: boolean;
+  mobileVerified?: boolean;
+  applicationFeeVerified?: boolean;
+
+  // Officer hierarchy — carries forward from the source Inquiry but
+  // can be overridden during application processing if a different
+  // officer takes over.
+  assignedOfficerId?: Schema.Types.ObjectId;
+  clusterHeadId?: Schema.Types.ObjectId;
 }
 
 const schema = new Schema<IApplicant>({
@@ -123,7 +145,31 @@ const schema = new Schema<IApplicant>({
   applicationDate: { type: Date, default: Date.now },
   status: {
     type: String,
-    enum: ['draft', 'submitted', 'under_review', 'eligible', 'ineligible', 'offered', 'accepted', 'fee_paid', 'enrolled', 'withdrawn', 'rejected'],
+    enum: [
+      // Pre-submit
+      'draft',
+      'submitted',
+      // Verification
+      'under_review',
+      'documents_pending',
+      'documents_verified',
+      // Eligibility decision
+      'eligible',
+      'ineligible',
+      'conditional_eligible',
+      // Offer lifecycle
+      'offered',
+      'offer_declined',
+      'offer_lapsed',
+      'accepted',
+      // Fee + enrollment
+      'fee_pending',
+      'fee_paid',
+      'enrolled',
+      // Withdrawn / rejected
+      'withdrawn',
+      'rejected',
+    ],
     default: 'draft',
   },
   notes: String,
@@ -152,10 +198,30 @@ const schema = new Schema<IApplicant>({
   nriVisaValidity: Date,
   scholarshipEligible: { type: Boolean, default: false },
   scholarshipScheme: String,
+
+  // ─── Strategic Gap 5 — CRM depth (Phase A) ───────────────────────
+  // UTM attribution carried forward from Inquiry at convert time.
+  utmSource: { type: String, trim: true },
+  utmMedium: { type: String, trim: true },
+  utmCampaign: { type: String, trim: true },
+  utmTerm: { type: String, trim: true },
+  utmContent: { type: String, trim: true },
+
+  // Verification flags.
+  emailVerified: { type: Boolean, default: false },
+  mobileVerified: { type: Boolean, default: false },
+  applicationFeeVerified: { type: Boolean, default: false },
+
+  // Officer hierarchy carried forward from Inquiry (can be overridden).
+  assignedOfficerId: { type: Schema.Types.ObjectId, ref: 'Person' },
+  clusterHeadId: { type: Schema.Types.ObjectId, ref: 'Person' },
 }, { timestamps: true });
 
 schema.index({ collegeId: 1, applicationNumber: 1 }, { unique: true });
 schema.index({ collegeId: 1, status: 1 });
 schema.index({ collegeId: 1, phone: 1 });
+// CRM dashboard indexes.
+schema.index({ collegeId: 1, assignedOfficerId: 1, status: 1 });
+schema.index({ collegeId: 1, utmCampaign: 1 });
 
 export const Applicant = model<IApplicant>('Applicant', schema);

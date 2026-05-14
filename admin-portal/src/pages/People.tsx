@@ -16,6 +16,7 @@ import ParentsPage from './people/ParentsPage';
 import OrganizationsPage from './people/OrganizationsPage';
 import StudentDetailPage from './people/StudentDetailPage';
 import FacultyDetailPage from './people/FacultyDetailPage';
+import FacultyDocumentQueuePage from './people/FacultyDocumentQueuePage';
 import StaffDetailPage from './people/StaffDetailPage';
 import ParentDetailPage from './people/ParentDetailPage';
 
@@ -223,6 +224,9 @@ export default function People() {
         {/* Faculty */}
         <Route path="faculty" element={<FacultyPage />} />
         <Route path="faculty/new" element={<FacultyFormPage />} />
+        {/* Static "queue" path BEFORE :id, otherwise React Router would
+            match "/people/faculty/document-queue" as :id="document-queue". */}
+        <Route path="faculty/document-queue" element={<FacultyDocumentQueuePage />} />
         <Route path="faculty/:id" element={<FacultyDetailPage />} />
         <Route path="faculty/:id/edit" element={<FacultyFormPage />} />
         {/* Staff */}

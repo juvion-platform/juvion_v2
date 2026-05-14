@@ -664,6 +664,19 @@ export async function createFaculty(collegeId: string, data: any, performedBy: s
     contractType: data.contractType || 'regular', status: data.status || 'active',
   };
   ['specialization', 'qualification', 'departmentId'].forEach(k => { if (data[k]) fields[k] = data[k]; });
+  // externalIds is the NAAC-evidence floor (Strategic Gap 1 Phase A).
+  // Persist on create when the operator filled any of the 33 fields.
+  if (data.externalIds && typeof data.externalIds === 'object') {
+    fields.externalIds = data.externalIds;
+  }
+  // profileBio + office are Phase B1 content blocks. Same shape rule as
+  // externalIds — only persist when present and an object.
+  if (data.profileBio && typeof data.profileBio === 'object') {
+    fields.profileBio = data.profileBio;
+  }
+  if (data.office && typeof data.office === 'object') {
+    fields.office = data.office;
+  }
   const doc = await Faculty.create(fields);
   await createAuditLog({ collegeId, entityType: 'Faculty', entityId: String(doc._id), entityName: data.name, action: 'create', changes: [], performedBy });
   return { ...doc.toObject(), person: person.toObject() };
@@ -679,6 +692,20 @@ export async function updateFaculty(collegeId: string, id: string, data: any, pe
 
   const facFields: any = {};
   ['employeeCode', 'designation', 'specialization', 'qualification', 'contractType', 'status', 'departmentId'].forEach(k => { if (data[k] !== undefined) facFields[k] = data[k]; });
+  // externalIds is set as a whole object — operators clear individual
+  // IDs by sending an empty string, and clear the entire bag by sending
+  // an empty object (or omitting the key). Mongoose merges via $set at
+  // the path level so partial updates work as expected.
+  if (data.externalIds !== undefined) {
+    facFields.externalIds = data.externalIds;
+  }
+  // Same whole-object semantics for profileBio + office (Phase B1).
+  if (data.profileBio !== undefined) {
+    facFields.profileBio = data.profileBio;
+  }
+  if (data.office !== undefined) {
+    facFields.office = data.office;
+  }
   if (Object.keys(facFields).length > 0) await Faculty.findByIdAndUpdate(id, { $set: facFields });
 
   await createAuditLog({ collegeId, entityType: 'Faculty', entityId: id, entityName: data.name || 'Faculty', action: 'update', changes: [], performedBy });

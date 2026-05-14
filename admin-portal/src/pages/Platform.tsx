@@ -1,7 +1,7 @@
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getPlatformStats } from '../services/platform';
-import { Megaphone, FileText, Bell, ClipboardList, MessageSquare, Mail, Smartphone, MessageCircle, Shield } from 'lucide-react';
+import { Megaphone, FileText, Bell, ClipboardList, MessageSquare, Mail, Smartphone, MessageCircle, Shield, Upload } from 'lucide-react';
 import Breadcrumbs from '../components/ui/Breadcrumbs';
 
 import AnnouncementsPage from './platform/AnnouncementsPage';
@@ -13,6 +13,7 @@ import EmailLogsPage from './platform/EmailLogsPage';
 import SMSLogsPage from './platform/SMSLogsPage';
 import WhatsAppLogsPage from './platform/WhatsAppLogsPage';
 import RbacPoliciesPage from './platform/RbacPolicies';
+import BulkImportsPage from './platform/BulkImportsPage';
 
 function PlatformHome() {
   const navigate = useNavigate();
@@ -114,6 +115,11 @@ function PlatformHome() {
           <div className="font-semibold text-navy-dark text-sm">RBAC Policies</div>
           <p className="text-xs text-gray-500 mt-1">Manage access control policies</p>
         </button>
+        <button onClick={() => navigate('bulk-imports')} className="bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all border-cyan-200 hover:border-cyan-400">
+          <div className="inline-flex p-2.5 rounded-lg mb-3 bg-cyan-50 text-cyan-600"><Upload size={22} /></div>
+          <div className="font-semibold text-navy-dark text-sm">Bulk Imports</div>
+          <p className="text-xs text-gray-500 mt-1">Schema-driven CSV import for students, faculty, fees, …</p>
+        </button>
       </div>
     </div>
   );
@@ -142,6 +148,7 @@ export default function Platform() {
         <Route path="sms-logs" element={<SMSLogsPage />} />
         <Route path="whatsapp-logs" element={<WhatsAppLogsPage />} />
         <Route path="rbac-policies" element={<RbacPoliciesPage />} />
+        <Route path="bulk-imports" element={<BulkImportsPage />} />
       </Routes>
     </SubPageWrapper>
   );
