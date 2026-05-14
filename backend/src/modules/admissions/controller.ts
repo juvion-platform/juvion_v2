@@ -7,8 +7,8 @@ const who = (req: AuthRequest) => req.user?.name || 'System';
 // ─── Inquiries ───────────────────────────────────────────────
 export async function listInquiries(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const { page = '1', limit = '20', status } = req.query as any;
-    res.json(await svc.listInquiries(req.collegeId!, +page, +limit, status, req.authScope));
+    const { page = '1', limit = '20', status, grade, sort } = req.query as any;
+    res.json(await svc.listInquiries(req.collegeId!, +page, +limit, status, req.authScope, grade, sort));
   } catch (e) { next(e); }
 }
 
@@ -182,4 +182,29 @@ export async function crmOfficerStats(req: AuthRequest, res: Response, next: Nex
 
 export async function crmSourceStats(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await svc.getCRMSourceStats(req.collegeId!)); } catch (e) { next(e); }
+}
+
+// ─── 001-ai-lead-scoring ─────────────────────────────────────────
+
+export async function rescoreInquiry(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const r = await svc.rescoreInquiry(req.collegeId!, String(req.params.id), who(req));
+    // 208 Already Reported for the debounce hit; 202 for a fresh enqueue.
+    if (r.status === 'already_scored') return res.status(208).json(r);
+    return res.status(202).json(r);
+  } catch (e) { next(e); }
+}
+
+export async function batchScoreInquiries(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const r = await svc.batchScoreInquiries(req.collegeId!, who(req), req.body ?? {});
+    return res.status(202).json(r);
+  } catch (e) { next(e); }
+}
+
+export async function leadScoringStats(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const range = (req.query.range as 'today' | 'week' | 'month' | undefined) ?? 'today';
+    res.json(await svc.getLeadScoringStats(req.collegeId!, range));
+  } catch (e) { next(e); }
 }

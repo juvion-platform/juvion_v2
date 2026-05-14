@@ -1,5 +1,7 @@
 import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
+import { deriveLeadGrade } from './lead-scoring/grade';
+import { scoreInquiry } from './lead-scoring/service';
 import { Admission } from '../../models/admissions/Admission';
 import { AdmissionCancellation } from '../../models/admissions/AdmissionCancellation';
 import { AllotmentResult } from '../../models/admissions/AllotmentResult';
@@ -67,16 +69,30 @@ registerWorkflowStepHandler('W01', 'lead_score', async ({ instance, result }) =>
   const inquiryId = await ensureInquiryLinked(instance);
   if (!inquiryId) return;
 
-  const leadScore = typeof result.leadScore === 'number' ? result.leadScore : undefined;
-  const leadGrade = typeof result.leadGrade === 'string' ? result.leadGrade : deriveLeadGrade(leadScore);
+  // 001-ai-lead-scoring §10.9 — the W01 step now drives the scorer
+  // directly instead of expecting an external `result.leadScore`. If the
+  // caller still pre-supplied a score (e.g. legacy imports), honour it
+  // and skip the scorer; otherwise compute via the orchestrator.
+  const collegeId = String(instance.collegeId);
+  const performedBy = typeof result.performedBy === 'string' ? result.performedBy : 'workflow:w01-lead-score';
 
-  const update: Record<string, any> = {};
-  if (leadScore !== undefined) update.leadScore = leadScore;
-  if (leadGrade) update.leadGrade = leadGrade;
-  if (typeof result.status === 'string') update.status = result.status;
+  let leadScore: number | undefined;
+  let leadGrade: string | undefined;
 
-  if (Object.keys(update).length > 0) {
+  if (typeof result.leadScore === 'number') {
+    leadScore = result.leadScore;
+    leadGrade = typeof result.leadGrade === 'string' ? result.leadGrade : deriveLeadGrade(leadScore);
+    const update: Record<string, any> = { leadScore };
+    if (leadGrade) update.leadGrade = leadGrade;
+    if (typeof result.status === 'string') update.status = result.status;
     await Inquiry.findByIdAndUpdate(inquiryId, { $set: update });
+  } else {
+    const scored = await scoreInquiry(collegeId, inquiryId, performedBy, { trigger: 'manual' });
+    leadScore = scored.blendedScore;
+    leadGrade = scored.leadGrade;
+    if (typeof result.status === 'string') {
+      await Inquiry.findByIdAndUpdate(inquiryId, { $set: { status: result.status } });
+    }
   }
 
   await saveInstanceMetadata(instance, { inquiryId, ...(leadGrade ? { leadGrade } : {}) });
@@ -2649,13 +2665,6 @@ async function updateProvisioningStatus(
     admission.studentId = new mongoose.Types.ObjectId(String(result.studentId)) as any;
   }
   await admission.save();
-}
-
-function deriveLeadGrade(leadScore?: number): string | undefined {
-  if (leadScore === undefined) return undefined;
-  if (leadScore >= 80) return 'hot';
-  if (leadScore >= 50) return 'warm';
-  return 'cold';
 }
 
 function deriveChecklistStatus(documents: any[]): 'pending' | 'partial' | 'complete' | 'verified' {

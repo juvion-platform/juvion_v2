@@ -18,6 +18,15 @@ import { WorkflowTask } from '../../models/workflow/WorkflowTask';
 import { paginate } from '../../shared/pagination';
 import { createAuditLog } from '../../shared/audit';
 import { AppError } from '../../middleware/errorHandler';
+import { enqueueScoring } from './lead-scoring/enqueue';
+
+// 001-ai-lead-scoring §10.9 / Story 2 — interaction outcomes that should
+// trigger a re-score. Negative/neutral outcomes are intentionally excluded
+// to keep the LLM bill down; the score will still refresh on the next
+// positive signal or via manual rescore.
+const RESCORE_TRIGGERING_OUTCOMES = new Set([
+  'interested', 'callback_requested', 'visit_scheduled', 'converted',
+]);
 
 // ─── Lead Interactions ──────────────────────────────────────
 
@@ -38,6 +47,18 @@ export async function createLeadInteraction(collegeId: string, data: any, perfor
     collegeId, entityType: 'LeadInteraction', entityId: String(doc._id),
     entityName: `${data.type} interaction`, action: 'create', changes: [], performedBy,
   });
+
+  // 001-ai-lead-scoring §10.6 / Story 2 — positive outcomes refresh the
+  // score. The 5-min worker-level debounce (spec §10.6) prevents thrash
+  // when several positive interactions land in quick succession.
+  if (data.outcome && RESCORE_TRIGGERING_OUTCOMES.has(data.outcome)) {
+    enqueueScoring({
+      collegeId, inquiryId: String(data.inquiryId), performedBy, trigger: 'interaction',
+    }).catch((err: unknown) => {
+      // eslint-disable-next-line no-console
+      console.warn(`[lead-interaction] lead-scoring enqueue failed (inquiry=${data.inquiryId}):`, (err as Error).message);
+    });
+  }
 
   return doc;
 }

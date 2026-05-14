@@ -224,3 +224,21 @@ export const previewAssignmentRuleSchema = z.object({
   // is the rule-engine's job, not the schema's.
   inquiry: z.record(z.unknown()),
 });
+
+// ─── 001-ai-lead-scoring — request schemas ────────────────────────
+
+export const batchScoreSchema = z.object({
+  // Mongo filter projection — same fields the CRM dashboard filters by.
+  // All optional; an empty filter rescores all of the college's inquiries
+  // (subject to the maxJobs cap).
+  status: z.string().optional(),
+  source: z.string().optional(),
+  leadGrade: z.enum(['hot', 'warm', 'cold', 'dormant']).optional(),
+  updatedSince: z.string().datetime().optional(),
+  // Safety cap — the service also enforces a server-side ceiling.
+  maxJobs: z.number().int().positive().max(2000).optional(),
+}).strict();
+
+export const leadScoringStatsQuerySchema = z.object({
+  range: z.enum(['today', 'week', 'month']).optional(),
+});
