@@ -25,6 +25,7 @@ import GradeCardsPage from './academics/GradeCardsPage';
 import SemesterResultsPage from './academics/SemesterResultsPage';
 import LessonPlansPage from './academics/LessonPlansPage';
 import CourseFeedbackPage from './academics/CourseFeedbackPage';
+import ExamConfigPage from './academics/ExamConfigPage';
 import PromotionPage from './academics/PromotionPage';
 
 const STRUCTURE_CARDS = [
@@ -159,6 +160,7 @@ function AcademicsHome() {
           { to: 'promotion', icon: TrendingUp, label: 'Promotion', desc: 'Promote students + fee pin', iconBg: 'bg-emerald-50 text-emerald-600', border: 'border-emerald-200 hover:border-emerald-400' },
           { to: 'lesson-plans', icon: BookCopy, label: 'Lesson Plans', desc: 'Week-wise planning', iconBg: 'bg-teal-50 text-teal-600', border: 'border-teal-200 hover:border-teal-400' },
           { to: 'course-feedback', icon: MessageSquare, label: 'Feedback', desc: 'Course & faculty feedback', iconBg: 'bg-pink-50 text-pink-600', border: 'border-pink-200 hover:border-pink-400' },
+          { to: 'exam-config', icon: ClipboardCheck, label: 'Exam Config', desc: 'Rooms · evaluators · grading · papers · signatures · MOOC', iconBg: 'bg-cyan-50 text-cyan-600', border: 'border-cyan-200 hover:border-cyan-400' },
         ].map(card => {
           const Icon = card.icon;
           return (
@@ -210,6 +212,8 @@ export default function Academics() {
         <Route path="promotion" element={<PromotionPage />} />
         <Route path="lesson-plans" element={<LessonPlansPage />} />
         <Route path="course-feedback" element={<CourseFeedbackPage />} />
+        <Route path="exam-config" element={<ExamConfigPage />} />
+        <Route path="exam-config/:entity" element={<ExamConfigPage />} />
       </Routes>
     </SubPageWrapper>
   );

@@ -3,6 +3,7 @@ import { authenticate } from '../../middleware/authenticate';
 import { authorize } from '../../middleware/authorize';
 import { validate } from '../../middleware/validate';
 import * as ctrl from './controller';
+import * as examCfg from './exam-config-controller';
 import {
   createRegulationSchema, updateRegulationSchema,
   createProgrammeSchema, updateProgrammeSchema,
@@ -503,5 +504,51 @@ router.get('/students/:id/academic-summary', authorize('academics', 'read'), ctr
 router.get('/offerings/:id/delivery-progress', authorize('academics', 'read'), ctrl.getCourseDeliveryProgressCtrl);
 router.get('/exam-calendar', authorize('academics', 'read'), ctrl.getExamCalendarCtrl);
 router.get('/enrollment-count', authorize('academics', 'read'), ctrl.getSemesterEnrollmentCountCtrl);
+
+// ─── Strategic Gap 6 — Examination administration depth (Phase A) ─────
+// Master-data CRUD for the 7 new exam-config entities. Validation
+// schemas deferred to Phase B; v1 leans on Mongoose schema enums +
+// service-layer 404s, same as the existing exam-management endpoints.
+router.get   ('/exam-config/rooms',                 authorize('academics', 'read'),   examCfg.listExamRooms);
+router.get   ('/exam-config/rooms/:id',             authorize('academics', 'read'),   examCfg.getExamRoom);
+router.post  ('/exam-config/rooms',                 authorize('academics', 'create'), examCfg.createExamRoom);
+router.put   ('/exam-config/rooms/:id',             authorize('academics', 'update'), examCfg.updateExamRoom);
+router.delete('/exam-config/rooms/:id',             authorize('academics', 'delete'), examCfg.deleteExamRoom);
+
+router.get   ('/exam-config/evaluators',            authorize('academics', 'read'),   examCfg.listEvaluators);
+router.get   ('/exam-config/evaluators/:id',        authorize('academics', 'read'),   examCfg.getEvaluator);
+router.post  ('/exam-config/evaluators',            authorize('academics', 'create'), examCfg.createEvaluator);
+router.put   ('/exam-config/evaluators/:id',        authorize('academics', 'update'), examCfg.updateEvaluator);
+router.delete('/exam-config/evaluators/:id',        authorize('academics', 'delete'), examCfg.deleteEvaluator);
+
+router.get   ('/exam-config/grade-templates',       authorize('academics', 'read'),   examCfg.listGradeTemplates);
+router.get   ('/exam-config/grade-templates/:id',   authorize('academics', 'read'),   examCfg.getGradeTemplate);
+router.post  ('/exam-config/grade-templates',       authorize('academics', 'create'), examCfg.createGradeTemplate);
+router.put   ('/exam-config/grade-templates/:id',   authorize('academics', 'update'), examCfg.updateGradeTemplate);
+router.delete('/exam-config/grade-templates/:id',   authorize('academics', 'delete'), examCfg.deleteGradeTemplate);
+
+router.get   ('/exam-config/centre-templates',      authorize('academics', 'read'),   examCfg.listExamCentreTemplates);
+router.get   ('/exam-config/centre-templates/:id',  authorize('academics', 'read'),   examCfg.getExamCentreTemplate);
+router.post  ('/exam-config/centre-templates',      authorize('academics', 'create'), examCfg.createExamCentreTemplate);
+router.put   ('/exam-config/centre-templates/:id',  authorize('academics', 'update'), examCfg.updateExamCentreTemplate);
+router.delete('/exam-config/centre-templates/:id',  authorize('academics', 'delete'), examCfg.deleteExamCentreTemplate);
+
+router.get   ('/exam-config/question-papers',       authorize('academics', 'read'),   examCfg.listQuestionPapers);
+router.get   ('/exam-config/question-papers/:id',   authorize('academics', 'read'),   examCfg.getQuestionPaper);
+router.post  ('/exam-config/question-papers',       authorize('academics', 'create'), examCfg.createQuestionPaper);
+router.put   ('/exam-config/question-papers/:id',   authorize('academics', 'update'), examCfg.updateQuestionPaper);
+router.delete('/exam-config/question-papers/:id',   authorize('academics', 'delete'), examCfg.deleteQuestionPaper);
+
+router.get   ('/exam-config/signatures',            authorize('academics', 'read'),   examCfg.listSignatureTypes);
+router.get   ('/exam-config/signatures/:id',        authorize('academics', 'read'),   examCfg.getSignatureType);
+router.post  ('/exam-config/signatures',            authorize('academics', 'create'), examCfg.createSignatureType);
+router.put   ('/exam-config/signatures/:id',        authorize('academics', 'update'), examCfg.updateSignatureType);
+router.delete('/exam-config/signatures/:id',        authorize('academics', 'delete'), examCfg.deleteSignatureType);
+
+router.get   ('/exam-config/mooc-subjects',         authorize('academics', 'read'),   examCfg.listMoocSubjects);
+router.get   ('/exam-config/mooc-subjects/:id',     authorize('academics', 'read'),   examCfg.getMoocSubject);
+router.post  ('/exam-config/mooc-subjects',         authorize('academics', 'create'), examCfg.createMoocSubject);
+router.put   ('/exam-config/mooc-subjects/:id',     authorize('academics', 'update'), examCfg.updateMoocSubject);
+router.delete('/exam-config/mooc-subjects/:id',     authorize('academics', 'delete'), examCfg.deleteMoocSubject);
 
 export default router;

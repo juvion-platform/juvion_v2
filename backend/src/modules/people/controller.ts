@@ -2,6 +2,14 @@ import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../../middleware/authenticate';
 import * as svc from './service';
 import * as exitService from './exit-service';
+import { ALL_PERSONAS, L1_L2_PERSONAS, L3_SUB_PERSONAS } from '../../shared/rbac/personas';
+
+// ─── Strategic Gap 7 — persona catalog ─────────────────────────────
+export async function listPersonas(_req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    res.json({ all: ALL_PERSONAS, l1_l2: L1_L2_PERSONAS, l3: L3_SUB_PERSONAS });
+  } catch (e) { next(e); }
+}
 
 const who = (req: AuthRequest) => req.user?.name || 'System';
 const qp = (req: AuthRequest) => {

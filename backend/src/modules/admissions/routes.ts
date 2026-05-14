@@ -68,4 +68,10 @@ router.get('/assignment-rules/:id', authorize('admissions', 'read'), ctrl.getAss
 router.put('/assignment-rules/:id', authorize('admissions', 'update'), validate(updateAssignmentRuleSchema), ctrl.updateAssignmentRule);
 router.delete('/assignment-rules/:id', authorize('admissions', 'delete'), ctrl.deleteAssignmentRule);
 
+// ─── Strategic Gap 5 Phase B — CRM dashboard aggregations ─────────
+router.get('/crm/pipeline', authorize('admissions', 'read'), ctrl.crmPipelineStats);
+router.get('/crm/funnel',   authorize('admissions', 'read'), ctrl.crmFunnelStats);
+router.get('/crm/officers', authorize('admissions', 'read'), ctrl.crmOfficerStats);
+router.get('/crm/sources',  authorize('admissions', 'read'), ctrl.crmSourceStats);
+
 export default router;

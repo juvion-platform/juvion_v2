@@ -3,6 +3,7 @@ import { authenticate } from '../../middleware/authenticate';
 import { authorize } from '../../middleware/authorize';
 import { validate } from '../../middleware/validate';
 import * as ctrl from './controller';
+import * as reportCtrl from './report-controller';
 import {
   createCommitteeSchema, updateCommitteeSchema,
   createMeetingSchema, updateMeetingSchema,
@@ -51,5 +52,14 @@ router.get('/goals/:id', authorize('governance', 'read'), ctrl.getGoal);
 router.post('/goals', authorize('governance', 'create'), validate(createGoalSchema), ctrl.createGoal);
 router.put('/goals/:id', authorize('governance', 'update'), validate(updateGoalSchema), ctrl.updateGoal);
 router.delete('/goals/:id', authorize('governance', 'delete'), ctrl.deleteGoal);
+
+// ─── Strategic Gap 4 — Declarative report engine (Phase A) ─────────
+// Static `/definitions` and `/runs` paths BEFORE the parameterised
+// `:code/...` routes so they aren't matched as code="definitions".
+router.get ('/reports/definitions',          authorize('governance', 'read'),   reportCtrl.listDefinitionsHandler);
+router.get ('/reports/definitions/:code',    authorize('governance', 'read'),   reportCtrl.getDefinitionHandler);
+router.get ('/reports/runs',                 authorize('governance', 'read'),   reportCtrl.listRunsHandler);
+router.get ('/reports/runs/:id',             authorize('governance', 'read'),   reportCtrl.getRunHandler);
+router.post('/reports/run/:code',            authorize('governance', 'create'), reportCtrl.runReportHandler);
 
 export default router;

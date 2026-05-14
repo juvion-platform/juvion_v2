@@ -109,3 +109,99 @@ export const listWorkflowTasks = (page = 1, limit = 20, status?: string, phase?:
 
 export const listWorkflowAllotmentRounds = (academicYearId?: string) =>
   api.get(`${WORKFLOW_BASE}/allotment-rounds`, { params: { academicYearId } }).then(r => r.data);
+
+// ─── Strategic Gap 5 — AssignmentRule + CRM dashboard clients ──────
+
+export type AssignmentRuleField =
+  | 'source' | 'utmSource' | 'utmMedium' | 'utmCampaign'
+  | 'programmeInterest' | 'branchInterest'
+  | 'leadScore' | 'leadGrade'
+  | 'state' | 'city' | 'interStream';
+export type AssignmentRuleOperator =
+  | 'equals' | 'not_equals' | 'in' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains';
+
+export interface AssignmentRuleCondition {
+  field: AssignmentRuleField;
+  operator: AssignmentRuleOperator;
+  value: string | number | string[];
+}
+
+export interface AssignmentRuleDoc {
+  _id: string;
+  collegeId: string;
+  name: string;
+  description?: string;
+  conditions: AssignmentRuleCondition[];
+  assignedOfficerId: string;
+  clusterHeadId?: string;
+  priority: number;
+  enabled: boolean;
+  createdBy: string;
+  matchCount: number;
+  lastMatchedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export const listAssignmentRules = (): Promise<AssignmentRuleDoc[]> =>
+  api.get(`${BASE}/assignment-rules`).then((r) => r.data);
+
+export const getAssignmentRule = (id: string): Promise<AssignmentRuleDoc> =>
+  api.get(`${BASE}/assignment-rules/${id}`).then((r) => r.data);
+
+export const createAssignmentRule = (
+  data: Partial<AssignmentRuleDoc>,
+): Promise<AssignmentRuleDoc> =>
+  api.post(`${BASE}/assignment-rules`, data).then((r) => r.data);
+
+export const updateAssignmentRule = (
+  id: string,
+  patch: Partial<AssignmentRuleDoc>,
+): Promise<AssignmentRuleDoc> =>
+  api.put(`${BASE}/assignment-rules/${id}`, patch).then((r) => r.data);
+
+export const deleteAssignmentRule = (id: string): Promise<{ deleted: true }> =>
+  api.delete(`${BASE}/assignment-rules/${id}`).then((r) => r.data);
+
+export const previewAssignmentRule = (
+  inquiry: Record<string, unknown>,
+): Promise<{ matched: boolean; rule: AssignmentRuleDoc | null }> =>
+  api
+    .post(`${BASE}/assignment-rules/preview`, { inquiry })
+    .then((r) => r.data);
+
+// ─── CRM dashboard ─────────────────────────────────────────────────
+
+export interface CRMPipelineStats {
+  total: number;
+  byStatus: Record<string, number>;
+}
+
+export interface CRMFunnelStats {
+  stages: Array<{ stage: string; count: number; statuses: string[] }>;
+}
+
+export interface CRMOfficerStats {
+  officers: Array<{
+    officerId: string;
+    name: string;
+    assigned: number;
+    converted: number;
+    conversionRate: number;
+  }>;
+  unassigned: number;
+}
+
+export interface CRMSourceStats {
+  bySource: Array<{ source: string | null; inquiries: number; converted: number; conversionRate: number }>;
+  byUtmCampaign: Array<{ utmCampaign: string | null; inquiries: number; converted: number; conversionRate: number }>;
+}
+
+export const getCRMPipeline = (): Promise<CRMPipelineStats> =>
+  api.get(`${BASE}/crm/pipeline`).then((r) => r.data);
+export const getCRMFunnel = (): Promise<CRMFunnelStats> =>
+  api.get(`${BASE}/crm/funnel`).then((r) => r.data);
+export const getCRMOfficers = (): Promise<CRMOfficerStats> =>
+  api.get(`${BASE}/crm/officers`).then((r) => r.data);
+export const getCRMSources = (): Promise<CRMSourceStats> =>
+  api.get(`${BASE}/crm/sources`).then((r) => r.data);

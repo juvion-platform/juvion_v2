@@ -463,4 +463,10 @@ router.get('/alumni', authorize('people', 'read'), ctrl.listAlumniCtrl);
 router.get('/alumni/:id', authorize('people', 'read'), ctrl.getAlumniCtrl);
 router.post('/alumni', authorize('people', 'create'), validate(createAlumniRecordSchema), ctrl.createAlumniRecordCtrl);
 
+// ─── Strategic Gap 7 — Persona catalog ─────────────────────────
+// Read-only; any authenticated user can fetch the canonical persona
+// list (UIs use it to render dropdowns). Source of truth is
+// shared/rbac/personas.ts.
+router.get('/personas', authorize('people', 'read'), ctrl.listPersonas);
+
 export default router;

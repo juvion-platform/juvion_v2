@@ -1,7 +1,7 @@
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getPlatformStats } from '../services/platform';
-import { Megaphone, FileText, Bell, ClipboardList, MessageSquare, Mail, Smartphone, MessageCircle, Shield, Upload } from 'lucide-react';
+import { Megaphone, FileText, Bell, ClipboardList, MessageSquare, Mail, Smartphone, MessageCircle, Shield, Upload, Settings, Plug } from 'lucide-react';
 import Breadcrumbs from '../components/ui/Breadcrumbs';
 
 import AnnouncementsPage from './platform/AnnouncementsPage';
@@ -14,6 +14,8 @@ import SMSLogsPage from './platform/SMSLogsPage';
 import WhatsAppLogsPage from './platform/WhatsAppLogsPage';
 import RbacPoliciesPage from './platform/RbacPolicies';
 import BulkImportsPage from './platform/BulkImportsPage';
+import SchemaConfigPage from './platform/SchemaConfigPage';
+import IntegrationsPage from './platform/IntegrationsPage';
 
 function PlatformHome() {
   const navigate = useNavigate();
@@ -120,6 +122,16 @@ function PlatformHome() {
           <div className="font-semibold text-navy-dark text-sm">Bulk Imports</div>
           <p className="text-xs text-gray-500 mt-1">Schema-driven CSV import for students, faculty, fees, …</p>
         </button>
+        <button onClick={() => navigate('config')} className="bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all border-emerald-200 hover:border-emerald-400">
+          <div className="inline-flex p-2.5 rounded-lg mb-3 bg-emerald-50 text-emerald-600"><Settings size={22} /></div>
+          <div className="font-semibold text-navy-dark text-sm">Configuration</div>
+          <p className="text-xs text-gray-500 mt-1">Feature flags, notification templates, schema-driven settings</p>
+        </button>
+        <button onClick={() => navigate('integrations')} className="bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all border-indigo-200 hover:border-indigo-400">
+          <div className="inline-flex p-2.5 rounded-lg mb-3 bg-indigo-50 text-indigo-600"><Plug size={22} /></div>
+          <div className="font-semibold text-navy-dark text-sm">Integrations</div>
+          <p className="text-xs text-gray-500 mt-1">ERPNext / Frappe HR bridge — personnel-side HR</p>
+        </button>
       </div>
     </div>
   );
@@ -149,6 +161,8 @@ export default function Platform() {
         <Route path="whatsapp-logs" element={<WhatsAppLogsPage />} />
         <Route path="rbac-policies" element={<RbacPoliciesPage />} />
         <Route path="bulk-imports" element={<BulkImportsPage />} />
+        <Route path="config" element={<SchemaConfigPage />} />
+        <Route path="integrations" element={<IntegrationsPage />} />
       </Routes>
     </SubPageWrapper>
   );
