@@ -1,5 +1,5 @@
 /**
- * PII masker for the fee-analytics-ai-native finance-agent.
+ * Shared PII masker for LLM-bound payloads.
  *
  * Masks sensitive fields with opaque tokens before sending to the LLM, and
  * restores tokens in the LLM response.
@@ -7,8 +7,9 @@
  * Tokens are scoped to a single `maskPII()` call — ordinals reset every
  * call. The same value appearing twice in one input gets the same token.
  *
- * Spec source: `.captain/specs/fee-analytics-ai-native/spec.md`
- *   §AC PII masking + plan §1.5 (PII masking pipeline)
+ * Originally written for fee-analytics-ai-native; relocated here so
+ * lead-scoring (001-ai-lead-scoring §10.5) and future LLM consumers
+ * share one PII surface.
  */
 
 /**

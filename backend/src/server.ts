@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { connectDB } from './config/db';
 import app from './app';
 import { registerProposalExpiryQueue } from './shared/jobs/proposal-expiry-worker';
+import { registerLeadScoringQueue } from './modules/admissions/lead-scoring/worker';
 import { initBridgeListeners } from './modules/platform/erpnext-bridge';
 
 const PORT = process.env.PORT || 3003;
@@ -16,6 +17,11 @@ async function start() {
       await registerProposalExpiryQueue();
     } catch (err) {
       console.warn('[server] Failed to register proposal-expiry queue (Redis unavailable?):', err);
+    }
+    try {
+      registerLeadScoringQueue();
+    } catch (err) {
+      console.warn('[server] Failed to register lead-scoring queue (Redis unavailable?):', err);
     }
   }
 

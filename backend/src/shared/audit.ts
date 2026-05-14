@@ -29,6 +29,7 @@ const AUDIT_ACTIONS: AuditAction[] = [
   'propose', 'accept', 'decline', 'withdraw', 'expire',
   'waitlist_promote', 'vacate_request', 'vacate_approve', 'vacate_reject',
   'approve', 'reject', 'submit', 'publish', 'archive',
+  'ai_score_computed',
 ];
 
 const auditLogSchema = new Schema<IAuditLog>({

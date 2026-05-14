@@ -43,7 +43,9 @@ export type AuditAction =
   | 'reject'
   | 'submit'
   | 'publish'
-  | 'archive';
+  | 'archive'
+  // AI / scoring events
+  | 'ai_score_computed';
 
 export interface AuditEntry {
   collegeId: string;

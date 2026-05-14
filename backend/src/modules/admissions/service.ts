@@ -12,6 +12,7 @@ import { createAuditLog } from '../../shared/audit';
 import { AppError } from '../../middleware/errorHandler';
 import { AuthScope } from '../../shared/rbac/types';
 import { applyAuthScope } from '../../shared/rbac/apply-scope';
+import { enqueueScoring } from './lead-scoring/enqueue';
 
 // ─── Dashboard Stats ─────────────────────────────────
 export async function getDashboardStats(collegeId: string) {
@@ -46,11 +47,29 @@ export async function getDashboardStats(collegeId: string) {
 
 // ─── Inquiries ───────────────────────────────────────────────
 
-export async function listInquiries(collegeId: string, page: number, limit: number, status?: string, authScope?: AuthScope) {
+export async function listInquiries(
+  collegeId: string,
+  page: number,
+  limit: number,
+  status?: string,
+  authScope?: AuthScope,
+  // 001-ai-lead-scoring Story 4 — optional grade filter + score sort.
+  // Defaults preserve existing behavior (no filter, sort by createdAt desc).
+  grade?: string,
+  sort?: 'newest' | 'score',
+) {
   const filter: any = { collegeId };
   if (status) filter.status = status;
+  if (grade === 'hot' || grade === 'warm' || grade === 'cold' || grade === 'dormant') {
+    filter.leadGrade = grade;
+  } else if (grade === 'hot_warm') {
+    filter.leadGrade = { $in: ['hot', 'warm'] };
+  }
   if (authScope) applyAuthScope(filter, authScope);
-  return paginate(Inquiry, filter, page, limit, { createdAt: -1 });
+  const sortSpec: Record<string, 1 | -1> = sort === 'score'
+    ? { leadScore: -1, createdAt: -1 }
+    : { createdAt: -1 };
+  return paginate(Inquiry, filter, page, limit, sortSpec);
 }
 
 export async function getInquiry(collegeId: string, id: string) {
@@ -88,22 +107,39 @@ export async function createInquiry(collegeId: string, data: any, performedBy: s
   }
   const doc = await Inquiry.create({ ...data, collegeId });
   await createAuditLog({ collegeId, entityType: 'Inquiry', entityId: String(doc._id), entityName: data.name, action: 'create', changes: [], performedBy });
+
+  // 001-ai-lead-scoring §10.6 — enqueue an initial score job. Best-effort:
+  // queue failures must not unwind the create. The inquiry can still be
+  // scored later via the rescore endpoint.
+  enqueueScoring({
+    collegeId, inquiryId: String(doc._id), performedBy, trigger: 'create',
+  }).catch((err: unknown) => {
+    // eslint-disable-next-line no-console
+    console.warn(`[inquiry-create] lead-scoring enqueue failed (id=${String(doc._id)}):`, (err as Error).message);
+  });
+
   return doc;
 }
 
 /**
- * Internal: find the first-matching enabled rule and bump its
- * counters. Returns the matched rule (or null). Separated from
- * `previewAssignmentRule` because preview is read-only — this
- * version performs the side-effects of an actual assignment.
+ * Find the first-matching enabled rule and bump its counters. Returns
+ * the matched rule (or null). Separated from `previewAssignmentRule`
+ * because preview is read-only — this version performs the side-effects
+ * of an actual assignment.
+ *
+ * Originally created for create-time routing (`applyAssignmentRulesOnCreate`).
+ * Renamed + exported per 001-ai-lead-scoring §10.9 so the scoring worker
+ * can re-evaluate rules after writing a fresh `leadScore`/`leadGrade`.
+ * The input is any partial-Inquiry projection — the evaluator pulls only
+ * the rule-relevant fields (source, leadScore, leadGrade, programmeInterest…).
  */
-async function applyAssignmentRulesOnCreate(
+export async function applyAssignmentRules(
   collegeId: string,
-  inquiryPayload: Record<string, unknown>,
+  inquiryFields: Record<string, unknown>,
 ): Promise<IAssignmentRule | null> {
   const rules = await AssignmentRule.find({ collegeId, enabled: true }).sort({ priority: 1, createdAt: 1 });
   for (const rule of rules) {
-    if (evaluateAssignmentRule(rule, inquiryPayload)) {
+    if (evaluateAssignmentRule(rule, inquiryFields)) {
       // Bump match counters atomically. Even if this fails (e.g.
       // race condition), the assignment itself still succeeds.
       AssignmentRule.updateOne(
@@ -114,6 +150,14 @@ async function applyAssignmentRulesOnCreate(
     }
   }
   return null;
+}
+
+/** Backwards-compatible alias for the create-time caller below. */
+async function applyAssignmentRulesOnCreate(
+  collegeId: string,
+  inquiryPayload: Record<string, unknown>,
+): Promise<IAssignmentRule | null> {
+  return applyAssignmentRules(collegeId, inquiryPayload);
 }
 
 export async function updateInquiry(collegeId: string, id: string, data: any, performedBy: string) {
@@ -641,4 +685,108 @@ export async function getCRMSourceStats(collegeId: string): Promise<{
     bySource: toRows<{ source: string | null; inquiries: number; converted: number; conversionRate: number }>(bySourceMap, 'source'),
     byUtmCampaign: toRows<{ utmCampaign: string | null; inquiries: number; converted: number; conversionRate: number }>(byCampaignMap, 'utmCampaign'),
   };
+}
+
+// ─── 001-ai-lead-scoring — public service functions ──────────────────
+//
+// These wrap the lead-scoring/* internals so the controller stays
+// admissions-module-flavored (single import path, consistent with the
+// rest of M01). Implementation details live under lead-scoring/.
+
+import { LeadScoringStats } from '../../models/admissions/LeadScoringStats';
+import { enqueueScoring as enqueueLeadScoring, scoringJobId } from './lead-scoring/enqueue';
+
+const BATCH_HARD_CAP = 2000; // server-side absolute ceiling
+
+export async function rescoreInquiry(collegeId: string, inquiryId: string, performedBy: string) {
+  // Guard: confirm the inquiry exists + is in scope BEFORE enqueueing,
+  // so a 404 surfaces cleanly to the caller. The worker has its own
+  // multi-tenant guard for the actual scoring write.
+  const inquiry = await Inquiry.findOne({ _id: inquiryId, collegeId }).select('_id lastScoredAt').lean();
+  if (!inquiry) throw new AppError(404, 'Inquiry not found');
+
+  const now = new Date();
+
+  // 208 Already Reported — debounce window covers very fresh scores.
+  if (inquiry.lastScoredAt && now.getTime() - inquiry.lastScoredAt.getTime() < 60_000) {
+    return {
+      status: 'already_scored' as const,
+      lastScoredAt: inquiry.lastScoredAt,
+      jobId: scoringJobId(collegeId, inquiryId, now),
+    };
+  }
+
+  const job = await enqueueLeadScoring({ collegeId, inquiryId, performedBy, trigger: 'manual', now });
+  return { status: 'enqueued' as const, jobId: String(job?.id ?? scoringJobId(collegeId, inquiryId, now)) };
+}
+
+export async function batchScoreInquiries(
+  collegeId: string,
+  performedBy: string,
+  filter: { status?: string; source?: string; leadGrade?: string; updatedSince?: string; maxJobs?: number },
+) {
+  const mongoFilter: Record<string, unknown> = { collegeId };
+  if (filter.status) mongoFilter.status = filter.status;
+  if (filter.source) mongoFilter.source = filter.source;
+  if (filter.leadGrade) mongoFilter.leadGrade = filter.leadGrade;
+  if (filter.updatedSince) mongoFilter.updatedAt = { $gte: new Date(filter.updatedSince) };
+
+  const cap = Math.min(filter.maxJobs ?? BATCH_HARD_CAP, BATCH_HARD_CAP);
+  const ids = await Inquiry.find(mongoFilter).select('_id').limit(cap).lean();
+
+  // Best-effort: enqueue failures are logged but don't fail the whole batch.
+  let enqueued = 0;
+  for (const row of ids) {
+    try {
+      await enqueueLeadScoring({
+        collegeId, inquiryId: String(row._id),
+        performedBy: 'system:lead-scoring-batch',
+        trigger: 'batch',
+      });
+      enqueued++;
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn(`[batch-score] enqueue failed (inquiry=${String(row._id)}):`, (err as Error).message);
+    }
+  }
+
+  return { enqueued, requestedBy: performedBy, filterMatched: ids.length };
+}
+
+export async function getLeadScoringStats(collegeId: string, range: 'today' | 'week' | 'month' = 'today') {
+  const days = range === 'today' ? 1 : range === 'week' ? 7 : 30;
+  const since = new Date();
+  since.setUTCHours(0, 0, 0, 0);
+  since.setUTCDate(since.getUTCDate() - (days - 1));
+
+  const rows = await LeadScoringStats.find({ collegeId, date: { $gte: since } }).sort({ date: -1 }).lean();
+
+  // Aggregate over the range so the frontend gets a single summary card.
+  const agg = rows.reduce(
+    (acc, r) => {
+      acc.totalScored += r.totalScored;
+      acc.llmScored += r.llmScored;
+      acc.rulesOnlyScored += r.rulesOnlyScored;
+      acc.totalLlmCostInr += r.totalLlmCostInr;
+      acc.avgLatencyMs = (acc.avgLatencyMs + r.avgLatencyMs) / 2; // rough running avg
+      for (const g of ['hot', 'warm', 'cold', 'dormant'] as const) {
+        acc.gradeDistribution[g] += r.gradeDistribution?.[g] ?? 0;
+      }
+      acc.capReached = acc.capReached || r.llmCapHit;
+      acc.modelVersion = acc.modelVersion ?? r.modelVersion ?? null;
+      return acc;
+    },
+    {
+      totalScored: 0,
+      llmScored: 0,
+      rulesOnlyScored: 0,
+      totalLlmCostInr: 0,
+      avgLatencyMs: 0,
+      gradeDistribution: { hot: 0, warm: 0, cold: 0, dormant: 0 },
+      capReached: false,
+      modelVersion: null as string | null,
+    },
+  );
+
+  return { range, days, ...agg, daily: rows };
 }

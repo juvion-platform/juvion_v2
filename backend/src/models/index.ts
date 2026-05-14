@@ -18,6 +18,7 @@ export { FeeNegotiation } from './admissions/FeeNegotiation';
 export { AdmissionCancellation } from './admissions/AdmissionCancellation';
 export { LeadImportBatch } from './admissions/LeadImportBatch';
 export { LeadInteraction } from './admissions/LeadInteraction';
+export { LeadScoringStats } from './admissions/LeadScoringStats';
 
 // === People ===
 export { AcademicHistory } from './people/AcademicHistory';

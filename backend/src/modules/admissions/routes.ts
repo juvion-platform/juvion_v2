@@ -11,6 +11,7 @@ import {
   createOfferSchema, updateOfferSchema,
   upsertDocChecklistSchema, createAdmissionSchema,
   createAssignmentRuleSchema, updateAssignmentRuleSchema, previewAssignmentRuleSchema,
+  batchScoreSchema,
 } from './validation';
 
 const router = Router();
@@ -73,5 +74,12 @@ router.get('/crm/pipeline', authorize('admissions', 'read'), ctrl.crmPipelineSta
 router.get('/crm/funnel',   authorize('admissions', 'read'), ctrl.crmFunnelStats);
 router.get('/crm/officers', authorize('admissions', 'read'), ctrl.crmOfficerStats);
 router.get('/crm/sources',  authorize('admissions', 'read'), ctrl.crmSourceStats);
+
+// ─── 001-ai-lead-scoring ──────────────────────────────────────────
+// Note: GET /lead-scoring/batch/:batchId is deferred — needs a persistent
+// BatchRun model. For v1 the frontend polls inquiry.lastScoredAt instead.
+router.post('/inquiries/:id/rescore', authorize('admissions', 'update'), ctrl.rescoreInquiry);
+router.post('/lead-scoring/batch', authorize('admissions', 'update'), validate(batchScoreSchema), ctrl.batchScoreInquiries);
+router.get('/lead-scoring/stats', authorize('admissions', 'read'), ctrl.leadScoringStats);
 
 export default router;

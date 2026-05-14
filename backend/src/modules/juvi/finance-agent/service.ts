@@ -37,7 +37,7 @@ import {
 import { SituationDismissal } from '../../../models/juvi/SituationDismissal';
 
 import { createLLMClient, type LLMResponse } from './llm-client';
-import { maskPII, unmaskText } from './pii';
+import { maskPII, unmaskText } from '../../../shared/llm/pii';
 import {
   forChat,
   forForecast,
