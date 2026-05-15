@@ -47,7 +47,8 @@ export type AuditAction =
   // AI / scoring events
   | 'ai_score_computed'
   | 'ai_config_suggested'
-  | 'ai_config_applied';
+  | 'ai_config_applied'
+  | 'ai_nl_report_query';
 
 export interface AuditEntry {
   collegeId: string;
