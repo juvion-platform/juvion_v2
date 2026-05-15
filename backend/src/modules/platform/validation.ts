@@ -138,3 +138,26 @@ export const createRbacPolicySchema = z.object({
 });
 
 export const updateRbacPolicySchema = createRbacPolicySchema.partial();
+
+// ═══ 002-ai-assisted-config ══════════════════════════════════════════
+
+export const suggestConfigBodySchema = z.object({
+  context: z.object({
+    collegeProfile: z.record(z.unknown()).optional(),
+    currentValues: z.record(z.unknown()).optional(),
+  }).optional(),
+}).strict();
+
+export const configSuggestionStatsQuerySchema = z.object({
+  range: z.enum(['today', 'week', 'month']).optional(),
+});
+
+// Extended upsert body — `aiAcceptedFields` flows through to the
+// service so suggestion statuses can be updated atomically.
+export const upsertConfigEntryBodySchema = z.object({
+  values: z.record(z.unknown()).optional(),
+  label: z.string().optional(),
+  enabled: z.boolean().optional(),
+  aiAcceptedFields: z.array(z.string()).optional(),
+  batchId: z.string().optional(),
+}).strict();

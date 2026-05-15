@@ -6,6 +6,8 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../../middleware/authenticate';
 import * as svc from './report-service';
+import * as nlSvc from './nl-reports/service';
+import { nlStatsRangeSchema } from './validation';
 
 const collegeId = (req: AuthRequest) => req.collegeId!;
 const performedBy = (req: AuthRequest) => req.user?.name || 'unknown';
@@ -45,5 +47,23 @@ export async function runReportHandler(req: AuthRequest, res: Response, next: Ne
     const params = (req.body?.parameters as Record<string, unknown>) || {};
     const doc = await svc.runReport(collegeId(req), code, params, performedBy(req));
     res.json(doc);
+  } catch (e) { next(e); }
+}
+
+// ─── 003-ai-nl-report-queries ────────────────────────────
+
+export async function nlQueryHandler(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { question } = req.body as { question: string };
+    const result = await nlSvc.nlQuery(collegeId(req), question, performedBy(req));
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
+export async function nlStatsHandler(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const parsed = nlStatsRangeSchema.safeParse(req.query.range ?? 'today');
+    const range = parsed.success ? parsed.data : 'today';
+    res.json(await nlSvc.getNlReportStats(collegeId(req), range));
   } catch (e) { next(e); }
 }

@@ -47,6 +47,12 @@ export interface ConfigField {
   options?: ConfigFieldOption[];
   /** Free-form placeholder text. */
   placeholder?: string;
+  /**
+   * 002-ai-assisted-config §10.4 — when false, this field is omitted
+   * from the LLM suggestion context (e.g. credentials, integration
+   * tokens). Defaults to true; all 4 v1 schemas leave it unset.
+   */
+  aiSuggestable?: boolean;
 }
 
 export interface ConfigSchema {

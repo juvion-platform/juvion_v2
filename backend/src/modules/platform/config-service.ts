@@ -97,7 +97,15 @@ interface UpsertInput {
   identifier?: string;
   label?: string;
   enabled?: boolean;
+  // 002-ai-assisted-config §10.10 — fields that came from accepted
+  // AI suggestions (paired with the batch they belong to). The service
+  // stamps `source: 'ai'` on matching audit `changes` and updates the
+  // ConfigSuggestion statuses for the batch atomically.
+  aiAcceptedFields?: string[];
+  batchId?: string;
 }
+
+import { acceptSuggestionsOnSave } from './config-suggest/service';
 
 export async function upsertConfigEntry(
   collegeId: string,
@@ -151,15 +159,44 @@ export async function upsertConfigEntry(
     { new: true, upsert: true, setDefaultsOnInsert: true },
   );
 
+  // 002 §10.3 + §10.10 — provenance on `changes` so we can tell AI-
+  // accepted fields apart from manual edits.
+  const aiAccepted = new Set(input.aiAcceptedFields ?? []);
+  const changes = aiAccepted.size > 0
+    ? Object.keys(result.values).map((field) => ({
+        field,
+        displayName: field,
+        oldValue: existing?.values?.[field],
+        newValue: result.values[field],
+        source: aiAccepted.has(field) ? ('ai' as const) : ('ui' as const),
+      }))
+    : [];
+
   await createAuditLog({
     collegeId,
     entityType: 'ConfigEntry',
     entityId: String(doc._id),
     entityName: `${type}:${identifier}`,
     action,
-    changes: [],
+    changes,
     performedBy,
   });
+
+  // Atomically reconcile the suggestion batch: accepted fields →
+  // 'accepted', the rest of the batch → 'rejected'. Write a parallel
+  // `ai_config_applied` audit entry so the lineage is unambiguous.
+  if (input.batchId && aiAccepted.size > 0) {
+    await acceptSuggestionsOnSave(collegeId, input.batchId, [...aiAccepted], performedBy);
+    await createAuditLog({
+      collegeId,
+      entityType: 'ConfigEntry',
+      entityId: String(doc._id),
+      entityName: `${type}:${identifier}`,
+      action: 'ai_config_applied',
+      changes: [],
+      performedBy,
+    });
+  }
 
   return doc;
 }

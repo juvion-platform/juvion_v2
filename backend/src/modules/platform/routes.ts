@@ -138,6 +138,20 @@ router.delete(
 // `:identifier` is required for multi-cardinality types (e.g. notif-
 // templates), ignored for single (e.g. institution-feature-flags) —
 // the upsert handler resolves the singleton via a sentinel.
+// 002-ai-assisted-config — must come BEFORE /config/:type/:identifier
+// so '/config/suggestions/stats' isn't eaten by the dynamic two-segment
+// upsert/list catch-all.
+router.get(
+  '/config/suggestions/stats',
+  authorize('platform', 'read'),
+  configCtrl.configSuggestionsStatsHandler,
+);
+router.post(
+  '/config/:type/suggest',
+  authorize('platform', 'update'),
+  configCtrl.suggestConfigHandler,
+);
+
 router.get(
   '/config/types',
   authorize('platform', 'read'),

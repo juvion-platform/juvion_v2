@@ -22,17 +22,28 @@ export interface ClaimResult {
   error?: Error;
 }
 
-function dayKey(collegeId: string, when: Date): string {
+function dayKey(collegeId: string, when: Date, namespace: string): string {
   const day = when.toISOString().slice(0, 10);
-  return `lead-score:llm-count:${collegeId}:${day}`;
+  return `${namespace}:llm-count:${collegeId}:${day}`;
 }
 
+/**
+ * Claims one LLM call from the daily per-college cap.
+ *
+ * The `namespace` argument lets unrelated features (lead scoring, config
+ * suggestion, NL reports) keep separate counters without colliding on the
+ * same Redis key. Defaults to `'lead-score'` for back-compat with the
+ * original single-caller setup (002-ai-assisted-config GATE 3 B-1: this
+ * is the 4th positional, not the 3rd, so existing callers passing `now`
+ * positionally don't break).
+ */
 export async function tryClaimLLMSlot(
   collegeId: string,
   cap: number,
   now: Date = new Date(),
+  namespace: string = 'lead-score',
 ): Promise<ClaimResult> {
-  const key = dayKey(collegeId, now);
+  const key = dayKey(collegeId, now, namespace);
   try {
     const count = await redis.incr(key);
     if (count === 1) await redis.expire(key, 86_400);

@@ -45,7 +45,10 @@ export type AuditAction =
   | 'publish'
   | 'archive'
   // AI / scoring events
-  | 'ai_score_computed';
+  | 'ai_score_computed'
+  | 'ai_config_suggested'
+  | 'ai_config_applied'
+  | 'ai_nl_report_query';
 
 export interface AuditEntry {
   collegeId: string;
@@ -63,4 +66,11 @@ export interface FieldChange {
   displayName: string;
   oldValue: any;
   newValue: any;
+  /**
+   * 002-ai-assisted-config §10.3 — provenance of the new value.
+   *   'ui'     — admin typed it in the form (default; omitted for back-compat)
+   *   'ai'     — value came from an accepted ConfigSuggestion
+   *   'import' — value came from a bulk import
+   */
+  source?: 'ui' | 'ai' | 'import';
 }

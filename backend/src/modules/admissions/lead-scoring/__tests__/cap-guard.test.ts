@@ -81,4 +81,34 @@ describe('tryClaimLLMSlot', () => {
     expect(r.allowed).toBe(false);
     expect(r.error).toBeDefined();
   });
+
+  // 002-ai-assisted-config Task 1.2 — namespace parameterization.
+  // Existing callers pass `now` as positional 3rd arg; namespace is the
+  // 4th positional with default 'lead-score' (GATE 3 B-1).
+
+  it('defaults the Redis key namespace to "lead-score" for back-compat', async () => {
+    incrMock.mockResolvedValueOnce(1);
+    await tryClaimLLMSlot('college-X', 500, new Date('2026-05-14T10:00:00Z'));
+    const key = incrMock.mock.calls[0]![0] as string;
+    expect(key.startsWith('lead-score:')).toBe(true);
+  });
+
+  it('uses the provided namespace when the 4th arg is set', async () => {
+    incrMock.mockResolvedValueOnce(1);
+    await tryClaimLLMSlot('college-X', 50, new Date('2026-05-14T10:00:00Z'), 'config-suggest');
+    const key = incrMock.mock.calls[0]![0] as string;
+    expect(key.startsWith('config-suggest:')).toBe(true);
+    expect(key).toContain('college-X');
+    expect(key).toContain('2026-05-14');
+  });
+
+  it('isolates keys across namespaces for the same (college, day)', async () => {
+    incrMock.mockResolvedValueOnce(1);
+    await tryClaimLLMSlot('college-Y', 500, new Date('2026-05-14T10:00:00Z'));
+    const leadKey = incrMock.mock.calls[0]![0] as string;
+    incrMock.mockResolvedValueOnce(1);
+    await tryClaimLLMSlot('college-Y', 50, new Date('2026-05-14T10:00:00Z'), 'config-suggest');
+    const configKey = incrMock.mock.calls[1]![0] as string;
+    expect(leadKey).not.toBe(configKey);
+  });
 });
