@@ -5,6 +5,8 @@ import {
   type ReportParam, type ReportRun,
 } from '../../services/governance';
 import Badge from '../../components/ui/Badge';
+import NlQueryPanel from '../../components/governance/NlQueryPanel';
+import { useAuthStore } from '../../stores/authStore';
 import { FileText, Play, AlertCircle, CheckCircle2, Clock, Construction, ArrowLeft } from 'lucide-react';
 
 // Strategic Gap 4 — declarative reports browser.
@@ -170,12 +172,15 @@ function ReportsHub({ defs, onPick }: { defs: ReportDefinition[]; onPick: (d: Re
 
 // ─── Run view ────────────────────────────────────────────────────
 
-function ReportRunner({ def, onBack }: { def: ReportDefinition; onBack: () => void }) {
+function ReportRunner({ def, initialParams, onBack }: { def: ReportDefinition; initialParams?: Record<string, unknown>; onBack: () => void }) {
   const [params, setParams] = useState<Record<string, unknown>>(() => {
     const init: Record<string, unknown> = {};
     for (const p of def.parameters) {
       if (p.default !== undefined) init[p.key] = p.default;
     }
+    // 003 — when entering via NL "Run as picker", pre-fill the form so
+    // the admin sees exactly what the LLM proposed before they Run.
+    if (initialParams) Object.assign(init, initialParams);
     return init;
   });
   const [currentRun, setCurrentRun] = useState<ReportRun | null>(null);
@@ -263,8 +268,32 @@ export default function ReportsPage() {
     queryFn: listReportDefinitions,
   });
   const [active, setActive] = useState<ReportDefinition | null>(null);
+  const [pendingParams, setPendingParams] = useState<Record<string, unknown> | undefined>(undefined);
+  const userRole = useAuthStore((s) => s.user?.role);
+  const showNlPanel = userRole === 'admin' || userRole === 'super_admin';
+
+  // 003 — Run as picker: look up the def, prime the params, switch to runner view.
+  function handleRunAsPicker(reportCode: string, params: Record<string, unknown>) {
+    const def = (data?.definitions || []).find((d) => d.code === reportCode);
+    if (!def) return;
+    setPendingParams(params);
+    setActive(def);
+  }
 
   if (isLoading) return <div className="text-sm text-gray-400">Loading reports…</div>;
-  if (!active) return <ReportsHub defs={data?.definitions || []} onPick={setActive} />;
-  return <ReportRunner def={active} onBack={() => setActive(null)} />;
+  if (!active) {
+    return (
+      <div>
+        {showNlPanel && <NlQueryPanel onRunAsPicker={handleRunAsPicker} />}
+        <ReportsHub defs={data?.definitions || []} onPick={setActive} />
+      </div>
+    );
+  }
+  return (
+    <ReportRunner
+      def={active}
+      initialParams={pendingParams}
+      onBack={() => { setActive(null); setPendingParams(undefined); }}
+    />
+  );
 }
