@@ -113,9 +113,57 @@ export default function FacultyDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [tab, setTab] = useState<DetailTabKey>('profile');
+  // ─── All hooks live above the early returns ─────────────────────
+  // React's rules of hooks: every render must call the same hooks in
+  // the same order. The early returns below (isLoading / error) skip
+  // the rest of the component, so any useQuery placed after them
+  // would fire on render N+1 but not on render N — crash. Sibling
+  // pages (StudentDetailPage, ParentDetailPage, StaffDetailPage)
+  // follow the same all-hooks-first layout.
+
   const { data: f, isLoading, error } = useQuery({
     queryKey: ['faculty', id],
     queryFn: () => getFaculty(id!),
+    enabled: !!id,
+  });
+  // Document count for the Documents tab badge.
+  const { data: docsData } = useQuery({
+    queryKey: ['faculty-documents', id],
+    queryFn: () => listFacultyDocuments(id!),
+    enabled: !!id,
+  });
+  // Teaching & research counts — drives a combined badge on the
+  // Teaching tab so operators see "is anything tracked for this
+  // faculty?" at a glance.
+  const { data: subjectsData } = useQuery({
+    queryKey: ['faculty-subjects', id],
+    queryFn: () => listFacultySubjects(id!),
+    enabled: !!id,
+  });
+  const { data: scholarsData } = useQuery({
+    queryKey: ['faculty-scholars', id],
+    queryFn: () => listFacultyScholars(id!),
+    enabled: !!id,
+  });
+  const { data: booksData } = useQuery({
+    queryKey: ['faculty-books', id],
+    queryFn: () => listFacultyBooks(id!),
+    enabled: !!id,
+  });
+  // Research-outputs counts (Phase B original spec).
+  const { data: publicationsData } = useQuery({
+    queryKey: ['faculty-publications', id],
+    queryFn: () => listFacultyPublications(id!),
+    enabled: !!id,
+  });
+  const { data: patentsData } = useQuery({
+    queryKey: ['faculty-patents', id],
+    queryFn: () => listFacultyPatents(id!),
+    enabled: !!id,
+  });
+  const { data: projectsData } = useQuery({
+    queryKey: ['faculty-projects', id],
+    queryFn: () => listFacultyProjects(id!),
     enabled: !!id,
   });
 
@@ -151,53 +199,11 @@ export default function FacultyDetailPage() {
   const populatedIdCount = EXTERNAL_ID_GROUPS.reduce((acc, g) => {
     return acc + g.fields.filter((field) => (externalIds[field.key] ?? '').toString().trim().length > 0).length;
   }, 0);
-  // Document count for the Documents tab badge.
-  const { data: docsData } = useQuery({
-    queryKey: ['faculty-documents', id],
-    queryFn: () => listFacultyDocuments(id!),
-    enabled: !!id,
-  });
   const documentCount = docsData?.items?.length ?? 0;
-
-  // Teaching & research counts — drives a combined badge on the
-  // Teaching tab so operators see "is anything tracked for this
-  // faculty?" at a glance.
-  const { data: subjectsData } = useQuery({
-    queryKey: ['faculty-subjects', id],
-    queryFn: () => listFacultySubjects(id!),
-    enabled: !!id,
-  });
-  const { data: scholarsData } = useQuery({
-    queryKey: ['faculty-scholars', id],
-    queryFn: () => listFacultyScholars(id!),
-    enabled: !!id,
-  });
-  const { data: booksData } = useQuery({
-    queryKey: ['faculty-books', id],
-    queryFn: () => listFacultyBooks(id!),
-    enabled: !!id,
-  });
   const teachingCount =
     (subjectsData?.items?.length ?? 0) +
     (scholarsData?.items?.length ?? 0) +
     (booksData?.items?.length ?? 0);
-
-  // Research-outputs counts (Phase B original spec).
-  const { data: publicationsData } = useQuery({
-    queryKey: ['faculty-publications', id],
-    queryFn: () => listFacultyPublications(id!),
-    enabled: !!id,
-  });
-  const { data: patentsData } = useQuery({
-    queryKey: ['faculty-patents', id],
-    queryFn: () => listFacultyPatents(id!),
-    enabled: !!id,
-  });
-  const { data: projectsData } = useQuery({
-    queryKey: ['faculty-projects', id],
-    queryFn: () => listFacultyProjects(id!),
-    enabled: !!id,
-  });
   const outputsCount =
     (publicationsData?.items?.length ?? 0) +
     (patentsData?.items?.length ?? 0) +
