@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticate } from '../../middleware/authenticate';
 import { authorize } from '../../middleware/authorize';
+import { requireRole } from '../../middleware/requireRole';
 import { validate } from '../../middleware/validate';
 import * as ctrl from './controller';
 import * as reportCtrl from './report-controller';
@@ -10,6 +11,7 @@ import {
   createPolicySchema, updatePolicySchema,
   createBoardMemberSchema, updateBoardMemberSchema,
   createGoalSchema, updateGoalSchema,
+  nlQuerySchema,
 } from './validation';
 
 const router = Router();
@@ -61,5 +63,25 @@ router.get ('/reports/definitions/:code',    authorize('governance', 'read'),   
 router.get ('/reports/runs',                 authorize('governance', 'read'),   reportCtrl.listRunsHandler);
 router.get ('/reports/runs/:id',             authorize('governance', 'read'),   reportCtrl.getRunHandler);
 router.post('/reports/run/:code',            authorize('governance', 'create'), reportCtrl.runReportHandler);
+
+// ─── 003-ai-nl-report-queries ─────────────────────────────────────
+// Mounted BEFORE the parameterised /reports/run/:code already declared
+// above — `/reports/nl-query` is a literal segment so no ordering risk.
+// Hard role gate: admin / super_admin only (row-level RBAC at the query
+// layer is out of scope for v1; non-admin personas would not have a
+// safe NL surface).
+router.post(
+  '/reports/nl-query',
+  authorize('governance', 'read'),
+  requireRole(['admin', 'super_admin']),
+  validate(nlQuerySchema),
+  reportCtrl.nlQueryHandler,
+);
+router.get(
+  '/reports/nl-query/stats',
+  authorize('governance', 'read'),
+  requireRole(['admin', 'super_admin']),
+  reportCtrl.nlStatsHandler,
+);
 
 export default router;
