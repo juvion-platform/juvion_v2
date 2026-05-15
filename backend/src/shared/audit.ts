@@ -32,6 +32,7 @@ const AUDIT_ACTIONS: AuditAction[] = [
   'ai_score_computed',
   'ai_config_suggested',
   'ai_config_applied',
+  'ai_nl_report_query',
 ];
 
 const auditLogSchema = new Schema<IAuditLog>({

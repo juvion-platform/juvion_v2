@@ -394,6 +394,7 @@ export { WhatsAppLog } from './communication/WhatsAppLog';
 export { InferenceLog } from './platform/InferenceLog';
 export { IntegrationLog } from './platform/IntegrationLog';
 export { ConfigSuggestion } from './platform/ConfigSuggestion';
+export { NlReportQuery } from './governance/NlReportQuery';
 
 // === Juvi ===
 export { AckRecord } from './juvi/AckRecord';

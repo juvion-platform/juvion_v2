@@ -122,3 +122,54 @@ export const getReportRun = (id: string): Promise<ReportRun> =>
 
 export const runReport = (code: string, parameters: Record<string, unknown>): Promise<ReportRun> =>
   api.post(`${BASE}/reports/run/${code}`, { parameters }).then((r) => r.data);
+
+// ─── 003-ai-nl-report-queries ─────────────────────────────────────
+
+export const ALLOWED_NL_REPORTS = [
+  'admissions-funnel',
+  'lead-source-performance',
+  'student-roster-snapshot',
+] as const;
+
+export type AllowedNlReportCode = (typeof ALLOWED_NL_REPORTS)[number];
+
+export interface NlMatchedResponse {
+  status: 'matched';
+  reportCode: AllowedNlReportCode;
+  params: Record<string, unknown>;
+  runId: string;
+  results: unknown;
+  rationale: string;
+  llmModel: string;
+  costInr: number;
+  isDuplicate?: boolean;
+}
+
+export interface NlRefusedResponse {
+  status: 'refused';
+  reason: string;
+  supportedReports: ReadonlyArray<string>;
+  llmModel: string;
+  costInr: number;
+  isDuplicate?: boolean;
+  capReached?: boolean;
+}
+
+export type NlQueryResponse = NlMatchedResponse | NlRefusedResponse;
+
+export interface NlReportStats {
+  range: 'today' | 'week' | 'month';
+  totalQueries: number;
+  matched: number;
+  refused: number;
+  llmCostInr: number;
+  byReport: Array<{ reportCode: string; count: number; costInr: number }>;
+}
+
+export const runNlQuery = (question: string): Promise<NlQueryResponse> =>
+  api.post(`${BASE}/reports/nl-query`, { question }).then((r) => r.data);
+
+export const getNlReportStats = (
+  range: 'today' | 'week' | 'month' = 'today',
+): Promise<NlReportStats> =>
+  api.get(`${BASE}/reports/nl-query/stats`, { params: { range } }).then((r) => r.data);

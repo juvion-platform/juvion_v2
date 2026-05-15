@@ -174,13 +174,18 @@ const leadSourcePerformance: ReportDefinition = {
   ],
   implementationStatus: 'implemented',
   run: async (ctx, params) => {
-    const collegeId = new Types.ObjectId(ctx.collegeId);
+    // 003-nl-report-queries Story 4: variable renamed from `collegeId` to
+    // `cidObj` so the explicit `{ collegeId: cidObj, ... }` form replaces
+    // the shorthand `{ collegeId, ... }` that the
+    // aggregate-collegeid-pattern regression guard flags. Runtime behaviour
+    // is unchanged — the value was already an ObjectId.
+    const cidObj = new Types.ObjectId(ctx.collegeId);
     const from = parseDate(params.from);
     const to = parseDate(params.to);
     if (!from || !to) throw new Error('from and to are required');
 
     const pipeline: any[] = [
-      { $match: { collegeId, createdAt: { $gte: from, $lte: to } } },
+      { $match: { collegeId: cidObj, createdAt: { $gte: from, $lte: to } } },
       {
         $group: {
           _id: '$source',

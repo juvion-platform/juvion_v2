@@ -73,3 +73,11 @@ export const createGoalSchema = z.object({
   status: z.enum(['active', 'achieved', 'on_track', 'at_risk', 'missed']).optional(),
 });
 export const updateGoalSchema = createGoalSchema.partial();
+
+// ═══ 003-ai-nl-report-queries ═══════════════════════════
+
+export const nlQuerySchema = z.object({
+  question: z.string().trim().min(1, 'Question required').max(500, 'Question too long (max 500 chars)'),
+}).strict();
+
+export const nlStatsRangeSchema = z.enum(['today', 'week', 'month']);
