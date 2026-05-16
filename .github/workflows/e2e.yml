@@ -1,0 +1,114 @@
+# Playwright E2E — CI regression gate.
+# Spec: .captain/specs/playwright-e2e/spec.md
+#
+# Phase A scope: auth-only, super_admin + principal, 5 tests.
+# Job blocks merge on failure. Failure artifacts uploaded for debugging.
+
+name: e2e
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Cancel in-flight runs for the same PR/branch when a new push lands.
+concurrency:
+  group: e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        # No healthcheck block — Mongo 7 binds the port quickly and the
+        # backend's own /api/health waits on Mongo before responding.
+
+    env:
+      # Match the dev-env defaults the codebase assumes.
+      NODE_ENV: production
+      PORT: '3003'
+      MONGO_URI: mongodb://localhost:27017/juvion_v2_e2e
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: e2e-ci-secret
+      DEV_COLLEGE_ID: '000000000000000000000001'
+      E2E_BASE_URL: http://localhost:5173
+      E2E_BACKEND_URL: http://localhost:3003
+      # Skip rate-limiting so serial Playwright login flows do not trip
+      # the 10/15-min login limit. Production NEVER sets this.
+      E2E_TESTING: '1'
+      CI: 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck both workspaces
+        run: npm run typecheck
+
+      - name: Run backend unit tests
+        run: npm run test -w backend
+
+      - name: Install Playwright browsers (chromium only)
+        run: npx --workspace admin-portal playwright install --with-deps chromium
+
+      - name: Build admin-portal
+        run: npm run build -w admin-portal
+
+      - name: Start backend (background)
+        run: |
+          # ts-node-dev to match dev parity; logs to a file so we can
+          # tail them on failure.
+          nohup npm run dev -w backend > /tmp/backend.log 2>&1 &
+          echo "Backend PID: $!"
+
+      - name: Start admin-portal preview (background)
+        run: |
+          # Vite preview serves the production build on port 5173 — it
+          # is faster than `dev` and mirrors what CI artifacts look at.
+          nohup npx --workspace admin-portal vite preview --host 0.0.0.0 --port 5173 > /tmp/portal.log 2>&1 &
+          echo "Portal PID: $!"
+
+      - name: Run Playwright tests
+        run: npm run test:e2e -w admin-portal
+
+      - name: Upload Playwright report (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            admin-portal/test-results/
+            admin-portal/playwright-report/
+          retention-days: 7
+
+      - name: Upload backend log (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-log
+          path: /tmp/backend.log
+          retention-days: 7
+
+      - name: Upload portal log (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: portal-log
+          path: /tmp/portal.log
+          retention-days: 7
