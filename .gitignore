@@ -12,3 +12,8 @@ coverage/
 .vite/
 .turbo/
 package-lock.json
+
+# Playwright E2E (Phase A — .captain/specs/playwright-e2e)
+test-results/
+playwright-report/
+playwright/.cache/

@@ -273,6 +273,8 @@ export default function DashboardLayout() {
             <button
               onClick={() => setProfileOpen(!profileOpen)}
               className="flex items-center gap-1"
+              aria-label="Open profile menu"
+              data-testid="profile-menu-trigger"
             >
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-teal-500 to-primary-500 text-white flex items-center justify-center text-sm font-medium shadow-sm">
                 {initial}
@@ -305,6 +307,7 @@ export default function DashboardLayout() {
                 <button
                   onClick={handleLogout}
                   className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                  data-testid="sign-out-button"
                 >
                   <LogOut size={15} />
                   Sign out
