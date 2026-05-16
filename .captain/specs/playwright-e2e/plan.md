@@ -8,25 +8,33 @@ Playwright runs in a **separate test pipeline** from the existing vitest unit/in
 
 ### Components
 
-All new code lives in `admin-portal/`. Backend gets a single new seed script.
+Tests live in a sibling workspace `e2e/` (not under admin-portal) because they assert on full-stack behavior, not single-workspace UI. Phase B+ test suites (Admissions, CRM, Fee, Bulk Import) will all cross module boundaries, so the workspace name reflects that.
 
 ```
-admin-portal/
+e2e/                                    NEW WORKSPACE
+  package.json                          NEW · @playwright/test devDep + test scripts
+  tsconfig.json                         NEW · strict ESM TS for the suite
   playwright.config.ts                  NEW · runner config (1 project, chromium, retries=0 in CI)
   tests/
-    e2e/
-      auth.spec.ts                      NEW · the 5 Phase A tests
-      fixtures/
-        auth-fixture.ts                 NEW · loginAs(role) — reused in Phase B+
-      utils/
-        test-users.ts                   NEW · the two test-user constants + a typed accessor
+    auth.spec.ts                        NEW · the 5 Phase A tests
     global-setup.ts                     NEW · polls /api/health, runs seed-e2e-users
-  package.json                          MOD · add @playwright/test, scripts: test:e2e, test:e2e:headed, test:e2e:debug
-  .gitignore                            MOD · ignore test-results/, playwright-report/
+    fixtures/
+      auth-fixture.ts                   NEW · loginAs(role) — reused in Phase B+
+    utils/
+      test-users.ts                     NEW · the two test-user constants + a typed accessor
 
 backend/
   src/scripts/seed-e2e-users.ts         NEW · idempotent upsert of the 2 test users
   package.json                          MOD · script: seed:e2e-users
+  src/app.ts                            MOD · E2E_TESTING env-gated rate-limit bypass
+
+admin-portal/
+  src/pages/Login.tsx                   MOD · htmlFor on labels (a11y; enables getByLabel)
+  src/layouts/DashboardLayout.tsx       MOD · aria-label + data-testid on profile + sign-out
+  src/services/api.ts                   MOD · skip 401-redirect when failing request IS /auth/login
+
+package.json (root)                     MOD · workspaces += "e2e"; new test:e2e script
+.gitignore (root)                       MOD · ignore test-results/, playwright-report/
 
 .github/workflows/
   e2e.yml                               NEW · CI workflow: mongo service + node setup + seed + test
