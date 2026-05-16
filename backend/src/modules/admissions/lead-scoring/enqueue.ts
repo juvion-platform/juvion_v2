@@ -29,7 +29,10 @@ const MINUTE_MS = 60_000;
 
 export function scoringJobId(collegeId: string, inquiryId: string, when: Date = new Date()): string {
   const minuteBucket = Math.floor(when.getTime() / MINUTE_MS);
-  return `score:${collegeId}:${inquiryId}:${minuteBucket}`;
+  // BullMQ rejects `:` in custom jobIds (same restriction as queue names).
+  // Use `_` separator — matches the queue-naming convention introduced in
+  // commit 15d4182. Underscores produce no ambiguity with valid inputs.
+  return `score_${collegeId}_${inquiryId}_${minuteBucket}`;
 }
 
 export async function enqueueScoring(input: EnqueueScoringInput) {
