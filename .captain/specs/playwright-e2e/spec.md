@@ -116,3 +116,4 @@ Two roles are covered in Phase A:
 
 - 2026-05-14: Initial spec created. Phase A scope locked: auth-only, super_admin + principal, CI regression gate.
 - 2026-05-14: Corrected super_admin landing URL `/` → `/select-college` after reading `Login.tsx:41-49`. OQ-4 in plan is now resolved.
+- 2026-05-16: Migrated test layout from `admin-portal/tests/` → sibling workspace `e2e/`. The tests assert on full-stack behavior, not admin-portal-only behavior; the workspace name now reflects that. CI workflow updated to `npm run test -w e2e`. No test logic changed; 5/5 still green.

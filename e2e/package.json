@@ -1,0 +1,19 @@
+{
+  "name": "juvion-v2-e2e",
+  "private": true,
+  "version": "0.1.0",
+  "description": "System-level Playwright E2E tests for Juvion v2 (admin-portal + backend).",
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "test:report": "playwright show-report",
+    "test:install": "playwright install --with-deps chromium",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "typescript": "~5.6.0"
+  }
+}
