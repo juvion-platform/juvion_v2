@@ -38,6 +38,11 @@ describe('scoringJobId', () => {
     const t = new Date('2026-05-14T10:00:30Z');
     expect(scoringJobId('c1', 'i1', t)).not.toBe(scoringJobId('c1', 'i2', t));
   });
+
+  it('contains NO `:` characters (BullMQ rejects them in custom jobIds)', () => {
+    const id = scoringJobId('college-1', 'inquiry-2', new Date('2026-05-14T10:00:30Z'));
+    expect(id).not.toMatch(/:/);
+  });
 });
 
 describe('enqueueScoring', () => {
@@ -51,7 +56,7 @@ describe('enqueueScoring', () => {
     });
     expect(addJobMock).toHaveBeenCalledTimes(1);
     const [queueName, jobName, data, opts] = addJobMock.mock.calls[0]!;
-    expect(queueName).toBe('admissions:lead-scoring');
+    expect(queueName).toBe('admissions_lead_scoring');
     expect(jobName).toBe('score');
     expect(data).toMatchObject({
       collegeId: 'c1',

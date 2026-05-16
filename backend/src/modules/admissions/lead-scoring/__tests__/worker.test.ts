@@ -64,7 +64,7 @@ describe('registerLeadScoringQueue', () => {
     registerLeadScoringQueue();
     expect(registerQueueMock).toHaveBeenCalledTimes(1);
     const cfg = registerQueueMock.mock.calls[0]![0];
-    expect(cfg.name).toBe('admissions:lead-scoring');
+    expect(cfg.name).toBe('admissions_lead_scoring');
     expect(typeof cfg.processor).toBe('function');
     expect(cfg.concurrency).toBe(3);
   });
