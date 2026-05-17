@@ -13,6 +13,7 @@ import {
   type PopulatedFeeStructureInstance,
   type IFeeComponent,
 } from '../../services/fee-configuration';
+import ProgrammeTransferDialog from '../../components/people/ProgrammeTransferDialog';
 import { ArrowLeft, Save, Loader2, AlertTriangle, CheckCircle2, ExternalLink, IndianRupee } from 'lucide-react';
 
 const STATUSES = ['prospective', 'active', 'year_back', 'detained', 'graduated', 'exited', 'alumni'] as const;
@@ -194,6 +195,12 @@ export default function StudentFormPage() {
    * Academic Details in one click.
    */
   const [formTab, setFormTab] = useState<FormTabKey>('profile');
+  // Programme transfer is a separate workflow because the BE rejects
+  // programmeId changes via the generic patch endpoint (see
+  // backend/src/modules/people/service.ts: T11 rebind guard). The dialog
+  // posts to /finance/students/:id/transfer-programme which archives the
+  // old fee pin and rebinds it against the new programme's structure.
+  const [showTransferDialog, setShowTransferDialog] = useState(false);
 
   const { data: existing, isLoading: loadingExisting } = useQuery({
     queryKey: ['student', id],
@@ -906,11 +913,32 @@ export default function StudentFormPage() {
               </select>
             </div>
             <div>
-              <div className="flex items-center justify-between mb-1"><label className="text-sm font-medium text-gray-700">Programme</label><Link to="/academics/programmes" className="text-xs text-primary-600 hover:underline">+ Manage</Link></div>
-              <select value={form.programmeId} onChange={e => setForm(f => ({ ...f, programmeId: e.target.value }))} className={inp}>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-sm font-medium text-gray-700">Programme</label>
+                {isEdit ? (
+                  <button type="button" onClick={() => setShowTransferDialog(true)} className="text-xs text-amber-700 hover:underline">
+                    Transfer programme
+                  </button>
+                ) : (
+                  <Link to="/academics/programmes" className="text-xs text-primary-600 hover:underline">+ Manage</Link>
+                )}
+              </div>
+              <select
+                value={form.programmeId}
+                onChange={e => setForm(f => ({ ...f, programmeId: e.target.value }))}
+                className={inp}
+                disabled={isEdit}
+                aria-readonly={isEdit}
+              >
                 <option value="">Select...</option>
                 {(programmesData?.items || []).map((p: any) => <option key={p._id} value={p._id}>{p.name || p.code}</option>)}
               </select>
+              {isEdit && (
+                <p className="mt-1 text-[11px] text-gray-500">
+                  Programme is read-only here. Use Transfer programme to rebind the fee pin atomically (the
+                  generic update rejects programme changes by design).
+                </p>
+              )}
             </div>
             <div>
               <div className="flex items-center justify-between mb-1"><label className="text-sm font-medium text-gray-700">Branch</label><Link to="/academics/branches" className="text-xs text-primary-600 hover:underline">+ Manage</Link></div>
@@ -1043,6 +1071,20 @@ export default function StudentFormPage() {
           </button>
         </div>
       </form>
+
+      {showTransferDialog && id && (
+        <ProgrammeTransferDialog
+          studentId={id}
+          currentProgrammeId={form.programmeId}
+          currentProgrammeName={existing?.programmeId?.name ?? existing?.programme?.name}
+          currentYear={Number((existing as { yearOfStudy?: number } | undefined)?.yearOfStudy) || undefined}
+          onClose={() => setShowTransferDialog(false)}
+          onSuccess={() => {
+            setShowTransferDialog(false);
+            qc.invalidateQueries({ queryKey: ['student', id] });
+          }}
+        />
+      )}
     </div>
   );
 }
