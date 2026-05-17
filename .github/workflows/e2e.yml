@@ -31,13 +31,24 @@ jobs:
         # backend's own /api/health waits on Mongo before responding.
 
     env:
-      # Match the dev-env defaults the codebase assumes.
-      NODE_ENV: production
+      # NODE_ENV is INTENTIONALLY UNSET at job scope. Setting it to
+      # 'production' globally caused two cascading failures:
+      #   1. `npm ci` skipped devDependencies (vitest, @testing-library/*,
+      #      @playwright/test) — typecheck and tests couldn't find them.
+      #   2. `vitest`-imported `src/app.ts` ran its import-time
+      #      `process.exit(1)` guard for missing PAYMENT_WEBHOOK_SECRET
+      #      in production, killing the test runner mid-suite.
+      # Steps that genuinely need production NODE_ENV (backend dev server,
+      # admin-portal preview) set it inline below.
       PORT: '3003'
       MONGO_URI: mongodb://localhost:27017/juvion_v2_e2e
       REDIS_URL: redis://localhost:6379
       JWT_SECRET: e2e-ci-secret
       DEV_COLLEGE_ID: '000000000000000000000001'
+      # Dummy webhook secret so the backend dev server's startup guard
+      # (app.ts:55) doesn't exit when run with NODE_ENV=production below.
+      # The e2e suite never actually invokes the payment-webhook path.
+      PAYMENT_WEBHOOK_SECRET: 'ci-dummy-webhook-secret'
       E2E_BASE_URL: http://localhost:5173
       E2E_BACKEND_URL: http://localhost:3003
       # Skip rate-limiting so serial Playwright login flows do not trip
@@ -56,11 +67,9 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        # The job-level `NODE_ENV: production` causes `npm ci` to skip
-        # devDependencies, which means vitest, @testing-library/*, and
-        # @playwright/test never land in node_modules and the typecheck
-        # step explodes with "Cannot find module 'vitest'" et al.
-        # `--include=dev` forces the full install regardless of NODE_ENV.
+        # --include=dev is belt-and-braces: NODE_ENV is unset at job scope
+        # now (see comment above), but the flag makes the install robust
+        # against any future caller that re-introduces NODE_ENV.
         run: npm ci --include=dev
 
       - name: Typecheck both workspaces
@@ -76,6 +85,11 @@ jobs:
         run: npm run build -w admin-portal
 
       - name: Start backend (background)
+        # NODE_ENV inline so the dev server behaves like prod for e2e
+        # (no /api dev-auth bypass, no DEV_COLLEGE_ID injection). Test
+        # steps above run with NODE_ENV unset (vitest defaults to 'test').
+        env:
+          NODE_ENV: production
         run: |
           # ts-node-dev to match dev parity; logs to a file so we can
           # tail them on failure.
