@@ -548,12 +548,13 @@ export async function checkPinValidity(
   if (docBranch && docBranch !== studentBranch) {
     return { valid: false, reason: 'branch_mismatch', currentPin, matchingInstance };
   }
-  // quota: strict exact
-  if ((pinnedInstance.quota ?? null) !== (student.quota ?? null)) {
-    // null/absent on either side counts as mismatch (quota is a required axis)
-    if (pinnedInstance.quota || student.quota) {
-      return { valid: false, reason: 'quota_mismatch', currentPin, matchingInstance };
-    }
+  // quota: §005 wildcard contract (matches resolveMatchingFeeStructureInstance).
+  // FSI.quota=null is a wildcard — valid regardless of student.quota.
+  // FSI.quota=X with student.quota !== X → quota_mismatch.
+  const docQuota = pinnedInstance.quota ?? null;
+  const studentQuota = student.quota ?? null;
+  if (docQuota && docQuota !== studentQuota) {
+    return { valid: false, reason: 'quota_mismatch', currentPin, matchingInstance };
   }
   // category: mismatch only when instance has a category set and student
   // differs. Null-category instance is a wildcard.
