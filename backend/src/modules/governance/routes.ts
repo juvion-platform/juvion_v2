@@ -1,10 +1,28 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate } from '../../middleware/authenticate';
 import { authorize } from '../../middleware/authorize';
 import { requireRole } from '../../middleware/requireRole';
 import { validate } from '../../middleware/validate';
 import * as ctrl from './controller';
 import * as reportCtrl from './report-controller';
+
+/**
+ * 004-rbac-nl-queries §10.6 — `RBAC_NL_ENFORCE` rollout wrapper.
+ *
+ * Env-conditional per-request. When the flag is `'true'`, the existing
+ * `authorize('governance','read')` upstream of this middleware (which
+ * populates `req.authScope`) is the only gate — HOD/faculty per §10.9
+ * policy seed pass through. When the flag is anything else, this
+ * middleware acts as the legacy hard `requireRole(['admin','super_admin'])`
+ * gate so behavior is byte-identical to 003 today.
+ */
+function rbacNlEnforce(req: Request, res: Response, next: NextFunction): void {
+  if (process.env.RBAC_NL_ENFORCE === 'true') {
+    next();
+    return;
+  }
+  requireRole(['admin', 'super_admin'])(req as any, res, next);
+}
 import {
   createCommitteeSchema, updateCommitteeSchema,
   createMeetingSchema, updateMeetingSchema,
@@ -73,14 +91,14 @@ router.post('/reports/run/:code',            authorize('governance', 'create'), 
 router.post(
   '/reports/nl-query',
   authorize('governance', 'read'),
-  requireRole(['admin', 'super_admin']),
+  rbacNlEnforce,
   validate(nlQuerySchema),
   reportCtrl.nlQueryHandler,
 );
 router.get(
   '/reports/nl-query/stats',
   authorize('governance', 'read'),
-  requireRole(['admin', 'super_admin']),
+  rbacNlEnforce,
   reportCtrl.nlStatsHandler,
 );
 

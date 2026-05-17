@@ -58,7 +58,15 @@ export async function runReportHandler(req: AuthRequest, res: Response, next: Ne
 export async function nlQueryHandler(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { question } = req.body as { question: string };
-    const result = await nlSvc.nlQuery(collegeId(req), question, performedBy(req));
+    const result = await nlSvc.nlQuery(collegeId(req), question, performedBy(req), {
+      // 004 §3 — thread req.authScope into the service. When RBAC_NL_ENFORCE
+      // is unset, the legacy hard requireRole gate restricts to admin /
+      // super_admin and authorize() still populates a benign authScope (per
+      // authorize.ts:21 RBAC_ENFORCE='false' fallback), so this is safe.
+      authScope: req.authScope,
+      role: req.user?.role,
+      personaType: req.user?.personaType,
+    });
     res.json(result);
   } catch (e) { next(e); }
 }

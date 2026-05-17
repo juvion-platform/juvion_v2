@@ -124,7 +124,16 @@ describe('POST /api/governance/reports/nl-query', () => {
     expect(res.status).toBe(200);
     expect(res.body.status).toBe('matched');
     expect(res.body.reportCode).toBe('admissions-funnel');
-    expect(nlQueryMock).toHaveBeenCalledWith(adminCollege, 'april funnel', 'Admin User');
+    // 004 §3 — controller now threads authScope/role/personaType opts through.
+    expect(nlQueryMock).toHaveBeenCalledWith(
+      adminCollege,
+      'april funnel',
+      'Admin User',
+      expect.objectContaining({
+        authScope: expect.any(Object),
+        role: expect.any(String),
+      }),
+    );
   });
 
   it('200 refused: service-decided refusal still returns 200 (spec §10.11)', async () => {
