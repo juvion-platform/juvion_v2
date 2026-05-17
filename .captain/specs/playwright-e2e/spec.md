@@ -124,3 +124,11 @@ Two roles are covered in Phase A:
 - 2026-05-14: Corrected super_admin landing URL `/` → `/select-college` after reading `Login.tsx:41-49`. OQ-4 in plan is now resolved.
 - 2026-05-16: Migrated test layout from `admin-portal/tests/` → sibling workspace `e2e/`. The tests assert on full-stack behavior, not admin-portal-only behavior; the workspace name now reflects that. CI workflow updated to `npm run test -w e2e`. No test logic changed; 5/5 still green.
 - 2026-05-16: **Phase B Wave 1** scope added — Admissions intake (AC4.6 create, AC4.7 convert-to-applicant, AC4.8 delete) + CRM dashboard renders (AC4.9 dashboard cards visible, AC4.10 assignment-rules page renders). Reuses the `loginAs` fixture. Each test creates its own data through the UI (no fixture seed) so they stay fully isolated. Two new spec files: `admissions.spec.ts`, `crm-dashboard.spec.ts`. Total suite now 10 tests.
+- 2026-05-17: **Phase B Wave 2** scope added — render-only coverage across the 5 NEW admin surfaces shipped in PR #59 (Gaps 3, 4, 6, 8) plus the M12 bulk-imports page. Six tests catch API-contract drift on each surface without writing state:
+  - AC4.11 `/platform/config` hub → at least 4 schema-driven config types render as cards
+  - AC4.12 `/platform/config` institution-feature-flags singleton form renders with 3 representative boolean toggles + Save button
+  - AC4.13 `/platform/integrations` ERPNext bridge page renders heading + Test Connection button
+  - AC4.14 `/platform/bulk-imports` page renders heading + "New import" CTA
+  - AC4.15 `/academics/exam-config` hub renders 7 entity cards
+  - AC4.16 `/governance/reports` hub renders + 3 of the 12 report definitions appear under their category heading
+  Five new spec files: `platform-config.spec.ts`, `platform-integrations.spec.ts`, `bulk-imports.spec.ts`, `exam-config.spec.ts`, `reports.spec.ts`. Total suite now 16 tests.
