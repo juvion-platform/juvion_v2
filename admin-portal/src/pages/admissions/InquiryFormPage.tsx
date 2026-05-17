@@ -187,8 +187,8 @@ export default function InquiryFormPage() {
           </div>
           <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className={lbl}>Name <span className="text-red-500">*</span></label>
-              <input required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className={inp} placeholder="Full name" />
+              <label htmlFor="inquiry-name" className={lbl}>Name <span className="text-red-500">*</span></label>
+              <input id="inquiry-name" required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className={inp} placeholder="Full name" />
             </div>
             <div>
               <label className={lbl}>Father's Name</label>
@@ -202,8 +202,8 @@ export default function InquiryFormPage() {
               </select>
             </div>
             <div>
-              <label className={lbl}>Phone <span className="text-red-500">*</span></label>
-              <input required value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} className={inp} placeholder="10-digit mobile" />
+              <label htmlFor="inquiry-phone" className={lbl}>Phone <span className="text-red-500">*</span></label>
+              <input id="inquiry-phone" required value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} className={inp} placeholder="10-digit mobile" />
             </div>
             <div>
               <label className={lbl}>Alternate Phone</label>
