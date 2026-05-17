@@ -27,6 +27,7 @@ import { Inquiry } from '../../models/admissions/Inquiry';
 import { Applicant } from '../../models/admissions/Applicant';
 import { Admission } from '../../models/admissions/Admission';
 import { Student } from '../../models/people/Student';
+import type { AuthScope } from '../../shared/rbac/types';
 
 // ─── Types ───────────────────────────────────────────────────────
 
@@ -55,6 +56,13 @@ export interface ReportColumn {
 
 export interface ReportRunContext {
   collegeId: string;
+  /**
+   * 004-rbac-nl-queries §3 — row-level RBAC threading. Optional in slice B
+   * to keep existing callers compiling; tightened to required in slice C
+   * when `runReport` gains the 5th `authScope` arg and the `runReport`
+   * eligibility gate (§10.10) is in place.
+   */
+  authScope?: AuthScope;
 }
 
 export interface ReportRunOutput {
@@ -67,6 +75,22 @@ export class PhaseBStubError extends Error {
     super(message);
     this.name = 'PhaseBStubError';
   }
+}
+
+/**
+ * 004-rbac-nl-queries §3 — per-report eligibility declaration.
+ *
+ * Each report declares, per scope dimension, whether it accepts a non-admin
+ * caller (`'supported'`) or requires admin (`'admin-only'`). The
+ * `runReport` eligibility gate (§10.10) refuses a call BEFORE invoking the
+ * runner when an `authScope` flag is set but the corresponding dimension
+ * is declared `'admin-only'`. Phase B stubs declare both dimensions as
+ * `'admin-only'` placeholders — when an author un-stubs, they must
+ * re-evaluate the declarations.
+ */
+export interface ScopeEligibility {
+  departmentOnly: 'supported' | 'admin-only';
+  selfOnly: 'supported' | 'admin-only';
 }
 
 export interface ReportDefinition {
@@ -87,6 +111,8 @@ export interface ReportDefinition {
   columns: ReportColumn[];
   /** When status is 'phase_b', the runner is a stub. */
   implementationStatus: 'implemented' | 'phase_b';
+  /** 004-rbac-nl-queries §3 — scope-eligibility per dimension. */
+  scopeEligibility: ScopeEligibility;
   run: (ctx: ReportRunContext, params: Record<string, unknown>) => Promise<ReportRunOutput>;
 }
 
@@ -121,6 +147,7 @@ const admissionsFunnel: ReportDefinition = {
     { key: 'conversionRate', label: 'Conversion vs Previous', type: 'percent' },
   ],
   implementationStatus: 'implemented',
+  scopeEligibility: { departmentOnly: 'admin-only', selfOnly: 'admin-only' },
   run: async (ctx, params) => {
     const collegeId = new Types.ObjectId(ctx.collegeId);
     const from = parseDate(params.from);
@@ -173,6 +200,7 @@ const leadSourcePerformance: ReportDefinition = {
     { key: 'conversionRate', label: 'Conversion Rate', type: 'percent' },
   ],
   implementationStatus: 'implemented',
+  scopeEligibility: { departmentOnly: 'admin-only', selfOnly: 'admin-only' },
   run: async (ctx, params) => {
     // 003-nl-report-queries Story 4: variable renamed from `collegeId` to
     // `cidObj` so the explicit `{ collegeId: cidObj, ... }` form replaces
@@ -234,6 +262,7 @@ const defaulterList: ReportDefinition = {
     { key: 'lastReminderAt', label: 'Last Reminder', type: 'date' },
   ],
   implementationStatus: 'phase_b',
+  scopeEligibility: { departmentOnly: 'admin-only', selfOnly: 'admin-only' },
   run: phaseBStub,
 };
 
@@ -262,6 +291,7 @@ const collectionSummary: ReportDefinition = {
     { key: 'transactionCount', label: 'Transactions', type: 'number' },
   ],
   implementationStatus: 'phase_b',
+  scopeEligibility: { departmentOnly: 'admin-only', selfOnly: 'admin-only' },
   run: phaseBStub,
 };
 
@@ -284,6 +314,7 @@ const attendanceBelowThreshold: ReportDefinition = {
     { key: 'sessionsTotal', label: 'Total Sessions', type: 'number' },
   ],
   implementationStatus: 'phase_b',
+  scopeEligibility: { departmentOnly: 'admin-only', selfOnly: 'admin-only' },
   run: phaseBStub,
 };
 
@@ -303,6 +334,7 @@ const backlogReport: ReportDefinition = {
     { key: 'studentCount', label: 'Students w/ Backlog', type: 'number' },
   ],
   implementationStatus: 'phase_b',
+  scopeEligibility: { departmentOnly: 'admin-only', selfOnly: 'admin-only' },
   run: phaseBStub,
 };
 
@@ -324,6 +356,7 @@ const facultyWorkload: ReportDefinition = {
     { key: 'hoursPerWeek', label: 'Hrs/Week', type: 'number' },
   ],
   implementationStatus: 'phase_b',
+  scopeEligibility: { departmentOnly: 'admin-only', selfOnly: 'admin-only' },
   run: phaseBStub,
 };
 
@@ -344,6 +377,7 @@ const hostelOccupancy: ReportDefinition = {
     { key: 'occupancyPct', label: 'Occupancy %', type: 'percent' },
   ],
   implementationStatus: 'phase_b',
+  scopeEligibility: { departmentOnly: 'admin-only', selfOnly: 'admin-only' },
   run: phaseBStub,
 };
 
@@ -364,6 +398,7 @@ const transportUtilization: ReportDefinition = {
     { key: 'utilizationPct', label: 'Utilization %', type: 'percent' },
   ],
   implementationStatus: 'phase_b',
+  scopeEligibility: { departmentOnly: 'admin-only', selfOnly: 'admin-only' },
   run: phaseBStub,
 };
 
@@ -385,6 +420,7 @@ const placementPipeline: ReportDefinition = {
     { key: 'offered', label: 'Offered', type: 'number' },
   ],
   implementationStatus: 'phase_b',
+  scopeEligibility: { departmentOnly: 'admin-only', selfOnly: 'admin-only' },
   run: phaseBStub,
 };
 
@@ -406,6 +442,7 @@ const libraryOutstanding: ReportDefinition = {
     { key: 'fineAccrued', label: 'Fine (₹)', type: 'currency' },
   ],
   implementationStatus: 'phase_b',
+  scopeEligibility: { departmentOnly: 'admin-only', selfOnly: 'admin-only' },
   run: phaseBStub,
 };
 
@@ -428,6 +465,11 @@ const studentRosterSnapshot: ReportDefinition = {
     { key: 'count', label: 'Students', type: 'number' },
   ],
   implementationStatus: 'implemented',
+  // 004 §3 — only runner that supports HOD/faculty departmentOnly scope in v1
+  // (Department -> Branch -> Student two-step lookup in run()). selfOnly stays
+  // admin-only because there is no "my own row" semantic for HOD/faculty here;
+  // student NL access is deferred to a separate Phase C feature.
+  scopeEligibility: { departmentOnly: 'supported', selfOnly: 'admin-only' },
   run: async (ctx, params) => {
     const collegeId = new Types.ObjectId(ctx.collegeId);
     const match: Record<string, unknown> = { collegeId };
