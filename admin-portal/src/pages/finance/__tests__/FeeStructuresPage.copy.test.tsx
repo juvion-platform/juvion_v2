@@ -34,6 +34,15 @@ vi.mock('../../../services/academics', () => ({
 vi.mock('../../../services/fee-categories', () => ({
   listFeeCategories: vi.fn(),
 }));
+// The Quota dropdown is dynamically populated from `listFeeQuotas`
+// since the per-college quota config landed. Without this mock the
+// real axios call fails in jsdom, `feeQuotas.items` stays undefined,
+// the quota <select> renders only its placeholder option, the form
+// fails HTML5 `required` validation, and `createFeeStructure` is
+// never invoked.
+vi.mock('../../../services/fee-quotas', () => ({
+  listFeeQuotas: vi.fn(),
+}));
 
 import {
   listFeeStructures,
@@ -45,6 +54,7 @@ import {
   listBranches,
 } from '../../../services/academics';
 import { listFeeCategories } from '../../../services/fee-categories';
+import { listFeeQuotas } from '../../../services/fee-quotas';
 
 const mockedList = listFeeStructures as Mock;
 const mockedCreate = createFeeStructure as Mock;
@@ -52,6 +62,7 @@ const mockedYears = listAcademicYears as Mock;
 const mockedProgrammes = listProgrammes as Mock;
 const mockedBranches = listBranches as Mock;
 const mockedFeeCategories = listFeeCategories as Mock;
+const mockedFeeQuotas = listFeeQuotas as Mock;
 
 const ACADEMIC_YEAR_ID = '64a000000000000000000001';
 const PROGRAMME_ID = '64a000000000000000000002';
@@ -80,6 +91,7 @@ beforeEach(() => {
   mockedProgrammes.mockReset();
   mockedBranches.mockReset();
   mockedFeeCategories.mockReset();
+  mockedFeeQuotas.mockReset();
 
   mockedList.mockResolvedValue({ items: [SOURCE_ROW], total: 1, page: 1, pages: 1 });
   mockedYears.mockResolvedValue({
@@ -100,6 +112,16 @@ beforeEach(() => {
   mockedFeeCategories.mockResolvedValue({
     items: [{ _id: 'cat-1', code: 'Tuition', name: 'Tuition', status: 'active' }],
     total: 1, page: 1, pages: 1,
+  });
+  // SOURCE_ROW.quota = 'management' — the mock must include a quota
+  // with code='management' so the Copy prefill lands on a real
+  // <option> and the form's required validation passes.
+  mockedFeeQuotas.mockResolvedValue({
+    items: [
+      { _id: 'q-1', code: 'management', name: 'Management', status: 'active' },
+      { _id: 'q-2', code: 'convener', name: 'Convener', status: 'active' },
+    ],
+    total: 2, page: 1, pages: 1,
   });
   mockedCreate.mockResolvedValue({ ...SOURCE_ROW, _id: 'new-clone-id' });
 });
