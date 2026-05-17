@@ -318,8 +318,9 @@ describe('stub-delivery workers (SMS / email / WhatsApp)', () => {
     expect(registerQueue).toHaveBeenCalledTimes(3);
     const calls = vi.mocked(registerQueue).mock.calls;
     const names = calls.map((c) => c[0].name).sort();
+    // BullMQ rejects `:` in queue names; underscores per 15d4182.
     expect(names).toEqual(
-      ['platform:email', 'platform:sms', 'platform:whatsapp'].sort(),
+      ['platform_email', 'platform_sms', 'platform_whatsapp'].sort(),
     );
     for (const c of calls) {
       expect(c[0].concurrency).toBe(5);
