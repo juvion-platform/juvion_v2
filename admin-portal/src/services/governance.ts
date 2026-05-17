@@ -148,6 +148,8 @@ export interface NlMatchedResponse {
 export interface NlRefusedResponse {
   status: 'refused';
   reason: string;
+  /** 004 §10.7 — sub-categorizes 'report-not-scopable-for-role' and 'scope-unresolved'. */
+  reasonDimension?: 'department' | 'self';
   supportedReports: ReadonlyArray<string>;
   llmModel: string;
   costInr: number;
@@ -164,6 +166,8 @@ export interface NlReportStats {
   refused: number;
   llmCostInr: number;
   byReport: Array<{ reportCode: string; count: number; costInr: number }>;
+  /** 004 §10.5 — persona breakdown. Excludes pre-004 docs where `role` is undefined. */
+  byRole: Array<{ role: string; count: number; costInr: number }>;
 }
 
 export const runNlQuery = (question: string): Promise<NlQueryResponse> =>

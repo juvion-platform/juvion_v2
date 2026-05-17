@@ -6,7 +6,6 @@ import {
 } from '../../services/governance';
 import Badge from '../../components/ui/Badge';
 import NlQueryPanel from '../../components/governance/NlQueryPanel';
-import { useAuthStore } from '../../stores/authStore';
 import { FileText, Play, AlertCircle, CheckCircle2, Clock, Construction, ArrowLeft } from 'lucide-react';
 
 // Strategic Gap 4 — declarative reports browser.
@@ -269,8 +268,10 @@ export default function ReportsPage() {
   });
   const [active, setActive] = useState<ReportDefinition | null>(null);
   const [pendingParams, setPendingParams] = useState<Record<string, unknown> | undefined>(undefined);
-  const userRole = useAuthStore((s) => s.user?.role);
-  const showNlPanel = userRole === 'admin' || userRole === 'super_admin';
+  // 004 §G.4 — role gate removed. After RBAC_NL_ENFORCE='true' + §10.9 seed,
+  // HOD / faculty / principal also reach this panel. Backend authorize() decides;
+  // FE renders a policy-denied banner inline if the request returns 403.
+  const showNlPanel = true;
 
   // 003 — Run as picker: look up the def, prime the params, switch to runner view.
   function handleRunAsPicker(reportCode: string, params: Record<string, unknown>) {

@@ -129,6 +129,55 @@ describe('<NlQueryPanel />', () => {
     await screen.findByText(/daily.*cap.*reached/i);
   });
 
+  // 004 §10.12 / Story 6 — 403 policy-denied path renders the inline banner
+  it('shows a policy-denied banner when authorize() returns 403', async () => {
+    runNlQueryMock.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: { status: 403, data: { error: 'Access denied' } },
+    });
+
+    renderWith(<NlQueryPanel onRunAsPicker={vi.fn()} />);
+    fireEvent.change(screen.getByPlaceholderText(/ask a question/i), { target: { value: 'q' } });
+    fireEvent.click(screen.getByRole('button', { name: /ask/i }));
+
+    await screen.findByText(/your role can.t run governance reports/i);
+  });
+
+  // 004 §10.7 — sub-categorized refusal renders dimension-aware copy
+  it('renders department-scope-not-eligible copy for report-not-scopable-for-role + dimension=department', async () => {
+    runNlQueryMock.mockResolvedValueOnce({
+      status: 'refused',
+      reason: 'report-not-scopable-for-role',
+      reasonDimension: 'department',
+      supportedReports: ['student-roster-snapshot'],
+      llmModel: 'claude', costInr: 0.1,
+    } satisfies NlQueryResponse);
+
+    renderWith(<NlQueryPanel onRunAsPicker={vi.fn()} />);
+    fireEvent.change(screen.getByPlaceholderText(/ask a question/i), { target: { value: 'admissions funnel' } });
+    fireEvent.click(screen.getByRole('button', { name: /ask/i }));
+
+    await screen.findByText(/department-scoped data of this kind/i);
+    expect(screen.getByText('student-roster-snapshot')).toBeInTheDocument();
+  });
+
+  // 004 §10.10 — scope-unresolved refusal renders the data-quality copy
+  it('renders data-quality copy for scope-unresolved + dimension=department', async () => {
+    runNlQueryMock.mockResolvedValueOnce({
+      status: 'refused',
+      reason: 'scope-unresolved',
+      reasonDimension: 'department',
+      supportedReports: [],
+      llmModel: 'claude', costInr: 0.1,
+    } satisfies NlQueryResponse);
+
+    renderWith(<NlQueryPanel onRunAsPicker={vi.fn()} />);
+    fireEvent.change(screen.getByPlaceholderText(/ask a question/i), { target: { value: 'q' } });
+    fireEvent.click(screen.getByRole('button', { name: /ask/i }));
+
+    await screen.findByText(/couldn.t determine your department/i);
+  });
+
   it('Ask button disabled while the request is pending', async () => {
     let resolveFn: (v: NlQueryResponse) => void = () => {};
     runNlQueryMock.mockReturnValueOnce(new Promise<NlQueryResponse>((res) => { resolveFn = res; }));

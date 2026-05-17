@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { Sparkles, ArrowRight, AlertTriangle } from 'lucide-react';
+import { Sparkles, ArrowRight, AlertTriangle, ShieldOff } from 'lucide-react';
 import clsx from 'clsx';
+import type { AxiosError } from 'axios';
 
 import { runNlQuery, type NlQueryResponse } from '../../services/governance';
 
@@ -31,17 +32,27 @@ const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ri
 export default function NlQueryPanel({ onRunAsPicker }: Props) {
   const [question, setQuestion] = useState('');
   const [response, setResponse] = useState<NlQueryResponse | null>(null);
+  // 004 §10.12 / Story 6 — track 403 (policy denial) distinctly from
+  // in-band refusals so we can render a specific banner.
+  const [policyDenied, setPolicyDenied] = useState(false);
 
   const mut = useMutation({
     mutationFn: (q: string) => runNlQuery(q),
-    onSuccess: (resp) => setResponse(resp),
-    onError: () => setResponse(null),
+    onSuccess: (resp) => {
+      setPolicyDenied(false);
+      setResponse(resp);
+    },
+    onError: (err: AxiosError) => {
+      setResponse(null);
+      setPolicyDenied(err.response?.status === 403);
+    },
   });
 
   function handleAsk(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = question.trim();
     if (!trimmed) return;
+    setPolicyDenied(false);
     mut.mutate(trimmed);
   }
 
@@ -99,12 +110,47 @@ export default function NlQueryPanel({ onRunAsPicker }: Props) {
       {response && response.status === 'refused' && (
         <RefusedBanner response={response} />
       )}
+
+      {policyDenied && <PolicyDeniedBanner />}
     </div>
   );
 }
 
+function PolicyDeniedBanner() {
+  return (
+    <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3">
+      <div className="flex items-start gap-2">
+        <ShieldOff size={14} className="text-rose-600 mt-0.5 shrink-0" />
+        <div className="text-xs text-rose-800">
+          Your role can&apos;t run governance reports. If you believe this is incorrect, contact your administrator.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function refusalCopy(response: Extract<NlQueryResponse, { status: 'refused' }>): string {
+  const { reason, reasonDimension } = response;
+  // 004 §10.7 — render friendlier copy for the new sub-categorized reasons.
+  if (reason === 'cap_reached') {
+    return 'Daily AI question cap reached for this college. Try again tomorrow or contact your admin to raise the cap.';
+  }
+  if (reason === 'scope-unresolved') {
+    return reasonDimension === 'department'
+      ? 'We couldn\'t determine your department. Contact admin to update your Faculty record.'
+      : 'We couldn\'t determine your profile. Contact admin to update your account.';
+  }
+  if (reason === 'report-not-scopable-for-role') {
+    return reasonDimension === 'department'
+      ? 'Your role can\'t view department-scoped data of this kind. Try a report from the list below.'
+      : 'Your role can\'t view self-scoped data of this kind. Try a report from the list below.';
+  }
+  return reason; // timeout, parser reasons, report_run_failed
+}
+
 function RefusedBanner({ response }: { response: Extract<NlQueryResponse, { status: 'refused' }> }) {
   const isCap = response.reason === 'cap_reached' || response.capReached === true;
+  const copy = refusalCopy(response);
   return (
     <div
       className={clsx(
@@ -115,13 +161,7 @@ function RefusedBanner({ response }: { response: Extract<NlQueryResponse, { stat
       <div className="flex items-start gap-2">
         {isCap && <AlertTriangle size={14} className="text-amber-600 mt-0.5 shrink-0" />}
         <div className="flex-1">
-          {isCap ? (
-            <div className="text-xs text-amber-800">
-              Daily AI question cap reached for this college. Try again tomorrow or contact your admin to raise the cap.
-            </div>
-          ) : (
-            <div className="text-xs text-gray-700">{response.reason}</div>
-          )}
+          <div className={clsx('text-xs', isCap ? 'text-amber-800' : 'text-gray-700')}>{copy}</div>
           {!isCap && response.supportedReports.length > 0 && (
             <>
               <div className="text-[11px] text-gray-500 mt-2 mb-1">Try one of these reports directly:</div>
