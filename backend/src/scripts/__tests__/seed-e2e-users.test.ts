@@ -52,7 +52,11 @@ describe('seed-e2e-users', () => {
     expect(superUser?.role).toBe('super_admin');
     expect(superUser?.collegeId).toBeUndefined();
 
-    expect(principalUser?.role).toBe('principal');
+    // role='admin' matches the canonical college-operator posture
+    // (mirrors the existing JIT seed at backend/src/seed.ts:543-546).
+    // The "principal" name is semantic for the test-user identity,
+    // not the DB role.
+    expect(principalUser?.role).toBe('admin');
     expect(principalUser?.collegeId).toBeTruthy();
     expect(principalUser?.personaType).toBe('L-PRIN');
   });

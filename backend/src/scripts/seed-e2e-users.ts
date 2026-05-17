@@ -36,7 +36,7 @@ export const E2E_TEST_PASSWORD = 'E2ETestPassword!';
 export interface E2EUserDefinition {
   email: string;
   name: string;
-  role: 'super_admin' | 'principal';
+  role: 'super_admin' | 'admin';
   personaType: string;
   /** Empty string means "no collegeId" — the super_admin case. */
   collegeId?: string;
@@ -57,9 +57,15 @@ export const E2E_USER_DEFINITIONS: E2EUserDefinition[] = [
     // No collegeId — super_admin is cross-college.
   },
   {
+    // Email name kept as `e2e_principal` (semantic: college-level
+    // admin from the test perspective). The DB role is 'admin' to
+    // match the canonical RBAC posture for college operators — the
+    // existing JIT seed uses role='admin' for the same reason.
+    // Phase A tests still refer to this user as "principal" — that's
+    // the test-user identity, not the DB role.
     email: 'e2e_principal@juvion.test',
     name: 'E2E Principal',
-    role: 'principal',
+    role: 'admin',
     personaType: 'L-PRIN',
     collegeId: process.env.DEV_COLLEGE_ID || '000000000000000000000001',
   },

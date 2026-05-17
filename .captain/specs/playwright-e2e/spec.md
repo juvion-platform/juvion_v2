@@ -48,12 +48,18 @@ Two roles are covered in Phase A:
 - [ ] **AC-1** Test infra installed: Playwright dependencies added to `admin-portal` only (backend keeps vitest). One `playwright.config.ts` checked in. `npm run test:e2e` runs the suite.
 - [ ] **AC-2** Test users seeded: dedicated `seed-e2e-users` script creates two known users — `e2e_super@juvion.test` and `e2e_principal@juvion.test` — each with a fixed password (`E2ETestPassword!`) and the appropriate role + collegeId. Script is idempotent (re-runnable).
 - [ ] **AC-3** Auth fixture: a Playwright fixture `loginAs(role)` performs the form-based login in a fresh browser context and returns a page where the user is authenticated. Other test suites in Phase B+ reuse this fixture.
-- [ ] **AC-4** Five tests pass:
+- [ ] **AC-4** Five auth tests pass:
   - [ ] `auth.spec.ts › super_admin: login succeeds and lands at /select-college`
   - [ ] `auth.spec.ts › principal: login succeeds and lands at /`
   - [ ] `auth.spec.ts › bad password: stays on /login with error visible`
   - [ ] `auth.spec.ts › unauthenticated navigate to /admissions redirects to /login`
   - [ ] `auth.spec.ts › logout: clears localStorage and redirects to /login`
+- [ ] **AC-4.6 → AC-4.10 (Phase B Wave 1)** Five admissions + CRM tests pass:
+  - [ ] `admissions.spec.ts › principal: create inquiry from form → appears in list (AC4.6)`
+  - [ ] `admissions.spec.ts › principal: convert inquiry → applicant exists (AC4.7)`
+  - [ ] `admissions.spec.ts › principal: delete inquiry → no longer in list (AC4.8)`
+  - [ ] `crm-dashboard.spec.ts › principal: /admissions/crm renders all 4 cards (AC4.9)`
+  - [ ] `crm-dashboard.spec.ts › principal: /admissions/assignment-rules renders (AC4.10)`
 - [ ] **AC-5** Suite runs in **under 90 seconds** wall-clock on a clean CI runner (cold start of backend + admin-portal + Mongo).
 - [ ] **AC-6** **Zero flakes** in 10 consecutive CI runs of the unchanged suite before this is considered ready to gate PRs.
 - [ ] **AC-7** CI integration: a GitHub Actions workflow (`.github/workflows/e2e.yml`) runs the suite on every PR to `main` and on every push to `main`. Failure blocks merge.
@@ -117,3 +123,4 @@ Two roles are covered in Phase A:
 - 2026-05-14: Initial spec created. Phase A scope locked: auth-only, super_admin + principal, CI regression gate.
 - 2026-05-14: Corrected super_admin landing URL `/` → `/select-college` after reading `Login.tsx:41-49`. OQ-4 in plan is now resolved.
 - 2026-05-16: Migrated test layout from `admin-portal/tests/` → sibling workspace `e2e/`. The tests assert on full-stack behavior, not admin-portal-only behavior; the workspace name now reflects that. CI workflow updated to `npm run test -w e2e`. No test logic changed; 5/5 still green.
+- 2026-05-16: **Phase B Wave 1** scope added — Admissions intake (AC4.6 create, AC4.7 convert-to-applicant, AC4.8 delete) + CRM dashboard renders (AC4.9 dashboard cards visible, AC4.10 assignment-rules page renders). Reuses the `loginAs` fixture. Each test creates its own data through the UI (no fixture seed) so they stay fully isolated. Two new spec files: `admissions.spec.ts`, `crm-dashboard.spec.ts`. Total suite now 10 tests.
