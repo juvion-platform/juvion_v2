@@ -29,6 +29,13 @@ jobs:
           - 27017:27017
         # No healthcheck block — Mongo 7 binds the port quickly and the
         # backend's own /api/health waits on Mongo before responding.
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        # The backend's BullMQ + dedup-cache + rbac-policy-cache all use
+        # Redis; without this service the backend dev server hangs on
+        # ECONNREFUSED 127.0.0.1:6379 and /api/health never goes green.
 
     env:
       # NODE_ENV is INTENTIONALLY UNSET at job scope. Setting it to
