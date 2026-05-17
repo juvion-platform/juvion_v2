@@ -48,6 +48,11 @@ jobs:
       # Steps that genuinely need production NODE_ENV (backend dev server,
       # admin-portal preview) set it inline below.
       PORT: '3003'
+      # backend/src/config/db.ts expects MONGODB_URI specifically (not
+      # the docker-compose-style MONGO_URI). Keep both: MONGODB_URI for
+      # the backend, MONGO_URI for any tool that reaches for the
+      # alternative spelling.
+      MONGODB_URI: mongodb://localhost:27017/juvion_v2_e2e
       MONGO_URI: mongodb://localhost:27017/juvion_v2_e2e
       REDIS_URL: redis://localhost:6379
       JWT_SECRET: e2e-ci-secret
