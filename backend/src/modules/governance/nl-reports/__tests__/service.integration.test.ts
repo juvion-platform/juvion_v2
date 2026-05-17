@@ -37,9 +37,13 @@ vi.mock('../../../../config/redis', () => ({
   default: { get: redisGetMock, setex: redisSetexMock },
 }));
 
-vi.mock('../../report-service', () => ({
-  runReport: runReportMock,
-}));
+vi.mock('../../report-service', async (orig) => {
+  const actual = await orig<typeof import('../../report-service')>();
+  return {
+    ...actual,
+    runReport: runReportMock,
+  };
+});
 
 import { setupMongo, teardownMongo, clearCollections } from '../../../../__tests__/helpers/mongoMemory';
 import { NlReportQuery } from '../../../../models/governance/NlReportQuery';
@@ -93,8 +97,15 @@ describe('nlQuery — integration', () => {
       expect(r.params).toEqual({ from: '2026-04-01', to: '2026-04-30' });
       expect(String(r.runId)).toBe(String(runId));
     }
-    // runReport called with 4 positional args (GATE 3 M-1)
-    expect(runReportMock).toHaveBeenCalledWith(collegeId, 'admissions-funnel', { from: '2026-04-01', to: '2026-04-30' }, 'admin-1');
+    // runReport called with 5 positional args (004 §10.10 — 5th arg authScope).
+    // Slice C passes ADMIN_FULL_SCOPE; slice E will wire the real authScope through.
+    expect(runReportMock).toHaveBeenCalledWith(
+      collegeId,
+      'admissions-funnel',
+      { from: '2026-04-01', to: '2026-04-30' },
+      'admin-1',
+      expect.objectContaining({ departmentOnly: false, selfOnly: false }),
+    );
     // Persisted
     const docs = await NlReportQuery.find({ collegeId }).lean();
     expect(docs).toHaveLength(1);

@@ -57,12 +57,12 @@ export interface ReportColumn {
 export interface ReportRunContext {
   collegeId: string;
   /**
-   * 004-rbac-nl-queries §3 — row-level RBAC threading. Optional in slice B
-   * to keep existing callers compiling; tightened to required in slice C
-   * when `runReport` gains the 5th `authScope` arg and the `runReport`
-   * eligibility gate (§10.10) is in place.
+   * 004-rbac-nl-queries §3 — row-level RBAC threading. REQUIRED.
+   * Admin paths pass `ADMIN_FULL_SCOPE` from report-service (both
+   * `departmentOnly` and `selfOnly` false) which makes any
+   * `applyAuthScope` call inside the runner a no-op.
    */
-  authScope?: AuthScope;
+  authScope: AuthScope;
 }
 
 export interface ReportRunOutput {

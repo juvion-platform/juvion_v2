@@ -17,7 +17,7 @@ import { createAuditLog } from '../../../shared/audit';
 import { maskPII } from '../../../shared/llm/pii';
 import { NlReportQuery } from '../../../models/governance/NlReportQuery';
 import { createLLMClient, type LLMMessage } from '../../juvi/finance-agent/llm-client';
-import { runReport } from '../report-service';
+import { runReport, ADMIN_FULL_SCOPE } from '../report-service';
 
 import { tryClaimNlReportSlot } from './cap-guard';
 import { buildNlReportPrompt, PROMPT_VERSION, ALLOWED_REPORTS, type AllowedReportCode } from './prompt';
@@ -185,12 +185,16 @@ export async function nlQuery(
     return refused;
   }
 
-  // 7. runReport (4-arg, per GATE 3 M-1).
+  // 7. runReport (5-arg, per 004 §10.10 — slice E will wire opts.authScope
+  // through from the controller. For slice C we pass the admin sentinel so
+  // existing NL behavior is unchanged until the wrapper middleware in slice F
+  // populates a real authScope via authorize('governance','read').
   const runDoc = await runReport(
     collegeId,
     validated.normalized.reportCode,
     validated.normalized.params,
     performedBy,
+    ADMIN_FULL_SCOPE,
   );
 
   // GATE 3 M-2 — defensive: only matched if the run actually succeeded.

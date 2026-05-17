@@ -45,7 +45,10 @@ export async function runReportHandler(req: AuthRequest, res: Response, next: Ne
   try {
     const { code } = req.params as { code: string };
     const params = (req.body?.parameters as Record<string, unknown>) || {};
-    const doc = await svc.runReport(collegeId(req), code, params, performedBy(req));
+    // 004 §10.10 — REST endpoint still behind requireRole(admin/super_admin) per
+    // spec §4 item 8 (out of scope to upgrade); pass ADMIN_FULL_SCOPE sentinel so
+    // the eligibility gate is a no-op for these admin-only callers.
+    const doc = await svc.runReport(collegeId(req), code, params, performedBy(req), svc.ADMIN_FULL_SCOPE);
     res.json(doc);
   } catch (e) { next(e); }
 }
