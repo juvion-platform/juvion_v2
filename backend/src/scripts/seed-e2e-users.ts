@@ -28,6 +28,8 @@ import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
 import { User } from '../models/User';
+import { Policy } from '../models/platform/Policy';
+import { DEFAULT_POLICIES } from '../shared/rbac/defaults';
 
 dotenv.config();
 
@@ -75,6 +77,38 @@ export interface SeedResult {
   created: number;
   updated: number;
   total: number;
+  policiesSeeded?: number;
+}
+
+/**
+ * Upserts DEFAULT_POLICIES into the Policy collection.
+ *
+ * Without seeded policies, `evaluateAccess` returns `null` for every
+ * (role, module, action) tuple → `authorize()` middleware 403s every
+ * non-auth request → CI e2e tests for admissions / CRM / governance /
+ * platform / bulk-imports all fail because the FE renders nothing.
+ *
+ * Idempotent: matches on (role, personaType ?? null, module, action,
+ * collegeId ?? null) so re-runs neither duplicate nor drift.
+ */
+export async function seedDefaultPolicies(): Promise<number> {
+  let written = 0;
+  for (const p of DEFAULT_POLICIES) {
+    const filter = {
+      role: p.role,
+      personaType: p.personaType ?? null,
+      module: p.module,
+      action: p.action,
+      collegeId: p.collegeId ?? null,
+    };
+    await Policy.updateOne(
+      filter,
+      { $set: { ...p, createdBy: 'seed-e2e' }, $setOnInsert: { createdAt: new Date() } },
+      { upsert: true },
+    );
+    written += 1;
+  }
+  return written;
 }
 
 /**
@@ -126,15 +160,19 @@ export async function seedE2EUsers(): Promise<SeedResult> {
 // ─── CLI entrypoint ───────────────────────────────────────────────
 
 async function main() {
-  const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/juvion_v2';
+  const mongoUri =
+    process.env.MONGODB_URI ||
+    process.env.MONGO_URI ||
+    'mongodb://localhost:27017/juvion_v2';
   // eslint-disable-next-line no-console
   console.log(`[seed-e2e-users] connecting to ${mongoUri}`);
   await mongoose.connect(mongoUri);
   try {
     const result = await seedE2EUsers();
+    const policiesSeeded = await seedDefaultPolicies();
     // eslint-disable-next-line no-console
     console.log(
-      `[seed-e2e-users] done · created=${result.created} updated=${result.updated} total=${result.total}`,
+      `[seed-e2e-users] done · users created=${result.created} updated=${result.updated} total=${result.total} · policies=${policiesSeeded}`,
     );
   } finally {
     await mongoose.disconnect();
