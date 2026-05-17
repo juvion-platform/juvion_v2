@@ -16,5 +16,9 @@ const schema = new Schema<IBranch>({
 }, { timestamps: true });
 
 schema.index({ collegeId: 1, code: 1 }, { unique: true });
+// 004 §10.2 — supports the Department -> Branch lookup in the
+// student-roster-snapshot runner when an HOD/faculty queries their
+// department's roster.
+schema.index({ collegeId: 1, departmentId: 1 });
 
 export const Branch = model<IBranch>('Branch', schema);

@@ -27,6 +27,7 @@ import { Inquiry } from '../../models/admissions/Inquiry';
 import { Applicant } from '../../models/admissions/Applicant';
 import { Admission } from '../../models/admissions/Admission';
 import { Student } from '../../models/people/Student';
+import { Branch } from '../../models/academic-structure/Branch';
 import type { AuthScope } from '../../shared/rbac/types';
 
 // ─── Types ───────────────────────────────────────────────────────
@@ -471,9 +472,21 @@ const studentRosterSnapshot: ReportDefinition = {
   // student NL access is deferred to a separate Phase C feature.
   scopeEligibility: { departmentOnly: 'supported', selfOnly: 'admin-only' },
   run: async (ctx, params) => {
-    const collegeId = new Types.ObjectId(ctx.collegeId);
-    const match: Record<string, unknown> = { collegeId };
+    const cidObj = new Types.ObjectId(ctx.collegeId);
+    const match: Record<string, unknown> = { collegeId: cidObj };
     if ((params.status as string) !== 'all') match.status = 'active';
+
+    // 004 §10.3 — HOD/faculty department scope via two-step Branch lookup.
+    // AuthScope.departmentId is a Department._id; Student.branchId is a
+    // Branch._id. Resolve all branches belonging to the HOD's department
+    // and constrain the aggregation to that branch set.
+    if (ctx.authScope.departmentOnly && ctx.authScope.departmentId) {
+      const branches = await Branch.find(
+        { collegeId: cidObj, departmentId: new Types.ObjectId(ctx.authScope.departmentId) },
+        { _id: 1 },
+      ).lean();
+      match.branchId = { $in: branches.map((b) => b._id) };
+    }
 
     const rows = await Student.aggregate([
       { $match: match },
