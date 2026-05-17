@@ -35,7 +35,7 @@ describe('buildNlReportPrompt', () => {
     expect(sys).toContain('student-roster-snapshot');
   });
 
-  it('system declares the exact param shapes from §10.5', () => {
+  it('system declares the exact param shapes from §10.5 + Phase B Wave 1', () => {
     const sys = buildNlReportPrompt({ today, maskedQuestion: 'q' })[0]!.content;
     // funnel + lead-source use { from, to }
     expect(sys).toMatch(/from.*to/);
@@ -43,6 +43,11 @@ describe('buildNlReportPrompt', () => {
     expect(sys).toMatch(/active.*all|status/);
     // Make sure the wrong key names are NOT present (regression: spec used fromDate/toDate)
     expect(sys).not.toMatch(/fromDate|toDate|programmeId|branchId|asOfDate/);
+    // Phase B Wave 1 additions: backlog-report's optional departmentId,
+    // hostel-occupancy explicitly takes no required params.
+    expect(sys).toContain('backlog-report');
+    expect(sys).toContain('hostel-occupancy');
+    expect(sys).toContain('departmentId');
   });
 
   it('user content carries the masked question and today date', () => {
@@ -52,11 +57,17 @@ describe('buildNlReportPrompt', () => {
     expect(user).toContain('sept funnel for {name_1}');
   });
 
-  it('ALLOWED_REPORTS is the canonical 3-report tuple', () => {
-    expect(ALLOWED_REPORTS).toEqual(['admissions-funnel', 'lead-source-performance', 'student-roster-snapshot']);
+  it('ALLOWED_REPORTS is the canonical 5-report tuple (Phase B Wave 1)', () => {
+    expect(ALLOWED_REPORTS).toEqual([
+      'admissions-funnel',
+      'lead-source-performance',
+      'student-roster-snapshot',
+      'backlog-report',
+      'hostel-occupancy',
+    ]);
   });
 
-  it('PROMPT_VERSION is stable', () => {
-    expect(PROMPT_VERSION).toBe('nl-report-prompt-v1');
+  it('PROMPT_VERSION is bumped to v2 with Phase B Wave 1 additions', () => {
+    expect(PROMPT_VERSION).toBe('nl-report-prompt-v2');
   });
 });

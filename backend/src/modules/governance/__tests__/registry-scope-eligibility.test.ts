@@ -49,14 +49,23 @@ describe('REPORT_REGISTRY — scopeEligibility declarations', () => {
     expect(def!.scopeEligibility.selfOnly).toBe('admin-only');
   });
 
-  it('exactly one runner declares departmentOnly: supported in v1', () => {
+  it('runners that declare departmentOnly: supported in v1', () => {
     const supported = REPORT_REGISTRY.filter((d: ReportDefinition) => d.scopeEligibility.departmentOnly === 'supported');
-    expect(supported).toHaveLength(1);
-    expect(supported[0]!.code).toBe('student-roster-snapshot');
+    // 004 (Wave 0): student-roster-snapshot
+    // Phase B Wave 1: backlog-report (department-aware via Course.departmentId)
+    expect(supported.map((d) => d.code).sort()).toEqual(['backlog-report', 'student-roster-snapshot']);
   });
 
   it('no runner declares selfOnly: supported in v1 (counsellor / student NL deferred)', () => {
     const supported = REPORT_REGISTRY.filter((d: ReportDefinition) => d.scopeEligibility.selfOnly === 'supported');
     expect(supported).toHaveLength(0);
+  });
+
+  it('Phase B Wave 1 runners are implemented (not stubs)', () => {
+    for (const code of ['backlog-report', 'hostel-occupancy']) {
+      const def = REPORT_REGISTRY.find((d) => d.code === code);
+      expect(def, `${code} missing from registry`).toBeDefined();
+      expect(def!.implementationStatus).toBe('implemented');
+    }
   });
 });

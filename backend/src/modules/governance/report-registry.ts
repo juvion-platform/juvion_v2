@@ -28,6 +28,8 @@ import { Applicant } from '../../models/admissions/Applicant';
 import { Admission } from '../../models/admissions/Admission';
 import { Student } from '../../models/people/Student';
 import { Branch } from '../../models/academic-structure/Branch';
+import { Backlog } from '../../models/academic-ops/Backlog';
+import { HostelBlock } from '../../models/welfare/HostelBlock';
 import type { AuthScope } from '../../shared/rbac/types';
 
 // ─── Types ───────────────────────────────────────────────────────
@@ -325,7 +327,7 @@ const backlogReport: ReportDefinition = {
   code: 'backlog-report',
   label: 'Active Backlogs by Department',
   category: 'academics',
-  description: 'Students with active backlog records, grouped by department + course. Phase B will aggregate against the Backlog model.',
+  description: 'Students with active backlog records, grouped by department + course. Counts distinct students per (department, course) cell.',
   parameters: [
     { key: 'departmentId', label: 'Department (optional)', type: 'string' },
   ],
@@ -334,9 +336,69 @@ const backlogReport: ReportDefinition = {
     { key: 'course', label: 'Course', type: 'string' },
     { key: 'studentCount', label: 'Students w/ Backlog', type: 'number' },
   ],
-  implementationStatus: 'phase_b',
-  scopeEligibility: { departmentOnly: 'admin-only', selfOnly: 'admin-only' },
-  run: phaseBStub,
+  implementationStatus: 'implemented',
+  // HOD/faculty scope is meaningful: filter Course.departmentId by
+  // authScope.departmentId. selfOnly is admin-only (no "my own backlog
+  // group" semantic for HOD/faculty).
+  scopeEligibility: { departmentOnly: 'supported', selfOnly: 'admin-only' },
+  run: async (ctx, params) => {
+    const cidObj = new Types.ObjectId(ctx.collegeId);
+
+    // First pipeline stage: Backlog.collegeId match + active-only filter.
+    // 'cleared' rows represent resolved backlogs and shouldn't appear in
+    // an "active backlogs" report.
+    const pipeline: any[] = [
+      { $match: { collegeId: cidObj, currentStatus: { $ne: 'cleared' } } },
+      { $lookup: { from: 'courses', localField: 'courseId', foreignField: '_id', as: 'course' } },
+      { $unwind: '$course' },
+    ];
+
+    // Department scope: prefer the explicit param if provided, otherwise
+    // honor the HOD/faculty authScope. The param wins because admins may
+    // want to drill into a specific department from the picker.
+    const explicitDept = params.departmentId ? new Types.ObjectId(String(params.departmentId)) : undefined;
+    const scopedDept =
+      ctx.authScope.departmentOnly && ctx.authScope.departmentId
+        ? new Types.ObjectId(ctx.authScope.departmentId)
+        : undefined;
+    const departmentFilter = explicitDept ?? scopedDept;
+    if (departmentFilter) {
+      pipeline.push({ $match: { 'course.departmentId': departmentFilter } });
+    }
+
+    pipeline.push(
+      { $lookup: { from: 'departments', localField: 'course.departmentId', foreignField: '_id', as: 'dept' } },
+      { $unwind: '$dept' },
+      {
+        $group: {
+          _id: {
+            departmentName: '$dept.name',
+            courseCode: '$course.code',
+            courseName: '$course.name',
+          },
+          students: { $addToSet: '$studentId' },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          department: '$_id.departmentName',
+          course: { $concat: ['$_id.courseCode', ' — ', '$_id.courseName'] },
+          studentCount: { $size: '$students' },
+        },
+      },
+      { $sort: { department: 1, course: 1 } },
+    );
+
+    const rows = await Backlog.aggregate(pipeline);
+    return {
+      rows,
+      summary: {
+        groups: rows.length,
+        totalStudents: rows.reduce((s, r) => s + (r.studentCount as number), 0),
+      },
+    };
+  },
 };
 
 // ─── 7. Faculty Workload ─────────────────────────────────────────
@@ -367,9 +429,9 @@ const hostelOccupancy: ReportDefinition = {
   code: 'hostel-occupancy',
   label: 'Hostel Occupancy',
   category: 'hostel',
-  description: 'Hostels with occupancy rate (allocated / capacity). Phase B will aggregate the HostelAllocation x HostelRoom join.',
+  description: 'Hostels with occupancy rate (allocated / capacity). Current-snapshot only in v1; the asOf param is reserved for v1.5 once the allocation timeline is fully back-fillable.',
   parameters: [
-    { key: 'asOf', label: 'As Of', type: 'date', helpText: 'Snapshot date. Defaults to today.' },
+    { key: 'asOf', label: 'As Of', type: 'date', helpText: 'Snapshot date. v1 ignores this and returns the current snapshot (reserved for v1.5).' },
   ],
   columns: [
     { key: 'hostelName', label: 'Hostel', type: 'string' },
@@ -377,9 +439,78 @@ const hostelOccupancy: ReportDefinition = {
     { key: 'allocated', label: 'Allocated', type: 'number' },
     { key: 'occupancyPct', label: 'Occupancy %', type: 'percent' },
   ],
-  implementationStatus: 'phase_b',
+  implementationStatus: 'implemented',
+  // Hostels aren't department-scoped — they sit under welfare. HODs/
+  // faculty don't own a slice of hostel occupancy data, so both scope
+  // dimensions stay admin-only.
   scopeEligibility: { departmentOnly: 'admin-only', selfOnly: 'admin-only' },
-  run: phaseBStub,
+  run: async (ctx, _params) => {
+    const cidObj = new Types.ObjectId(ctx.collegeId);
+    // HostelBlock carries totalCapacity directly (the warden tooling
+    // keeps it in sync as rooms are added/removed) so we don't need to
+    // roll up HostelRoom.capacity.
+    const rows = await HostelBlock.aggregate([
+      { $match: { collegeId: cidObj, isActive: true } },
+      // Pull the rooms in this block so we can match HostelAllocation.roomId.
+      {
+        $lookup: {
+          from: 'hostelrooms',
+          let: { blockId: '$_id', cid: '$collegeId' },
+          pipeline: [
+            { $match: { $expr: { $and: [{ $eq: ['$blockId', '$$blockId'] }, { $eq: ['$collegeId', '$$cid'] }] } } },
+            { $project: { _id: 1 } },
+          ],
+          as: 'rooms',
+        },
+      },
+      // Count `active` allocations whose roomId is one of this block's rooms.
+      {
+        $lookup: {
+          from: 'hostelallocations',
+          let: { roomIds: '$rooms._id', cid: '$collegeId' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$collegeId', '$$cid'] },
+                    { $eq: ['$status', 'active'] },
+                    { $in: ['$roomId', '$$roomIds'] },
+                  ],
+                },
+              },
+            },
+            { $project: { _id: 1 } },
+          ],
+          as: 'allocations',
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          hostelName: '$name',
+          capacity: { $ifNull: ['$totalCapacity', 0] },
+          allocated: { $size: '$allocations' },
+          occupancyPct: {
+            $cond: [
+              { $gt: [{ $ifNull: ['$totalCapacity', 0] }, 0] },
+              { $round: [{ $multiply: [{ $divide: [{ $size: '$allocations' }, '$totalCapacity'] }, 100] }, 1] },
+              0,
+            ],
+          },
+        },
+      },
+      { $sort: { hostelName: 1 } },
+    ]);
+    return {
+      rows,
+      summary: {
+        hostels: rows.length,
+        totalCapacity: rows.reduce((s, r) => s + (r.capacity as number), 0),
+        totalAllocated: rows.reduce((s, r) => s + (r.allocated as number), 0),
+      },
+    };
+  },
 };
 
 // ─── 9. Transport Utilization ────────────────────────────────────
