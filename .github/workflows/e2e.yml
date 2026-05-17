@@ -56,7 +56,12 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        # The job-level `NODE_ENV: production` causes `npm ci` to skip
+        # devDependencies, which means vitest, @testing-library/*, and
+        # @playwright/test never land in node_modules and the typecheck
+        # step explodes with "Cannot find module 'vitest'" et al.
+        # `--include=dev` forces the full install regardless of NODE_ENV.
+        run: npm ci --include=dev
 
       - name: Typecheck both workspaces
         run: npm run typecheck
