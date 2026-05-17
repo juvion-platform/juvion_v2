@@ -15,6 +15,11 @@
  *   - Partial state: missing rows are created; existing rows are
  *     normalised back to the canonical shape.
  *
+ * Policy seeding: this script also runs `seedPolicies()` from
+ * shared/seed/policies so the RBAC default policies are upserted into
+ * the Policy collection. Without them, `authorize()` 403s every
+ * authenticated request and the e2e suite fails on post-login fetches.
+ *
  * Called from:
  *   - Local dev: `npm run seed:e2e-users -w backend`
  *   - CI:        the .github/workflows/e2e.yml workflow runs this
@@ -28,8 +33,7 @@ import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
 import { User } from '../models/User';
-import { Policy } from '../models/platform/Policy';
-import { DEFAULT_POLICIES } from '../shared/rbac/defaults';
+import { seedPolicies } from '../shared/seed/policies';
 
 dotenv.config();
 
@@ -77,38 +81,6 @@ export interface SeedResult {
   created: number;
   updated: number;
   total: number;
-  policiesSeeded?: number;
-}
-
-/**
- * Upserts DEFAULT_POLICIES into the Policy collection.
- *
- * Without seeded policies, `evaluateAccess` returns `null` for every
- * (role, module, action) tuple → `authorize()` middleware 403s every
- * non-auth request → CI e2e tests for admissions / CRM / governance /
- * platform / bulk-imports all fail because the FE renders nothing.
- *
- * Idempotent: matches on (role, personaType ?? null, module, action,
- * collegeId ?? null) so re-runs neither duplicate nor drift.
- */
-export async function seedDefaultPolicies(): Promise<number> {
-  let written = 0;
-  for (const p of DEFAULT_POLICIES) {
-    const filter = {
-      role: p.role,
-      personaType: p.personaType ?? null,
-      module: p.module,
-      action: p.action,
-      collegeId: p.collegeId ?? null,
-    };
-    await Policy.updateOne(
-      filter,
-      { $set: { ...p, createdBy: 'seed-e2e' }, $setOnInsert: { createdAt: new Date() } },
-      { upsert: true },
-    );
-    written += 1;
-  }
-  return written;
 }
 
 /**
@@ -168,11 +140,14 @@ async function main() {
   console.log(`[seed-e2e-users] connecting to ${mongoUri}`);
   await mongoose.connect(mongoUri);
   try {
-    const result = await seedE2EUsers();
-    const policiesSeeded = await seedDefaultPolicies();
+    const userResult = await seedE2EUsers();
+    // RBAC default policies are required for `authorize()` to grant access.
+    // Without them every authenticated request 403s and the e2e suite fails
+    // on the post-login fetches (admissions, governance, platform, etc.).
+    const policyResult = await seedPolicies({ createdBy: 'seed-e2e' });
     // eslint-disable-next-line no-console
     console.log(
-      `[seed-e2e-users] done · users created=${result.created} updated=${result.updated} total=${result.total} · policies=${policiesSeeded}`,
+      `[seed-e2e-users] done · users created=${userResult.created} updated=${userResult.updated} total=${userResult.total} · policies attempted=${policyResult.attempted} created=${policyResult.created} updated=${policyResult.updated}`,
     );
   } finally {
     await mongoose.disconnect();

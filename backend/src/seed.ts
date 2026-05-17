@@ -107,8 +107,7 @@ import {
 } from './models';
 import { User } from './models/User';
 import { College } from './models/College';
-import { Policy as RBACPolicy } from './models/platform/Policy';
-import { DEFAULT_POLICIES } from './shared/rbac/defaults';
+import { seedPolicies } from './shared/seed/policies';
 import bcrypt from 'bcryptjs';
 
 const CID = new mongoose.Types.ObjectId('000000000000000000000001');
@@ -3155,12 +3154,14 @@ async function seed() {
   console.log('StudyRecommendations created');
 
   // ========================================================================
-  // RBAC DEFAULT POLICIES
+  // RBAC DEFAULT POLICIES — shared/seed/policies (idempotent upsert).
   // ========================================================================
-  // Seed default RBAC policies
-  await RBACPolicy.deleteMany({ collegeId: { $exists: false } });
-  await RBACPolicy.insertMany(DEFAULT_POLICIES.map((p) => ({ ...p, createdBy: 'seed' })));
-  console.log(`Seeded ${DEFAULT_POLICIES.length} default RBAC policies`);
+  // Note: we no longer deleteMany() then insertMany() because the upsert
+  // path handles both new + existing rows correctly. If an operator added
+  // college-specific policy overrides via the admin UI, those rows stay
+  // intact — seedPolicies only touches rows that match its natural key.
+  const seedResult = await seedPolicies({ createdBy: 'seed' });
+  console.log(`Seeded ${seedResult.attempted} default RBAC policies (created=${seedResult.created} updated=${seedResult.updated})`);
 
   // ========================================================================
   // DONE

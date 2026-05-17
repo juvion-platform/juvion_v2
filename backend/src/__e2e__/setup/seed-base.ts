@@ -3,8 +3,7 @@ import {
   AcademicYear, Batch, Branch, Department, Programme,
   Regulation, Section, Semester,
 } from '../../models';
-import { Policy } from '../../models/platform/Policy';
-import { DEFAULT_POLICIES } from '../../shared/rbac/defaults';
+import { seedPolicies } from '../../shared/seed/policies';
 import { createTestUser } from '../factories/user.factory';
 
 export interface BaseFixtures {
@@ -103,10 +102,8 @@ export async function seedBase(): Promise<BaseFixtures> {
     name: 'Principal', email: 'principal@test.com',
   });
 
-  // 9. RBAC default policies
-  await Policy.insertMany(
-    DEFAULT_POLICIES.map((p) => ({ ...p, createdBy: 'seed' }))
-  );
+  // 9. RBAC default policies (shared/seed/policies — idempotent upsert).
+  await seedPolicies({ createdBy: 'seed' });
 
   return {
     college, collegeId, regulation, cse, ece, btech, cseBranch, eceBranch,
