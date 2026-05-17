@@ -94,6 +94,12 @@ jobs:
         run: npm run test:install -w e2e
 
       - name: Build admin-portal
+        # vite-preview does NOT honor the dev-server proxy. Without
+        # VITE_API_URL set at build time, the bundle bakes in the
+        # fallback '/api' which the preview server 404s. Login then
+        # silently fails in Playwright (URL stays at /login).
+        env:
+          VITE_API_URL: http://localhost:3003/api
         run: npm run build -w admin-portal
 
       - name: Start backend (background)
