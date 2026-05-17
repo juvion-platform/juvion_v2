@@ -1,5 +1,6 @@
 /**
  * 003-nl-report-queries §3 + §10.5 + §10.8 + §10.13.
+ * Phase B Wave 1 — backlog-report + hostel-occupancy added to allow-list.
  *
  * System + user LLMMessage pair for the NL → report-allow-list translator.
  *
@@ -9,16 +10,24 @@
  *   admissions-funnel:        { from, to }
  *   lead-source-performance:  { from, to }
  *   student-roster-snapshot:  { status: 'active' | 'all' }
+ *   backlog-report:           { departmentId?: string }
+ *   hostel-occupancy:         { asOf?: ISO-date } (param currently ignored;
+ *                              runner returns current snapshot)
+ *
+ * PROMPT_VERSION bumped to v2 with the additions so persisted NlReportQuery
+ * docs can be distinguished by the prompt that produced them.
  */
 
 import type { LLMMessage } from '../../juvi/finance-agent/llm-client';
 
-export const PROMPT_VERSION = 'nl-report-prompt-v1';
+export const PROMPT_VERSION = 'nl-report-prompt-v2';
 
 export const ALLOWED_REPORTS = [
   'admissions-funnel',
   'lead-source-performance',
   'student-roster-snapshot',
+  'backlog-report',
+  'hostel-occupancy',
 ] as const;
 
 export type AllowedReportCode = (typeof ALLOWED_REPORTS)[number];
@@ -38,6 +47,8 @@ function systemPrompt(): string {
     '  "admissions-funnel"        — params: { from: ISO-date, to: ISO-date }',
     '  "lead-source-performance"  — params: { from: ISO-date, to: ISO-date }',
     '  "student-roster-snapshot"  — params: { status: "active" | "all" } (default "active")',
+    '  "backlog-report"           — params: { departmentId?: string } (optional; omit for college-wide)',
+    '  "hostel-occupancy"         — params: { } (no required params; asOf reserved for v1.5)',
     '',
     'Output ONLY a single JSON object — no prose, no markdown fences, no commentary. The object MUST be',
     'one of these two shapes:',
@@ -50,6 +61,8 @@ function systemPrompt(): string {
     '- Never invent a reportCode outside the allow-list above. If the question does not fit, refuse.',
     '- Never invent params keys outside what the allow-list line shows. The two date-range reports',
     '  use EXACTLY the keys `from` and `to`. The roster report uses EXACTLY the key `status`.',
+    '  The backlog report takes an OPTIONAL `departmentId` (omit when the user asks college-wide).',
+    '  The hostel-occupancy report takes NO params in v1 (do not synthesize an asOf value).',
     '- Dates: prefer ISO yyyy-mm-dd. If the user says "last month", resolve relative to TODAY (passed in user content).',
     '- If a required param is missing or unclear, refuse with a hint about what is missing.',
     '- Rationale / reason must be one complete sentence, under 25 words.',
