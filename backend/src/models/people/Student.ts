@@ -182,5 +182,8 @@ schema.index({ collegeId: 1, rollNumber: 1 }, { unique: true, sparse: true });
 // Sparse index to accelerate nightly audit + pin-coverage queries that
 // join students ↔ FeeStructureInstance on the pinned id (plan §2.1).
 schema.index({ 'feePins.feeStructureInstanceId': 1 }, { sparse: true });
+// 004 §10.2 — supports the scope-aware student-roster-snapshot aggregation
+// for HOD/faculty (matched as { collegeId, branchId: { $in }, status }).
+schema.index({ collegeId: 1, branchId: 1, status: 1 });
 
 export const Student = model<IStudent>('Student', schema);

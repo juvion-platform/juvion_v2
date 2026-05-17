@@ -52,6 +52,17 @@ export const DEFAULT_POLICIES: Omit<PolicyDoc, '_id'>[] = [
   // Base staff fallback: read-only
   { role: 'staff', module: '*', action: 'read', effect: 'allow', priority: 600, isActive: true, description: 'Staff base: read-only fallback' },
 
+  // ─── 004-rbac-nl-queries §10.9 — governance NL unlock ──────────
+  // HOD + faculty: department-scoped governance read (enables NL queries
+  // for student-roster-snapshot in their department). Staff: explicit deny
+  // at priority 700 overrides the 600 fallback so no staff persona gains
+  // unscoped governance:read via the wildcard. Per-staff-persona unlocks
+  // (counsellor selfOnly, cluster-head departmentOnly) land in v1.5 once
+  // backfill migrations complete.
+  { role: 'hod', module: 'governance', action: 'read', effect: 'allow', priority: 800, isActive: true, scope: { departmentOnly: true }, description: 'HOD: read governance reports for own department' },
+  { role: 'faculty', module: 'governance', action: 'read', effect: 'allow', priority: 700, isActive: true, scope: { departmentOnly: true }, description: 'Faculty: read governance reports for own department' },
+  { role: 'staff', module: 'governance', action: 'read', effect: 'deny', priority: 700, isActive: true, description: 'Staff base: deny governance reads (overridden per-persona in v1.5)' },
+
   // ── student: self-scoped read + limited create ──
   { role: 'student', module: 'academics', action: 'read', effect: 'allow', priority: 600, isActive: true, scope: { selfOnly: true }, description: 'Student: read own academics' },
   { role: 'student', module: 'finance', action: 'read', effect: 'allow', priority: 600, isActive: true, scope: { selfOnly: true }, description: 'Student: read own finance' },

@@ -29,15 +29,38 @@ jobs:
           - 27017:27017
         # No healthcheck block — Mongo 7 binds the port quickly and the
         # backend's own /api/health waits on Mongo before responding.
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        # The backend's BullMQ + dedup-cache + rbac-policy-cache all use
+        # Redis; without this service the backend dev server hangs on
+        # ECONNREFUSED 127.0.0.1:6379 and /api/health never goes green.
 
     env:
-      # Match the dev-env defaults the codebase assumes.
-      NODE_ENV: production
+      # NODE_ENV is INTENTIONALLY UNSET at job scope. Setting it to
+      # 'production' globally caused two cascading failures:
+      #   1. `npm ci` skipped devDependencies (vitest, @testing-library/*,
+      #      @playwright/test) — typecheck and tests couldn't find them.
+      #   2. `vitest`-imported `src/app.ts` ran its import-time
+      #      `process.exit(1)` guard for missing PAYMENT_WEBHOOK_SECRET
+      #      in production, killing the test runner mid-suite.
+      # Steps that genuinely need production NODE_ENV (backend dev server,
+      # admin-portal preview) set it inline below.
       PORT: '3003'
+      # backend/src/config/db.ts expects MONGODB_URI specifically (not
+      # the docker-compose-style MONGO_URI). Keep both: MONGODB_URI for
+      # the backend, MONGO_URI for any tool that reaches for the
+      # alternative spelling.
+      MONGODB_URI: mongodb://localhost:27017/juvion_v2_e2e
       MONGO_URI: mongodb://localhost:27017/juvion_v2_e2e
       REDIS_URL: redis://localhost:6379
       JWT_SECRET: e2e-ci-secret
       DEV_COLLEGE_ID: '000000000000000000000001'
+      # Dummy webhook secret so the backend dev server's startup guard
+      # (app.ts:55) doesn't exit when run with NODE_ENV=production below.
+      # The e2e suite never actually invokes the payment-webhook path.
+      PAYMENT_WEBHOOK_SECRET: 'ci-dummy-webhook-secret'
       E2E_BASE_URL: http://localhost:5173
       E2E_BACKEND_URL: http://localhost:3003
       # Skip rate-limiting so serial Playwright login flows do not trip
@@ -56,7 +79,10 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        # --include=dev is belt-and-braces: NODE_ENV is unset at job scope
+        # now (see comment above), but the flag makes the install robust
+        # against any future caller that re-introduces NODE_ENV.
+        run: npm ci --include=dev
 
       - name: Typecheck both workspaces
         run: npm run typecheck
@@ -68,9 +94,20 @@ jobs:
         run: npm run test:install -w e2e
 
       - name: Build admin-portal
+        # vite-preview does NOT honor the dev-server proxy. Without
+        # VITE_API_URL set at build time, the bundle bakes in the
+        # fallback '/api' which the preview server 404s. Login then
+        # silently fails in Playwright (URL stays at /login).
+        env:
+          VITE_API_URL: http://localhost:3003/api
         run: npm run build -w admin-portal
 
       - name: Start backend (background)
+        # NODE_ENV inline so the dev server behaves like prod for e2e
+        # (no /api dev-auth bypass, no DEV_COLLEGE_ID injection). Test
+        # steps above run with NODE_ENV unset (vitest defaults to 'test').
+        env:
+          NODE_ENV: production
         run: |
           # ts-node-dev to match dev parity; logs to a file so we can
           # tail them on failure.

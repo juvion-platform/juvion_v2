@@ -169,10 +169,12 @@ describe('llmUsageWeeklyCronWorker', () => {
       expect(LLM_USAGE_WEEKLY_JOB_OPTS.backoff.type).toBe('exponential');
     });
 
-    it('registers the LLM_USAGE_WEEKLY queue name under the platform: namespace', () => {
+    it('registers the LLM_USAGE_WEEKLY queue name under the platform_ namespace', () => {
       expect(QUEUE_NAMES).toHaveProperty('LLM_USAGE_WEEKLY');
+      // BullMQ rejects `:` in queue/job names; underscores are the codebase convention
+      // (introduced in 15d4182, after the queue manager hit "Queue name cannot contain :").
       expect((QUEUE_NAMES as Record<string, string>).LLM_USAGE_WEEKLY).toBe(
-        'platform:llm-usage-weekly',
+        'platform_llm_usage_weekly',
       );
     });
 

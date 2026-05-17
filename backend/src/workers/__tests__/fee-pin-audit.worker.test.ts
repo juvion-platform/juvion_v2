@@ -414,8 +414,9 @@ describe('feePinAuditWorker', () => {
     await feePinAuditWorker(buildJob({ collegeId: String(a._id) }));
 
     // One email job should have been enqueued (via the mocked addJob).
+    // BullMQ rejects `:` in queue names; underscores per 15d4182.
     const emailCalls = vi.mocked(addJob).mock.calls.filter(
-      (args) => args[0] === 'platform:email',
+      (args) => args[0] === 'platform_email',
     );
     expect(emailCalls.length).toBe(1);
     expect(emailCalls[0]?.[1]).toBe('fee-pin-audit-alert');

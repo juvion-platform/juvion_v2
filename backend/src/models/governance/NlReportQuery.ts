@@ -24,6 +24,8 @@ export interface INlReportQuery extends Document {
   params?: Record<string, unknown>;
   /** Populated only when status === 'refused'. Mirrors the HTTP body key. */
   reason?: string;
+  /** 004 §10.7 — sub-categorizes 'report-not-scopable-for-role' and 'scope-unresolved'. */
+  reasonDimension?: 'department' | 'self';
   /** Set when matched: the ReportRun the NL flow produced. */
   runId?: Types.ObjectId;
   performedBy: string;
@@ -33,6 +35,16 @@ export interface INlReportQuery extends Document {
   costInr: number;
   /** True when the cap-guard denied the LLM claim. */
   capReached?: boolean;
+  // 004 §10.5 — RBAC observability. All optional so pre-004 docs survive.
+  role?: string;
+  personaType?: string;
+  authScopeApplied?: {
+    departmentOnly: boolean;
+    selfOnly: boolean;
+    departmentId?: string;
+    personId?: string;
+    userId?: string;
+  };
 }
 
 const schema = new Schema<INlReportQuery>(
@@ -43,6 +55,7 @@ const schema = new Schema<INlReportQuery>(
     selectedReport: String,
     params: { type: Schema.Types.Mixed },
     reason: String,
+    reasonDimension: { type: String, enum: ['department', 'self'] },
     runId: { type: Schema.Types.ObjectId, ref: 'ReportRun' },
     performedBy: { type: String, required: true },
     generatedAt: { type: Date, required: true, default: Date.now },
@@ -50,6 +63,19 @@ const schema = new Schema<INlReportQuery>(
     promptVersion: { type: String, required: true },
     costInr: { type: Number, required: true, min: 0 },
     capReached: { type: Boolean },
+    // 004 §10.5 — RBAC observability.
+    role: String,
+    personaType: String,
+    authScopeApplied: {
+      type: {
+        departmentOnly: { type: Boolean, required: true },
+        selfOnly: { type: Boolean, required: true },
+        departmentId: String,
+        personId: String,
+        userId: String,
+      },
+      _id: false,
+    },
   },
   { timestamps: true },
 );

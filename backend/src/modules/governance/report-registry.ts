@@ -27,6 +27,8 @@ import { Inquiry } from '../../models/admissions/Inquiry';
 import { Applicant } from '../../models/admissions/Applicant';
 import { Admission } from '../../models/admissions/Admission';
 import { Student } from '../../models/people/Student';
+import { Branch } from '../../models/academic-structure/Branch';
+import type { AuthScope } from '../../shared/rbac/types';
 
 // ─── Types ───────────────────────────────────────────────────────
 
@@ -55,6 +57,13 @@ export interface ReportColumn {
 
 export interface ReportRunContext {
   collegeId: string;
+  /**
+   * 004-rbac-nl-queries §3 — row-level RBAC threading. REQUIRED.
+   * Admin paths pass `ADMIN_FULL_SCOPE` from report-service (both
+   * `departmentOnly` and `selfOnly` false) which makes any
+   * `applyAuthScope` call inside the runner a no-op.
+   */
+  authScope: AuthScope;
 }
 
 export interface ReportRunOutput {
@@ -67,6 +76,22 @@ export class PhaseBStubError extends Error {
     super(message);
     this.name = 'PhaseBStubError';
   }
+}
+
+/**
+ * 004-rbac-nl-queries §3 — per-report eligibility declaration.
+ *
+ * Each report declares, per scope dimension, whether it accepts a non-admin
+ * caller (`'supported'`) or requires admin (`'admin-only'`). The
+ * `runReport` eligibility gate (§10.10) refuses a call BEFORE invoking the
+ * runner when an `authScope` flag is set but the corresponding dimension
+ * is declared `'admin-only'`. Phase B stubs declare both dimensions as
+ * `'admin-only'` placeholders — when an author un-stubs, they must
+ * re-evaluate the declarations.
+ */
+export interface ScopeEligibility {
+  departmentOnly: 'supported' | 'admin-only';
+  selfOnly: 'supported' | 'admin-only';
 }
 
 export interface ReportDefinition {
@@ -87,6 +112,8 @@ export interface ReportDefinition {
   columns: ReportColumn[];
   /** When status is 'phase_b', the runner is a stub. */
   implementationStatus: 'implemented' | 'phase_b';
+  /** 004-rbac-nl-queries §3 — scope-eligibility per dimension. */
+  scopeEligibility: ScopeEligibility;
   run: (ctx: ReportRunContext, params: Record<string, unknown>) => Promise<ReportRunOutput>;
 }
 
@@ -121,6 +148,7 @@ const admissionsFunnel: ReportDefinition = {
     { key: 'conversionRate', label: 'Conversion vs Previous', type: 'percent' },
   ],
   implementationStatus: 'implemented',
+  scopeEligibility: { departmentOnly: 'admin-only', selfOnly: 'admin-only' },
   run: async (ctx, params) => {
     const collegeId = new Types.ObjectId(ctx.collegeId);
     const from = parseDate(params.from);
@@ -173,6 +201,7 @@ const leadSourcePerformance: ReportDefinition = {
     { key: 'conversionRate', label: 'Conversion Rate', type: 'percent' },
   ],
   implementationStatus: 'implemented',
+  scopeEligibility: { departmentOnly: 'admin-only', selfOnly: 'admin-only' },
   run: async (ctx, params) => {
     // 003-nl-report-queries Story 4: variable renamed from `collegeId` to
     // `cidObj` so the explicit `{ collegeId: cidObj, ... }` form replaces
@@ -234,6 +263,7 @@ const defaulterList: ReportDefinition = {
     { key: 'lastReminderAt', label: 'Last Reminder', type: 'date' },
   ],
   implementationStatus: 'phase_b',
+  scopeEligibility: { departmentOnly: 'admin-only', selfOnly: 'admin-only' },
   run: phaseBStub,
 };
 
@@ -262,6 +292,7 @@ const collectionSummary: ReportDefinition = {
     { key: 'transactionCount', label: 'Transactions', type: 'number' },
   ],
   implementationStatus: 'phase_b',
+  scopeEligibility: { departmentOnly: 'admin-only', selfOnly: 'admin-only' },
   run: phaseBStub,
 };
 
@@ -284,6 +315,7 @@ const attendanceBelowThreshold: ReportDefinition = {
     { key: 'sessionsTotal', label: 'Total Sessions', type: 'number' },
   ],
   implementationStatus: 'phase_b',
+  scopeEligibility: { departmentOnly: 'admin-only', selfOnly: 'admin-only' },
   run: phaseBStub,
 };
 
@@ -303,6 +335,7 @@ const backlogReport: ReportDefinition = {
     { key: 'studentCount', label: 'Students w/ Backlog', type: 'number' },
   ],
   implementationStatus: 'phase_b',
+  scopeEligibility: { departmentOnly: 'admin-only', selfOnly: 'admin-only' },
   run: phaseBStub,
 };
 
@@ -324,6 +357,7 @@ const facultyWorkload: ReportDefinition = {
     { key: 'hoursPerWeek', label: 'Hrs/Week', type: 'number' },
   ],
   implementationStatus: 'phase_b',
+  scopeEligibility: { departmentOnly: 'admin-only', selfOnly: 'admin-only' },
   run: phaseBStub,
 };
 
@@ -344,6 +378,7 @@ const hostelOccupancy: ReportDefinition = {
     { key: 'occupancyPct', label: 'Occupancy %', type: 'percent' },
   ],
   implementationStatus: 'phase_b',
+  scopeEligibility: { departmentOnly: 'admin-only', selfOnly: 'admin-only' },
   run: phaseBStub,
 };
 
@@ -364,6 +399,7 @@ const transportUtilization: ReportDefinition = {
     { key: 'utilizationPct', label: 'Utilization %', type: 'percent' },
   ],
   implementationStatus: 'phase_b',
+  scopeEligibility: { departmentOnly: 'admin-only', selfOnly: 'admin-only' },
   run: phaseBStub,
 };
 
@@ -385,6 +421,7 @@ const placementPipeline: ReportDefinition = {
     { key: 'offered', label: 'Offered', type: 'number' },
   ],
   implementationStatus: 'phase_b',
+  scopeEligibility: { departmentOnly: 'admin-only', selfOnly: 'admin-only' },
   run: phaseBStub,
 };
 
@@ -406,6 +443,7 @@ const libraryOutstanding: ReportDefinition = {
     { key: 'fineAccrued', label: 'Fine (₹)', type: 'currency' },
   ],
   implementationStatus: 'phase_b',
+  scopeEligibility: { departmentOnly: 'admin-only', selfOnly: 'admin-only' },
   run: phaseBStub,
 };
 
@@ -428,10 +466,27 @@ const studentRosterSnapshot: ReportDefinition = {
     { key: 'count', label: 'Students', type: 'number' },
   ],
   implementationStatus: 'implemented',
+  // 004 §3 — only runner that supports HOD/faculty departmentOnly scope in v1
+  // (Department -> Branch -> Student two-step lookup in run()). selfOnly stays
+  // admin-only because there is no "my own row" semantic for HOD/faculty here;
+  // student NL access is deferred to a separate Phase C feature.
+  scopeEligibility: { departmentOnly: 'supported', selfOnly: 'admin-only' },
   run: async (ctx, params) => {
-    const collegeId = new Types.ObjectId(ctx.collegeId);
-    const match: Record<string, unknown> = { collegeId };
+    const cidObj = new Types.ObjectId(ctx.collegeId);
+    const match: Record<string, unknown> = { collegeId: cidObj };
     if ((params.status as string) !== 'all') match.status = 'active';
+
+    // 004 §10.3 — HOD/faculty department scope via two-step Branch lookup.
+    // AuthScope.departmentId is a Department._id; Student.branchId is a
+    // Branch._id. Resolve all branches belonging to the HOD's department
+    // and constrain the aggregation to that branch set.
+    if (ctx.authScope.departmentOnly && ctx.authScope.departmentId) {
+      const branches = await Branch.find(
+        { collegeId: cidObj, departmentId: new Types.ObjectId(ctx.authScope.departmentId) },
+        { _id: 1 },
+      ).lean();
+      match.branchId = { $in: branches.map((b) => b._id) };
+    }
 
     const rows = await Student.aggregate([
       { $match: match },
