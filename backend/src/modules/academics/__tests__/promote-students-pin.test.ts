@@ -57,6 +57,14 @@ async function seedBatch(params: SeedParams) {
     const student = await Student.create({
       collegeId: params.collegeId,
       personId: oid(),
+      // Distinct rollNumber per student — the Student model declares a
+      // unique compound index on { collegeId, rollNumber } (sparse, but a
+      // sparse compound where `collegeId` is required still indexes every
+      // doc — missing rollNumber is treated as `null`). Without unique
+      // values here, the second insert in a given test races the index
+      // build and intermittently fails E11000. Real-world inserts always
+      // assign a rollNumber, so the fixture matches production behaviour.
+      rollNumber: `R-${i}-${oid().toString().slice(-6)}`,
       admissionYear: 2025,
       programmeId: params.programmeId,
       branchId: oid(),
