@@ -262,6 +262,9 @@ export interface ForecastBand {
  * `narrative` is `null` when the LLM provider is degraded/disabled — the
  * deterministic projection band is still returned so the UI can render
  * the range without the driver text.
+ *
+ * `cachedAt` is an ISO timestamp when the response was served from the
+ * daily Redis cache; absent on fresh (non-cached) responses.
  */
 export interface ForecastWithNarrative {
   projection: ForecastBand;
@@ -274,6 +277,8 @@ export interface ForecastWithNarrative {
    * The dashboard's <BudgetBanner /> hydrates from this field.
    */
   budgetWarning?: BudgetWarning;
+  /** ISO timestamp when this result was first cached; absent on fresh responses. */
+  cachedAt?: string;
 }
 
 /**
@@ -281,13 +286,17 @@ export interface ForecastWithNarrative {
  *
  * `monthAnchor` can be any date inside the target month — the backend
  * snaps to the month-end when projecting (see service.ts).
+ *
+ * Pass `force=true` to bypass the daily Redis cache and recompute.
  */
 export async function getForecastNarrative(
   monthAnchor: Date,
+  force = false,
 ): Promise<ForecastWithNarrative> {
   return api
     .post<ForecastWithNarrative>('/juvi/finance-agent/forecast-narrative', {
       monthAnchor: monthAnchor.toISOString(),
+      ...(force ? { force: true } : {}),
     })
     .then((r) => r.data);
 }
@@ -325,21 +334,36 @@ export interface RiskScoreResult {
 }
 
 /**
+ * Response wrapper from POST /juvi/finance-agent/risk-scores.
+ *
+ * `cachedAt` is the oldest cached-at timestamp in the batch (i.e., the
+ * time the earliest entry was first computed and stored). Absent when all
+ * scores were computed fresh in this request.
+ */
+export interface RiskScoresResponse {
+  scores: RiskScoreResult[];
+  cachedAt?: string;
+}
+
+/**
  * Batch-fetch deterministic risk scores for a list of students. Pass
  * `includeNarrative=true` only for single-student lazy hover loads —
  * batch calls keep this `false` so the LLM is never invoked for the full
  * defaulter list.
  *
  * Backend caps the batch at 100 student ids (Zod-validated).
+ * Pass `force=true` to bypass the daily Redis cache.
  */
 export async function getRiskScores(
   studentIds: string[],
   includeNarrative = false,
-): Promise<RiskScoreResult[]> {
+  force = false,
+): Promise<RiskScoresResponse> {
   return api
-    .post<RiskScoreResult[]>('/juvi/finance-agent/risk-scores', {
+    .post<RiskScoresResponse>('/juvi/finance-agent/risk-scores', {
       studentIds,
       includeNarrative,
+      ...(force ? { force: true } : {}),
     })
     .then((r) => r.data);
 }
@@ -389,14 +413,29 @@ export interface Situation {
 }
 
 /**
+ * Response wrapper from POST /juvi/finance-agent/situations.
+ *
+ * `cachedAt` is the ISO timestamp when this result was first computed and
+ * cached. Absent on fresh (non-cached) responses.
+ */
+export interface SituationsResponse {
+  situations: Situation[];
+  cachedAt?: string;
+}
+
+/**
  * Fetch the current set of agent-surfaced situations for the caller's
  * college. The backend assembles up to ~10 deterministic candidates,
  * applies the user's outstanding dismissals, then asks the LLM to pick
  * 3-5. Empty array means "collection is clean".
+ *
+ * Pass `force=true` to bypass the daily Redis cache and recompute.
  */
-export async function getSituations(): Promise<Situation[]> {
+export async function getSituations(force = false): Promise<SituationsResponse> {
   return api
-    .post<Situation[]>('/juvi/finance-agent/situations', {})
+    .post<SituationsResponse>('/juvi/finance-agent/situations', {
+      ...(force ? { force: true } : {}),
+    })
     .then((r) => r.data);
 }
 

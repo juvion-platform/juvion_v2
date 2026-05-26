@@ -24,6 +24,16 @@ import { AppError } from '../../../middleware/errorHandler';
 import { Student } from '../../../models/people/Student';
 
 import * as service from './service';
+import {
+  batchGetAICache,
+  batchSetAICache,
+  deleteAICache,
+  forecastCacheKey,
+  getAICache,
+  riskScoreCacheKey,
+  setAICache,
+  situationsCacheKey,
+} from '../../../shared/cache/ai-feature-cache';
 
 /** Resolve the authenticated user id (a JWT-signed Mongo ObjectId string). */
 function getUserId(req: AuthRequest): string {
@@ -143,12 +153,25 @@ export async function forecastNarrativeHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const { monthAnchor } = req.body as { monthAnchor: Date };
-    const result = await service.handleForecastNarrative(
-      req.collegeId!,
-      monthAnchor,
-    );
-    res.json(result);
+    const { monthAnchor, force } = req.body as {
+      monthAnchor: Date;
+      force?: boolean;
+    };
+    const collegeId = req.collegeId!;
+    const monthYYYYMM = monthAnchor.toISOString().slice(0, 7);
+    const cacheKey = forecastCacheKey(collegeId, monthYYYYMM);
+
+    if (!force) {
+      const cached = await getAICache<Record<string, unknown>>(cacheKey);
+      if (cached) {
+        res.json({ ...cached.data, cachedAt: cached.cachedAt });
+        return;
+      }
+    }
+
+    const result = await service.handleForecastNarrative(collegeId, monthAnchor);
+    const cachedAt = await setAICache(cacheKey, result);
+    res.json({ ...(result as unknown as Record<string, unknown>), cachedAt });
   } catch (e) {
     next(e);
   }
@@ -156,26 +179,82 @@ export async function forecastNarrativeHandler(
 
 // ── POST /risk-scores ─────────────────────────────────────────────────
 
+type RiskScoreEntry = Awaited<ReturnType<typeof service.handleRiskScores>>[number];
+
 export async function riskScoresHandler(
   req: AuthRequest,
   res: Response,
   next: NextFunction,
 ): Promise<void> {
   try {
-    const { studentIds, includeNarrative } = req.body as {
+    const { studentIds, includeNarrative, force } = req.body as {
       studentIds: string[];
       includeNarrative?: boolean;
+      force?: boolean;
     };
     const collegeId = req.collegeId!;
 
     await assertStudentsInCollege(collegeId, studentIds);
 
-    const result = await service.handleRiskScores(
-      collegeId,
-      studentIds,
-      includeNarrative,
-    );
-    res.json(result);
+    // Narrative calls are single-student hover loads — skip per-student
+    // caching to keep the popover always fresh and avoid a separate key
+    // namespace for narrative text.
+    if (includeNarrative) {
+      const scores = await service.handleRiskScores(collegeId, studentIds, true);
+      res.json({ scores, cachedAt: undefined });
+      return;
+    }
+
+    // Per-student cache lookup via parallel Redis GETs.
+    const pairs = studentIds.map((sid) => ({
+      studentId: sid,
+      key: riskScoreCacheKey(collegeId, sid),
+    }));
+    const cachedMap = force
+      ? new Map<string, { data: RiskScoreEntry; cachedAt: string }>()
+      : await batchGetAICache<RiskScoreEntry>(pairs);
+
+    const uncachedIds = studentIds.filter((sid) => !cachedMap.has(sid));
+
+    const freshMap = new Map<string, RiskScoreEntry>();
+    let freshCachedAt: string | undefined;
+
+    if (uncachedIds.length > 0) {
+      const freshScores = await service.handleRiskScores(
+        collegeId,
+        uncachedIds,
+        false,
+      );
+      for (const score of freshScores) {
+        freshMap.set(score.studentId, score);
+      }
+      freshCachedAt = await batchSetAICache(
+        uncachedIds
+          .map((sid) => ({
+            key: riskScoreCacheKey(collegeId, sid),
+            data: freshMap.get(sid),
+          }))
+          .filter(
+            (e): e is { key: string; data: RiskScoreEntry } =>
+              e.data !== undefined,
+          ),
+      );
+    }
+
+    // Reconstruct in original request order.
+    const scores = studentIds
+      .map((sid) => cachedMap.get(sid)?.data ?? freshMap.get(sid))
+      .filter((s): s is RiskScoreEntry => s !== undefined);
+
+    // Report the oldest cached-at timestamp so the UI knows the staleness.
+    const allTimes = [
+      ...Array.from(cachedMap.values()).map((e) => e.cachedAt),
+      ...(freshCachedAt !== undefined ? [freshCachedAt] : []),
+    ];
+    const cachedAt =
+      allTimes.length > 0 ? allTimes.reduce((a, b) => (a < b ? a : b)) : undefined;
+
+    res.json({ scores, cachedAt });
   } catch (e) {
     next(e);
   }
@@ -189,9 +268,24 @@ export async function situationsHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
+    const { force } = (req.body ?? {}) as { force?: boolean };
     const userId = getUserId(req);
-    const result = await service.handleSituations(req.collegeId!, userId);
-    res.json(result);
+    const collegeId = req.collegeId!;
+    const cacheKey = situationsCacheKey(collegeId);
+
+    type SituationArr = Awaited<ReturnType<typeof service.handleSituations>>;
+
+    if (!force) {
+      const cached = await getAICache<SituationArr>(cacheKey);
+      if (cached) {
+        res.json({ situations: cached.data, cachedAt: cached.cachedAt });
+        return;
+      }
+    }
+
+    const result = await service.handleSituations(collegeId, userId);
+    const cachedAt = await setAICache(cacheKey, result);
+    res.json({ situations: result, cachedAt });
   } catch (e) {
     next(e);
   }
@@ -273,6 +367,10 @@ export async function dismissSituationHandler(
       snoozeDays,
       reason,
     );
+
+    // Invalidate the daily situations cache so the next fetch re-runs the
+    // LLM pick and excludes the newly dismissed card.
+    await deleteAICache(situationsCacheKey(req.collegeId!));
 
     res.json({ ok: true });
   } catch (e) {

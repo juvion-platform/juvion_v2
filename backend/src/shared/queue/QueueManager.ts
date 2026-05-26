@@ -124,7 +124,7 @@ export const QUEUE_NAMES = {
   LLM_USAGE_WEEKLY: 'platform:llm-usage-weekly',
 
   // Campus ops
-  CAMPUS_PROPOSAL_EXPIRY: 'campus:proposal-expiry',
+  CAMPUS_PROPOSAL_EXPIRY: 'campus_proposal_expiry',
 
   // Finance
   FEE_COMMITMENT: 'finance:fee-commitment',

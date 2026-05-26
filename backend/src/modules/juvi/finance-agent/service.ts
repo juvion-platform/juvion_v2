@@ -691,7 +691,9 @@ export async function handleSituations(
     userId,
     type: 'situations',
     maskedPrompt: `${candidates.length} candidates`,
-    maskedResponse: lastMaskedResponse,
+    // Guard against empty string when both LLM retries throw or return ''
+    // — Mongoose 6+ rejects empty strings on required String fields.
+    maskedResponse: lastMaskedResponse || '(llm-failed)',
     llm,
   });
 

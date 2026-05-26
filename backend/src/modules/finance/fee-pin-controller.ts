@@ -37,6 +37,9 @@ export async function listStudentPins(
     const student = await Student.findOne({
       _id: id,
       collegeId: req.collegeId,
+    }).populate({
+      path: 'feePins.feeStructureInstanceId',
+      select: 'status totalAmount approvedAt quota category programmeId branchId academicYearId',
     });
     if (!student) throw new AppError(404, 'Student not found');
     res.json({ pins: student.feePins ?? [] });
