@@ -185,6 +185,21 @@ function toPinPojo(subdoc: IFeePin & { toObject?: () => IFeePin }): IFeePin {
  *      category-exact > branch-wild + category-wild). Within a bucket,
  *      tie-break on `approvedAt` descending.
  */
+/**
+ * Score one wildcardable axis. Returns:
+ *   - 2  on exact match (instance has a specific value that equals student's)
+ *   - 1  on wildcard (instance is null/absent — accepts any student value)
+ *   - 0  on mismatch (instance has a value that disagrees with student's)
+ *
+ * The caller treats 0 as "drop this candidate". Tying breakers prefer
+ * exact (2) over wildcard (1) so the most-specific fee structure wins.
+ */
+function scoreAxis<T>(docValue: T | null | undefined, studentValue: T | null | undefined): number {
+  if (docValue === null || docValue === undefined) return 1; // wildcard
+  if (studentValue !== null && studentValue !== undefined && docValue === studentValue) return 2;
+  return 0; // mismatch
+}
+
 export async function resolveMatchingFeeStructureInstance(
   student: IStudent,
   yearOfStudy: number,
@@ -196,61 +211,56 @@ export async function resolveMatchingFeeStructureInstance(
     : undefined;
   if (!academicYearId) return null;
 
+  // Base filter: the 4 axes that MUST match exactly. The wildcardable
+  // axes (branch, category, quota, yearOfStudy) are evaluated in the
+  // scoring loop below so a single null-vs-value contract applies
+  // uniformly. Keeping them out of the base filter also lets a single
+  // round-trip return both exact-match and wildcard candidates for the
+  // same student, which the scorer then orders by specificity.
   const baseFilter: Record<string, unknown> = {
     collegeId: student.collegeId,
     programmeId: student.programmeId,
     academicYearId,
     status: 'active',
   };
-  if (student.quota) {
-    // Quota must match exactly — no fallback.
-    baseFilter.quota = student.quota;
-  }
-  // NOTE: yearOfStudy is not a field on FeeStructureInstance (see model).
-  // The plan / AC says year-of-study is a dimension of the combo; the
-  // existing codebase tracks that via the AcademicYear + programme
-  // together (each year gets its own academicYearId row per programme).
-  // We pass yearOfStudy through so the caller can include it if/when the
-  // model grows a `yearOfStudy` field. For now it's a no-op filter.
-  void yearOfStudy;
 
   const candidates = await FeeStructureInstance.find(baseFilter);
   if (candidates.length === 0) return null;
 
   const studentBranch = student.branchId ? String(student.branchId) : null;
   const studentCategory = student.category ?? null;
+  const studentQuota = student.quota ?? null;
 
   type Scored = { doc: IFeeStructureInstance; score: number; approvedAt: number };
   const scored: Scored[] = [];
 
   for (const doc of candidates) {
-    const docBranch = doc.branchId ? String(doc.branchId) : null;
-    const docCategory = doc.category ?? null;
+    const branchScore = scoreAxis(doc.branchId ? String(doc.branchId) : null, studentBranch);
+    if (branchScore === 0) continue;
 
-    // Branch: exact match gets 2, null-branch (wildcard) gets 1, mismatch is rejected.
-    let branchScore: number;
-    if (docBranch === null) {
-      branchScore = 1; // wildcard — always acceptable
-    } else if (studentBranch && docBranch === studentBranch) {
-      branchScore = 2;
-    } else {
-      continue; // branch on instance that doesn't match student → drop
-    }
+    const categoryScore = scoreAxis(doc.category ?? null, studentCategory);
+    if (categoryScore === 0) continue;
 
-    // Category: exact 2, wildcard 1, mismatch rejected.
-    let categoryScore: number;
-    if (docCategory === null) {
-      categoryScore = 1;
-    } else if (studentCategory && docCategory === studentCategory) {
-      categoryScore = 2;
-    } else {
-      continue;
-    }
+    // §005 fix — quota is now scored alongside branch + category. The
+    // pre-§005 base filter included `quota` conditionally, which
+    // (a) excluded null-quota wildcard instances when the student had
+    // a quota set, and (b) let any FSI through when the student had no
+    // quota. Routing quota through the scorer fixes both.
+    const quotaScore = scoreAxis(doc.quota ?? null, studentQuota);
+    if (quotaScore === 0) continue;
+
+    // §005 fix — yearOfStudy is now a real column on FSI. Wildcard
+    // semantics keep legacy FSIs (no yearOfStudy field) working
+    // unchanged.
+    const yearScore = scoreAxis(typeof doc.yearOfStudy === 'number' ? doc.yearOfStudy : null, yearOfStudy);
+    if (yearScore === 0) continue;
 
     const approvedAt = doc.approvedAt ? doc.approvedAt.getTime() : 0;
-    // Weight branch higher than category so branch-exact always beats
-    // branch-wildcard regardless of category.
-    const score = branchScore * 10 + categoryScore;
+    // Specificity ordering: branch (10000) > category (1000) > quota
+    // (100) > yearOfStudy (10). Within a tier, exact (2) beats wildcard (1).
+    // Powers-of-ten weights guarantee a higher-tier exact always beats
+    // any combination of lower-tier exacts.
+    const score = branchScore * 10000 + categoryScore * 1000 + quotaScore * 100 + yearScore * 10;
     scored.push({ doc, score, approvedAt });
   }
 
@@ -538,12 +548,13 @@ export async function checkPinValidity(
   if (docBranch && docBranch !== studentBranch) {
     return { valid: false, reason: 'branch_mismatch', currentPin, matchingInstance };
   }
-  // quota: strict exact
-  if ((pinnedInstance.quota ?? null) !== (student.quota ?? null)) {
-    // null/absent on either side counts as mismatch (quota is a required axis)
-    if (pinnedInstance.quota || student.quota) {
-      return { valid: false, reason: 'quota_mismatch', currentPin, matchingInstance };
-    }
+  // quota: §005 wildcard contract (matches resolveMatchingFeeStructureInstance).
+  // FSI.quota=null is a wildcard — valid regardless of student.quota.
+  // FSI.quota=X with student.quota !== X → quota_mismatch.
+  const docQuota = pinnedInstance.quota ?? null;
+  const studentQuota = student.quota ?? null;
+  if (docQuota && docQuota !== studentQuota) {
+    return { valid: false, reason: 'quota_mismatch', currentPin, matchingInstance };
   }
   // category: mismatch only when instance has a category set and student
   // differs. Null-category instance is a wildcard.
