@@ -20,6 +20,14 @@ export type FeePinReason =
 
 export type FeePinCommitmentSheetStatus = 'queued' | 'generated' | 'failed';
 
+export interface IFeePinComponent {
+  feeComponentId: Types.ObjectId;
+  name: string;
+  amount: number;
+  componentType: string;
+  isRefundable: boolean;
+}
+
 export interface IFeePin {
   _id: Types.ObjectId;
   yearOfStudy: number;
@@ -33,7 +41,22 @@ export interface IFeePin {
   archiveReason?: string;
   commitmentSheetDocumentId?: Types.ObjectId;
   commitmentSheetStatus?: FeePinCommitmentSheetStatus;
+  /** Frozen fee total at the moment of pinning. Undefined on legacy pins. */
+  snapshotTotalAmount?: number;
+  /** Evaluated (conditional-filtered) components frozen at pin time. Undefined on legacy pins. */
+  snapshotComponents?: Types.DocumentArray<IFeePinComponent & Types.Subdocument>;
 }
+
+const feePinComponentSchema = new Schema<IFeePinComponent>(
+  {
+    feeComponentId: { type: Schema.Types.ObjectId, ref: 'FeeComponent', required: true },
+    name: { type: String, required: true },
+    amount: { type: Number, required: true },
+    componentType: { type: String, required: true },
+    isRefundable: { type: Boolean, required: true },
+  },
+  { _id: true },
+);
 
 const feePinSchema = new Schema<IFeePin>(
   {
@@ -67,6 +90,8 @@ const feePinSchema = new Schema<IFeePin>(
       type: String,
       enum: ['queued', 'generated', 'failed'],
     },
+    snapshotTotalAmount: { type: Number },
+    snapshotComponents: { type: [feePinComponentSchema], default: undefined },
   },
   { _id: true },
 );

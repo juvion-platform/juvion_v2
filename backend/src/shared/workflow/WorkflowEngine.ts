@@ -104,15 +104,26 @@ export async function completeTask(input: CompleteTaskInput): Promise<{ task: IW
   task.notes = input.notes;
   await task.save();
 
-  const handlerOutcome = await executeWorkflowStepHandler(def.id, task.stepId, {
-    instance,
-    task,
-    result: task.result || {},
-    completedBy: input.completedBy,
-  });
-  if (handlerOutcome?.result) {
-    task.result = handlerOutcome.result;
+  let handlerOutcome: Awaited<ReturnType<typeof executeWorkflowStepHandler>>;
+  try {
+    handlerOutcome = await executeWorkflowStepHandler(def.id, task.stepId, {
+      instance,
+      task,
+      result: task.result || {},
+      completedBy: input.completedBy,
+    });
+    if (handlerOutcome?.result) {
+      task.result = handlerOutcome.result;
+      await task.save();
+    }
+  } catch (handlerErr) {
+    task.status = 'failed';
+    task.result = {
+      ...(task.result || {}),
+      handlerError: handlerErr instanceof Error ? handlerErr.message : String(handlerErr),
+    };
     await task.save();
+    throw handlerErr;
   }
 
   // Record in instance history
@@ -157,11 +168,15 @@ export async function completeTask(input: CompleteTaskInput): Promise<{ task: IW
       await parentGroupTask.save();
 
       instance.history.push({ step: parentGroupTask.stepId, status: 'completed', at: new Date(), by: input.completedBy });
-    }
 
-    await advanceWorkflow(instance, def, parentGroupTask.stepId, parentGroupTask.result);
+      // Advance ONLY once — inside the guard so concurrent sibling completions
+      // don't each trigger advanceWorkflow and create duplicate next-step tasks.
+      await advanceWorkflow(instance, def, parentGroupTask.stepId, parentGroupTask.result);
+    }
   } else {
-    await advanceWorkflow(instance, def, task.stepId, input.result);
+    // Use task.result (handler-enriched) not input.result (raw user input) —
+    // guards like all_documents_verified depend on fields the handler computes.
+    await advanceWorkflow(instance, def, task.stepId, task.result);
   }
 
   return { task, instance };

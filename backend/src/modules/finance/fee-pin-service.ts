@@ -41,6 +41,8 @@ import {
   FeeStructureInstance,
   IFeeStructureInstance,
 } from '../../models/finance/FeeStructureInstance';
+import { FeeComponent } from '../../models/finance/FeeComponent';
+import { FeeComponentRule } from '../../models/finance/FeeComponentRule';
 import { Batch } from '../../models/academic-structure/Batch';
 import { AcademicYear } from '../../models/academic-structure/AcademicYear';
 import { enqueueFeeCommitmentJob } from '../../workers/fee-commitment.worker';
@@ -566,6 +568,102 @@ interface CommitPinInput {
   enqueueCommitmentSheet?: boolean;
 }
 
+interface SnapshotComponent {
+  feeComponentId: Types.ObjectId;
+  name: string;
+  amount: number;
+  componentType: string;
+  isRefundable: boolean;
+}
+
+/**
+ * Evaluate which FeeComponents apply to a student for a given FSI and
+ * return the filtered list. Duplicates the logic from
+ * `evaluateRulesForInstance` in fee-lifecycle-service — cannot import
+ * that function due to a circular dependency (lifecycle imports pin-service).
+ */
+async function snapshotFeeComponents(
+  collegeId: string,
+  feeStructureInstanceId: Types.ObjectId,
+  studentProfile: { quota?: string; category?: string },
+): Promise<{ components: SnapshotComponent[]; totalAmount: number }> {
+  const [components, fsi] = await Promise.all([
+    FeeComponent.find({ collegeId, feeStructureInstanceId }).lean(),
+    FeeStructureInstance.findOne({ _id: feeStructureInstanceId, collegeId }).lean(),
+  ]);
+
+  const result: SnapshotComponent[] = [];
+
+  for (const comp of components) {
+    if (!comp.isConditional) {
+      result.push({
+        feeComponentId: comp._id as Types.ObjectId,
+        name: comp.name,
+        amount: comp.amount,
+        componentType: comp.componentType,
+        isRefundable: comp.isRefundable,
+      });
+      continue;
+    }
+
+    const rules = await FeeComponentRule.find({
+      collegeId,
+      feeComponentId: comp._id,
+      status: 'configured',
+    }).lean();
+
+    let applicable = true;
+    for (const rule of rules) {
+      let matches = false;
+      switch (rule.conditionType) {
+        case 'hostel':
+        case 'transport':
+          // Student model does not yet track hostel/transport — treat as false.
+          matches = rule.operator === 'equals'
+            ? rule.conditionValue === 'false'
+            : true;
+          break;
+        case 'quota':
+          matches = rule.operator === 'equals'
+            ? (studentProfile.quota ?? '') === rule.conditionValue
+            : rule.operator === 'in'
+              ? rule.conditionValue.split(',').includes(studentProfile.quota ?? '')
+              : true;
+          break;
+        case 'category':
+          matches = rule.operator === 'equals'
+            ? (studentProfile.category ?? '') === rule.conditionValue
+            : rule.operator === 'in'
+              ? rule.conditionValue.split(',').includes(studentProfile.category ?? '')
+              : true;
+          break;
+        default:
+          matches = true;
+      }
+      if (!matches) {
+        applicable = false;
+        break;
+      }
+    }
+
+    if (applicable) {
+      result.push({
+        feeComponentId: comp._id as Types.ObjectId,
+        name: comp.name,
+        amount: comp.amount,
+        componentType: comp.componentType,
+        isRefundable: comp.isRefundable,
+      });
+    }
+  }
+
+  // If no component rows exist, fall back to the FSI's top-level totalAmount
+  // (common when the admin set the total directly without breaking it into components).
+  const componentSum = result.reduce((sum, c) => sum + c.amount, 0);
+  const totalAmount = componentSum > 0 ? componentSum : (fsi?.totalAmount ?? 0);
+  return { components: result, totalAmount };
+}
+
 async function commitPin(
   student: IStudent,
   yearOfStudy: number,
@@ -582,6 +680,14 @@ async function commitPin(
     }
   }
 
+  // Snapshot the applicable components at pin time so invoice generation
+  // uses frozen amounts even if the college later edits FeeComponent docs.
+  const snapshot = await snapshotFeeComponents(
+    String(student.collegeId),
+    input.feeStructureInstanceId,
+    { quota: student.quota, category: student.category },
+  );
+
   student.feePins.push({
     yearOfStudy,
     feeStructureInstanceId: input.feeStructureInstanceId,
@@ -590,6 +696,8 @@ async function commitPin(
     reason: input.reason,
     remarks: input.remarks,
     archivedAt: null,
+    snapshotTotalAmount: snapshot.totalAmount,
+    snapshotComponents: snapshot.components,
   } as unknown as IFeePin);
 
   await student.save();
