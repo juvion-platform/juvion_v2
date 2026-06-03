@@ -67,9 +67,11 @@ import {
   type ForecastWithNarrative,
   type ReminderDraft,
   type RiskScoreResult,
+  type RiskScoresResponse,
   type Situation,
   type SituationAction,
   type SituationActionType,
+  type SituationsResponse,
 } from '../../services/finance-agent';
 import BudgetBanner from '../../components/finance/BudgetBanner';
 import { useAuthStore } from '../../stores/authStore';
@@ -94,6 +96,14 @@ function formatInrCompact(value: number | undefined | null): string {
 
 function formatInrFull(value: number | undefined | null): string {
   return `\u20B9${(value ?? 0).toLocaleString('en-IN')}`;
+}
+
+function formatCachedAt(iso: string): string {
+  return new Date(iso).toLocaleTimeString('en-IN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
 }
 
 function monthLabel(d: Date): string {
@@ -328,7 +338,10 @@ function AIForecastBanner({
   /** Surface a 429 status from the forecast call to the parent dashboard. */
   on429?: () => void;
 }) {
+  const queryClient = useQueryClient();
   const monthAnchorIso = monthAnchor.toISOString();
+  const [isForceRefreshing, setIsForceRefreshing] = useState(false);
+
   const query = useQuery<ForecastWithNarrative>({
     queryKey: ['fee-forecast', monthAnchorIso],
     queryFn: () => getForecastNarrative(monthAnchor),
@@ -353,6 +366,21 @@ function AIForecastBanner({
   useEffect(() => {
     if (errorStatus === 429 && on429) on429();
   }, [errorStatus, on429]);
+
+  const handleForceRefresh = () => {
+    setIsForceRefreshing(true);
+    getForecastNarrative(monthAnchor, true)
+      .then((result) => {
+        queryClient.setQueryData<ForecastWithNarrative>(
+          ['fee-forecast', monthAnchorIso],
+          result,
+        );
+      })
+      .catch(() => {
+        void query.refetch();
+      })
+      .finally(() => setIsForceRefreshing(false));
+  };
 
   if (query.isLoading) {
     return (
@@ -380,7 +408,7 @@ function AIForecastBanner({
     );
   }
 
-  const { projection, narrative } = query.data;
+  const { projection, narrative, cachedAt } = query.data;
   // Degraded mode hides the narrative ("driver text") but keeps the
   // deterministic projection band visible — the numbers don't depend on
   // the LLM and shouldn't disappear when the budget is tight.
@@ -394,14 +422,21 @@ function AIForecastBanner({
           <Sparkles size={16} />
         </div>
         <div className="text-sm text-emerald-900 leading-snug min-w-0">
-          <div>
-            <strong className="font-semibold">AI forecast:</strong>{' '}
-            Likely{' '}
-            <strong className="font-semibold">
-              {formatInrCompact(projection.lower)}–{formatInrCompact(projection.upper)}
-            </strong>{' '}
-            by month-end{' '}
-            <span className="text-emerald-700/70">({confidencePct}% confidence)</span>.
+          <div className="flex items-center gap-2 flex-wrap">
+            <span>
+              <strong className="font-semibold">AI forecast:</strong>{' '}
+              Likely{' '}
+              <strong className="font-semibold">
+                {formatInrCompact(projection.lower)}–{formatInrCompact(projection.upper)}
+              </strong>{' '}
+              by month-end{' '}
+              <span className="text-emerald-700/70">({confidencePct}% confidence)</span>.
+            </span>
+            {cachedAt && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-700/60 bg-emerald-100/60 px-2 py-0.5 rounded-full">
+                Cached · {formatCachedAt(cachedAt)}
+              </span>
+            )}
           </div>
           {showNarrative && (
             <div className="mt-1.5 text-xs text-emerald-800/90 whitespace-pre-wrap">
@@ -418,14 +453,29 @@ function AIForecastBanner({
           )}
         </div>
       </div>
-      <button
-        type="button"
-        onClick={onViewRisk}
-        className="flex-shrink-0 self-start text-xs font-semibold px-3 py-2 rounded-lg bg-gradient-to-br from-blue-600 to-teal-500 text-white hover:shadow-md transition-shadow flex items-center gap-1"
-      >
-        View risk list
-        <ArrowRight size={13} />
-      </button>
+      <div className="flex-shrink-0 self-start flex items-center gap-2">
+        <button
+          type="button"
+          onClick={handleForceRefresh}
+          disabled={isForceRefreshing}
+          title="Refresh forecast"
+          aria-label="Refresh forecast"
+          className="h-7 w-7 rounded-lg border border-emerald-300 bg-emerald-100/60 hover:bg-emerald-200/60 flex items-center justify-center text-emerald-700 disabled:opacity-50"
+        >
+          <RefreshCcw
+            size={12}
+            className={isForceRefreshing ? 'animate-spin' : ''}
+          />
+        </button>
+        <button
+          type="button"
+          onClick={onViewRisk}
+          className="text-xs font-semibold px-3 py-2 rounded-lg bg-gradient-to-br from-blue-600 to-teal-500 text-white hover:shadow-md transition-shadow flex items-center gap-1"
+        >
+          View risk list
+          <ArrowRight size={13} />
+        </button>
+      </div>
     </div>
   );
 }
@@ -454,7 +504,7 @@ function RiskHoverPopover({
     queryKey: ['risk-narrative', studentId],
     queryFn: async () => {
       const out = await getRiskScores([studentId], true);
-      return out[0]?.narrative ?? null;
+      return out.scores[0]?.narrative ?? null;
     },
     enabled: fetchNarrative,
     staleTime: 10 * 60 * 1000,
@@ -1559,9 +1609,9 @@ function SituationCards({
   degraded?: boolean;
 }) {
   const queryClient = useQueryClient();
-  const query = useQuery<Situation[]>({
+  const query = useQuery<SituationsResponse>({
     queryKey: ['situations'],
-    queryFn: getSituations,
+    queryFn: () => getSituations(),
     staleTime: 5 * 60 * 1000,
     retry: false,
     enabled: !degraded,
@@ -1574,6 +1624,7 @@ function SituationCards({
   const [toast, setToast] = useState<SituationToastState | null>(null);
   const [dismissTarget, setDismissTarget] = useState<Situation | null>(null);
   const [isDismissSubmitting, setIsDismissSubmitting] = useState(false);
+  const [isForceRefreshing, setIsForceRefreshing] = useState(false);
 
   // Empty-state delay: avoid flashing the empty message on quick loads.
   // We only show the empty message after 500ms of "no data" — by which
@@ -1581,7 +1632,7 @@ function SituationCards({
   // cards doesn't feel like a layout glitch.
   const [showEmpty, setShowEmpty] = useState(false);
   useEffect(() => {
-    if (query.isSuccess && (query.data?.length ?? 0) === 0) {
+    if (query.isSuccess && (query.data?.situations.length ?? 0) === 0) {
       const t = window.setTimeout(() => setShowEmpty(true), 500);
       return () => window.clearTimeout(t);
     }
@@ -1590,7 +1641,15 @@ function SituationCards({
   }, [query.isSuccess, query.data]);
 
   const refresh = () => {
-    void queryClient.invalidateQueries({ queryKey: ['situations'] });
+    setIsForceRefreshing(true);
+    getSituations(true)
+      .then((result) => {
+        queryClient.setQueryData<SituationsResponse>(['situations'], result);
+      })
+      .catch(() => {
+        void queryClient.invalidateQueries({ queryKey: ['situations'] });
+      })
+      .finally(() => setIsForceRefreshing(false));
   };
 
   const handleAction = (situation: Situation, action: SituationAction) => {
@@ -1667,19 +1726,26 @@ function SituationCards({
             Preview
           </span>
         </div>
-        <button
-          type="button"
-          onClick={refresh}
-          disabled={query.isFetching}
-          aria-label="Refresh agent findings"
-          title="Refresh"
-          className="h-7 w-7 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center text-slate-500 disabled:opacity-50"
-        >
-          <RefreshCcw
-            size={12}
-            className={query.isFetching ? 'animate-spin' : ''}
-          />
-        </button>
+        <div className="flex items-center gap-2">
+          {query.data?.cachedAt && (
+            <span className="text-[10px] font-medium text-violet-600/60 bg-violet-50 px-2 py-0.5 rounded-full">
+              Cached · {formatCachedAt(query.data.cachedAt)}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={refresh}
+            disabled={query.isFetching || isForceRefreshing}
+            aria-label="Refresh agent findings"
+            title="Refresh"
+            className="h-7 w-7 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center text-slate-500 disabled:opacity-50"
+          >
+            <RefreshCcw
+              size={12}
+              className={query.isFetching || isForceRefreshing ? 'animate-spin' : ''}
+            />
+          </button>
+        </div>
       </div>
 
       {query.isLoading ? (
@@ -1702,7 +1768,7 @@ function SituationCards({
             Retry
           </button>
         </div>
-      ) : (query.data?.length ?? 0) === 0 ? (
+      ) : (query.data?.situations.length ?? 0) === 0 ? (
         showEmpty ? (
           <div className="text-xs text-slate-500 italic px-1 transition-opacity duration-300">
             No situations need attention — collection is clean.
@@ -1714,7 +1780,7 @@ function SituationCards({
         )
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {(query.data ?? []).slice(0, 5).map((s) => (
+          {(query.data?.situations ?? []).slice(0, 5).map((s) => (
             <SituationCard
               key={s.id}
               situation={s}
@@ -2425,7 +2491,7 @@ export default function FeeDashboardPage() {
     [defaulters],
   );
   const studentIdsKey = visibleStudentIds.join(',');
-  const riskScoresQuery = useQuery<RiskScoreResult[]>({
+  const riskScoresQuery = useQuery<RiskScoresResponse>({
     queryKey: ['risk-scores', studentIdsKey],
     queryFn: () => getRiskScores(visibleStudentIds, false),
     enabled: hasAccess && visibleStudentIds.length > 0,
@@ -2436,7 +2502,7 @@ export default function FeeDashboardPage() {
   // O(1) lookup map for per-card score injection.
   const riskScoresMap = useMemo(() => {
     const m = new Map<string, RiskScoreResult>();
-    for (const r of riskScoresQuery.data ?? []) {
+    for (const r of riskScoresQuery.data?.scores ?? []) {
       m.set(r.studentId, r);
     }
     return m;
@@ -2493,11 +2559,58 @@ export default function FeeDashboardPage() {
     return list;
   }, [defaulters, effectiveSort, riskScoresMap]);
 
+  const [isRefreshingAll, setIsRefreshingAll] = useState(false);
+
   const refreshAll = () => {
+    setIsRefreshingAll(true);
+
+    // Non-AI queries: standard React Query invalidation.
     queryClient.invalidateQueries({ queryKey: ['fee-dashboard-mtd'] });
     queryClient.invalidateQueries({ queryKey: ['fee-dashboard-ytd'] });
     queryClient.invalidateQueries({ queryKey: ['fee-defaulters'] });
-    queryClient.invalidateQueries({ queryKey: ['risk-scores'] });
+
+    // AI caches: force=true bypasses Redis and recomputes fresh.
+    const aiRefreshes: Promise<unknown>[] = [
+      getForecastNarrative(monthAnchor, true).then((result) => {
+        queryClient.setQueryData<ForecastWithNarrative>(
+          ['fee-forecast', monthAnchor.toISOString()],
+          result,
+        );
+      }),
+      getSituations(true).then((result) => {
+        queryClient.setQueryData<SituationsResponse>(['situations'], result);
+      }),
+    ];
+
+    if (visibleStudentIds.length > 0) {
+      aiRefreshes.push(
+        getRiskScores(visibleStudentIds, false, true).then((result) => {
+          queryClient.setQueryData<RiskScoresResponse>(
+            ['risk-scores', studentIdsKey],
+            result,
+          );
+        }),
+      );
+    }
+
+    Promise.allSettled(aiRefreshes).finally(() => setIsRefreshingAll(false));
+  };
+
+  const [isForceRefreshingRisk, setIsForceRefreshingRisk] = useState(false);
+  const forceRefreshRiskScores = () => {
+    if (visibleStudentIds.length === 0) return;
+    setIsForceRefreshingRisk(true);
+    getRiskScores(visibleStudentIds, false, true)
+      .then((result) => {
+        queryClient.setQueryData<RiskScoresResponse>(
+          ['risk-scores', studentIdsKey],
+          result,
+        );
+      })
+      .catch(() => {
+        queryClient.invalidateQueries({ queryKey: ['risk-scores'] });
+      })
+      .finally(() => setIsForceRefreshingRisk(false));
   };
 
   const scrollToRiskList = () => {
@@ -2555,11 +2668,16 @@ export default function FeeDashboardPage() {
           <button
             type="button"
             onClick={refreshAll}
-            className="h-8 w-8 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center text-slate-600"
-            title="Refresh"
-            aria-label="Refresh"
+            disabled={isRefreshingAll}
+            className="h-8 px-3 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 flex items-center gap-1.5 text-xs font-medium text-slate-600 disabled:opacity-60 disabled:cursor-not-allowed"
+            title="Refresh all data and AI caches"
+            aria-label="Refresh all"
           >
-            <RefreshCcw size={14} />
+            <RefreshCcw
+              size={13}
+              className={isRefreshingAll ? 'animate-spin' : ''}
+            />
+            {isRefreshingAll ? 'Refreshing…' : 'Refresh'}
           </button>
         </div>
       </div>
@@ -2626,8 +2744,28 @@ export default function FeeDashboardPage() {
       >
         <div className="flex items-start justify-between mb-3 gap-3">
           <div>
-            <div className="text-sm font-bold text-slate-800">
-              Students requiring action — AI risk-sorted
+            <div className="flex items-center gap-2">
+              <div className="text-sm font-bold text-slate-800">
+                Students requiring action — AI risk-sorted
+              </div>
+              {riskScoresQuery.data?.cachedAt && (
+                <span className="text-[10px] font-medium text-blue-600/60 bg-blue-50 px-2 py-0.5 rounded-full">
+                  Cached · {formatCachedAt(riskScoresQuery.data.cachedAt)}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={forceRefreshRiskScores}
+                disabled={isForceRefreshingRisk || riskScoresQuery.isFetching}
+                title="Refresh risk scores"
+                aria-label="Refresh risk scores"
+                className="h-6 w-6 rounded-md border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center text-slate-400 disabled:opacity-50"
+              >
+                <RefreshCcw
+                  size={11}
+                  className={isForceRefreshingRisk ? 'animate-spin' : ''}
+                />
+              </button>
             </div>
             <div className="text-xs text-slate-500">
               Ranked by deterministic risk score (hover a badge for the AI breakdown)

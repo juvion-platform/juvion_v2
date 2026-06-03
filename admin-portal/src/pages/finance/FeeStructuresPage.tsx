@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listFeeStructures, createFeeStructure, updateFeeStructure, deleteFeeStructure } from '../../services/finance';
 import { listAcademicYears, listProgrammes, listBranches } from '../../services/academics';
@@ -23,7 +23,7 @@ interface Component {
 
 const emptyComponent = (): Component => ({ name: '', amount: '', isRefundable: false });
 
-const emptyForm = { academicYearId: '', programmeId: '', branchId: '', category: '', quota: 'convener', year: '' };
+const emptyForm = { academicYearId: '', programmeId: '', branchId: '', categories: [] as string[], quotas: [] as string[], year: '' };
 
 /** Pull a human-readable message from an axios error / generic Error. */
 function extractErrorMessage(err: unknown): string {
@@ -33,6 +33,65 @@ function extractErrorMessage(err: unknown): string {
     e?.response?.data?.message ??
     e?.message ??
     'Something went wrong. Please try again.'
+  );
+}
+
+function MultiSelect({ options, selected, onChange, placeholder, disabled }: {
+  options: { value: string; label: string }[];
+  selected: string[];
+  onChange: (vals: string[]) => void;
+  placeholder: string;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handle(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handle);
+    return () => document.removeEventListener('mousedown', handle);
+  }, [open]);
+
+  function toggle(val: string) {
+    onChange(selected.includes(val) ? selected.filter(v => v !== val) : [...selected, val]);
+  }
+
+  const displayLabel = selected.length === 0
+    ? <span className="text-gray-400">{placeholder}</span>
+    : <span>{selected.map(v => options.find(o => o.value === v)?.label ?? v).join(', ')}</span>;
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => !disabled && setOpen(o => !o)}
+        className={inp + ' text-left truncate'}
+      >
+        {displayLabel}
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto py-1">
+          {options.length === 0
+            ? <p className="px-3 py-2 text-sm text-gray-400">No options available</p>
+            : options.map(opt => (
+              <label key={opt.value} className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 cursor-pointer text-sm">
+                <input
+                  type="checkbox"
+                  checked={selected.includes(opt.value)}
+                  onChange={() => toggle(opt.value)}
+                  className="rounded border-gray-300 h-3.5 w-3.5"
+                />
+                {opt.label}
+              </label>
+            ))
+          }
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -57,8 +116,8 @@ export default function FeeStructuresPage() {
         academicYearId: row.academicYearId?._id || row.academicYearId || '',
         programmeId: row.programmeId?._id || row.programmeId || '',
         branchId: row.branchId?._id || row.branchId || '',
-        category: row.category || '',
-        quota: row.quota || 'convener',
+        categories: row.category ? [row.category] : [],
+        quotas: row.quota ? [row.quota] : [],
         year: String(row.year || ''),
       });
       if (row.components && row.components.length > 0) {
@@ -80,7 +139,9 @@ export default function FeeStructuresPage() {
   });
 
   const createMut = useMutation({
-    mutationFn: createFeeStructure,
+    mutationFn: async (payloads: any[]) => {
+      for (const payload of payloads) await createFeeStructure(payload);
+    },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['fee-structures'] }); vem.close(); },
     onError: (err) => setSaveError(extractErrorMessage(err)),
   });
@@ -102,18 +163,47 @@ export default function FeeStructuresPage() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaveError(null);
-    const payload: any = {
-      ...form,
+    const basePayload: any = {
+      academicYearId: form.academicYearId,
+      programmeId: form.programmeId,
+      branchId: form.branchId || undefined,
       year: Number(form.year),
       totalAmount,
       components: components.map(c => ({ name: c.name, amount: Number(c.amount) || 0, isRefundable: c.isRefundable })),
     };
-    if (!payload.branchId) delete payload.branchId;
-    if (vem.isEdit && vem.entity) updateMut.mutate({ id: vem.entity._id, data: payload });
-    else createMut.mutate(payload);
+    if (!basePayload.branchId) delete basePayload.branchId;
+
+    if (vem.isEdit && vem.entity) {
+      const payload = {
+        ...basePayload,
+        category: form.categories[0] || undefined,
+        quota: form.quotas[0] || undefined,
+      };
+      updateMut.mutate({ id: vem.entity._id, data: payload });
+    } else {
+      // Create one fee structure per category × quota combination.
+      // Empty selection means "no filter" (wildcard), represented as undefined.
+      const cats = form.categories.length > 0 ? form.categories : [undefined];
+      const quots = form.quotas.length > 0 ? form.quotas : [undefined];
+      const payloads: any[] = [];
+      for (const category of cats) {
+        for (const quota of quots) {
+          const p = { ...basePayload };
+          if (category) p.category = category;
+          if (quota) p.quota = quota;
+          payloads.push(p);
+        }
+      }
+      createMut.mutate(payloads);
+    }
   }
 
   const saving = createMut.isPending || updateMut.isPending;
+
+  const categoryOptions = (feeCategories?.items || []).map((cat: any) => ({ value: cat.code, label: cat.name }));
+  const quotaOptions = (feeQuotas?.items ?? [])
+    .filter((q: { status?: string }) => q.status !== 'inactive')
+    .map((q: { _id: string; code: string; name: string }) => ({ value: q.code, label: `${q.code} — ${q.name}` }));
 
   const columns = [
     { key: 'programmeId', label: 'Programme', render: (r: any) => <span className="font-medium text-navy">{r.programmeId?.name || '—'}</span> },
@@ -202,29 +292,37 @@ export default function FeeStructuresPage() {
                 </select>
               </div>
               <div>
-                <label className={lbl}>Category * {!vem.isView && <Link to="/finance/fee-management/fee-categories" target="_blank" className={manageLink}>+ Manage <ExternalLink size={10} /></Link>}</label>
-                <select required value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className={inp}>
-                  <option value="">Select category</option>
-                  {(feeCategories?.items || []).map((cat: any) => (
-                    <option key={cat._id} value={cat.code}>{cat.name}</option>
-                  ))}
-                </select>
+                <label className={lbl}>
+                  Category {!vem.isView && <Link to="/finance/fee-management/fee-categories" target="_blank" className={manageLink}>+ Manage <ExternalLink size={10} /></Link>}
+                  {!vem.isView && !vem.isEdit && form.categories.length > 1 && (
+                    <span className="ml-1 text-xs text-primary-600 font-normal">({form.categories.length} selected → creates {form.categories.length * Math.max(form.quotas.length, 1)} structures)</span>
+                  )}
+                </label>
+                <MultiSelect
+                  options={categoryOptions}
+                  selected={form.categories}
+                  onChange={vals => setForm(f => ({ ...f, categories: vals }))}
+                  placeholder="Select categories"
+                  disabled={vem.isView}
+                />
               </div>
               <div>
                 <label className={lbl}>
-                  Quota *
+                  Quota
                   <Link to="/finance/fee-management/fee-quotas" target="_blank" className={manageLink}>
                     + Manage <ExternalLink size={10} />
                   </Link>
+                  {!vem.isView && !vem.isEdit && form.quotas.length > 1 && (
+                    <span className="ml-1 text-xs text-primary-600 font-normal">({form.quotas.length} selected)</span>
+                  )}
                 </label>
-                <select required value={form.quota} onChange={e => setForm(f => ({ ...f, quota: e.target.value }))} className={inp}>
-                  <option value="">Select quota</option>
-                  {(feeQuotas?.items ?? [])
-                    .filter((q: { status?: string }) => q.status !== 'inactive')
-                    .map((q: { _id: string; code: string; name: string }) => (
-                      <option key={q._id} value={q.code}>{q.code} — {q.name}</option>
-                    ))}
-                </select>
+                <MultiSelect
+                  options={quotaOptions}
+                  selected={form.quotas}
+                  onChange={vals => setForm(f => ({ ...f, quotas: vals }))}
+                  placeholder="Select quotas"
+                  disabled={vem.isView}
+                />
               </div>
               <div><label className={lbl}>Year *</label><input required type="number" min={1} value={form.year} onChange={e => setForm(f => ({ ...f, year: e.target.value }))} className={inp} /></div>
             </div>
@@ -295,7 +393,11 @@ export default function FeeStructuresPage() {
               </button>
             ) : (
               <button type="submit" disabled={saving} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
-                {saving ? 'Saving…' : vem.isEdit ? 'Update' : 'Create'}
+                {saving ? 'Saving…' : vem.isEdit ? 'Update' : (
+                  form.categories.length > 1 || form.quotas.length > 1
+                    ? `Create ${Math.max(form.categories.length, 1) * Math.max(form.quotas.length, 1)} Structures`
+                    : 'Create'
+                )}
               </button>
             )}
           </div>

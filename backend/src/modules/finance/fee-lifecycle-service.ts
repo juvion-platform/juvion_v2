@@ -478,7 +478,15 @@ export async function generateSemesterInvoice(
   // When we fell back to live resolution we preserve the pre-Task-10
   // behavior by calling the existing evaluator.
   let applicableComponents: Array<{ feeComponentId: string; name: string; amount: number }>;
-  if (pin && instance) {
+  if (pin && pin.snapshotComponents && pin.snapshotComponents.length > 0) {
+    // Use frozen snapshot — immune to post-pin FeeComponent edits.
+    applicableComponents = pin.snapshotComponents.map((c) => ({
+      feeComponentId: String(c.feeComponentId),
+      name: c.name,
+      amount: c.amount,
+    }));
+  } else if (pin && instance) {
+    // Legacy pin (no snapshot): fall back to live DB fetch.
     applicableComponents = await evaluateRulesForInstance(
       collegeId,
       String(instance._id),

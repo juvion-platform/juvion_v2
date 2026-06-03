@@ -39,9 +39,11 @@ export const chatQuerySchema = z.object({
 /**
  * POST /forecast-narrative — LLM driver text on top of the Holt-Winters
  * month-end projection. `monthAnchor` is any date in the target month.
+ * `force` bypasses the daily Redis cache and recomputes from scratch.
  */
 export const forecastNarrativeSchema = z.object({
   monthAnchor: z.coerce.date(),
+  force: z.boolean().optional(),
 });
 
 /**
@@ -49,17 +51,22 @@ export const forecastNarrativeSchema = z.object({
  * per-student narrative (LLM, opt-in).
  *
  * Cap of 100 students per request matches plan §1.8.
+ * `force` bypasses the daily Redis cache for non-narrative batch calls.
  */
 export const riskScoresSchema = z.object({
   studentIds: z.array(z.string()).min(1).max(100),
   includeNarrative: z.boolean().optional(),
+  force: z.boolean().optional(),
 });
 
 /**
- * POST /situations — strict empty body. Anything in the body would be a
- * cross-college injection attempt; the server uses `req.collegeId` only.
+ * POST /situations — only `force` (optional) is accepted; the server
+ * resolves the college from `req.collegeId` only. `force` bypasses the
+ * daily Redis cache and recomputes from scratch.
  */
-export const situationsSchema = z.object({}).strict();
+export const situationsSchema = z.object({
+  force: z.boolean().optional(),
+});
 
 /**
  * POST /reminder-drafts — agent-drafted fee reminders for a batch of
