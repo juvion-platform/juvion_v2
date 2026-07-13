@@ -1,6 +1,6 @@
 import api from './api';
 
-const BASE = '/campus-ops';
+const BASE = '/campus';
 
 // ─── Stats ────────────────────────────────────────────────
 export const getCampusOpsStats = () => api.get(`${BASE}/stats`).then(r => r.data);
