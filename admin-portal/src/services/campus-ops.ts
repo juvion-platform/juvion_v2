@@ -1,6 +1,8 @@
 import api from './api';
 
-const BASE = '/campus-ops';
+// Backend mounts the M08 Campus Ops router at /api/campus (see
+// backend/src/routes/index.ts). Using '/campus-ops' here 404s every request.
+const BASE = '/campus';
 
 // ─── Stats ────────────────────────────────────────────────
 export const getCampusOpsStats = () => api.get(`${BASE}/stats`).then(r => r.data);

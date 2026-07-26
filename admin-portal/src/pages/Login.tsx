@@ -112,34 +112,39 @@ export default function Login() {
             {loading ? 'Signing in...' : 'Sign in'}
           </button>
 
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <div>
-              <h3 className="text-sm font-semibold text-slate-800">Sample credentials</h3>
-              <p className="mt-1 text-xs text-slate-500">Seeded accounts from the development database.</p>
-            </div>
+          {/* Dev-only: seeded credentials must never ship to a deployed build.
+              `import.meta.env.DEV` is statically false in `vite build`, so this
+              whole block (and the passwords in it) is dropped at bundle time. */}
+          {import.meta.env.DEV && (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-800">Sample credentials</h3>
+                <p className="mt-1 text-xs text-slate-500">Seeded accounts from the development database.</p>
+              </div>
 
-            <div className="mt-3 space-y-3">
-              {sampleAccounts.map((account) => (
-                <button
-                  key={account.email}
-                  type="button"
-                  onClick={() => applySampleCredentials(account)}
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-left transition hover:border-teal-300 hover:bg-teal-50"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-medium text-slate-800">{account.label}</div>
-                      <div className="mt-1 text-xs text-slate-600">{account.email}</div>
+              <div className="mt-3 space-y-3">
+                {sampleAccounts.map((account) => (
+                  <button
+                    key={account.email}
+                    type="button"
+                    onClick={() => applySampleCredentials(account)}
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-left transition hover:border-teal-300 hover:bg-teal-50"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-medium text-slate-800">{account.label}</div>
+                        <div className="mt-1 text-xs text-slate-600">{account.email}</div>
+                      </div>
+                      <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">
+                        {account.password}
+                      </span>
                     </div>
-                    <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">
-                      {account.password}
-                    </span>
-                  </div>
-                  <p className="mt-2 text-xs text-slate-500">{account.hint}</p>
-                </button>
-              ))}
+                    <p className="mt-2 text-xs text-slate-500">{account.hint}</p>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </form>
       </div>
     </div>
