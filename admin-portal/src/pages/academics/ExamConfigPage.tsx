@@ -9,6 +9,10 @@ import {
   DoorOpen, UserCheck, Trophy, Building2, FileSpreadsheet, Stamp, Globe,
   Plus, Pencil, Trash2, Hash, Award, ArrowLeft,
 } from 'lucide-react';
+import { confirmAction } from '../../stores/confirmStore';
+import { useListControls } from '../../hooks/useListControls';
+import Pagination from '../../components/ui/Pagination';
+import SearchInput from '../../components/ui/SearchInput';
 
 // ─── Entity registry — one row per exam-config entity ───────────────
 // Each entry maps an entity slug to the service calls + table columns.
@@ -21,7 +25,7 @@ interface EntityDescriptor {
   icon: any;
   iconColor: string;
   cardinality: 'paged' | 'all';
-  list: (p?: number, l?: number) => Promise<any>;
+  list: (p?: number, l?: number, search?: string) => Promise<any>;
   create: (data: any) => Promise<any>;
   update: (id: string, data: any) => Promise<any>;
   delete: (id: string) => Promise<any>;
@@ -38,7 +42,7 @@ const ENTITIES: Record<string, EntityDescriptor> = {
     icon: DoorOpen,
     iconColor: 'bg-blue-50 text-blue-600',
     cardinality: 'paged',
-    list: (p, l) => svc.listExamRooms(p, l),
+    list: (p, l, q) => svc.listExamRooms(p, l, q),
     create: svc.createExamRoom, update: svc.updateExamRoom, delete: svc.deleteExamRoom,
     columns: [
       { key: 'code', label: 'Code', render: (r) => <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded">{r.code}</span> },
@@ -56,7 +60,7 @@ const ENTITIES: Record<string, EntityDescriptor> = {
     icon: UserCheck,
     iconColor: 'bg-purple-50 text-purple-600',
     cardinality: 'paged',
-    list: (p, l) => svc.listEvaluators(p, l),
+    list: (p, l, q) => svc.listEvaluators(p, l, q),
     create: svc.createEvaluator, update: svc.updateEvaluator, delete: svc.deleteEvaluator,
     columns: [
       { key: 'name', label: 'Name', render: (r) => <span className="font-medium">{r.name}</span> },
@@ -74,7 +78,7 @@ const ENTITIES: Record<string, EntityDescriptor> = {
     icon: Trophy,
     iconColor: 'bg-amber-50 text-amber-600',
     cardinality: 'paged',
-    list: (p, l) => svc.listGradeTemplates(p, l),
+    list: (p, l, q) => svc.listGradeTemplates(p, l, q),
     create: svc.createGradeTemplate, update: svc.updateGradeTemplate, delete: svc.deleteGradeTemplate,
     columns: [
       { key: 'name', label: 'Name', render: (r) => <span className="font-medium">{r.name}</span> },
@@ -92,7 +96,7 @@ const ENTITIES: Record<string, EntityDescriptor> = {
     icon: Building2,
     iconColor: 'bg-teal-50 text-teal-600',
     cardinality: 'paged',
-    list: (p, l) => svc.listExamCentreTemplates(p, l),
+    list: (p, l, q) => svc.listExamCentreTemplates(p, l, q),
     create: svc.createExamCentreTemplate, update: svc.updateExamCentreTemplate, delete: svc.deleteExamCentreTemplate,
     columns: [
       { key: 'code', label: 'Code', render: (r) => <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded">{r.code}</span> },
@@ -110,7 +114,7 @@ const ENTITIES: Record<string, EntityDescriptor> = {
     icon: FileSpreadsheet,
     iconColor: 'bg-rose-50 text-rose-600',
     cardinality: 'paged',
-    list: (p, l) => svc.listQuestionPapers(p, l),
+    list: (p, l, q) => svc.listQuestionPapers(p, l, q),
     create: svc.createQuestionPaper, update: svc.updateQuestionPaper, delete: svc.deleteQuestionPaper,
     columns: [
       { key: 'name', label: 'Name', render: (r) => <span className="font-medium">{r.name}</span> },
@@ -149,7 +153,7 @@ const ENTITIES: Record<string, EntityDescriptor> = {
     icon: Globe,
     iconColor: 'bg-emerald-50 text-emerald-600',
     cardinality: 'paged',
-    list: (p, l) => svc.listMoocSubjects(p, l),
+    list: (p, l, q) => svc.listMoocSubjects(p, l, q),
     create: svc.createMoocSubject, update: svc.updateMoocSubject, delete: svc.deleteMoocSubject,
     columns: [
       { key: 'code', label: 'Code', render: (r) => <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded">{r.code}</span> },
@@ -167,16 +171,16 @@ const ENTITIES: Record<string, EntityDescriptor> = {
 function EntityCRUDPage({ entity }: { entity: EntityDescriptor }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const [page, setPage] = useState(1);
+  const { page, setPage, limit, setLimit, search, setSearch } = useListControls();
   const [editingRow, setEditingRow] = useState<any | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [jsonText, setJsonText] = useState('');
   const [jsonError, setJsonError] = useState<string | null>(null);
 
-  const queryKey = ['exam-config', entity.slug, page];
+  const queryKey = ['exam-config', entity.slug, page, limit, search];
   const { data, isLoading } = useQuery({
     queryKey,
-    queryFn: () => entity.list(page, 20),
+    queryFn: () => entity.list(page, limit, search),
   });
 
   const createMut = useMutation({
@@ -239,7 +243,7 @@ function EntityCRUDPage({ entity }: { entity: EntityDescriptor }) {
     { key: 'actions', label: '', render: (r: any) => (
       <div className="flex gap-1">
         <button onClick={(e) => { e.stopPropagation(); openEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
-        <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this row?')) deleteMut.mutate(r._id); }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
+        <button onClick={(e) => { e.stopPropagation(); void confirmAction({ title: 'Delete this row?', tone: 'danger', confirmLabel: 'Delete' }).then((__c) => { if (__c.confirmed) { deleteMut.mutate(r._id); } }) }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
       </div>
     )},
   ];
@@ -257,9 +261,17 @@ function EntityCRUDPage({ entity }: { entity: EntityDescriptor }) {
             <p className="text-xs text-gray-500 mt-0.5">{entity.description}</p>
           </div>
         </div>
-        <button onClick={openCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700">
-          <Plus size={16} className="text-white" /> New
-        </button>
+        <div className="flex items-center gap-3">
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder={`Search ${entity.label.toLowerCase()}…`}
+            className="w-56"
+          />
+          <button onClick={openCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700">
+            <Plus size={16} className="text-white" /> New
+          </button>
+        </div>
       </div>
 
       <DataTable
@@ -270,12 +282,15 @@ function EntityCRUDPage({ entity }: { entity: EntityDescriptor }) {
         onRowClick={(r: any) => openEdit(r)}
       />
 
-      {entity.cardinality === 'paged' && pages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-4">
-          <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Prev</button>
-          <span className="text-sm text-gray-500">Page {page} of {pages}</span>
-          <button disabled={page >= pages} onClick={() => setPage((p) => p + 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Next</button>
-        </div>
+      {entity.cardinality === 'paged' && (
+        <Pagination
+          page={page}
+          pages={pages}
+          total={data?.total}
+          limit={limit}
+          onPageChange={setPage}
+          onLimitChange={setLimit}
+        />
       )}
 
       <Modal

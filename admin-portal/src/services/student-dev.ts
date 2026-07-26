@@ -6,8 +6,8 @@ const BASE = '/student-dev';
 export const getStudentDevStats = () => api.get(`${BASE}/stats`).then(r => r.data);
 
 // ─── Clubs ────────────────────────────────────────────────
-export const listClubs = (page = 1, limit = 20, type?: string) =>
-  api.get(`${BASE}/clubs`, { params: { page, limit, type } }).then(r => r.data);
+export const listClubs = (page = 1, limit = 20, type?: string, search?: string) =>
+  api.get(`${BASE}/clubs`, { params: { page, limit, type, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getClub = (id: string) =>
   api.get(`${BASE}/clubs/${id}`).then(r => r.data);
 export const createClub = (data: any) =>
@@ -18,8 +18,8 @@ export const deleteClub = (id: string) =>
   api.delete(`${BASE}/clubs/${id}`).then(r => r.data);
 
 // ─── Club Memberships ─────────────────────────────────────
-export const listClubMemberships = (page = 1, limit = 20, clubId?: string, status?: string) =>
-  api.get(`${BASE}/club-memberships`, { params: { page, limit, clubId, status } }).then(r => r.data);
+export const listClubMemberships = (page = 1, limit = 20, clubId?: string, status?: string, search?: string) =>
+  api.get(`${BASE}/club-memberships`, { params: { page, limit, clubId, status, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getClubMembership = (id: string) =>
   api.get(`${BASE}/club-memberships/${id}`).then(r => r.data);
 export const createClubMembership = (data: any) =>
@@ -30,8 +30,8 @@ export const deleteClubMembership = (id: string) =>
   api.delete(`${BASE}/club-memberships/${id}`).then(r => r.data);
 
 // ─── Events ───────────────────────────────────────────────
-export const listEvents = (page = 1, limit = 20, type?: string, status?: string) =>
-  api.get(`${BASE}/events`, { params: { page, limit, type, status } }).then(r => r.data);
+export const listEvents = (page = 1, limit = 20, type?: string, status?: string, search?: string) =>
+  api.get(`${BASE}/events`, { params: { page, limit, type, status, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getEvent = (id: string) =>
   api.get(`${BASE}/events/${id}`).then(r => r.data);
 export const createEvent = (data: any) =>
@@ -42,8 +42,8 @@ export const deleteEvent = (id: string) =>
   api.delete(`${BASE}/events/${id}`).then(r => r.data);
 
 // ─── Event Registrations ──────────────────────────────────
-export const listEventRegistrations = (page = 1, limit = 20, eventId?: string, status?: string) =>
-  api.get(`${BASE}/event-registrations`, { params: { page, limit, eventId, status } }).then(r => r.data);
+export const listEventRegistrations = (page = 1, limit = 20, eventId?: string, status?: string, search?: string) =>
+  api.get(`${BASE}/event-registrations`, { params: { page, limit, eventId, status, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getEventRegistration = (id: string) =>
   api.get(`${BASE}/event-registrations/${id}`).then(r => r.data);
 export const createEventRegistration = (data: any) =>
@@ -54,8 +54,8 @@ export const deleteEventRegistration = (id: string) =>
   api.delete(`${BASE}/event-registrations/${id}`).then(r => r.data);
 
 // ─── Achievements ─────────────────────────────────────────
-export const listAchievements = (page = 1, limit = 20, category?: string, level?: string) =>
-  api.get(`${BASE}/achievements`, { params: { page, limit, category, level } }).then(r => r.data);
+export const listAchievements = (page = 1, limit = 20, category?: string, level?: string, search?: string) =>
+  api.get(`${BASE}/achievements`, { params: { page, limit, category, level, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getAchievement = (id: string) =>
   api.get(`${BASE}/achievements/${id}`).then(r => r.data);
 export const createAchievement = (data: any) =>
@@ -66,8 +66,8 @@ export const deleteAchievement = (id: string) =>
   api.delete(`${BASE}/achievements/${id}`).then(r => r.data);
 
 // ─── Mentoring ────────────────────────────────────────────
-export const listMentoringSessions = (page = 1, limit = 20, status?: string) =>
-  api.get(`${BASE}/mentoring`, { params: { page, limit, status } }).then(r => r.data);
+export const listMentoringSessions = (page = 1, limit = 20, status?: string, search?: string) =>
+  api.get(`${BASE}/mentoring`, { params: { page, limit, status, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getMentoringSession = (id: string) =>
   api.get(`${BASE}/mentoring/${id}`).then(r => r.data);
 export const createMentoringSession = (data: any) =>
@@ -78,8 +78,8 @@ export const deleteMentoringSession = (id: string) =>
   api.delete(`${BASE}/mentoring/${id}`).then(r => r.data);
 
 // ─── Sports Teams ─────────────────────────────────────────
-export const listSportsTeams = (page = 1, limit = 20, category?: string) =>
-  api.get(`${BASE}/sports-teams`, { params: { page, limit, category } }).then(r => r.data);
+export const listSportsTeams = (page = 1, limit = 20, category?: string, search?: string) =>
+  api.get(`${BASE}/sports-teams`, { params: { page, limit, category, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getSportsTeam = (id: string) =>
   api.get(`${BASE}/sports-teams/${id}`).then(r => r.data);
 export const createSportsTeam = (data: any) =>
@@ -90,8 +90,8 @@ export const deleteSportsTeam = (id: string) =>
   api.delete(`${BASE}/sports-teams/${id}`).then(r => r.data);
 
 // ─── Sports Team Members ──────────────────────────────────
-export const listSportsTeamMembers = (page = 1, limit = 20, teamId?: string) =>
-  api.get(`${BASE}/sports-team-members`, { params: { page, limit, teamId } }).then(r => r.data);
+export const listSportsTeamMembers = (page = 1, limit = 20, teamId?: string, search?: string) =>
+  api.get(`${BASE}/sports-team-members`, { params: { page, limit, teamId, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getSportsTeamMember = (id: string) =>
   api.get(`${BASE}/sports-team-members/${id}`).then(r => r.data);
 export const createSportsTeamMember = (data: any) =>
@@ -102,8 +102,8 @@ export const deleteSportsTeamMember = (id: string) =>
   api.delete(`${BASE}/sports-team-members/${id}`).then(r => r.data);
 
 // ─── NSS Activities ───────────────────────────────────────
-export const listNSSActivities = (page = 1, limit = 20, type?: string, status?: string) =>
-  api.get(`${BASE}/nss-activities`, { params: { page, limit, type, status } }).then(r => r.data);
+export const listNSSActivities = (page = 1, limit = 20, type?: string, status?: string, search?: string) =>
+  api.get(`${BASE}/nss-activities`, { params: { page, limit, type, status, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getNSSActivity = (id: string) =>
   api.get(`${BASE}/nss-activities/${id}`).then(r => r.data);
 export const createNSSActivity = (data: any) =>
@@ -114,8 +114,8 @@ export const deleteNSSActivity = (id: string) =>
   api.delete(`${BASE}/nss-activities/${id}`).then(r => r.data);
 
 // ─── NSS Participants ─────────────────────────────────────
-export const listNSSParticipants = (page = 1, limit = 20, activityId?: string) =>
-  api.get(`${BASE}/nss-participants`, { params: { page, limit, activityId } }).then(r => r.data);
+export const listNSSParticipants = (page = 1, limit = 20, activityId?: string, search?: string) =>
+  api.get(`${BASE}/nss-participants`, { params: { page, limit, activityId, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getNSSParticipant = (id: string) =>
   api.get(`${BASE}/nss-participants/${id}`).then(r => r.data);
 export const createNSSParticipant = (data: any) =>
@@ -126,8 +126,8 @@ export const deleteNSSParticipant = (id: string) =>
   api.delete(`${BASE}/nss-participants/${id}`).then(r => r.data);
 
 // ─── Skill Certifications ─────────────────────────────────
-export const listSkillCertifications = (page = 1, limit = 20, provider?: string) =>
-  api.get(`${BASE}/skill-certifications`, { params: { page, limit, provider } }).then(r => r.data);
+export const listSkillCertifications = (page = 1, limit = 20, provider?: string, search?: string) =>
+  api.get(`${BASE}/skill-certifications`, { params: { page, limit, provider, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getSkillCertification = (id: string) =>
   api.get(`${BASE}/skill-certifications/${id}`).then(r => r.data);
 export const createSkillCertification = (data: any) =>
@@ -138,8 +138,8 @@ export const deleteSkillCertification = (id: string) =>
   api.delete(`${BASE}/skill-certifications/${id}`).then(r => r.data);
 
 // ─── Student Projects ─────────────────────────────────────
-export const listStudentProjects = (page = 1, limit = 20, type?: string, status?: string) =>
-  api.get(`${BASE}/student-projects`, { params: { page, limit, type, status } }).then(r => r.data);
+export const listStudentProjects = (page = 1, limit = 20, type?: string, status?: string, search?: string) =>
+  api.get(`${BASE}/student-projects`, { params: { page, limit, type, status, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getStudentProject = (id: string) =>
   api.get(`${BASE}/student-projects/${id}`).then(r => r.data);
 export const createStudentProject = (data: any) =>
@@ -150,8 +150,8 @@ export const deleteStudentProject = (id: string) =>
   api.delete(`${BASE}/student-projects/${id}`).then(r => r.data);
 
 // ─── Community Projects ───────────────────────────────────
-export const listCommunityProjects = (page = 1, limit = 20, status?: string) =>
-  api.get(`${BASE}/community-projects`, { params: { page, limit, status } }).then(r => r.data);
+export const listCommunityProjects = (page = 1, limit = 20, status?: string, search?: string) =>
+  api.get(`${BASE}/community-projects`, { params: { page, limit, status, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getCommunityProject = (id: string) =>
   api.get(`${BASE}/community-projects/${id}`).then(r => r.data);
 export const createCommunityProject = (data: any) =>
@@ -162,8 +162,8 @@ export const deleteCommunityProject = (id: string) =>
   api.delete(`${BASE}/community-projects/${id}`).then(r => r.data);
 
 // ─── Leadership Roles ─────────────────────────────────────
-export const listLeadershipRoles = (page = 1, limit = 20, body?: string) =>
-  api.get(`${BASE}/leadership-roles`, { params: { page, limit, body } }).then(r => r.data);
+export const listLeadershipRoles = (page = 1, limit = 20, body?: string, search?: string) =>
+  api.get(`${BASE}/leadership-roles`, { params: { page, limit, body, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getLeadershipRole = (id: string) =>
   api.get(`${BASE}/leadership-roles/${id}`).then(r => r.data);
 export const createLeadershipRole = (data: any) =>

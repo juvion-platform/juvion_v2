@@ -6,8 +6,8 @@ const BASE = '/welfare';
 export const getWelfareStats = () => api.get(`${BASE}/stats`).then(r => r.data);
 
 // ─── Hostel Blocks ────────────────────────────────────────
-export const listHostelBlocks = (page = 1, limit = 20) =>
-  api.get(`${BASE}/hostel-blocks`, { params: { page, limit } }).then(r => r.data);
+export const listHostelBlocks = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/hostel-blocks`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getHostelBlock = (id: string) =>
   api.get(`${BASE}/hostel-blocks/${id}`).then(r => r.data);
 export const createHostelBlock = (data: any) =>
@@ -18,8 +18,8 @@ export const deleteHostelBlock = (id: string) =>
   api.delete(`${BASE}/hostel-blocks/${id}`).then(r => r.data);
 
 // ─── Hostel Rooms ─────────────────────────────────────────
-export const listHostelRooms = (page = 1, limit = 20, blockId?: string) =>
-  api.get(`${BASE}/hostel-rooms`, { params: { page, limit, blockId } }).then(r => r.data);
+export const listHostelRooms = (page = 1, limit = 20, blockId?: string, search?: string) =>
+  api.get(`${BASE}/hostel-rooms`, { params: { page, limit, blockId, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getHostelRoom = (id: string) =>
   api.get(`${BASE}/hostel-rooms/${id}`).then(r => r.data);
 export const createHostelRoom = (data: any) =>
@@ -30,8 +30,8 @@ export const deleteHostelRoom = (id: string) =>
   api.delete(`${BASE}/hostel-rooms/${id}`).then(r => r.data);
 
 // ─── Hostel Allocations ───────────────────────────────────
-export const listHostelAllocations = (page = 1, limit = 20, studentId?: string, status?: string) =>
-  api.get(`${BASE}/hostel-allocations`, { params: { page, limit, studentId, status } }).then(r => r.data);
+export const listHostelAllocations = (page = 1, limit = 20, studentId?: string, status?: string, search?: string) =>
+  api.get(`${BASE}/hostel-allocations`, { params: { page, limit, studentId, status, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getHostelAllocation = (id: string) =>
   api.get(`${BASE}/hostel-allocations/${id}`).then(r => r.data);
 export const createHostelAllocation = (data: any) =>
@@ -42,8 +42,8 @@ export const deleteHostelAllocation = (id: string) =>
   api.delete(`${BASE}/hostel-allocations/${id}`).then(r => r.data);
 
 // ─── Hostel Visitor Logs ──────────────────────────────────
-export const listHostelVisitorLogs = (page = 1, limit = 20, studentId?: string) =>
-  api.get(`${BASE}/hostel-visitor-logs`, { params: { page, limit, studentId } }).then(r => r.data);
+export const listHostelVisitorLogs = (page = 1, limit = 20, studentId?: string, search?: string) =>
+  api.get(`${BASE}/hostel-visitor-logs`, { params: { page, limit, studentId, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getHostelVisitorLog = (id: string) =>
   api.get(`${BASE}/hostel-visitor-logs/${id}`).then(r => r.data);
 export const createHostelVisitorLog = (data: any) =>
@@ -54,8 +54,8 @@ export const deleteHostelVisitorLog = (id: string) =>
   api.delete(`${BASE}/hostel-visitor-logs/${id}`).then(r => r.data);
 
 // ─── Mess Menus ───────────────────────────────────────────
-export const listMessMenus = (page = 1, limit = 20, day?: string) =>
-  api.get(`${BASE}/mess-menus`, { params: { page, limit, day } }).then(r => r.data);
+export const listMessMenus = (page = 1, limit = 20, day?: string, search?: string) =>
+  api.get(`${BASE}/mess-menus`, { params: { page, limit, day, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getMessMenu = (id: string) =>
   api.get(`${BASE}/mess-menus/${id}`).then(r => r.data);
 export const createMessMenu = (data: any) =>
@@ -66,8 +66,8 @@ export const deleteMessMenu = (id: string) =>
   api.delete(`${BASE}/mess-menus/${id}`).then(r => r.data);
 
 // ─── Mess Feedbacks ───────────────────────────────────────
-export const listMessFeedbacks = (page = 1, limit = 20, mealType?: string) =>
-  api.get(`${BASE}/mess-feedbacks`, { params: { page, limit, mealType } }).then(r => r.data);
+export const listMessFeedbacks = (page = 1, limit = 20, mealType?: string, search?: string) =>
+  api.get(`${BASE}/mess-feedbacks`, { params: { page, limit, mealType, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getMessFeedback = (id: string) =>
   api.get(`${BASE}/mess-feedbacks/${id}`).then(r => r.data);
 export const createMessFeedback = (data: any) =>
@@ -78,8 +78,8 @@ export const deleteMessFeedback = (id: string) =>
   api.delete(`${BASE}/mess-feedbacks/${id}`).then(r => r.data);
 
 // ─── Transport Routes ─────────────────────────────────────
-export const listTransportRoutes = (page = 1, limit = 20) =>
-  api.get(`${BASE}/transport-routes`, { params: { page, limit } }).then(r => r.data);
+export const listTransportRoutes = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/transport-routes`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getTransportRoute = (id: string) =>
   api.get(`${BASE}/transport-routes/${id}`).then(r => r.data);
 export const createTransportRoute = (data: any) =>
@@ -90,8 +90,8 @@ export const deleteTransportRoute = (id: string) =>
   api.delete(`${BASE}/transport-routes/${id}`).then(r => r.data);
 
 // ─── Transport Allocations ────────────────────────────────
-export const listTransportAllocations = (page = 1, limit = 20, routeId?: string, status?: string) =>
-  api.get(`${BASE}/transport-allocations`, { params: { page, limit, routeId, status } }).then(r => r.data);
+export const listTransportAllocations = (page = 1, limit = 20, routeId?: string, status?: string, search?: string) =>
+  api.get(`${BASE}/transport-allocations`, { params: { page, limit, routeId, status, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getTransportAllocation = (id: string) =>
   api.get(`${BASE}/transport-allocations/${id}`).then(r => r.data);
 export const createTransportAllocation = (data: any) =>
@@ -102,8 +102,8 @@ export const deleteTransportAllocation = (id: string) =>
   api.delete(`${BASE}/transport-allocations/${id}`).then(r => r.data);
 
 // ─── Health Records ───────────────────────────────────────
-export const listHealthRecords = (page = 1, limit = 20) =>
-  api.get(`${BASE}/health-records`, { params: { page, limit } }).then(r => r.data);
+export const listHealthRecords = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/health-records`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getHealthRecord = (id: string) =>
   api.get(`${BASE}/health-records/${id}`).then(r => r.data);
 export const createHealthRecord = (data: any) =>
@@ -114,8 +114,8 @@ export const deleteHealthRecord = (id: string) =>
   api.delete(`${BASE}/health-records/${id}`).then(r => r.data);
 
 // ─── Medical Visits ───────────────────────────────────────
-export const listMedicalVisits = (page = 1, limit = 20) =>
-  api.get(`${BASE}/medical-visits`, { params: { page, limit } }).then(r => r.data);
+export const listMedicalVisits = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/medical-visits`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getMedicalVisit = (id: string) =>
   api.get(`${BASE}/medical-visits/${id}`).then(r => r.data);
 export const createMedicalVisit = (data: any) =>
@@ -126,8 +126,8 @@ export const deleteMedicalVisit = (id: string) =>
   api.delete(`${BASE}/medical-visits/${id}`).then(r => r.data);
 
 // ─── Counseling Sessions ──────────────────────────────────
-export const listCounselingSessions = (page = 1, limit = 20, type?: string) =>
-  api.get(`${BASE}/counseling-sessions`, { params: { page, limit, type } }).then(r => r.data);
+export const listCounselingSessions = (page = 1, limit = 20, type?: string, search?: string) =>
+  api.get(`${BASE}/counseling-sessions`, { params: { page, limit, type, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getCounselingSession = (id: string) =>
   api.get(`${BASE}/counseling-sessions/${id}`).then(r => r.data);
 export const createCounselingSession = (data: any) =>
@@ -138,8 +138,8 @@ export const deleteCounselingSession = (id: string) =>
   api.delete(`${BASE}/counseling-sessions/${id}`).then(r => r.data);
 
 // ─── Crisis Alerts ────────────────────────────────────────
-export const listCrisisAlerts = (page = 1, limit = 20, status?: string) =>
-  api.get(`${BASE}/crisis-alerts`, { params: { page, limit, status } }).then(r => r.data);
+export const listCrisisAlerts = (page = 1, limit = 20, status?: string, search?: string) =>
+  api.get(`${BASE}/crisis-alerts`, { params: { page, limit, status, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getCrisisAlert = (id: string) =>
   api.get(`${BASE}/crisis-alerts/${id}`).then(r => r.data);
 export const createCrisisAlert = (data: any) =>
@@ -150,8 +150,8 @@ export const deleteCrisisAlert = (id: string) =>
   api.delete(`${BASE}/crisis-alerts/${id}`).then(r => r.data);
 
 // ─── Anti-Ragging Complaints ──────────────────────────────
-export const listAntiRaggingComplaints = (page = 1, limit = 20, status?: string) =>
-  api.get(`${BASE}/anti-ragging-complaints`, { params: { page, limit, status } }).then(r => r.data);
+export const listAntiRaggingComplaints = (page = 1, limit = 20, status?: string, search?: string) =>
+  api.get(`${BASE}/anti-ragging-complaints`, { params: { page, limit, status, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getAntiRaggingComplaint = (id: string) =>
   api.get(`${BASE}/anti-ragging-complaints/${id}`).then(r => r.data);
 export const createAntiRaggingComplaint = (data: any) =>
@@ -162,8 +162,8 @@ export const deleteAntiRaggingComplaint = (id: string) =>
   api.delete(`${BASE}/anti-ragging-complaints/${id}`).then(r => r.data);
 
 // ─── Student Grievances ───────────────────────────────────
-export const listStudentGrievances = (page = 1, limit = 20, status?: string) =>
-  api.get(`${BASE}/student-grievances`, { params: { page, limit, status } }).then(r => r.data);
+export const listStudentGrievances = (page = 1, limit = 20, status?: string, search?: string) =>
+  api.get(`${BASE}/student-grievances`, { params: { page, limit, status, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getStudentGrievance = (id: string) =>
   api.get(`${BASE}/student-grievances/${id}`).then(r => r.data);
 export const createStudentGrievance = (data: any) =>
@@ -174,8 +174,8 @@ export const deleteStudentGrievance = (id: string) =>
   api.delete(`${BASE}/student-grievances/${id}`).then(r => r.data);
 
 // ─── Insurance Claims ─────────────────────────────────────
-export const listInsuranceClaims = (page = 1, limit = 20, status?: string) =>
-  api.get(`${BASE}/insurance-claims`, { params: { page, limit, status } }).then(r => r.data);
+export const listInsuranceClaims = (page = 1, limit = 20, status?: string, search?: string) =>
+  api.get(`${BASE}/insurance-claims`, { params: { page, limit, status, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getInsuranceClaim = (id: string) =>
   api.get(`${BASE}/insurance-claims/${id}`).then(r => r.data);
 export const createInsuranceClaim = (data: any) =>
@@ -186,8 +186,8 @@ export const deleteInsuranceClaim = (id: string) =>
   api.delete(`${BASE}/insurance-claims/${id}`).then(r => r.data);
 
 // ─── Parent Meetings ──────────────────────────────────────
-export const listParentMeetings = (page = 1, limit = 20, status?: string) =>
-  api.get(`${BASE}/parent-meetings`, { params: { page, limit, status } }).then(r => r.data);
+export const listParentMeetings = (page = 1, limit = 20, status?: string, search?: string) =>
+  api.get(`${BASE}/parent-meetings`, { params: { page, limit, status, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getParentMeeting = (id: string) =>
   api.get(`${BASE}/parent-meetings/${id}`).then(r => r.data);
 export const createParentMeeting = (data: any) =>

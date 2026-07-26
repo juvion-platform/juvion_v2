@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 
 import DataTable from '../../components/ui/DataTable';
+import { confirmAction } from '../../stores/confirmStore';
 import {
   listPendingFacultyDocuments,
   approveFacultyDocument,
@@ -200,22 +201,31 @@ export default function FacultyDocumentQueuePage() {
     onError: (e: any) => setError(e?.response?.data?.error || e?.message || 'Bulk reject failed'),
   });
 
-  function handleBulkApprove() {
+  async function handleBulkApprove() {
     const ids = selectedVisible;
     if (ids.length === 0) return;
-    if (!window.confirm(`Mark ${ids.length} document${ids.length === 1 ? '' : 's'} as verified? This writes one audit-log entry per doc.`)) return;
+    const ok = await confirmAction({
+      title: `Mark ${ids.length} document${ids.length === 1 ? '' : 's'} as verified?`,
+      message: 'This writes one audit-log entry per doc.',
+      confirmLabel: 'Mark verified',
+    });
+    if (!ok.confirmed) return;
     bulkApproveMut.mutate(ids);
   }
 
-  function handleBulkReject() {
+  async function handleBulkReject() {
     const ids = selectedVisible;
     if (ids.length === 0) return;
-    const reason = window.prompt(
-      `Reject ${ids.length} document${ids.length === 1 ? '' : 's'}?\n\nProvide a shared reason — applied verbatim to every doc:`,
-      '',
-    );
-    if (!reason || !reason.trim()) return;
-    bulkRejectMut.mutate({ docIds: ids, reason: reason.trim() });
+    const res = await confirmAction({
+      title: `Reject ${ids.length} document${ids.length === 1 ? '' : 's'}?`,
+      message: 'The reason below is applied verbatim to every selected document.',
+      tone: 'danger',
+      confirmLabel: 'Reject',
+      requireReason: true,
+      reasonLabel: 'Shared rejection reason',
+    });
+    if (!res.confirmed || !res.reason) return;
+    bulkRejectMut.mutate({ docIds: ids, reason: res.reason });
   }
 
   async function handleView(doc: PendingFacultyDoc) {
@@ -228,20 +238,29 @@ export default function FacultyDocumentQueuePage() {
     }
   }
 
-  function handleApprove(doc: PendingFacultyDoc) {
-    if (!window.confirm(`Mark "${doc.title}" as verified? This creates an audit-log entry.`)) return;
+  async function handleApprove(doc: PendingFacultyDoc) {
+    const ok = await confirmAction({
+      title: `Mark "${doc.title}" as verified?`,
+      message: 'This creates an audit-log entry.',
+      confirmLabel: 'Mark verified',
+    });
+    if (!ok.confirmed) return;
     const { facultyId } = getFacultyDisplay(doc);
     approveMut.mutate({ facultyId, docId: doc._id });
   }
 
-  function handleReject(doc: PendingFacultyDoc) {
-    const reason = window.prompt(
-      `Reject "${doc.title}"?\n\nProvide a reason so the faculty member knows what to fix on re-upload:`,
-      '',
-    );
-    if (!reason || !reason.trim()) return;
+  async function handleReject(doc: PendingFacultyDoc) {
+    const res = await confirmAction({
+      title: `Reject "${doc.title}"?`,
+      message: 'The reason is shown to the faculty member so they know what to fix on re-upload.',
+      tone: 'danger',
+      confirmLabel: 'Reject',
+      requireReason: true,
+      reasonLabel: 'Rejection reason',
+    });
+    if (!res.confirmed || !res.reason) return;
     const { facultyId } = getFacultyDisplay(doc);
-    rejectMut.mutate({ facultyId, docId: doc._id, reason: reason.trim() });
+    rejectMut.mutate({ facultyId, docId: doc._id, reason: res.reason });
   }
 
   const columns = [

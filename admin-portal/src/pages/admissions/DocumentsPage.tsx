@@ -5,20 +5,22 @@ import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
 import { useViewEditMode } from '../../hooks/useViewEditMode';
+import Pagination from '../../components/ui/Pagination';
+import { useListControls } from '../../hooks/useListControls';
 
 
 const STATUS_COLOR: Record<string, string> = { pending: 'warning', partial: 'info', complete: 'success', verified: 'success' };
 const STATUSES = ['pending', 'partial', 'complete', 'verified'] as const;
 
 export default function DocumentsPage() {
-  const [page, setPage] = useState(1);
+  const { page, setPage, limit, setLimit, search } = useListControls();
   const [filterStatus, setFilterStatus] = useState('');
 
   const vem = useViewEditMode<any>();
 
   const { data, isLoading } = useQuery({
-    queryKey: ['doc-checklists', page, filterStatus],
-    queryFn: () => listDocumentChecklists(page, 20, filterStatus || undefined),
+    queryKey: ['doc-checklists', page, filterStatus, limit, search],
+    queryFn: () => listDocumentChecklists(page, limit, filterStatus || undefined, search),
   });
 
   const columns = [
@@ -53,13 +55,14 @@ export default function DocumentsPage() {
         onRowClick={vem.openForView}
       />
 
-      {data && data.pages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-4">
-          <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Prev</button>
-          <span className="text-sm text-gray-500">Page {page} of {data.pages}</span>
-          <button disabled={page >= data.pages} onClick={() => setPage(p => p + 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Next</button>
-        </div>
-      )}
+      <Pagination
+        page={page}
+        pages={data?.pages ?? 1}
+        total={data?.total}
+        limit={limit}
+        onPageChange={setPage}
+        onLimitChange={setLimit}
+      />
 
       <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('Document Checklist')}>
         {selected && (

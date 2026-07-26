@@ -6,6 +6,9 @@ import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
 import { Plus, Pencil, Eye, Phone, ChevronRight } from 'lucide-react';
+import Pagination from '../../components/ui/Pagination';
+import { useListControls } from '../../hooks/useListControls';
+import SearchInput from '../../components/ui/SearchInput';
 
 const STATUS_COLOR: Record<string, string> = {
   draft: 'default', submitted: 'info', under_review: 'warning', eligible: 'success', ineligible: 'danger',
@@ -31,7 +34,7 @@ const emptyForm: any = {
 
 export default function ApplicantsPage() {
   const qc = useQueryClient();
-  const [page, setPage] = useState(1);
+  const { page, setPage, limit, setLimit, search, setSearch } = useListControls();
   const [filterStatus, setFilterStatus] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -41,8 +44,8 @@ export default function ApplicantsPage() {
   const [tab, setTab] = useState<Tab>('personal');
 
   const { data, isLoading } = useQuery({
-    queryKey: ['applicants', page, filterStatus],
-    queryFn: () => listApplicants(page, 20, filterStatus || undefined),
+    queryKey: ['applicants', page, filterStatus, limit, search],
+    queryFn: () => listApplicants(page, limit, filterStatus || undefined, search),
   });
   // FeeQuota catalog — drives the Quota dropdown so admins extending
   // the catalog (via /finance/fee-management/fee-quotas) see new
@@ -131,6 +134,8 @@ export default function ApplicantsPage() {
     <div>
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-xl font-bold text-navy">Applicants</h2>
+        <div className="flex items-center gap-3">
+          <SearchInput value={search} onChange={setSearch} placeholder="Search applicants…" className="w-56" />
         <div className="flex gap-3">
           <select value={filterStatus} onChange={e => { setFilterStatus(e.target.value); setPage(1); }} className="border rounded-lg px-3 py-2 text-sm">
             <option value="">All Statuses</option>
@@ -140,17 +145,19 @@ export default function ApplicantsPage() {
             <Plus size={16} className="text-white" /> New Applicant
           </button>
         </div>
+        </div>
       </div>
 
       <DataTable columns={columns} data={data?.items || []} loading={isLoading} />
 
-      {data && data.pages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-4">
-          <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Prev</button>
-          <span className="text-sm text-gray-500">Page {page} of {data.pages}</span>
-          <button disabled={page >= data.pages} onClick={() => setPage(p => p + 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Next</button>
-        </div>
-      )}
+      <Pagination
+        page={page}
+        pages={data?.pages ?? 1}
+        total={data?.total}
+        limit={limit}
+        onPageChange={setPage}
+        onLimitChange={setLimit}
+      />
 
       {/* Create/Edit Modal */}
       <Modal open={modalOpen} onClose={closeModal} title={editing ? 'Edit Applicant' : 'New Applicant'}>

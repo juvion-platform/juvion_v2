@@ -6,8 +6,8 @@ const BASE = '/governance';
 export const getGovernanceStats = () => api.get(`${BASE}/stats`).then(r => r.data);
 
 // ─── Committees ───────────────────────────────────────────
-export const listCommittees = (page = 1, limit = 20, type?: string) =>
-  api.get(`${BASE}/committees`, { params: { page, limit, type } }).then(r => r.data);
+export const listCommittees = (page = 1, limit = 20, type?: string, search?: string) =>
+  api.get(`${BASE}/committees`, { params: { page, limit, type, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getCommittee = (id: string) =>
   api.get(`${BASE}/committees/${id}`).then(r => r.data);
 export const createCommittee = (data: any) =>
@@ -18,8 +18,8 @@ export const deleteCommittee = (id: string) =>
   api.delete(`${BASE}/committees/${id}`).then(r => r.data);
 
 // ─── Committee Meetings ──────────────────────────────────
-export const listMeetings = (page = 1, limit = 20, committeeId?: string, status?: string) =>
-  api.get(`${BASE}/meetings`, { params: { page, limit, committeeId, status } }).then(r => r.data);
+export const listMeetings = (page = 1, limit = 20, committeeId?: string, status?: string, search?: string) =>
+  api.get(`${BASE}/meetings`, { params: { page, limit, committeeId, status, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getMeeting = (id: string) =>
   api.get(`${BASE}/meetings/${id}`).then(r => r.data);
 export const createMeeting = (data: any) =>
@@ -30,8 +30,8 @@ export const deleteMeeting = (id: string) =>
   api.delete(`${BASE}/meetings/${id}`).then(r => r.data);
 
 // ─── Policies ─────────────────────────────────────────────
-export const listPolicies = (page = 1, limit = 20, category?: string, status?: string) =>
-  api.get(`${BASE}/policies`, { params: { page, limit, category, status } }).then(r => r.data);
+export const listPolicies = (page = 1, limit = 20, category?: string, status?: string, search?: string) =>
+  api.get(`${BASE}/policies`, { params: { page, limit, category, status, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getPolicy = (id: string) =>
   api.get(`${BASE}/policies/${id}`).then(r => r.data);
 export const createPolicy = (data: any) =>
@@ -42,8 +42,8 @@ export const deletePolicy = (id: string) =>
   api.delete(`${BASE}/policies/${id}`).then(r => r.data);
 
 // ─── Governing Body Members ──────────────────────────────
-export const listBoardMembers = (page = 1, limit = 20, role?: string) =>
-  api.get(`${BASE}/board-members`, { params: { page, limit, role } }).then(r => r.data);
+export const listBoardMembers = (page = 1, limit = 20, role?: string, search?: string) =>
+  api.get(`${BASE}/board-members`, { params: { page, limit, role, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getBoardMember = (id: string) =>
   api.get(`${BASE}/board-members/${id}`).then(r => r.data);
 export const createBoardMember = (data: any) =>
@@ -54,8 +54,8 @@ export const deleteBoardMember = (id: string) =>
   api.delete(`${BASE}/board-members/${id}`).then(r => r.data);
 
 // ─── Strategic Goals ──────────────────────────────────────
-export const listGoals = (page = 1, limit = 20, category?: string, status?: string) =>
-  api.get(`${BASE}/goals`, { params: { page, limit, category, status } }).then(r => r.data);
+export const listGoals = (page = 1, limit = 20, category?: string, status?: string, search?: string) =>
+  api.get(`${BASE}/goals`, { params: { page, limit, category, status, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getGoal = (id: string) =>
   api.get(`${BASE}/goals/${id}`).then(r => r.data);
 export const createGoal = (data: any) =>
@@ -114,8 +114,8 @@ export interface ReportRun {
 export const listReportDefinitions = (): Promise<{ definitions: ReportDefinition[] }> =>
   api.get(`${BASE}/reports/definitions`).then((r) => r.data);
 
-export const listReportRuns = (page = 1, limit = 20, definitionCode?: string) =>
-  api.get(`${BASE}/reports/runs`, { params: { page, limit, definitionCode } }).then((r) => r.data);
+export const listReportRuns = (page = 1, limit = 20, definitionCode?: string, search?: string) =>
+  api.get(`${BASE}/reports/runs`, { params: { page, limit, definitionCode, ...(search ? { search } : {}) } }).then((r) => r.data);
 
 export const getReportRun = (id: string): Promise<ReportRun> =>
   api.get(`${BASE}/reports/runs/${id}`).then((r) => r.data);

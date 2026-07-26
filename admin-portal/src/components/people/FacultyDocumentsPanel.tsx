@@ -45,6 +45,7 @@ import {
   FacultyDocumentCategory,
 } from '../../services/faculty-documents';
 import FacultyDocumentAuditModal from './FacultyDocumentAuditModal';
+import { confirmAction } from '../../stores/confirmStore';
 
 // ─── Doc type catalog ─────────────────────────────────────────────────
 
@@ -376,7 +377,13 @@ function DocumentCard({ facultyId, spec, docs, onMutated }: DocumentCardProps) {
   }
 
   async function handleArchive(doc: FacultyDocumentDoc) {
-    if (!window.confirm(`Archive "${doc.title}"? You can re-upload anytime.`)) return;
+    const ok = await confirmAction({
+      title: `Archive "${doc.title}"?`,
+      message: 'You can re-upload anytime.',
+      tone: 'danger',
+      confirmLabel: 'Archive',
+    });
+    if (!ok.confirmed) return;
     try {
       await archiveFacultyDocument(facultyId, doc._id);
       onMutated();
@@ -386,7 +393,12 @@ function DocumentCard({ facultyId, spec, docs, onMutated }: DocumentCardProps) {
   }
 
   async function handleApprove(doc: FacultyDocumentDoc) {
-    if (!window.confirm(`Mark "${doc.title}" as verified? This creates an audit-log entry.`)) return;
+    const ok = await confirmAction({
+      title: `Mark "${doc.title}" as verified?`,
+      message: 'This creates an audit-log entry.',
+      confirmLabel: 'Mark verified',
+    });
+    if (!ok.confirmed) return;
     try {
       await approveFacultyDocument(facultyId, doc._id);
       onMutated();
@@ -396,13 +408,17 @@ function DocumentCard({ facultyId, spec, docs, onMutated }: DocumentCardProps) {
   }
 
   async function handleReject(doc: FacultyDocumentDoc) {
-    const reason = window.prompt(
-      `Reject "${doc.title}"?\n\nProvide a reason so the faculty member knows what to fix on re-upload:`,
-      '',
-    );
-    if (!reason || !reason.trim()) return;
+    const res = await confirmAction({
+      title: `Reject "${doc.title}"?`,
+      message: 'The reason is shown to the faculty member so they know what to fix on re-upload.',
+      tone: 'danger',
+      confirmLabel: 'Reject',
+      requireReason: true,
+      reasonLabel: 'Rejection reason',
+    });
+    if (!res.confirmed || !res.reason) return;
     try {
-      await rejectFacultyDocument(facultyId, doc._id, reason.trim());
+      await rejectFacultyDocument(facultyId, doc._id, res.reason);
       onMutated();
     } catch (e: any) {
       setError(e?.response?.data?.error || e?.message || 'Reject failed');

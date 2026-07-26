@@ -6,6 +6,10 @@ import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
 import { Plus, Trash2 } from 'lucide-react';
 import { useViewEditMode } from '../../hooks/useViewEditMode';
+import { confirmAction } from '../../stores/confirmStore';
+import Pagination from '../../components/ui/Pagination';
+import { useListControls } from '../../hooks/useListControls';
+import SearchInput from '../../components/ui/SearchInput';
 
 const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default";
 const lbl = "block text-sm font-medium text-gray-700 mb-1";
@@ -14,11 +18,11 @@ const emptyForm = { regulationId: '', programmeId: '', branchId: '', semester: '
 
 export default function CurriculumPage() {
   const qc = useQueryClient();
-  const [page, setPage] = useState(1);
+  const { page, setPage, limit, setLimit, search, setSearch } = useListControls();
   const [filterBranch, setFilterBranch] = useState('');
   const [form, setForm] = useState(emptyForm);
 
-  const { data, isLoading } = useQuery({ queryKey: ['curriculum', page, filterBranch], queryFn: () => listCurriculumMaps(page, 20, filterBranch || undefined) });
+  const { data, isLoading } = useQuery({ queryKey: ['curriculum', page, filterBranch, limit, search], queryFn: () => listCurriculumMaps(page, limit, filterBranch || undefined, undefined, search) });
   const { data: regsData } = useQuery({ queryKey: ['regulations', 1, 100], queryFn: () => listRegulations(1, 100) });
   const { data: progsData } = useQuery({ queryKey: ['programmes', 1, 100], queryFn: () => listProgrammes(1, 100) });
   const { data: branchData } = useQuery({ queryKey: ['branches', 1, 100], queryFn: () => listBranches(1, 100) });
@@ -59,7 +63,7 @@ export default function CurriculumPage() {
     { key: 'isElective', label: 'Type', render: (r: any) => r.isElective ? <Badge variant="warning">Elective</Badge> : <Badge variant="info">Core</Badge> },
     { key: 'electiveGroup', label: 'Elective Group', render: (r: any) => r.electiveGroup || '—' },
     { key: 'actions', label: '', render: (r: any) => (
-      <button onClick={(e) => { e.stopPropagation(); if (confirm('Remove this mapping?')) deleteMut.mutate(r._id); }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
+      <button onClick={(e) => { e.stopPropagation(); void confirmAction({ title: 'Remove this mapping?', tone: 'danger', confirmLabel: 'Remove' }).then((__c) => { if (__c.confirmed) { deleteMut.mutate(r._id); } }) }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
     )},
   ];
 
@@ -67,6 +71,8 @@ export default function CurriculumPage() {
     <div>
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-xl font-bold text-navy">Curriculum Map</h2>
+        <div className="flex items-center gap-3">
+          <SearchInput value={search} onChange={setSearch} placeholder="Search curriculum map…" className="w-56" />
         <div className="flex gap-3">
           <select value={filterBranch} onChange={e => { setFilterBranch(e.target.value); setPage(1); }} className="border rounded-lg px-3 py-2 text-sm">
             <option value="">All Branches</option>
@@ -76,17 +82,19 @@ export default function CurriculumPage() {
             <Plus size={16} className="text-white" /> Map Course
           </button>
         </div>
+        </div>
       </div>
 
       <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
 
-      {data && data.pages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-4">
-          <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Prev</button>
-          <span className="text-sm text-gray-500">Page {page} of {data.pages}</span>
-          <button disabled={page >= data.pages} onClick={() => setPage(p => p + 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Next</button>
-        </div>
-      )}
+      <Pagination
+        page={page}
+        pages={data?.pages ?? 1}
+        total={data?.total}
+        limit={limit}
+        onPageChange={setPage}
+        onLimitChange={setLimit}
+      />
 
       <Modal open={vem.isOpen} onClose={vem.close} title={vem.isCreate ? 'Map Course to Curriculum' : 'Curriculum Mapping Details'}>
         <form onSubmit={handleSubmit} className="space-y-4">

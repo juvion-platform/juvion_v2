@@ -1,3 +1,4 @@
+import { useState } from 'react';
 /**
  * FeeQuotasPage — CRUD for the per-college admission-quota catalog
  * (convener, management, nri, spot, lateral, …). Mounted under
@@ -8,7 +9,6 @@
  * to populate the Quota dropdown on FeeStructure + Student forms.
  */
 
-import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, Copy } from 'lucide-react';
 
@@ -24,6 +24,9 @@ import {
   FeeQuotaDoc,
   FeeQuotaStatus,
 } from '../../services/fee-quotas';
+import { confirmAction } from '../../stores/confirmStore';
+import Pagination from '../../components/ui/Pagination';
+import { useListControls } from '../../hooks/useListControls';
 
 const inp =
   'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default';
@@ -47,12 +50,12 @@ const emptyForm: FormState = {
 
 export default function FeeQuotasPage() {
   const qc = useQueryClient();
-  const [page, setPage] = useState(1);
+  const { page, setPage, limit, setLimit, search } = useListControls();
   const [form, setForm] = useState<FormState>(emptyForm);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['fee-quotas', page],
-    queryFn: () => listFeeQuotas(page, 20),
+    queryKey: ['fee-quotas', page, limit, search],
+    queryFn: () => listFeeQuotas(page, limit),
   });
 
   const vem = useViewEditMode<FeeQuotaDoc>({
@@ -169,9 +172,7 @@ export default function FeeQuotasPage() {
           <button
             onClick={(e) => {
               e.stopPropagation();
-              if (window.confirm(`Delete fee quota "${r.name}"?`)) {
-                deleteMut.mutate(r._id);
-              }
+              void confirmAction({ title: `Delete fee quota "${r.name}"?`, tone: 'danger', confirmLabel: 'Delete' }).then((__c) => { if (__c.confirmed) { deleteMut.mutate(r._id); } })
             }}
             className="p-1 rounded hover:bg-red-50"
             title="Delete"
@@ -210,27 +211,14 @@ export default function FeeQuotasPage() {
         emptyState="No fee quotas yet — click 'New Fee Quota' to add one."
       />
 
-      {data && data.pages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-4">
-          <button
-            disabled={page <= 1}
-            onClick={() => setPage((p) => p - 1)}
-            className="px-3 py-1 border rounded text-sm disabled:opacity-40"
-          >
-            Prev
-          </button>
-          <span className="text-sm text-gray-500">
-            Page {page} of {data.pages}
-          </span>
-          <button
-            disabled={page >= data.pages}
-            onClick={() => setPage((p) => p + 1)}
-            className="px-3 py-1 border rounded text-sm disabled:opacity-40"
-          >
-            Next
-          </button>
-        </div>
-      )}
+      <Pagination
+        page={page}
+        pages={data?.pages ?? 1}
+        total={data?.total}
+        limit={limit}
+        onPageChange={setPage}
+        onLimitChange={setLimit}
+      />
 
       <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('Fee Quota')}>
         <form onSubmit={handleSubmit} className="space-y-4">

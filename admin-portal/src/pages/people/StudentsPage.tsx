@@ -6,7 +6,11 @@ import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import PersonThumbnail from '../../components/people/PersonThumbnail';
 import { useHighlightRow } from '../../hooks/useHighlightRow';
-import { Plus, Pencil, Trash2, Search } from 'lucide-react';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { confirmAction } from '../../stores/confirmStore';
+import Pagination from '../../components/ui/Pagination';
+import { useListControls } from '../../hooks/useListControls';
+import SearchInput from '../../components/ui/SearchInput';
 
 const STATUS_COLOR: Record<string, string> = {
   prospective: 'default', active: 'success', year_back: 'warning', detained: 'danger',
@@ -19,7 +23,7 @@ export default function StudentsPage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [page, setPage] = useState(1);
+  const { page, setPage, limit, setLimit } = useListControls();
   const [filterStatus, setFilterStatus] = useState(searchParams.get('status') || '');
   const [filterOnboardingStatus, setFilterOnboardingStatus] = useState(searchParams.get('onboardingStatus') || '');
   const [needsAttention, setNeedsAttention] = useState(searchParams.get('needsAttention') === 'true' || searchParams.get('needsAttention') === '1');
@@ -35,8 +39,8 @@ export default function StudentsPage() {
   }
 
   const { data, isLoading } = useQuery({
-    queryKey: ['students', page, filterStatus, search, filterOnboardingStatus, needsAttention],
-    queryFn: () => listStudents(page, 20, filterStatus || undefined, search || undefined, filterOnboardingStatus || undefined, needsAttention),
+    queryKey: ['students', page, filterStatus, search, filterOnboardingStatus, needsAttention, limit],
+    queryFn: () => listStudents(page, limit, filterStatus || undefined, search || undefined, filterOnboardingStatus || undefined, needsAttention),
   });
 
   // Consume ?highlight=<personId> from global-people-search: scrolls to + flashes
@@ -86,7 +90,7 @@ export default function StudentsPage() {
     { key: 'actions', label: '', render: (r: any) => (
       <div className="flex gap-1">
         <button onClick={(e) => { e.stopPropagation(); navigate(`/people/students/${r._id}/edit`); }} className="p-1 rounded hover:bg-amber-50"><Pencil size={15} className="text-amber-500" /></button>
-        <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete student?')) deleteMut.mutate(r._id); }} className="p-1 rounded hover:bg-red-50"><Trash2 size={15} className="text-red-500" /></button>
+        <button onClick={(e) => { e.stopPropagation(); void confirmAction({ title: 'Delete student?', tone: 'danger', confirmLabel: 'Delete' }).then((__c) => { if (__c.confirmed) { deleteMut.mutate(r._id); } }) }} className="p-1 rounded hover:bg-red-50"><Trash2 size={15} className="text-red-500" /></button>
       </div>
     )},
   ];
@@ -95,17 +99,8 @@ export default function StudentsPage() {
     <div>
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-xl font-bold text-navy">Students</h2>
-        <div className="flex gap-3">
-          <div className="relative">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-400" />
-            <input placeholder="Search name..." value={search} onChange={e => {
-              const value = e.target.value;
-              setSearch(value);
-              setPage(1);
-              syncSearchParams({ status: filterStatus, onboardingStatus: filterOnboardingStatus, search: value, needsAttention });
-            }}
-              className="pl-9 pr-3 py-2 border rounded-lg text-sm w-48" />
-          </div>
+        <div className="flex items-center gap-3">
+          <SearchInput value={search} onChange={setSearch} placeholder="Search students…" className="w-56" />
           <select value={filterStatus} onChange={e => {
             const value = e.target.value;
             setFilterStatus(value);
@@ -148,13 +143,14 @@ export default function StudentsPage() {
         rowProps={(r: any) => highlightAttrs(r.person?._id ?? r.personId?._id)}
       />
 
-      {data && data.pages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-4">
-          <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Prev</button>
-          <span className="text-sm text-gray-500">Page {page} of {data.pages}</span>
-          <button disabled={page >= data.pages} onClick={() => setPage(p => p + 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Next</button>
-        </div>
-      )}
+      <Pagination
+        page={page}
+        pages={data?.pages ?? 1}
+        total={data?.total}
+        limit={limit}
+        onPageChange={setPage}
+        onLimitChange={setLimit}
+      />
     </div>
   );
 }

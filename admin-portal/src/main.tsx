@@ -6,6 +6,7 @@ import type { Mutation, Query } from '@tanstack/react-query';
 import App from './App';
 import ErrorBoundary from './components/ErrorBoundary';
 import Toaster from './components/ui/Toaster';
+import ConfirmDialog from './components/ui/ConfirmDialog';
 import { toast } from './stores/toastStore';
 import { extractErrorMessage, defaultSuccessTitle } from './lib/errors';
 import './index.css';
@@ -71,6 +72,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <App />
+          <ConfirmDialog />
           <Toaster />
         </BrowserRouter>
       </QueryClientProvider>

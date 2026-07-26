@@ -6,8 +6,8 @@ const BASE = '/academics';
 export const getStats = () => api.get(`${BASE}/stats`).then(r => r.data);
 
 // ─── Regulations ───────────────────────────────────────
-export const listRegulations = (page = 1, limit = 20) =>
-  api.get(`${BASE}/regulations`, { params: { page, limit } }).then(r => r.data);
+export const listRegulations = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/regulations`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getRegulation = (id: string) =>
   api.get(`${BASE}/regulations/${id}`).then(r => r.data);
 export const createRegulation = (data: any) =>
@@ -18,8 +18,8 @@ export const deleteRegulation = (id: string) =>
   api.delete(`${BASE}/regulations/${id}`).then(r => r.data);
 
 // ─── Programmes ────────────────────────────────────────
-export const listProgrammes = (page = 1, limit = 20) =>
-  api.get(`${BASE}/programmes`, { params: { page, limit } }).then(r => r.data);
+export const listProgrammes = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/programmes`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getProgramme = (id: string) =>
   api.get(`${BASE}/programmes/${id}`).then(r => r.data);
 export const createProgramme = (data: any) =>
@@ -30,8 +30,8 @@ export const deleteProgramme = (id: string) =>
   api.delete(`${BASE}/programmes/${id}`).then(r => r.data);
 
 // ─── Departments ───────────────────────────────────────
-export const listDepartments = (page = 1, limit = 20) =>
-  api.get(`${BASE}/departments`, { params: { page, limit } }).then(r => r.data);
+export const listDepartments = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/departments`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getDepartment = (id: string) =>
   api.get(`${BASE}/departments/${id}`).then(r => r.data);
 export const createDepartment = (data: any) =>
@@ -42,8 +42,8 @@ export const deleteDepartment = (id: string) =>
   api.delete(`${BASE}/departments/${id}`).then(r => r.data);
 
 // ─── Branches ──────────────────────────────────────────
-export const listBranches = (page = 1, limit = 20) =>
-  api.get(`${BASE}/branches`, { params: { page, limit } }).then(r => r.data);
+export const listBranches = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/branches`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getBranch = (id: string) =>
   api.get(`${BASE}/branches/${id}`).then(r => r.data);
 export const createBranch = (data: any) =>
@@ -54,8 +54,8 @@ export const deleteBranch = (id: string) =>
   api.delete(`${BASE}/branches/${id}`).then(r => r.data);
 
 // ─── Batches ───────────────────────────────────────────
-export const listBatches = (page = 1, limit = 20) =>
-  api.get(`${BASE}/batches`, { params: { page, limit } }).then(r => r.data);
+export const listBatches = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/batches`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getBatch = (id: string) =>
   api.get(`${BASE}/batches/${id}`).then(r => r.data);
 export const createBatch = (data: any) =>
@@ -66,8 +66,8 @@ export const deleteBatch = (id: string) =>
   api.delete(`${BASE}/batches/${id}`).then(r => r.data);
 
 // ─── Sections ──────────────────────────────────────────
-export const listSections = (page = 1, limit = 20) =>
-  api.get(`${BASE}/sections`, { params: { page, limit } }).then(r => r.data);
+export const listSections = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/sections`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getSection = (id: string) =>
   api.get(`${BASE}/sections/${id}`).then(r => r.data);
 export const createSection = (data: any) =>
@@ -78,8 +78,8 @@ export const deleteSection = (id: string) =>
   api.delete(`${BASE}/sections/${id}`).then(r => r.data);
 
 // ─── Academic Years ────────────────────────────────────
-export const listAcademicYears = (page = 1, limit = 20) =>
-  api.get(`${BASE}/academic-years`, { params: { page, limit } }).then(r => r.data);
+export const listAcademicYears = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/academic-years`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getAcademicYear = (id: string) =>
   api.get(`${BASE}/academic-years/${id}`).then(r => r.data);
 export const createAcademicYear = (data: any) =>
@@ -90,8 +90,8 @@ export const deleteAcademicYear = (id: string) =>
   api.delete(`${BASE}/academic-years/${id}`).then(r => r.data);
 
 // ─── Semesters ─────────────────────────────────────────
-export const listSemesters = (page = 1, limit = 20, academicYearId?: string) =>
-  api.get(`${BASE}/semesters`, { params: { page, limit, academicYearId } }).then(r => r.data);
+export const listSemesters = (page = 1, limit = 20, academicYearId?: string, search?: string) =>
+  api.get(`${BASE}/semesters`, { params: { page, limit, academicYearId, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getSemester = (id: string) =>
   api.get(`${BASE}/semesters/${id}`).then(r => r.data);
 export const createSemester = (data: any) =>
@@ -102,8 +102,8 @@ export const deleteSemester = (id: string) =>
   api.delete(`${BASE}/semesters/${id}`).then(r => r.data);
 
 // ─── Courses ───────────────────────────────────────────
-export const listCourses = (page = 1, limit = 20, regulationId?: string) =>
-  api.get(`${BASE}/courses`, { params: { page, limit, regulationId } }).then(r => r.data);
+export const listCourses = (page = 1, limit = 20, regulationId?: string, search?: string) =>
+  api.get(`${BASE}/courses`, { params: { page, limit, regulationId, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getCourse = (id: string) =>
   api.get(`${BASE}/courses/${id}`).then(r => r.data);
 export const createCourse = (data: any) =>
@@ -114,8 +114,8 @@ export const deleteCourse = (id: string) =>
   api.delete(`${BASE}/courses/${id}`).then(r => r.data);
 
 // ─── Curriculum Maps ───────────────────────────────────
-export const listCurriculumMaps = (page = 1, limit = 20, branchId?: string, semester?: number) =>
-  api.get(`${BASE}/curriculum`, { params: { page, limit, branchId, semester } }).then(r => r.data);
+export const listCurriculumMaps = (page = 1, limit = 20, branchId?: string, semester?: number, search?: string) =>
+  api.get(`${BASE}/curriculum`, { params: { page, limit, branchId, semester, ...(search ? { search } : {}) } }).then(r => r.data);
 export const createCurriculumMap = (data: any) =>
   api.post(`${BASE}/curriculum`, data).then(r => r.data);
 export const updateCurriculumMap = (id: string, data: any) =>
@@ -124,8 +124,8 @@ export const deleteCurriculumMap = (id: string) =>
   api.delete(`${BASE}/curriculum/${id}`).then(r => r.data);
 
 // ─── Course Offerings ──────────────────────────────────
-export const listCourseOfferings = (page = 1, limit = 20, semesterId?: string) =>
-  api.get(`${BASE}/offerings`, { params: { page, limit, semesterId } }).then(r => r.data);
+export const listCourseOfferings = (page = 1, limit = 20, semesterId?: string, search?: string) =>
+  api.get(`${BASE}/offerings`, { params: { page, limit, semesterId, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getCourseOffering = (id: string) =>
   api.get(`${BASE}/offerings/${id}`).then(r => r.data);
 export const createCourseOffering = (data: any) =>
@@ -136,8 +136,8 @@ export const deleteCourseOffering = (id: string) =>
   api.delete(`${BASE}/offerings/${id}`).then(r => r.data);
 
 // ─── Enrollments ───────────────────────────────────────
-export const listAcadEnrollments = (page = 1, limit = 20, semesterId?: string) =>
-  api.get(`${BASE}/enrollments`, { params: { page, limit, semesterId } }).then(r => r.data);
+export const listAcadEnrollments = (page = 1, limit = 20, semesterId?: string, search?: string) =>
+  api.get(`${BASE}/enrollments`, { params: { page, limit, semesterId, ...(search ? { search } : {}) } }).then(r => r.data);
 export const createAcadEnrollment = (data: any) =>
   api.post(`${BASE}/enrollments`, data).then(r => r.data);
 export const updateAcadEnrollment = (id: string, data: any) =>
@@ -148,8 +148,8 @@ export const deleteAcadEnrollment = (id: string) =>
 // ═══ Phase 3: Scheduling ═══════════════════════════════════
 
 // ─── Academic Calendar ─────────────────────────────────
-export const listAcademicCalendars = (page = 1, limit = 20, academicYearId?: string) =>
-  api.get(`${BASE}/academic-calendar`, { params: { page, limit, academicYearId } }).then(r => r.data);
+export const listAcademicCalendars = (page = 1, limit = 20, academicYearId?: string, search?: string) =>
+  api.get(`${BASE}/academic-calendar`, { params: { page, limit, academicYearId, ...(search ? { search } : {}) } }).then(r => r.data);
 export const createAcademicCalendar = (data: any) =>
   api.post(`${BASE}/academic-calendar`, data).then(r => r.data);
 export const updateAcademicCalendar = (id: string, data: any) =>
@@ -158,8 +158,8 @@ export const deleteAcademicCalendar = (id: string) =>
   api.delete(`${BASE}/academic-calendar/${id}`).then(r => r.data);
 
 // ─── Timetables ────────────────────────────────────────
-export const listTimetables = (page = 1, limit = 20, semesterId?: string) =>
-  api.get(`${BASE}/timetables`, { params: { page, limit, semesterId } }).then(r => r.data);
+export const listTimetables = (page = 1, limit = 20, semesterId?: string, search?: string) =>
+  api.get(`${BASE}/timetables`, { params: { page, limit, semesterId, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getTimetable = (id: string) =>
   api.get(`${BASE}/timetables/${id}`).then(r => r.data);
 export const createTimetable = (data: any) =>
@@ -182,8 +182,8 @@ export const deleteTimetableSlot = (id: string) =>
 // ═══ Phase 4: Attendance ═══════════════════════════════════
 
 // ─── Attendance Sessions ──────────────────────────────
-export const listAttendanceSessions = (page = 1, limit = 20, courseOfferingId?: string) =>
-  api.get(`${BASE}/attendance-sessions`, { params: { page, limit, courseOfferingId } }).then(r => r.data);
+export const listAttendanceSessions = (page = 1, limit = 20, courseOfferingId?: string, search?: string) =>
+  api.get(`${BASE}/attendance-sessions`, { params: { page, limit, courseOfferingId, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getAttendanceSession = (id: string) =>
   api.get(`${BASE}/attendance-sessions/${id}`).then(r => r.data);
 export const createAttendanceSession = (data: any) =>
@@ -208,8 +208,8 @@ export const deleteAttendanceRecord = (id: string) =>
 // ═══ Phase 5: Internal Assessments ═════════════════════════
 
 // ─── Internal Assessments ─────────────────────────────
-export const listInternalAssessments = (page = 1, limit = 20, courseOfferingId?: string) =>
-  api.get(`${BASE}/internal-assessments`, { params: { page, limit, courseOfferingId } }).then(r => r.data);
+export const listInternalAssessments = (page = 1, limit = 20, courseOfferingId?: string, search?: string) =>
+  api.get(`${BASE}/internal-assessments`, { params: { page, limit, courseOfferingId, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getInternalAssessment = (id: string) =>
   api.get(`${BASE}/internal-assessments/${id}`).then(r => r.data);
 export const createInternalAssessment = (data: any) =>
@@ -234,8 +234,8 @@ export const deleteInternalMark = (id: string) =>
 // ═══ Phase 6: Exams ════════════════════════════════════════
 
 // ─── Exam Registrations ───────────────────────────────
-export const listExamRegistrations = (page = 1, limit = 20, semesterId?: string) =>
-  api.get(`${BASE}/exam-registrations`, { params: { page, limit, semesterId } }).then(r => r.data);
+export const listExamRegistrations = (page = 1, limit = 20, semesterId?: string, search?: string) =>
+  api.get(`${BASE}/exam-registrations`, { params: { page, limit, semesterId, ...(search ? { search } : {}) } }).then(r => r.data);
 export const createExamRegistration = (data: any) =>
   api.post(`${BASE}/exam-registrations`, data).then(r => r.data);
 export const updateExamRegistration = (id: string, data: any) =>
@@ -244,8 +244,8 @@ export const deleteExamRegistration = (id: string) =>
   api.delete(`${BASE}/exam-registrations/${id}`).then(r => r.data);
 
 // ─── Exam Schedules ───────────────────────────────────
-export const listExamSchedules = (page = 1, limit = 20, semesterId?: string) =>
-  api.get(`${BASE}/exam-schedules`, { params: { page, limit, semesterId } }).then(r => r.data);
+export const listExamSchedules = (page = 1, limit = 20, semesterId?: string, search?: string) =>
+  api.get(`${BASE}/exam-schedules`, { params: { page, limit, semesterId, ...(search ? { search } : {}) } }).then(r => r.data);
 export const createExamSchedule = (data: any) =>
   api.post(`${BASE}/exam-schedules`, data).then(r => r.data);
 export const updateExamSchedule = (id: string, data: any) =>
@@ -254,8 +254,8 @@ export const deleteExamSchedule = (id: string) =>
   api.delete(`${BASE}/exam-schedules/${id}`).then(r => r.data);
 
 // ─── External Marks ───────────────────────────────────
-export const listExternalMarks = (page = 1, limit = 20, semesterId?: string) =>
-  api.get(`${BASE}/external-marks`, { params: { page, limit, semesterId } }).then(r => r.data);
+export const listExternalMarks = (page = 1, limit = 20, semesterId?: string, search?: string) =>
+  api.get(`${BASE}/external-marks`, { params: { page, limit, semesterId, ...(search ? { search } : {}) } }).then(r => r.data);
 export const createExternalMark = (data: any) =>
   api.post(`${BASE}/external-marks`, data).then(r => r.data);
 export const updateExternalMark = (id: string, data: any) =>
@@ -266,8 +266,8 @@ export const deleteExternalMark = (id: string) =>
 // ═══ Phase 7: Results ══════════════════════════════════════
 
 // ─── Grade Cards ──────────────────────────────────────
-export const listGradeCards = (page = 1, limit = 20, semesterId?: string, studentId?: string) =>
-  api.get(`${BASE}/grade-cards`, { params: { page, limit, semesterId, studentId } }).then(r => r.data);
+export const listGradeCards = (page = 1, limit = 20, semesterId?: string, studentId?: string, search?: string) =>
+  api.get(`${BASE}/grade-cards`, { params: { page, limit, semesterId, studentId, ...(search ? { search } : {}) } }).then(r => r.data);
 export const createGradeCard = (data: any) =>
   api.post(`${BASE}/grade-cards`, data).then(r => r.data);
 export const updateGradeCard = (id: string, data: any) =>
@@ -276,8 +276,8 @@ export const deleteGradeCard = (id: string) =>
   api.delete(`${BASE}/grade-cards/${id}`).then(r => r.data);
 
 // ─── Semester Results ─────────────────────────────────
-export const listSemesterResults = (page = 1, limit = 20, semesterId?: string) =>
-  api.get(`${BASE}/semester-results`, { params: { page, limit, semesterId } }).then(r => r.data);
+export const listSemesterResults = (page = 1, limit = 20, semesterId?: string, search?: string) =>
+  api.get(`${BASE}/semester-results`, { params: { page, limit, semesterId, ...(search ? { search } : {}) } }).then(r => r.data);
 export const createSemesterResult = (data: any) =>
   api.post(`${BASE}/semester-results`, data).then(r => r.data);
 export const updateSemesterResult = (id: string, data: any) =>
@@ -308,8 +308,8 @@ export const deleteProgramOutcome = (id: string) =>
   api.delete(`${BASE}/program-outcomes/${id}`).then(r => r.data);
 
 // ─── Elective Allocations ─────────────────────────────
-export const listElectiveAllocations = (page = 1, limit = 20, semesterId?: string) =>
-  api.get(`${BASE}/elective-allocations`, { params: { page, limit, semesterId } }).then(r => r.data);
+export const listElectiveAllocations = (page = 1, limit = 20, semesterId?: string, search?: string) =>
+  api.get(`${BASE}/elective-allocations`, { params: { page, limit, semesterId, ...(search ? { search } : {}) } }).then(r => r.data);
 export const createElectiveAllocation = (data: any) =>
   api.post(`${BASE}/elective-allocations`, data).then(r => r.data);
 export const updateElectiveAllocation = (id: string, data: any) =>
@@ -318,8 +318,8 @@ export const deleteElectiveAllocation = (id: string) =>
   api.delete(`${BASE}/elective-allocations/${id}`).then(r => r.data);
 
 // ─── Lesson Plans ─────────────────────────────────────
-export const listLessonPlans = (page = 1, limit = 20, courseOfferingId?: string) =>
-  api.get(`${BASE}/lesson-plans`, { params: { page, limit, courseOfferingId } }).then(r => r.data);
+export const listLessonPlans = (page = 1, limit = 20, courseOfferingId?: string, search?: string) =>
+  api.get(`${BASE}/lesson-plans`, { params: { page, limit, courseOfferingId, ...(search ? { search } : {}) } }).then(r => r.data);
 export const createLessonPlan = (data: any) =>
   api.post(`${BASE}/lesson-plans`, data).then(r => r.data);
 export const updateLessonPlan = (id: string, data: any) =>
@@ -328,8 +328,8 @@ export const deleteLessonPlan = (id: string) =>
   api.delete(`${BASE}/lesson-plans/${id}`).then(r => r.data);
 
 // ─── Course Feedback ──────────────────────────────────
-export const listCourseFeedbacks = (page = 1, limit = 20, courseOfferingId?: string) =>
-  api.get(`${BASE}/course-feedback`, { params: { page, limit, courseOfferingId } }).then(r => r.data);
+export const listCourseFeedbacks = (page = 1, limit = 20, courseOfferingId?: string, search?: string) =>
+  api.get(`${BASE}/course-feedback`, { params: { page, limit, courseOfferingId, ...(search ? { search } : {}) } }).then(r => r.data);
 export const createCourseFeedback = (data: any) =>
   api.post(`${BASE}/course-feedback`, data).then(r => r.data);
 export const updateCourseFeedback = (id: string, data: any) =>

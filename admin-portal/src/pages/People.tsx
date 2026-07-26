@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getStats, listPersons, deletePerson } from '../services/people';
-import { Users, GraduationCap, Briefcase, UserCheck, Building2, Search, Trash2, Pencil, ChevronLeft, ChevronRight, IdCard } from 'lucide-react';
+import { Users, GraduationCap, Briefcase, UserCheck, Building2, Search, Trash2, Pencil, IdCard } from 'lucide-react';
 import Breadcrumbs from '../components/ui/Breadcrumbs';
 import DataTable from '../components/ui/DataTable';
+import Pagination from "../components/ui/Pagination";
 
 import StudentsPage from './people/StudentsPage';
 import FacultyPage from './people/FacultyPage';
@@ -20,6 +21,8 @@ import FacultyDocumentQueuePage from './people/FacultyDocumentQueuePage';
 import StaffDetailPage from './people/StaffDetailPage';
 import ParentDetailPage from './people/ParentDetailPage';
 import PersonaCatalogPage from './people/PersonaCatalogPage';
+import { confirmAction } from '../stores/confirmStore';
+import { useListControls } from '../hooks/useListControls';
 
 const CARDS = [
   { to: 'students', icon: GraduationCap, label: 'Students', desc: 'Student profiles & enrollment', iconBg: 'bg-primary-50 text-primary-600', border: 'border-primary-200 hover:border-primary-400', statKey: 'students' },
@@ -50,12 +53,12 @@ function PeopleHome() {
   const qc = useQueryClient();
   const { data: stats } = useQuery({ queryKey: ['people-stats'], queryFn: getStats });
 
-  const [page, setPage] = useState(1);
+  const { page, setPage, limit, setLimit } = useListControls({ initialLimit: 10 });
   const [search, setSearch] = useState('');
 
   const { data: personsData, isLoading } = useQuery({
-    queryKey: ['persons', page, search],
-    queryFn: () => listPersons(page, 15, search || undefined),
+    queryKey: ['persons', page, search, limit],
+    queryFn: () => listPersons(page, limit, search || undefined),
   });
 
   const deleteMut = useMutation({
@@ -110,7 +113,7 @@ function PeopleHome() {
             <Pencil size={15} className="text-amber-500" />
           </button>
         ))}
-        <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this person? This will not delete linked student/faculty/staff records.')) deleteMut.mutate(r._id); }} className="p-1.5 rounded hover:bg-red-50" title="Delete">
+        <button onClick={(e) => { e.stopPropagation(); void confirmAction({ title: 'Delete this person? This will not delete linked student/faculty/staff records.', tone: 'danger', confirmLabel: 'Delete' }).then((__c) => { if (__c.confirmed) { deleteMut.mutate(r._id); } }) }} className="p-1.5 rounded hover:bg-red-50" title="Delete">
           <Trash2 size={15} className="text-red-500" />
         </button>
       </div>
@@ -176,29 +179,17 @@ function PeopleHome() {
           }}
         />
 
-        {personsData && personsData.pages > 1 && (
-          <div className="flex items-center justify-between px-5 py-3 border-t">
-            <span className="text-sm text-gray-500">
-              Page {page} of {personsData.pages}
-            </span>
-            <div className="flex gap-2">
-              <button
-                disabled={page <= 1}
-                onClick={() => setPage(p => p - 1)}
-                className="flex items-center gap-1 px-3 py-1.5 border rounded-lg text-sm disabled:opacity-40 hover:bg-gray-50"
-              >
-                <ChevronLeft size={14} className="text-primary-500" /> Prev
-              </button>
-              <button
-                disabled={page >= personsData.pages}
-                onClick={() => setPage(p => p + 1)}
-                className="flex items-center gap-1 px-3 py-1.5 border rounded-lg text-sm disabled:opacity-40 hover:bg-gray-50"
-              >
-                Next <ChevronRight size={14} className="text-primary-500" />
-              </button>
-            </div>
-          </div>
-        )}
+        <div className="px-5 pb-3">
+          <Pagination
+            page={page}
+            pages={personsData?.pages ?? 1}
+            total={personsData?.total}
+            limit={limit}
+            onPageChange={setPage}
+            onLimitChange={setLimit}
+            itemLabel="people"
+          />
+        </div>
       </div>
     </div>
   );
