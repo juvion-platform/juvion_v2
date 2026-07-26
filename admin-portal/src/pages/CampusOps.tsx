@@ -6,7 +6,7 @@ import {
   ShieldCheck, Users, AlertTriangle, Camera, Phone,
   FlaskConical, ParkingCircle, Zap, Leaf, Droplets,
   Package, ArrowRightLeft, Wrench, CalendarCheck, HardHat,
-  Store, ClipboardList, Boxes, ArrowDownUp,
+  Store, ClipboardList, Boxes, ArrowDownUp, ClipboardCheck, UserCheck,
   Laptop, Network, ShieldAlert, Gauge, Trash2,
   BookOpen, BookMarked, BookCopy, IdCard, Banknote,
   DoorClosed, Globe, Newspaper,
@@ -85,6 +85,25 @@ function CampusOpsHome() {
           </div>
         </div>
       )}
+
+      {/* Service Allocations — these two routes existed but no card linked to
+          them, so they were reachable only by typing the URL. */}
+      <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Service Allocations</h3>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        {([
+          { to: 'allocation-proposals', icon: ClipboardCheck, label: 'Allocation Proposals', desc: 'Review hostel & transport proposals', iconBg: 'bg-emerald-50 text-emerald-600', border: 'border-emerald-200 hover:border-emerald-400' },
+          { to: 'my-services', icon: UserCheck, label: 'My Campus Services', desc: 'Your own hostel & transport allocations', iconBg: 'bg-sky-50 text-sky-600', border: 'border-sky-200 hover:border-sky-400' },
+        ] as const).map(card => {
+          const Icon = card.icon;
+          return (
+            <button key={card.to} onClick={() => navigate(card.to)} className={`bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all ${card.border}`}>
+              <div className={`inline-flex p-2.5 rounded-lg mb-3 ${card.iconBg}`}><Icon size={22} /></div>
+              <div className="font-semibold text-navy-dark text-sm">{card.label}</div>
+              <p className="text-xs text-gray-500 mt-1">{card.desc}</p>
+            </button>
+          );
+        })}
+      </div>
 
       {/* Campus Infrastructure */}
       <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Campus Infrastructure</h3>

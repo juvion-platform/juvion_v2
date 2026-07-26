@@ -42,6 +42,9 @@ const NAV_ITEMS: NavItem[] = [
     module: 'finance',
     children: [
       { to: '/finance/dashboard', label: 'Dashboard' },
+      // The full section-card hub lives at /finance/overview. It had no link
+      // anywhere in the UI, so it was reachable only by typing the URL.
+      { to: '/finance/overview', label: 'All Finance Sections' },
       { to: '/finance/fee-management', label: 'Fee Management' },
       { to: '/finance/scholarships-concessions', label: 'Scholarships & Concessions' },
       { to: '/finance/accounting', label: 'Accounting' },

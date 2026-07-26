@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listEmployees, createEmployee, updateEmployee, deleteEmployee } from '../../services/hr';
 import { listDepartments } from '../../services/academics';
+import { listPersons } from '../../services/people';
+import EntityPicker from '../../components/ui/EntityPicker';
 import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
@@ -106,7 +108,25 @@ export default function EmployeesPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <fieldset disabled={vem.isView} className="border-0 p-0 m-0 space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <div><label className={lbl}>Person ID *</label><input required value={form.personId} onChange={e => setForm(f => ({ ...f, personId: e.target.value }))} className={inp} /></div>
+              <div>
+                <label className={lbl} htmlFor="employee-person">
+                  Person * {!vem.isView && <Link to="/people" target="_blank" className={manageLink}>+ Manage <ExternalLink size={10} /></Link>}
+                </label>
+                <EntityPicker
+                  id="employee-person"
+                  required
+                  disabled={vem.isView}
+                  queryKey={['persons', 'picker']}
+                  fetcher={(q) => listPersons(1, 20, q || undefined)}
+                  value={form.personId}
+                  onChange={(v) => setForm(f => ({ ...f, personId: v }))}
+                  getId={(p: any) => p._id}
+                  getLabel={(p: any) => p.name || p._id}
+                  getHint={(p: any) => [p.phone, p.email].filter(Boolean).join(' · ') || undefined}
+                  fallbackLabel={vem.entity?.personId?.name}
+                  placeholder="Search people by name, phone or email"
+                />
+              </div>
               <div><label className={lbl}>Employee ID *</label><input required value={form.employeeId} onChange={e => setForm(f => ({ ...f, employeeId: e.target.value }))} className={inp} /></div>
               <div>
                 <label className={lbl}>Department * {!vem.isView && <Link to="/academics/departments" target="_blank" className={manageLink}>+ Manage <ExternalLink size={10} /></Link>}</label>
@@ -124,7 +144,22 @@ export default function EmployeesPage() {
                 </select>
               </div>
               <div><label className={lbl}>Joining Date *</label><input required type="date" value={form.joiningDate} onChange={e => setForm(f => ({ ...f, joiningDate: e.target.value }))} className={inp} /></div>
-              <div><label className={lbl}>Reporting To ID</label><input value={form.reportingToId} onChange={e => setForm(f => ({ ...f, reportingToId: e.target.value }))} className={inp} /></div>
+              <div>
+                <label className={lbl} htmlFor="employee-reporting-to">Reporting To</label>
+                <EntityPicker
+                  id="employee-reporting-to"
+                  disabled={vem.isView}
+                  queryKey={['employees', 'picker']}
+                  fetcher={(q) => listEmployees(1, 20, undefined, undefined, q || undefined)}
+                  value={form.reportingToId}
+                  onChange={(v) => setForm(f => ({ ...f, reportingToId: v }))}
+                  getId={(e: any) => e._id}
+                  getLabel={(e: any) => e.personId?.name || e.employeeId || e._id}
+                  getHint={(e: any) => [e.employeeId, e.designation].filter(Boolean).join(' · ') || undefined}
+                  fallbackLabel={vem.entity?.reportingToId?.personId?.name}
+                  placeholder="Search employees"
+                />
+              </div>
               <div><label className={lbl}>Status *</label>
                 <select required value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className={inp}>
                   {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}

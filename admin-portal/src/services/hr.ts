@@ -53,6 +53,16 @@ export const updateLeaveApplication = (id: string, data: any) =>
 export const deleteLeaveApplication = (id: string) =>
   api.delete(`${BASE}/leave-applications/${id}`).then(r => r.data);
 
+// Leave lifecycle. These transitions run balance deduction and approval
+// bookkeeping server-side — editing the raw `status` field via PUT skips all
+// of that, which is why the UI drives them through these endpoints instead.
+export const approveLeaveApplication = (id: string, data: { approverId?: string; remarks?: string } = {}) =>
+  api.post(`${BASE}/leave-applications/${id}/approve`, data).then(r => r.data);
+export const rejectLeaveApplication = (id: string, data: { approverId?: string; remarks?: string } = {}) =>
+  api.post(`${BASE}/leave-applications/${id}/reject`, data).then(r => r.data);
+export const withdrawLeaveApplication = (id: string) =>
+  api.post(`${BASE}/leave-applications/${id}/withdraw`, {}).then(r => r.data);
+
 // ─── Leave Balances ───────────────────────────────────────
 export const listLeaveBalances = (page = 1, limit = 20, employeeId?: string, academicYearId?: string, search?: string) =>
   api.get(`${BASE}/leave-balances`, { params: { page, limit, employeeId, academicYearId, ...(search ? { search } : {}) } }).then(r => r.data);

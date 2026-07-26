@@ -55,19 +55,27 @@ export default function PayrollPage() {
     onClose: () => setForm(emptyForm),
   });
 
+  // Derived totals — recomputed on every keystroke so the operator sees the
+  // payslip add up as they type instead of having to do the arithmetic.
+  const num = (v: string) => Number(v || 0);
+  const grossPay = num(form.basicPay) + num(form.hra) + num(form.da) + num(form.otherAllowances);
+  const totalDeductions = num(form.pf) + num(form.esi) + num(form.tds) + num(form.otherDeductions);
+  const netPay = grossPay - totalDeductions;
+
   const createMut = useMutation({ mutationFn: createPayroll, onSuccess: () => { qc.invalidateQueries({ queryKey: ['payroll'] }); vem.close(); } });
   const updateMut = useMutation({ mutationFn: ({ id, data }: any) => updatePayroll(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['payroll'] }); vem.close(); } });
   const deleteMut = useMutation({ mutationFn: deletePayroll, onSuccess: () => { qc.invalidateQueries({ queryKey: ['payroll'] }); } });
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (netPay < 0) return; // guarded in the UI too; belt and braces
     const payload: any = {
       ...form,
       month: Number(form.month),
       year: Number(form.year),
       basicPay: Number(form.basicPay),
-      grossPay: Number(form.grossPay),
-      netPay: Number(form.netPay),
+      grossPay,
+      netPay,
     };
     if (form.hra) payload.hra = Number(form.hra); else delete payload.hra;
     if (form.da) payload.da = Number(form.da); else delete payload.da;
@@ -143,12 +151,40 @@ export default function PayrollPage() {
               <div><label className={lbl}>HRA</label><input type="number" min={0} value={form.hra} onChange={e => setForm(f => ({ ...f, hra: e.target.value }))} className={inp} /></div>
               <div><label className={lbl}>DA</label><input type="number" min={0} value={form.da} onChange={e => setForm(f => ({ ...f, da: e.target.value }))} className={inp} /></div>
               <div><label className={lbl}>Other Allowances</label><input type="number" min={0} value={form.otherAllowances} onChange={e => setForm(f => ({ ...f, otherAllowances: e.target.value }))} className={inp} /></div>
-              <div><label className={lbl}>Gross Pay *</label><input required type="number" min={0} value={form.grossPay} onChange={e => setForm(f => ({ ...f, grossPay: e.target.value }))} className={inp} /></div>
               <div><label className={lbl}>PF</label><input type="number" min={0} value={form.pf} onChange={e => setForm(f => ({ ...f, pf: e.target.value }))} className={inp} /></div>
               <div><label className={lbl}>ESI</label><input type="number" min={0} value={form.esi} onChange={e => setForm(f => ({ ...f, esi: e.target.value }))} className={inp} /></div>
               <div><label className={lbl}>TDS</label><input type="number" min={0} value={form.tds} onChange={e => setForm(f => ({ ...f, tds: e.target.value }))} className={inp} /></div>
               <div><label className={lbl}>Other Deductions</label><input type="number" min={0} value={form.otherDeductions} onChange={e => setForm(f => ({ ...f, otherDeductions: e.target.value }))} className={inp} /></div>
-              <div><label className={lbl}>Net Pay *</label><input required type="number" min={0} value={form.netPay} onChange={e => setForm(f => ({ ...f, netPay: e.target.value }))} className={inp} /></div>
+
+              {/* Gross and net are arithmetic on the fields above. Asking an
+                  operator to re-add them by hand every month is how payslips
+                  end up disagreeing with their own components. */}
+              <div className="col-span-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-500">Gross Pay</p>
+                    <p className="text-lg font-semibold text-slate-800">₹{grossPay.toLocaleString('en-IN')}</p>
+                    <p className="text-xs text-slate-400">Basic + HRA + DA + Other allowances</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-500">Total Deductions</p>
+                    <p className="text-lg font-semibold text-slate-800">₹{totalDeductions.toLocaleString('en-IN')}</p>
+                    <p className="text-xs text-slate-400">PF + ESI + TDS + Other</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-500">Net Pay</p>
+                    <p className={`text-lg font-semibold ${netPay < 0 ? 'text-red-600' : 'text-teal-700'}`}>
+                      ₹{netPay.toLocaleString('en-IN')}
+                    </p>
+                    <p className="text-xs text-slate-400">Gross − deductions</p>
+                  </div>
+                </div>
+                {netPay < 0 && (
+                  <p className="mt-2 text-sm text-red-600" role="alert">
+                    Deductions exceed gross pay. Check the component amounts before saving.
+                  </p>
+                )}
+              </div>
               <div><label className={lbl}>Status *</label>
                 <select required value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className={inp}>
                   {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}

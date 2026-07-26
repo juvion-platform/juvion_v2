@@ -22,6 +22,7 @@ export default function LedgerPage() {
   const qc = useQueryClient();
   const { page, setPage, limit, setLimit, search, setSearch } = useListControls();
   const [form, setForm] = useState(emptyForm);
+  const [amountError, setAmountError] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({ queryKey: ['ledger', page, limit, search], queryFn: () => listFinancialLedger(page, limit, search) });
 
@@ -46,10 +47,27 @@ export default function LedgerPage() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const debit = Number(form.debit || 0);
+    const credit = Number(form.credit || 0);
+
+    // A ledger line has to move money. Leaving both blank previously saved a
+    // ₹0/₹0 entry that contributed nothing but still showed up in the journal.
+    if (debit <= 0 && credit <= 0) {
+      setAmountError('Enter a debit or a credit amount greater than zero.');
+      return;
+    }
+    // Single-sided entries only — a line that is both a debit and a credit is
+    // two entries, and silently accepting it makes the journal unbalanceable.
+    if (debit > 0 && credit > 0) {
+      setAmountError('An entry is either a debit or a credit, not both. Clear one of the two.');
+      return;
+    }
+    setAmountError(null);
+
     const payload: any = { ...form };
-    if (form.debit) payload.debit = Number(form.debit);
+    if (debit > 0) payload.debit = debit;
     else delete payload.debit;
-    if (form.credit) payload.credit = Number(form.credit);
+    if (credit > 0) payload.credit = credit;
     else delete payload.credit;
     if (!payload.referenceId) delete payload.referenceId;
     if (!payload.referenceType) delete payload.referenceType;
@@ -116,8 +134,11 @@ export default function LedgerPage() {
               </div>
               <div><label className={lbl}>Category *</label><input required value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className={inp} /></div>
               <div><label className={lbl}>Description *</label><input required value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className={inp} /></div>
-              <div><label className={lbl}>Debit</label><input type="number" min={0} value={form.debit} onChange={e => setForm(f => ({ ...f, debit: e.target.value }))} className={inp} /></div>
-              <div><label className={lbl}>Credit</label><input type="number" min={0} value={form.credit} onChange={e => setForm(f => ({ ...f, credit: e.target.value }))} className={inp} /></div>
+              <div><label className={lbl}>Debit</label><input type="number" min={0} step="0.01" value={form.debit} onChange={e => { setAmountError(null); setForm(f => ({ ...f, debit: e.target.value })); }} className={inp} aria-invalid={Boolean(amountError)} /></div>
+              <div><label className={lbl}>Credit</label><input type="number" min={0} step="0.01" value={form.credit} onChange={e => { setAmountError(null); setForm(f => ({ ...f, credit: e.target.value })); }} className={inp} aria-invalid={Boolean(amountError)} /></div>
+              {amountError && (
+                <p className="col-span-2 -mt-2 text-sm text-red-600" role="alert">{amountError}</p>
+              )}
               <div><label className={lbl}>Reference ID</label><input value={form.referenceId} onChange={e => setForm(f => ({ ...f, referenceId: e.target.value }))} className={inp} placeholder="Optional" /></div>
               <div><label className={lbl}>Reference Type</label><input value={form.referenceType} onChange={e => setForm(f => ({ ...f, referenceType: e.target.value }))} className={inp} placeholder="Optional" /></div>
             </div>

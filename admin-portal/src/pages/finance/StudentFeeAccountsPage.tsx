@@ -65,11 +65,9 @@ export default function StudentFeeAccountsPage() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const payload: any = { studentId: form.studentId };
+    // Only the assessed amount is caller-supplied; totalPaid/Waived/Refunded
+    // and balance are owned by the payment pipeline and rejected by the API.
     if (form.totalDue !== '') payload.totalDue = Number(form.totalDue);
-    if (form.totalPaid !== '') payload.totalPaid = Number(form.totalPaid);
-    if (form.totalWaived !== '') payload.totalWaived = Number(form.totalWaived);
-    if (form.totalRefunded !== '') payload.totalRefunded = Number(form.totalRefunded);
-    if (form.balance !== '') payload.balance = Number(form.balance);
     if (form.lastPaymentDate) payload.lastPaymentDate = form.lastPaymentDate;
 
     if (vem.isEdit && vem.entity) updateMut.mutate({ id: vem.entity._id, data: payload });
@@ -146,11 +144,37 @@ export default function StudentFeeAccountsPage() {
                   ))}
                 </select>
               </div>
-              <div><label className={lbl}>Balance</label><input type="number" min={0} value={form.balance} onChange={(e) => setForm((f) => ({ ...f, balance: e.target.value }))} className={inp} /></div>
               <div><label className={lbl}>Total Due</label><input type="number" min={0} value={form.totalDue} onChange={(e) => setForm((f) => ({ ...f, totalDue: e.target.value }))} className={inp} /></div>
-              <div><label className={lbl}>Total Paid</label><input type="number" min={0} value={form.totalPaid} onChange={(e) => setForm((f) => ({ ...f, totalPaid: e.target.value }))} className={inp} /></div>
-              <div><label className={lbl}>Total Waived</label><input type="number" min={0} value={form.totalWaived} onChange={(e) => setForm((f) => ({ ...f, totalWaived: e.target.value }))} className={inp} /></div>
-              <div><label className={lbl}>Total Refunded</label><input type="number" min={0} value={form.totalRefunded} onChange={(e) => setForm((f) => ({ ...f, totalRefunded: e.target.value }))} className={inp} /></div>
+
+              {/* Derived from the payment ledger — the backend maintains these
+                  with $inc on every payment/waiver/refund. Editing them by hand
+                  desyncs the account from its transactions, so they are shown
+                  read-only rather than as inputs. */}
+              <div className="col-span-2">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Computed from payments — not editable
+                  </p>
+                  <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm sm:grid-cols-4">
+                    {([
+                      ['Total Paid', form.totalPaid],
+                      ['Total Waived', form.totalWaived],
+                      ['Total Refunded', form.totalRefunded],
+                      ['Balance', form.balance],
+                    ] as const).map(([label, value]) => (
+                      <div key={label}>
+                        <dt className="text-xs text-slate-500">{label}</dt>
+                        <dd className="font-medium text-slate-800">
+                          ₹{Number(value || 0).toLocaleString('en-IN')}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                  <p className="mt-2 text-xs text-slate-400">
+                    Record a payment, waiver or refund to change these figures.
+                  </p>
+                </div>
+              </div>
               <div><label className={lbl}>Last Payment Date</label><input type="date" value={form.lastPaymentDate} onChange={(e) => setForm((f) => ({ ...f, lastPaymentDate: e.target.value }))} className={inp} /></div>
             </div>
           </fieldset>
