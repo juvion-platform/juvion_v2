@@ -9,6 +9,7 @@ import { Plus, Pencil, Eye, Phone, ChevronRight } from 'lucide-react';
 import Pagination from '../../components/ui/Pagination';
 import { useListControls } from '../../hooks/useListControls';
 import SearchInput from '../../components/ui/SearchInput';
+import { confirmAction } from '../../stores/confirmStore';
 
 const STATUS_COLOR: Record<string, string> = {
   draft: 'default', submitted: 'info', under_review: 'warning', eligible: 'success', ineligible: 'danger',
@@ -91,9 +92,19 @@ export default function ApplicantsPage() {
     return flow[current] || null;
   }
 
-  function advanceStatus(row: any) {
+  async function advanceStatus(row: any) {
     const next = nextStatus(row.status);
-    if (next) updateMut.mutate({ id: row._id, data: { status: next } });
+    if (!next) return;
+    // Advancing an applicant is a one-way move through the admissions funnel
+    // and used to fire instantly on a single chevron click, with no undo.
+    const who = row.name || row.applicationNumber || 'this applicant';
+    const { confirmed } = await confirmAction({
+      title: `Move ${who} to “${next.replace(/_/g, ' ')}”?`,
+      message: `Current status is “${row.status?.replace(/_/g, ' ')}”. There is no one-click undo — you would have to set the status back manually.`,
+      confirmLabel: 'Advance status',
+    });
+    if (!confirmed) return;
+    updateMut.mutate({ id: row._id, data: { status: next } });
   }
 
   const tabs: { key: Tab; label: string }[] = [
@@ -122,7 +133,7 @@ export default function ApplicantsPage() {
         <button onClick={(e) => { e.stopPropagation(); openDetail(r); }} className="p-1 rounded hover:bg-blue-50" title="View"><Eye size={15} className="text-blue-500" /></button>
         <button onClick={(e) => { e.stopPropagation(); openEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
         {nextStatus(r.status) && (
-          <button onClick={(e) => { e.stopPropagation(); advanceStatus(r); }} className="p-1 rounded hover:bg-green-50" title={`Advance to ${nextStatus(r.status)?.replace(/_/g, ' ')}`}>
+          <button onClick={(e) => { e.stopPropagation(); void advanceStatus(r); }} className="p-1 rounded hover:bg-green-50" title={`Advance to ${nextStatus(r.status)?.replace(/_/g, ' ')}`}>
             <ChevronRight size={15} className="text-green-500" />
           </button>
         )}
@@ -284,7 +295,7 @@ export default function ApplicantsPage() {
                 <Badge variant={STATUS_COLOR[selected.status]}>{selected.status?.replace(/_/g, ' ')}</Badge>
               </div>
               {nextStatus(selected.status) && (
-                <button onClick={() => { advanceStatus(selected); setDetailOpen(false); }} className="flex items-center gap-1 text-sm bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700">
+                <button onClick={() => { void advanceStatus(selected); setDetailOpen(false); }} className="flex items-center gap-1 text-sm bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700">
                   <ChevronRight size={14} className="text-white" /> Advance to {nextStatus(selected.status)?.replace(/_/g, ' ')}
                 </button>
               )}

@@ -132,6 +132,10 @@ export async function createAdmission(req: AuthRequest, res: Response, next: Nex
   try { res.status(201).json(await svc.createAdmission(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
 }
 
+export async function updateAdmission(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await svc.updateAdmission(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
+}
+
 // ─── Dashboard ───────────────────────────────────────────────
 export async function dashboardStats(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await svc.getDashboardStats(req.collegeId!)); } catch (e) { next(e); }

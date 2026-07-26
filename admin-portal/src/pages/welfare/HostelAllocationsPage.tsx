@@ -34,6 +34,11 @@ export default function HostelAllocationsPage() {
 
   const students = studentsData?.items || [];
   const rooms = roomsData?.items || [];
+
+  // The model carries both `currentOccupancy` and a legacy `occupancy`; prefer
+  // the former and fall back so older records still report a real number.
+  const roomOccupancy = (r: any): number => Number(r?.currentOccupancy ?? r?.occupancy ?? 0);
+  const selectedRoom = rooms.find((r: any) => r._id === form.roomId);
   const academicYears = ayData?.items || [];
 
   const vem = useViewEditMode<any>({
@@ -120,10 +125,32 @@ export default function HostelAllocationsPage() {
                 </select>
               </div>
               <div><label className={lbl}>Room * {!vem.isView && <Link to="/welfare/hostel-rooms" target="_blank" className={manageLink}>+ Manage <ExternalLink size={10} /></Link>}</label>
+                {/* Occupancy is shown per option and full rooms are disabled —
+                    the plain roomNumber list let a full room be allocated
+                    again with no warning at all. */}
                 <select required value={form.roomId} onChange={e => setForm(f => ({ ...f, roomId: e.target.value }))} className={inp}>
                   <option value="">Select room...</option>
-                  {rooms.map((r: any) => <option key={r._id} value={r._id}>{r.roomNumber}</option>)}
+                  {rooms.map((r: any) => {
+                    const occ = roomOccupancy(r);
+                    const isFull = r.capacity != null && occ >= r.capacity;
+                    // Never hide the currently-allocated room from its own edit form.
+                    const disabled = isFull && r._id !== form.roomId;
+                    return (
+                      <option key={r._id} value={r._id} disabled={disabled}>
+                        {r.roomNumber}
+                        {r.capacity != null ? ` — ${occ}/${r.capacity} occupied${isFull ? ' (full)' : ''}` : ''}
+                        {r.status && r.status !== 'available' ? ` · ${r.status}` : ''}
+                      </option>
+                    );
+                  })}
                 </select>
+                {selectedRoom && selectedRoom.capacity != null && (
+                  <p className={`mt-1 text-xs ${roomOccupancy(selectedRoom) >= selectedRoom.capacity ? 'text-red-600' : 'text-slate-500'}`}>
+                    {roomOccupancy(selectedRoom) >= selectedRoom.capacity
+                      ? 'This room is at capacity.'
+                      : `${selectedRoom.capacity - roomOccupancy(selectedRoom)} bed(s) free of ${selectedRoom.capacity}.`}
+                  </p>
+                )}
               </div>
               <div><label className={lbl}>Academic Year * {!vem.isView && <Link to="/academics/academic-years" target="_blank" className={manageLink}>+ Manage <ExternalLink size={10} /></Link>}</label>
                 <select required value={form.academicYearId} onChange={e => setForm(f => ({ ...f, academicYearId: e.target.value }))} className={inp}>

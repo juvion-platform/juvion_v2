@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listIQACReports, createIQACReport, updateIQACReport, deleteIQACReport } from '../../services/compliance';
+import { listAcademicYears } from '../../services/academics';
 import DataTable from '../../components/ui/DataTable';
+import EntityPicker from '../../components/ui/EntityPicker';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
@@ -93,8 +95,22 @@ export default function IQACReportsPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <fieldset disabled={vem.isView} className="border-0 p-0 m-0 space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <div><label className={lbl}>Academic Year ID *</label>
-                <input required value={form.academicYearId} onChange={e => setForm(f => ({ ...f, academicYearId: e.target.value }))} className={inp} />
+              <div>
+                <label className={lbl} htmlFor="iqac-year">Academic Year *</label>
+                <EntityPicker
+                  id="iqac-year"
+                  required
+                  disabled={vem.isView}
+                  queryKey={['academic-years', 'picker']}
+                  fetcher={(q) => listAcademicYears(1, 20, q || undefined)}
+                  value={form.academicYearId}
+                  onChange={(v) => setForm(f => ({ ...f, academicYearId: v }))}
+                  getId={(x: any) => x._id}
+                  getLabel={(y: any) => y.label || y.code || y._id}
+                  getHint={(y: any) => y.startDate ? new Date(y.startDate).getFullYear().toString() : undefined}
+                  fallbackLabel={vem.entity?.academicYearId?.label}
+                  placeholder="Search academic year"
+                />
               </div>
               <div><label className={lbl}>Report Type *</label>
                 <select required value={form.reportType} onChange={e => setForm(f => ({ ...f, reportType: e.target.value }))} className={inp}>

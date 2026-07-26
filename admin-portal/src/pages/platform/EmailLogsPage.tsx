@@ -1,12 +1,11 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { listEmailLogs, createEmailLog, updateEmailLog, deleteEmailLog } from '../../services/platform';
+import { listEmailLogs, createEmailLog, updateEmailLog } from '../../services/platform';
 import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Pencil } from 'lucide-react';
 import { useViewEditMode } from '../../hooks/useViewEditMode';
-import { confirmAction } from '../../stores/confirmStore';
 import Pagination from '../../components/ui/Pagination';
 import { useListControls } from '../../hooks/useListControls';
 import SearchInput from '../../components/ui/SearchInput';
@@ -38,7 +37,6 @@ export default function EmailLogsPage() {
 
   const createMut = useMutation({ mutationFn: createEmailLog, onSuccess: () => { qc.invalidateQueries({ queryKey: ['email-logs'] }); vem.close(); } });
   const updateMut = useMutation({ mutationFn: ({ id, data }: any) => updateEmailLog(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['email-logs'] }); vem.close(); } });
-  const deleteMut = useMutation({ mutationFn: deleteEmailLog, onSuccess: () => { qc.invalidateQueries({ queryKey: ['email-logs'] }); } });
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -67,7 +65,6 @@ export default function EmailLogsPage() {
     { key: 'actions', label: '', render: (r: any) => (
       <div className="flex gap-1">
         <button onClick={(e) => { e.stopPropagation(); vem.openForEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
-        <button onClick={(e) => { e.stopPropagation(); void confirmAction({ title: 'Delete this email log?', tone: 'danger', confirmLabel: 'Delete' }).then((__c) => { if (__c.confirmed) { deleteMut.mutate(r._id); } }) }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
       </div>
     )},
   ];
@@ -78,9 +75,7 @@ export default function EmailLogsPage() {
         <h2 className="text-xl font-bold text-navy">Email Logs</h2>
         <div className="flex items-center gap-3">
           <SearchInput value={search} onChange={setSearch} placeholder="Search email logs…" className="w-56" />
-        <button onClick={vem.openForCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700">
-          <Plus size={16} className="text-white" /> New Email Log
-        </button>
+        <span className="text-xs text-slate-400">Read-only · Email delivery logs are written by the notification pipeline.</span>
       </div>
       </div>
 

@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { listWhatsAppLogs, createWhatsAppLog, updateWhatsAppLog, deleteWhatsAppLog } from '../../services/platform';
+import { listWhatsAppLogs, createWhatsAppLog, updateWhatsAppLog } from '../../services/platform';
 import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
-import { confirmAction } from '../../stores/confirmStore';
+import { Pencil } from 'lucide-react';
 import Pagination from '../../components/ui/Pagination';
 import { useListControls } from '../../hooks/useListControls';
 import SearchInput from '../../components/ui/SearchInput';
@@ -25,13 +24,9 @@ export default function WhatsAppLogsPage() {
 
   const createMut = useMutation({ mutationFn: createWhatsAppLog, onSuccess: () => { qc.invalidateQueries({ queryKey: ['whatsapp-logs'] }); closeModal(); } });
   const updateMut = useMutation({ mutationFn: ({ id, data }: any) => updateWhatsAppLog(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['whatsapp-logs'] }); closeModal(); } });
-  const deleteMut = useMutation({ mutationFn: deleteWhatsAppLog, onSuccess: () => { qc.invalidateQueries({ queryKey: ['whatsapp-logs'] }); } });
 
-  function openCreate() {
-    setEditing(null);
-    setForm({ recipientPhone: '', recipientId: '', templateName: '', message: '', mediaUrl: '', status: 'queued' });
-    setModalOpen(true);
-  }
+  // No openCreate: WhatsApp logs are written by the notification pipeline, so
+  // the page is a viewer/editor for delivery status, not an authoring surface.
   function openEdit(row: any) {
     setEditing(row);
     setForm({
@@ -73,7 +68,6 @@ export default function WhatsAppLogsPage() {
     { key: 'actions', label: '', render: (r: any) => (
       <div className="flex gap-1">
         <button onClick={(e) => { e.stopPropagation(); openEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
-        <button onClick={(e) => { e.stopPropagation(); void confirmAction({ title: 'Delete this WhatsApp log?', tone: 'danger', confirmLabel: 'Delete' }).then((__c) => { if (__c.confirmed) { deleteMut.mutate(r._id); } }) }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
       </div>
     )},
   ];
@@ -84,9 +78,7 @@ export default function WhatsAppLogsPage() {
         <h2 className="text-xl font-bold text-navy">WhatsApp Logs</h2>
         <div className="flex items-center gap-3">
           <SearchInput value={search} onChange={setSearch} placeholder="Search whatsapp logs…" className="w-56" />
-        <button onClick={openCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700">
-          <Plus size={16} className="text-white" /> New WhatsApp Log
-        </button>
+          <span className="text-xs text-slate-400">Read-only · WhatsApp delivery logs are written by the notification pipeline.</span>
       </div>
       </div>
 

@@ -86,7 +86,27 @@ export default function AntiRaggingComplaintsPage() {
     { key: 'actions', label: '', render: (r: any) => (
       <div className="flex gap-1">
         <button onClick={(e) => { e.stopPropagation(); vem.openForEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
-        <button onClick={(e) => { e.stopPropagation(); void confirmAction({ title: 'Delete this complaint?', tone: 'danger', confirmLabel: 'Delete' }).then((__c) => { if (__c.confirmed) { deleteMut.mutate(r._id); } }) }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
+        {/* Anti-ragging complaints are statutory records (UGC Regulations
+            2009). Deletion is gated behind a typed confirmation and a recorded
+            reason rather than a one-click trash icon. */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            void confirmAction({
+              title: 'Permanently delete this anti-ragging complaint?',
+              message: 'This is a statutory record. Deleting it removes the complaint and its history for good — prefer closing the complaint with an outcome instead.',
+              tone: 'danger',
+              confirmLabel: 'Delete permanently',
+              requireTypedConfirmation: 'DELETE',
+              requireReason: true,
+              reasonLabel: 'Reason for deletion (recorded on the audit trail)',
+            }).then((__c) => { if (__c.confirmed) { deleteMut.mutate(r._id); } });
+          }}
+          className="p-1 rounded hover:bg-red-50"
+          title="Delete"
+        >
+          <Trash2 size={15} className="text-red-500" />
+        </button>
       </div>
     )},
   ];

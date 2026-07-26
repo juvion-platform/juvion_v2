@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { listExamScores, createExamScore, listApplicants } from '../../services/admissions';
+import { listExamScores, createExamScore, updateExamScore, listApplicants } from '../../services/admissions';
 import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
-import { Plus, ExternalLink } from 'lucide-react';
+import { Plus, Pencil, ExternalLink } from 'lucide-react';
 import { useViewEditMode } from '../../hooks/useViewEditMode';
 import Pagination from '../../components/ui/Pagination';
 import { useListControls } from '../../hooks/useListControls';
@@ -46,18 +46,27 @@ export default function ExamScoresPage() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['exam-scores'] }); vem.close(); },
   });
 
+  // The backend has exposed PUT /exam-scores/:id all along; the page just
+  // never called it, leaving every record permanently read-only.
+  const updateMut = useMutation({
+    mutationFn: ({ id, data }: any) => updateExamScore(id, data),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['exam-scores'] }); vem.close(); },
+  });
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    createMut.mutate({
+    const payload = {
       applicantId: form.applicantId,
       examType: form.examType,
       rank: form.rank ? Number(form.rank) : undefined,
       score: Number(form.score),
       year: Number(form.year),
-    });
+    };
+    if (vem.isEdit && vem.entity) updateMut.mutate({ id: vem.entity._id, data: payload });
+    else createMut.mutate(payload);
   }
 
-  const saving = createMut.isPending;
+  const saving = createMut.isPending || updateMut.isPending;
 
   const columns = [
     { key: 'examType', label: 'Exam', render: (r: any) => <Badge variant="info">{r.examType}</Badge> },
@@ -65,6 +74,11 @@ export default function ExamScoresPage() {
     { key: 'rank', label: 'Rank', render: (r: any) => r.rank || '—' },
     { key: 'year', label: 'Year' },
     { key: 'createdAt', label: 'Recorded', render: (r: any) => new Date(r.createdAt).toLocaleDateString() },
+    { key: 'actions', label: '', sortable: false, render: (r: any) => (
+      <button onClick={(e) => { e.stopPropagation(); vem.openForEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit">
+        <Pencil size={15} className="text-amber-500" />
+      </button>
+    )},
   ];
 
   return (
@@ -134,9 +148,13 @@ export default function ExamScoresPage() {
             <button type="button" onClick={vem.close} className="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50">
               {vem.isView ? 'Close' : 'Cancel'}
             </button>
-            {!vem.isView && (
+            {vem.isView ? (
+              <button type="button" onClick={vem.switchToEdit} className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700">
+                <Pencil size={14} /> Edit
+              </button>
+            ) : (
               <button type="submit" disabled={saving} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
-                {saving ? 'Saving…' : 'Add Score'}
+                {saving ? 'Saving…' : vem.isEdit ? 'Update' : 'Add Score'}
               </button>
             )}
           </div>

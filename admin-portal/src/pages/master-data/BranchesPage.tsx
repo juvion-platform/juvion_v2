@@ -40,7 +40,7 @@ export default function BranchesPage() {
 
   const createMut = useMutation({
     mutationFn: createBranch,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['branches'] }); vem.close(); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['branches'] }); qc.invalidateQueries({ queryKey: ['academics-stats'] }); vem.close(); },
   });
   const updateMut = useMutation({
     mutationFn: ({ id, data }: any) => updateBranch(id, data),
@@ -48,7 +48,7 @@ export default function BranchesPage() {
   });
   const deleteMut = useMutation({
     mutationFn: deleteBranch,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['branches'] }); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['branches'] }); qc.invalidateQueries({ queryKey: ['academics-stats'] }); },
   });
 
   function handleSubmit(e: React.FormEvent) {

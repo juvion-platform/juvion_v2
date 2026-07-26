@@ -57,12 +57,18 @@ export const listExamScores = (page = 1, limit = 20, applicantId?: string, searc
 export const createExamScore = (data: any) =>
   api.post(`${BASE}/exam-scores`, data).then(r => r.data);
 
+export const updateExamScore = (id: string, data: any) =>
+  api.put(`${BASE}/exam-scores/${id}`, data).then(r => r.data);
+
 // ─── Counseling ────────────────────────────────────────
 export const listCounseling = (page = 1, limit = 20, applicantId?: string, search?: string) =>
   api.get(`${BASE}/counseling`, { params: { page, limit, applicantId, ...(search ? { search } : {}) } }).then(r => r.data);
 
 export const createCounseling = (data: any) =>
   api.post(`${BASE}/counseling`, data).then(r => r.data);
+
+export const updateCounseling = (id: string, data: any) =>
+  api.put(`${BASE}/counseling/${id}`, data).then(r => r.data);
 
 // ─── Offers ────────────────────────────────────────────
 export const listOffers = (page = 1, limit = 20, status?: string, search?: string) =>
@@ -90,6 +96,9 @@ export const listEnrollments = (page = 1, limit = 20, search?: string) =>
 
 export const createEnrollment = (data: any) =>
   api.post(`${BASE}/enrollments`, data).then(r => r.data);
+
+export const updateEnrollment = (id: string, data: any) =>
+  api.put(`${BASE}/enrollments/${id}`, data).then(r => r.data);
 
 // ─── Workflow ──────────────────────────────────────────
 export const getWorkflowStats = () =>

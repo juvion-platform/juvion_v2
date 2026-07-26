@@ -288,13 +288,44 @@ export default function ParentsPage() {
               <h3 className="font-semibold text-navy-dark">Linked Students</h3>
               <Link to="/people/students" target="_blank" className={manageLink}>+ Manage</Link>
             </div>
-            <select multiple value={form.linkedStudents} onChange={e => setForm(f => ({ ...f, linkedStudents: Array.from(e.target.selectedOptions).map(option => option.value) }))} className={`${inp} h-40`}>
-              {studentOptions.map((student: any) => (
-                <option key={student._id} value={student._id}>
-                  {(student.person?.name || student.personId?.name || 'Student')} {student.rollNumber ? `(${student.rollNumber})` : ''}
-                </option>
-              ))}
-            </select>
+            {/* Was a native <select multiple>, which silently replaces the
+                whole selection unless the user holds ⌘/Ctrl — and said so
+                nowhere. Checkboxes make each pick independent and obvious. */}
+            <div className={`${inp} h-40 overflow-y-auto p-0`}>
+              {studentOptions.length === 0 ? (
+                <p className="p-3 text-sm text-gray-400">No students available.</p>
+              ) : (
+                <ul className="divide-y divide-gray-100">
+                  {studentOptions.map((student: any) => {
+                    const checked = form.linkedStudents.includes(student._id);
+                    return (
+                      <li key={student._id}>
+                        <label className="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm hover:bg-primary-50">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => setForm(f => ({
+                              ...f,
+                              linkedStudents: checked
+                                ? f.linkedStudents.filter((id: string) => id !== student._id)
+                                : [...f.linkedStudents, student._id],
+                            }))}
+                            className="h-4 w-4 rounded border-gray-300"
+                          />
+                          <span>
+                            {(student.person?.name || student.personId?.name || 'Student')}
+                            {student.rollNumber ? <span className="ml-1 text-xs text-gray-500">({student.rollNumber})</span> : null}
+                          </span>
+                        </label>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+            <p className="mt-1 text-xs text-gray-500">
+              {form.linkedStudents.length} student{form.linkedStudents.length === 1 ? '' : 's'} selected
+            </p>
           </section>
 
           <section>

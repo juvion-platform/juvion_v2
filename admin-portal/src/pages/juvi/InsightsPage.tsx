@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listInsights, createInsight, updateInsight, deleteInsight } from '../../services/juvi';
 import DataTable from '../../components/ui/DataTable';
+import MultiSelect, { type MultiSelectOption } from '../../components/ui/MultiSelect';
+import { listPersonas, type PersonaDescriptor } from '../../services/people';
+import { MODULE_OPTIONS } from '../../lib/modules';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
@@ -17,7 +20,10 @@ const STATUSES = ['new', 'seen', 'acted_upon', 'dismissed', 'expired'] as const;
 const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default";
 const lbl = "block text-sm font-medium text-gray-700 mb-1";
 
-const emptyForm = { type: 'recommendation' as string, module: '', title: '', description: '', severity: 'info' as string, targetPersonas: '', isActionable: false, actionSuggestion: '', status: 'new' as string };
+const emptyForm: {
+  type: string; module: string; title: string; description: string; severity: string;
+  targetPersonas: string[]; isActionable: boolean; actionSuggestion: string; status: string;
+} = { type: 'recommendation', module: '', title: '', description: '', severity: 'info', targetPersonas: [], isActionable: false, actionSuggestion: '', status: 'new' };
 
 export default function InsightsPage() {
   const qc = useQueryClient();
@@ -26,6 +32,13 @@ export default function InsightsPage() {
 
   const { data, isLoading } = useQuery({ queryKey: ['juvi-insights', page, limit, search], queryFn: () => listInsights(page, limit, undefined, undefined, search) });
 
+  const { data: personas } = useQuery({ queryKey: ['personas', 'catalog'], queryFn: listPersonas });
+  const personaOptions: MultiSelectOption[] = (personas?.all ?? []).map((p: PersonaDescriptor) => ({
+    value: p.code,
+    label: p.label,
+    hint: p.code,
+  }));
+
   const vem = useViewEditMode<any>({
     onOpenEntity: (row) => setForm({
       type: row.type || 'recommendation',
@@ -33,7 +46,7 @@ export default function InsightsPage() {
       title: row.title || '',
       description: row.description || '',
       severity: row.severity || 'info',
-      targetPersonas: (row.targetPersonas || []).join(', '),
+      targetPersonas: row.targetPersonas || [],
       isActionable: row.isActionable ?? false,
       actionSuggestion: row.actionSuggestion || '',
       status: row.status || 'new',
@@ -49,7 +62,7 @@ export default function InsightsPage() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const payload: any = { ...form };
-    payload.targetPersonas = form.targetPersonas ? form.targetPersonas.split(',').map(s => s.trim()).filter(Boolean) : [];
+    payload.targetPersonas = form.targetPersonas;
     if (!payload.description) delete payload.description;
     if (!payload.actionSuggestion) delete payload.actionSuggestion;
     if (vem.isEdit && vem.entity) updateMut.mutate({ id: vem.entity._id, data: payload });
@@ -110,14 +123,33 @@ export default function InsightsPage() {
                   {TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
-              <div><label className={lbl}>Module *</label><input required value={form.module} onChange={e => setForm(f => ({ ...f, module: e.target.value }))} className={inp} /></div>
+              <div><label className={lbl}>Module *</label>
+                {/* Free text here produced insights scoped to modules that
+                    don't exist. Constrained to the canonical slugs. */}
+                <select required value={form.module} onChange={e => setForm(f => ({ ...f, module: e.target.value }))} className={inp}>
+                  <option value="">Select module...</option>
+                  {MODULE_OPTIONS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                </select>
+              </div>
               <div><label className={lbl}>Severity</label>
                 <select value={form.severity} onChange={e => setForm(f => ({ ...f, severity: e.target.value }))} className={inp}>
                   {SEVERITIES.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
               <div className="col-span-2"><label className={lbl}>Description</label><textarea rows={3} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className={inp} /></div>
-              <div><label className={lbl}>Target Personas (comma-separated)</label><input value={form.targetPersonas} onChange={e => setForm(f => ({ ...f, targetPersonas: e.target.value }))} className={inp} placeholder="admin, faculty" /></div>
+              <div className="col-span-2">
+                <label className={lbl}>Target Personas</label>
+                {/* Sourced from the live persona catalog (GET /people/personas)
+                    so codes always match backend/src/shared/rbac/personas.ts.
+                    Free text let a typo target nobody. */}
+                <MultiSelect
+                  options={personaOptions}
+                  value={form.targetPersonas}
+                  onChange={(v) => setForm(f => ({ ...f, targetPersonas: v }))}
+                  disabled={vem.isView}
+                  emptyMessage="Loading persona catalog…"
+                />
+              </div>
               <div><label className={lbl}>Status</label>
                 <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className={inp}>
                   {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}

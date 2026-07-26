@@ -12,6 +12,7 @@ import { confirmAction } from '../../stores/confirmStore';
 import Pagination from '../../components/ui/Pagination';
 import { useListControls } from '../../hooks/useListControls';
 import SearchInput from '../../components/ui/SearchInput';
+import { rangeError } from '../../lib/validation';
 
 const STATUSES = ['planning', 'active', 'completed'] as const;
 const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default";
@@ -43,9 +44,12 @@ export default function PlacementSeasonsPage() {
   const createMut = useMutation({ mutationFn: createPlacementSeason, onSuccess: () => { qc.invalidateQueries({ queryKey: ['placement-seasons'] }); vem.close(); } });
   const updateMut = useMutation({ mutationFn: ({ id, data }: any) => updatePlacementSeason(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['placement-seasons'] }); vem.close(); } });
   const deleteMut = useMutation({ mutationFn: deletePlacementSeason, onSuccess: () => { qc.invalidateQueries({ queryKey: ['placement-seasons'] }); } });
+  const dateError = rangeError(form.startDate, form.endDate, { startLabel: 'start date', endLabel: 'end date', allowEqual: true });
+
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (dateError) return;
     const payload = { ...form };
     if (vem.isEdit && vem.entity) updateMut.mutate({ id: vem.entity._id, data: payload });
     else createMut.mutate(payload);
@@ -106,6 +110,7 @@ export default function PlacementSeasonsPage() {
               </div>
               <div><label className={lbl}>Start Date *</label><input required type="date" value={form.startDate} onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))} className={inp} /></div>
               <div><label className={lbl}>End Date *</label><input required type="date" value={form.endDate} onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))} className={inp} /></div>
+              {dateError && <p className="col-span-2 -mt-2 text-sm text-red-600" role="alert">{dateError}</p>}
               <div><label className={lbl}>Status</label>
                 <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className={inp}>
                   {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
@@ -122,7 +127,7 @@ export default function PlacementSeasonsPage() {
                 <Pencil size={14} /> Edit
               </button>
             ) : (
-              <button type="submit" disabled={saving} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
+              <button type="submit" disabled={saving || Boolean(dateError)} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
                 {saving ? 'Saving…' : vem.isEdit ? 'Update' : 'Create'}
               </button>
             )}

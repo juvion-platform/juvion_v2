@@ -1,13 +1,10 @@
-import { Routes, Route, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getStats } from '../services/academics';
 import { BookOpen, GraduationCap, Building2, GitBranch, Users, LayoutGrid, Calendar, Clock, BookMarked, Map, Layers, UserCheck, CalendarDays, Table2, ClipboardCheck, FileText, FileCheck, Award, Target, MessageSquare, BookCopy, TrendingUp } from 'lucide-react';
 import Breadcrumbs from '../components/ui/Breadcrumbs';
 
 import RegulationsPage from './academics/RegulationsPage';
-import ProgrammesPage from './academics/ProgrammesPage';
-import DepartmentsPage from './academics/DepartmentsPage';
-import BranchesPage from './academics/BranchesPage';
 import BatchesPage from './academics/BatchesPage';
 import SectionsPage from './academics/SectionsPage';
 import AcademicYearsPage from './academics/AcademicYearsPage';
@@ -197,9 +194,11 @@ export default function Academics() {
       <Routes>
         <Route index element={<AcademicsHome />} />
         <Route path="regulations" element={<RegulationsPage />} />
-        <Route path="programmes" element={<ProgrammesPage />} />
-        <Route path="departments" element={<DepartmentsPage />} />
-        <Route path="branches" element={<BranchesPage />} />
+        {/* Canonical home for these three is Master Data — see
+            pages/master-data/. Redirect rather than maintain a duplicate. */}
+        <Route path="programmes" element={<Navigate to="/master-data/programmes" replace />} />
+        <Route path="departments" element={<Navigate to="/master-data/departments" replace />} />
+        <Route path="branches" element={<Navigate to="/master-data/branches" replace />} />
         <Route path="batches" element={<BatchesPage />} />
         <Route path="sections" element={<SectionsPage />} />
         <Route path="academic-years" element={<AcademicYearsPage />} />

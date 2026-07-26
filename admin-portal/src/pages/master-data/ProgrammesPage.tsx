@@ -40,7 +40,7 @@ export default function ProgrammesPage() {
 
   const createMut = useMutation({
     mutationFn: createProgramme,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['programmes'] }); vem.close(); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['programmes'] }); qc.invalidateQueries({ queryKey: ['academics-stats'] }); vem.close(); },
   });
   const updateMut = useMutation({
     mutationFn: ({ id, data }: any) => updateProgramme(id, data),
@@ -48,7 +48,7 @@ export default function ProgrammesPage() {
   });
   const deleteMut = useMutation({
     mutationFn: deleteProgramme,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['programmes'] }); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['programmes'] }); qc.invalidateQueries({ queryKey: ['academics-stats'] }); },
   });
 
   function handleSubmit(e: React.FormEvent) {

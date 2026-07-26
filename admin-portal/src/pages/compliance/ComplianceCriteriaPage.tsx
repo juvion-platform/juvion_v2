@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { listComplianceCriteria, createComplianceCriteria, updateComplianceCriteria, deleteComplianceCriteria } from '../../services/compliance';
+import { listAccreditationCycles, listComplianceCriteria, createComplianceCriteria, updateComplianceCriteria, deleteComplianceCriteria } from '../../services/compliance';
 import DataTable from '../../components/ui/DataTable';
+import EntityPicker from '../../components/ui/EntityPicker';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
@@ -99,8 +100,22 @@ export default function ComplianceCriteriaPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <fieldset disabled={vem.isView} className="border-0 p-0 m-0 space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <div><label className={lbl}>Accreditation Cycle ID *</label>
-                <input required value={form.accreditationCycleId} onChange={e => setForm(f => ({ ...f, accreditationCycleId: e.target.value }))} className={inp} />
+              <div>
+                <label className={lbl} htmlFor="criteria-cycle">Accreditation Cycle *</label>
+                <EntityPicker
+                  id="criteria-cycle"
+                  required
+                  disabled={vem.isView}
+                  queryKey={['accreditation-cycles', 'picker']}
+                  fetcher={(q) => listAccreditationCycles(1, 20, q || undefined)}
+                  value={form.accreditationCycleId}
+                  onChange={(v) => setForm(f => ({ ...f, accreditationCycleId: v }))}
+                  getId={(x: any) => x._id}
+                  getLabel={(c: any) => c.name || c.cycleNumber || c._id}
+                  getHint={(c: any) => c.status || undefined}
+                  fallbackLabel={vem.entity?.accreditationCycleId?.name}
+                  placeholder="Search accreditation cycle"
+                />
               </div>
               <div><label className={lbl}>Criterion Number *</label>
                 <input required value={form.criterionNumber} onChange={e => setForm(f => ({ ...f, criterionNumber: e.target.value }))} className={inp} placeholder="e.g. 1.1.1" />

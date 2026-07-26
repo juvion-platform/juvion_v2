@@ -1,13 +1,12 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { listMessages, createMessage, updateMessage, deleteMessage, listConversations } from '../../services/juvi';
+import { listMessages, createMessage, updateMessage, listConversations } from '../../services/juvi';
 import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
-import { Plus, Pencil, Trash2, ExternalLink } from 'lucide-react';
+import { Pencil, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useViewEditMode } from '../../hooks/useViewEditMode';
-import { confirmAction } from '../../stores/confirmStore';
 import Pagination from '../../components/ui/Pagination';
 import { useListControls } from '../../hooks/useListControls';
 import SearchInput from '../../components/ui/SearchInput';
@@ -41,7 +40,6 @@ export default function MessagesPage() {
 
   const createMut = useMutation({ mutationFn: createMessage, onSuccess: () => { qc.invalidateQueries({ queryKey: ['juvi-messages'] }); vem.close(); } });
   const updateMut = useMutation({ mutationFn: ({ id, data }: any) => updateMessage(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['juvi-messages'] }); vem.close(); } });
-  const deleteMut = useMutation({ mutationFn: deleteMessage, onSuccess: () => { qc.invalidateQueries({ queryKey: ['juvi-messages'] }); } });
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -70,7 +68,6 @@ export default function MessagesPage() {
     { key: 'actions', label: '', render: (r: any) => (
       <div className="flex gap-1">
         <button onClick={(e) => { e.stopPropagation(); vem.openForEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
-        <button onClick={(e) => { e.stopPropagation(); void confirmAction({ title: 'Delete this message?', tone: 'danger', confirmLabel: 'Delete' }).then((__c) => { if (__c.confirmed) { deleteMut.mutate(r._id); } }) }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
       </div>
     )},
   ];
@@ -81,9 +78,7 @@ export default function MessagesPage() {
         <h2 className="text-xl font-bold text-navy">Messages</h2>
         <div className="flex items-center gap-3">
           <SearchInput value={search} onChange={setSearch} placeholder="Search messages…" className="w-56" />
-        <button onClick={vem.openForCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700">
-          <Plus size={16} className="text-white" /> New Message
-        </button>
+        <span className="text-xs text-slate-400">Read-only · Messages are recorded by Juvi as a conversation happens.</span>
       </div>
       </div>
 

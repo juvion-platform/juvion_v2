@@ -41,7 +41,7 @@ export default function DepartmentsPage() {
 
   const createMut = useMutation({
     mutationFn: createDepartment,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['departments'] }); vem.close(); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['departments'] }); qc.invalidateQueries({ queryKey: ['academics-stats'] }); vem.close(); },
   });
   const updateMut = useMutation({
     mutationFn: ({ id, data }: any) => updateDepartment(id, data),
@@ -49,7 +49,7 @@ export default function DepartmentsPage() {
   });
   const deleteMut = useMutation({
     mutationFn: deleteDepartment,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['departments'] }); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['departments'] }); qc.invalidateQueries({ queryKey: ['academics-stats'] }); },
   });
 
   function handleSubmit(e: React.FormEvent) {

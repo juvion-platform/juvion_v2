@@ -1,12 +1,11 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { listConversations, createConversation, updateConversation, deleteConversation } from '../../services/juvi';
+import { listConversations, createConversation, updateConversation } from '../../services/juvi';
 import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Pencil } from 'lucide-react';
 import { useViewEditMode } from '../../hooks/useViewEditMode';
-import { confirmAction } from '../../stores/confirmStore';
 import Pagination from '../../components/ui/Pagination';
 import { useListControls } from '../../hooks/useListControls';
 import SearchInput from '../../components/ui/SearchInput';
@@ -37,7 +36,6 @@ export default function ConversationsPage() {
 
   const createMut = useMutation({ mutationFn: createConversation, onSuccess: () => { qc.invalidateQueries({ queryKey: ['juvi-conversations'] }); vem.close(); } });
   const updateMut = useMutation({ mutationFn: ({ id, data }: any) => updateConversation(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['juvi-conversations'] }); vem.close(); } });
-  const deleteMut = useMutation({ mutationFn: deleteConversation, onSuccess: () => { qc.invalidateQueries({ queryKey: ['juvi-conversations'] }); } });
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -61,7 +59,6 @@ export default function ConversationsPage() {
     { key: 'actions', label: '', render: (r: any) => (
       <div className="flex gap-1">
         <button onClick={(e) => { e.stopPropagation(); vem.openForEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
-        <button onClick={(e) => { e.stopPropagation(); void confirmAction({ title: 'Delete this conversation?', tone: 'danger', confirmLabel: 'Delete' }).then((__c) => { if (__c.confirmed) { deleteMut.mutate(r._id); } }) }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
       </div>
     )},
   ];
@@ -72,9 +69,7 @@ export default function ConversationsPage() {
         <h2 className="text-xl font-bold text-navy">Conversations</h2>
         <div className="flex items-center gap-3">
           <SearchInput value={search} onChange={setSearch} placeholder="Search conversations…" className="w-56" />
-        <button onClick={vem.openForCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700">
-          <Plus size={16} className="text-white" /> New Conversation
-        </button>
+        <span className="text-xs text-slate-400">Read-only · Conversations are created by Juvi when a user starts a chat.</span>
       </div>
       </div>
 

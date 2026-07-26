@@ -1,12 +1,11 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { listUsageMetrics, createUsageMetric, updateUsageMetric, deleteUsageMetric } from '../../services/juvi';
+import { listUsageMetrics, createUsageMetric, updateUsageMetric } from '../../services/juvi';
 import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Pencil } from 'lucide-react';
 import { useViewEditMode } from '../../hooks/useViewEditMode';
-import { confirmAction } from '../../stores/confirmStore';
 import Pagination from '../../components/ui/Pagination';
 import { useListControls } from '../../hooks/useListControls';
 import SearchInput from '../../components/ui/SearchInput';
@@ -39,7 +38,6 @@ export default function UsageMetricsPage() {
 
   const createMut = useMutation({ mutationFn: createUsageMetric, onSuccess: () => { qc.invalidateQueries({ queryKey: ['juvi-usage-metrics'] }); vem.close(); } });
   const updateMut = useMutation({ mutationFn: ({ id, data }: any) => updateUsageMetric(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['juvi-usage-metrics'] }); vem.close(); } });
-  const deleteMut = useMutation({ mutationFn: deleteUsageMetric, onSuccess: () => { qc.invalidateQueries({ queryKey: ['juvi-usage-metrics'] }); } });
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -66,7 +64,6 @@ export default function UsageMetricsPage() {
     { key: 'actions', label: '', render: (r: any) => (
       <div className="flex gap-1">
         <button onClick={(e) => { e.stopPropagation(); vem.openForEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
-        <button onClick={(e) => { e.stopPropagation(); void confirmAction({ title: 'Delete this metric?', tone: 'danger', confirmLabel: 'Delete' }).then((__c) => { if (__c.confirmed) { deleteMut.mutate(r._id); } }) }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
       </div>
     )},
   ];
@@ -77,9 +74,7 @@ export default function UsageMetricsPage() {
         <h2 className="text-xl font-bold text-navy">Usage Metrics</h2>
         <div className="flex items-center gap-3">
           <SearchInput value={search} onChange={setSearch} placeholder="Search usage metrics…" className="w-56" />
-        <button onClick={vem.openForCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700">
-          <Plus size={16} className="text-white" /> New Metric
-        </button>
+        <span className="text-xs text-slate-400">Read-only · Usage metrics are aggregated automatically.</span>
       </div>
       </div>
 

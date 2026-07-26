@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { listEnrollments, createEnrollment, listApplicants } from '../../services/admissions';
+import { listEnrollments, createEnrollment, updateEnrollment, listApplicants } from '../../services/admissions';
 import { listStudents } from '../../services/people';
 import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
-import { Plus, ExternalLink } from 'lucide-react';
+import { Pencil, Plus, ExternalLink } from 'lucide-react';
 import { useViewEditMode } from '../../hooks/useViewEditMode';
 import Pagination from '../../components/ui/Pagination';
 import { useListControls } from '../../hooks/useListControls';
@@ -46,18 +46,32 @@ export default function EnrollmentsPage() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['enrollments'] }); vem.close(); },
   });
 
+  // PUT existed server-side; the page only ever POSTed, so records opened
+  // read-only with nothing but a Close button.
+  const updateMut = useMutation({
+    mutationFn: ({ id, data }: any) => updateEnrollment(id, data),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['enrollments'] }); vem.close(); },
+  });
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    createMut.mutate({ ...form, studentId: form.studentId || undefined });
+    const payload = { ...form, studentId: form.studentId || undefined };
+    if (vem.isEdit && vem.entity) updateMut.mutate({ id: vem.entity._id, data: payload });
+    else createMut.mutate(payload);
   }
 
-  const saving = createMut.isPending;
+  const saving = createMut.isPending || updateMut.isPending;
 
   const columns = [
     { key: 'admissionType', label: 'Type', render: (r: any) => <Badge variant={r.admissionType === 'fresh' ? 'info' : 'warning'}>{r.admissionType}</Badge> },
     { key: 'admittedBy', label: 'Admitted By' },
     { key: 'admissionDate', label: 'Admission Date', render: (r: any) => new Date(r.admissionDate).toLocaleDateString() },
     { key: 'createdAt', label: 'Recorded', render: (r: any) => new Date(r.createdAt).toLocaleDateString() },
+    { key: 'actions', label: '', sortable: false, render: (r: any) => (
+      <button onClick={(e) => { e.stopPropagation(); vem.openForEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit">
+        <Pencil size={15} className="text-amber-500" />
+      </button>
+    )},
   ];
 
   return (
@@ -136,9 +150,13 @@ export default function EnrollmentsPage() {
             <button type="button" onClick={vem.close} className="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50">
               {vem.isView ? 'Close' : 'Cancel'}
             </button>
-            {!vem.isView && (
+            {vem.isView ? (
+              <button type="button" onClick={vem.switchToEdit} className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700">
+                <Pencil size={14} /> Edit
+              </button>
+            ) : (
               <button type="submit" disabled={saving} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
-                {saving ? 'Saving…' : 'Enroll'}
+                {saving ? 'Saving…' : vem.isEdit ? 'Update' : 'Enroll'}
               </button>
             )}
           </div>

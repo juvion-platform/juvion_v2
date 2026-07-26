@@ -78,7 +78,26 @@ export default function CrisisAlertsPage() {
     { key: 'actions', label: '', render: (r: any) => (
       <div className="flex gap-1">
         <button onClick={(e) => { e.stopPropagation(); vem.openForEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
-        <button onClick={(e) => { e.stopPropagation(); void confirmAction({ title: 'Delete this alert?', tone: 'danger', confirmLabel: 'Delete' }).then((__c) => { if (__c.confirmed) { deleteMut.mutate(r._id); } }) }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
+        {/* Crisis alerts are safeguarding records — the same hard-delete
+            gating as anti-ragging complaints applies. */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            void confirmAction({
+              title: 'Permanently delete this crisis alert?',
+              message: 'Crisis alerts form part of the student-safeguarding trail. Deleting removes the alert and its escalation history for good — prefer resolving the alert instead.',
+              tone: 'danger',
+              confirmLabel: 'Delete permanently',
+              requireTypedConfirmation: 'DELETE',
+              requireReason: true,
+              reasonLabel: 'Reason for deletion (recorded on the audit trail)',
+            }).then((__c) => { if (__c.confirmed) { deleteMut.mutate(r._id); } });
+          }}
+          className="p-1 rounded hover:bg-red-50"
+          title="Delete"
+        >
+          <Trash2 size={15} className="text-red-500" />
+        </button>
       </div>
     )},
   ];

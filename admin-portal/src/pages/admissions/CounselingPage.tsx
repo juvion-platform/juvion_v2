@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { listCounseling, createCounseling, listApplicants } from '../../services/admissions';
+import { listCounseling, createCounseling, updateCounseling, listApplicants } from '../../services/admissions';
 import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
-import { Plus, ExternalLink } from 'lucide-react';
+import { Pencil, Plus, ExternalLink } from 'lucide-react';
 import { useViewEditMode } from '../../hooks/useViewEditMode';
 import Pagination from '../../components/ui/Pagination';
 import { useListControls } from '../../hooks/useListControls';
@@ -46,18 +46,27 @@ export default function CounselingPage() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['counseling'] }); vem.close(); },
   });
 
+  // PUT existed server-side; the page only ever POSTed, so records opened
+  // read-only with nothing but a Close button.
+  const updateMut = useMutation({
+    mutationFn: ({ id, data }: any) => updateCounseling(id, data),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['counseling'] }); vem.close(); },
+  });
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    createMut.mutate({
+    const payload = {
       applicantId: form.applicantId,
       round: Number(form.round),
       allotmentOrder: form.allotmentOrder ? Number(form.allotmentOrder) : undefined,
       collegeCode: form.collegeCode || undefined,
       branchCode: form.branchCode || undefined,
-    });
+    };
+    if (vem.isEdit && vem.entity) updateMut.mutate({ id: vem.entity._id, data: payload });
+    else createMut.mutate(payload);
   }
 
-  const saving = createMut.isPending;
+  const saving = createMut.isPending || updateMut.isPending;
 
   const columns = [
     { key: 'round', label: 'Round' },
@@ -66,6 +75,11 @@ export default function CounselingPage() {
     { key: 'branchCode', label: 'Branch Code', render: (r: any) => r.branchCode || '—' },
     { key: 'status', label: 'Status', render: (r: any) => <Badge variant={STATUS_COLOR[r.status]}>{r.status}</Badge> },
     { key: 'createdAt', label: 'Date', render: (r: any) => new Date(r.createdAt).toLocaleDateString() },
+    { key: 'actions', label: '', sortable: false, render: (r: any) => (
+      <button onClick={(e) => { e.stopPropagation(); vem.openForEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit">
+        <Pencil size={15} className="text-amber-500" />
+      </button>
+    )},
   ];
 
   return (
@@ -133,9 +147,13 @@ export default function CounselingPage() {
             <button type="button" onClick={vem.close} className="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50">
               {vem.isView ? 'Close' : 'Cancel'}
             </button>
-            {!vem.isView && (
+            {vem.isView ? (
+              <button type="button" onClick={vem.switchToEdit} className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700">
+                <Pencil size={14} /> Edit
+              </button>
+            ) : (
               <button type="submit" disabled={saving} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
-                {saving ? 'Saving…' : 'Add'}
+                {saving ? 'Saving…' : vem.isEdit ? 'Update' : 'Add'}
               </button>
             )}
           </div>

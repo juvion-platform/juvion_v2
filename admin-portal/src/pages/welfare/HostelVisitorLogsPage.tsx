@@ -11,6 +11,7 @@ import { confirmAction } from '../../stores/confirmStore';
 import Pagination from '../../components/ui/Pagination';
 import { useListControls } from '../../hooks/useListControls';
 import SearchInput from '../../components/ui/SearchInput';
+import { rangeError } from '../../lib/validation';
 
 const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default";
 const lbl = "block text-sm font-medium text-gray-700 mb-1";
@@ -44,9 +45,12 @@ export default function HostelVisitorLogsPage() {
   const createMut = useMutation({ mutationFn: createHostelVisitorLog, onSuccess: () => { qc.invalidateQueries({ queryKey: ['hostel-visitor-logs'] }); vem.close(); } });
   const updateMut = useMutation({ mutationFn: ({ id, data }: any) => updateHostelVisitorLog(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['hostel-visitor-logs'] }); vem.close(); } });
   const deleteMut = useMutation({ mutationFn: deleteHostelVisitorLog, onSuccess: () => { qc.invalidateQueries({ queryKey: ['hostel-visitor-logs'] }); } });
+  const timeError = rangeError(form.inTime, form.outTime, { startLabel: 'in-time', endLabel: 'out-time' });
+
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (timeError) return;
     const payload: any = { ...form };
     if (!payload.inTime) delete payload.inTime;
     if (!payload.outTime) delete payload.outTime;
@@ -118,6 +122,7 @@ export default function HostelVisitorLogsPage() {
               <div><label className={lbl}>Phone *</label><input required value={form.visitorPhone} onChange={e => setForm(f => ({ ...f, visitorPhone: e.target.value }))} className={inp} /></div>
               <div><label className={lbl}>In Time</label><input type="datetime-local" value={form.inTime} onChange={e => setForm(f => ({ ...f, inTime: e.target.value }))} className={inp} /></div>
               <div><label className={lbl}>Out Time</label><input type="datetime-local" value={form.outTime} onChange={e => setForm(f => ({ ...f, outTime: e.target.value }))} className={inp} /></div>
+              {timeError && <p className="col-span-2 -mt-2 text-sm text-red-600" role="alert">{timeError}</p>}
               <div className="col-span-2"><label className={lbl}>Purpose *</label><input required value={form.purpose} onChange={e => setForm(f => ({ ...f, purpose: e.target.value }))} className={inp} /></div>
             </div>
           </fieldset>
@@ -130,7 +135,7 @@ export default function HostelVisitorLogsPage() {
                 <Pencil size={14} /> Edit
               </button>
             ) : (
-              <button type="submit" disabled={saving} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
+              <button type="submit" disabled={saving || Boolean(timeError)} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
                 {saving ? 'Saving…' : vem.isEdit ? 'Update' : 'Create'}
               </button>
             )}

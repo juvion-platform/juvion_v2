@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { listAccreditationCycles, createAccreditationCycle, updateAccreditationCycle, deleteAccreditationCycle } from '../../services/compliance';
+import { listAccreditationBodies, listAccreditationCycles, createAccreditationCycle, updateAccreditationCycle, deleteAccreditationCycle } from '../../services/compliance';
 import DataTable from '../../components/ui/DataTable';
+import EntityPicker from '../../components/ui/EntityPicker';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
@@ -102,8 +103,22 @@ export default function AccreditationCyclesPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <fieldset disabled={vem.isView} className="border-0 p-0 m-0 space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <div><label className={lbl}>Body ID *</label>
-                <input required value={form.bodyId} onChange={e => setForm(f => ({ ...f, bodyId: e.target.value }))} className={inp} placeholder="AccreditationBody ID" />
+              <div>
+                <label className={lbl} htmlFor="cycle-body">Accreditation Body *</label>
+                <EntityPicker
+                  id="cycle-body"
+                  required
+                  disabled={vem.isView}
+                  queryKey={['accreditation-bodies', 'picker']}
+                  fetcher={(q) => listAccreditationBodies(1, 20, q || undefined)}
+                  value={form.bodyId}
+                  onChange={(v) => setForm(f => ({ ...f, bodyId: v }))}
+                  getId={(x: any) => x._id}
+                  getLabel={(b: any) => b.name || b.code || b._id}
+                  getHint={(b: any) => b.code || undefined}
+                  fallbackLabel={vem.entity?.bodyId?.name}
+                  placeholder="Search accreditation body"
+                />
               </div>
               <div><label className={lbl}>Cycle # *</label>
                 <input required type="number" min={1} value={form.cycle} onChange={e => setForm(f => ({ ...f, cycle: Number(e.target.value) }))} className={inp} />
