@@ -36,7 +36,8 @@ function AdmissionsHome() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {PHASE_CARDS.map((card, idx) => {
           const Icon = card.icon;
-          const count = stats ? stats.totals[card.statKey] : '—';
+          const hasStat = Boolean(card.statKey);
+          const count = hasStat && stats ? (stats.totals[card.statKey!] ?? 0) : null;
           return (
             <button
               key={card.to}
@@ -47,7 +48,9 @@ function AdmissionsHome() {
               <div className={`inline-flex p-2.5 rounded-lg mb-3 ${card.iconBg}`}>
                 <Icon size={22} />
               </div>
-              <div className="text-2xl font-bold text-navy mb-1">{count}</div>
+              {hasStat && (count === null
+                ? <div className="h-7 w-12 mb-1 animate-pulse rounded bg-slate-100" aria-hidden="true" />
+                : <div className="text-2xl font-bold text-navy mb-1">{count}</div>)}
               <div className="font-semibold text-navy-dark text-sm">{card.label}</div>
               <p className="text-xs text-gray-500 mt-1">{card.desc}</p>
               {idx < PHASE_CARDS.length - 1 && (

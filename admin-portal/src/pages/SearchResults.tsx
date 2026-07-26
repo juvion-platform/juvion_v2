@@ -128,7 +128,7 @@ export default function SearchResultsPage() {
         <EmptyFrame
           icon={<SearchIcon className="w-8 h-8 text-gray-300" />}
           title={`No people match "${q}".`}
-          subtitle="Try a different name, roll number, or employee code."
+          subtitle="Global search covers students, faculty, staff, parents and alumni only. Try a different name, roll number or employee code — or search from the relevant module page for courses, branches and fees."
         />
       ) : (
         <div className="space-y-6">
