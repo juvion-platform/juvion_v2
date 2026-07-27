@@ -1,15 +1,24 @@
 import { z } from 'zod';
+import { refineRange } from "../../shared/validation-helpers";
 
 // ═══ Placement Season ════════════════════════════════════
 
-export const createPlacementSeasonSchema = z.object({
+const placementSeasonShape = z.object({
   academicYearId: z.string().min(1),
   name: z.string().min(1),
   startDate: z.string().min(1),
   endDate: z.string().min(1),
   status: z.enum(['planning', 'active', 'completed']).optional(),
 });
-export const updatePlacementSeasonSchema = createPlacementSeasonSchema.partial();
+// A season ending before it starts was accepted silently; a single-day season
+// is legitimate, so equal bounds are allowed.
+const seasonDateRange = refineRange({
+  startField: 'startDate',
+  endField: 'endDate',
+  message: 'End date cannot be before the start date',
+});
+export const createPlacementSeasonSchema = placementSeasonShape.superRefine(seasonDateRange);
+export const updatePlacementSeasonSchema = placementSeasonShape.partial().superRefine(seasonDateRange);
 
 // ═══ Company ═════════════════════════════════════════════
 
