@@ -10,6 +10,7 @@ import { confirmAction } from '../../stores/confirmStore';
 import Pagination from '../../components/ui/Pagination';
 import { useListControls } from '../../hooks/useListControls';
 import SearchInput from '../../components/ui/SearchInput';
+import TimetableSlotsPanel from '../../components/academics/TimetableSlotsPanel';
 
 const STATUSES = ['draft', 'published', 'archived'] as const;
 const STATUS_COLOR: Record<string, string> = { draft: 'default', published: 'success', archived: 'info' };
@@ -84,7 +85,7 @@ export default function TimetablesPage() {
         onPageChange={setPage}
         onLimitChange={setLimit}
       />
-      <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('Timetable')}>
+      <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('Timetable')} widthClass="max-w-3xl">
         <form onSubmit={handleSubmit} className="space-y-4">
           <fieldset disabled={vem.isView} className="border-0 p-0 m-0 space-y-4">
             <div className="grid grid-cols-2 gap-4">
@@ -111,6 +112,24 @@ export default function TimetablesPage() {
               )}
             </div>
           </fieldset>
+
+          {/* Individual periods. Needs a saved timetable to attach slots to,
+              so it appears on view/edit rather than during create. */}
+          {vem.entity?._id && (
+            <div>
+              <label className={lbl}>Periods</label>
+              <TimetableSlotsPanel
+                timetableId={vem.entity._id}
+                readOnly={form.status === 'published' || form.status === 'archived'}
+              />
+              {(form.status === 'published' || form.status === 'archived') && (
+                <p className="mt-1 text-xs text-slate-500">
+                  A {form.status} timetable is locked. Move it back to draft to change periods.
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="flex justify-end gap-3 pt-2 border-t">
             <button type="button" onClick={vem.close} className="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50">
               {vem.isView ? 'Close' : 'Cancel'}

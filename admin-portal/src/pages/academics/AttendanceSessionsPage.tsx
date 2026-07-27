@@ -12,6 +12,7 @@ import { confirmAction } from '../../stores/confirmStore';
 import Pagination from '../../components/ui/Pagination';
 import { useListControls } from '../../hooks/useListControls';
 import SearchInput from '../../components/ui/SearchInput';
+import AttendanceMarkingPanel from '../../components/academics/AttendanceMarkingPanel';
 
 const STATUSES = ['open', 'closed'] as const;
 const STATUS_COLOR: Record<string, string> = { open: 'success', closed: 'default' };
@@ -95,7 +96,7 @@ export default function AttendanceSessionsPage() {
         onPageChange={setPage}
         onLimitChange={setLimit}
       />
-      <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('Attendance Session')}>
+      <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('Attendance Session')} widthClass="max-w-3xl">
         <form onSubmit={handleSubmit} className="space-y-4">
           <fieldset disabled={vem.isView} className="border-0 p-0 m-0 space-y-4">
             <div className="grid grid-cols-2 gap-4">
@@ -121,6 +122,24 @@ export default function AttendanceSessionsPage() {
               <div className="col-span-2"><label className={lbl}>Topic Covered</label><input value={form.topicCovered} onChange={e => setForm(f => ({ ...f, topicCovered: e.target.value }))} className={inp} /></div>
             </div>
           </fieldset>
+
+          {/* The register itself. Only meaningful once the session exists, so
+              it shows on view/edit of a saved session, not during create. */}
+          {vem.entity?._id && form.courseOfferingId && (
+            <div>
+              <label className={lbl}>Mark attendance</label>
+              <AttendanceMarkingPanel
+                sessionId={vem.entity._id}
+                courseOfferingId={form.courseOfferingId}
+                readOnly={form.status === 'closed'}
+              />
+              {form.status === 'closed' && (
+                <p className="mt-1 text-xs text-slate-500">
+                  This session is closed. Reopen it to change attendance.
+                </p>
+              )}
+            </div>
+          )}
           <div className="flex justify-end gap-3 pt-2 border-t">
             <button type="button" onClick={vem.close} className="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50">
               {vem.isView ? 'Close' : 'Cancel'}

@@ -193,6 +193,22 @@ export const updateAttendanceSession = (id: string, data: any) =>
 export const deleteAttendanceSession = (id: string) =>
   api.delete(`${BASE}/attendance-sessions/${id}`).then(r => r.data);
 
+// ─── Course offering roster ───────────────────────────
+export interface RosterStudent {
+  _id: string;
+  rollNumber?: string;
+  status?: string;
+  personId?: { _id: string; name?: string } | string;
+}
+export interface OfferingRoster {
+  sectionId: string;
+  sectionName: string;
+  source: "section-roster" | "batch-branch";
+  students: RosterStudent[];
+}
+export const getOfferingRoster = (courseOfferingId: string): Promise<OfferingRoster> =>
+  api.get(`${BASE}/offerings/${courseOfferingId}/roster`).then(r => r.data);
+
 // ─── Attendance Records ───────────────────────────────
 export const listAttendanceRecords = (sessionId: string) =>
   api.get(`${BASE}/attendance-records`, { params: { sessionId } }).then(r => r.data);

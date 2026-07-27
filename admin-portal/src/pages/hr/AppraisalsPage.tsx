@@ -12,6 +12,7 @@ import { confirmAction } from '../../stores/confirmStore';
 import Pagination from '../../components/ui/Pagination';
 import { useListControls } from '../../hooks/useListControls';
 import SearchInput from '../../components/ui/SearchInput';
+import AppraisalWorkflowPanel from '../../components/hr/AppraisalWorkflowPanel';
 
 const STATUSES = ['initiated', 'self_review', 'reviewer_review', 'completed'] as const;
 const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default";
@@ -110,7 +111,7 @@ export default function AppraisalsPage() {
         onLimitChange={setLimit}
       />
 
-      <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('Appraisal')}>
+      <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('Appraisal')} widthClass="max-w-2xl">
         <form onSubmit={handleSubmit} className="space-y-4">
           <fieldset disabled={vem.isView} className="border-0 p-0 m-0 space-y-4">
             <div className="grid grid-cols-2 gap-4">
@@ -142,6 +143,14 @@ export default function AppraisalsPage() {
               </div>
             </div>
           </fieldset>
+
+          {/* Stage actions. The raw rating inputs above remain for correcting
+              a value, but the guided flow below is what drives transitions,
+              moderation and disputes server-side. */}
+          {vem.entity?._id && (
+            <AppraisalWorkflowPanel appraisal={vem.entity} onDone={vem.close} />
+          )}
+
           <div className="flex justify-end gap-3 pt-2 border-t">
             <button type="button" onClick={vem.close} className="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50">
               {vem.isView ? 'Close' : 'Cancel'}

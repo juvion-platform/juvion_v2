@@ -10,6 +10,7 @@ import { confirmAction } from '../../stores/confirmStore';
 import Pagination from '../../components/ui/Pagination';
 import { useListControls } from '../../hooks/useListControls';
 import SearchInput from '../../components/ui/SearchInput';
+import InternalMarksPanel from '../../components/academics/InternalMarksPanel';
 
 const TYPES = ['mid1', 'mid2', 'assignment', 'quiz', 'seminar', 'lab_internal'] as const;
 const STATUSES = ['scheduled', 'conducted', 'marks_entered', 'finalized'] as const;
@@ -94,7 +95,7 @@ export default function InternalAssessmentsPage() {
         onPageChange={setPage}
         onLimitChange={setLimit}
       />
-      <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('Internal Assessment')}>
+      <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('Internal Assessment')} widthClass="max-w-3xl">
         <form onSubmit={handleSubmit} className="space-y-4">
           <fieldset disabled={vem.isView} className="border-0 p-0 m-0 space-y-4">
             <div className="grid grid-cols-2 gap-4">
@@ -120,6 +121,26 @@ export default function InternalAssessmentsPage() {
               </div>
             </div>
           </fieldset>
+
+          {/* Marks sheet. Needs a saved assessment (for assessmentId) and an
+              offering (for the roster), so it appears on view/edit only. */}
+          {vem.entity?._id && form.courseOfferingId && (
+            <div>
+              <label className={lbl}>Student marks</label>
+              <InternalMarksPanel
+                assessmentId={vem.entity._id}
+                courseOfferingId={form.courseOfferingId}
+                maxMarks={Number(form.maxMarks) || undefined}
+                readOnly={form.status === 'finalized'}
+              />
+              {form.status === 'finalized' && (
+                <p className="mt-1 text-xs text-slate-500">
+                  This assessment is finalized. Reopen it to change marks.
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="flex justify-end gap-3 pt-2 border-t">
             <button type="button" onClick={vem.close} className="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50">
               {vem.isView ? 'Close' : 'Cancel'}

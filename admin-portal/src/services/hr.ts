@@ -119,6 +119,22 @@ export const updateAppraisal = (id: string, data: any) =>
 export const deleteAppraisal = (id: string) =>
   api.delete(`${BASE}/appraisals/${id}`).then(r => r.data);
 
+// Appraisal lifecycle. The UI previously exposed only the raw rating number
+// fields via PUT, which skipped the stage transitions, moderation bookkeeping
+// and dispute trail these endpoints maintain.
+export const submitSelfAssessment = (id: string, data: { selfRating: number; selfAssessmentData: Record<string, unknown> }) =>
+  api.post(`${BASE}/appraisals/${id}/self-assessment`, data).then(r => r.data);
+export const aggregateAppraisalData = (id: string) =>
+  api.post(`${BASE}/appraisals/${id}/aggregate`, {}).then(r => r.data);
+export const submitReviewerAssessment = (id: string, data: { reviewerRating: number; reviewerComments: string }) =>
+  api.post(`${BASE}/appraisals/${id}/reviewer-assessment`, data).then(r => r.data);
+export const moderateAppraisal = (id: string, data: { moderationAdjustment: number }) =>
+  api.post(`${BASE}/appraisals/${id}/moderate`, data).then(r => r.data);
+export const disputeAppraisal = (id: string, data: { disputeText: string }) =>
+  api.post(`${BASE}/appraisals/${id}/dispute`, data).then(r => r.data);
+export const resolveAppraisalDispute = (id: string, data: { resolution: 'confirmed' | 'revised'; revisedRating?: number }) =>
+  api.post(`${BASE}/appraisals/${id}/resolve-dispute`, data).then(r => r.data);
+
 // ─── Promotions ───────────────────────────────────────────
 export const listPromotions = (page = 1, limit = 20, employeeId?: string, search?: string) =>
   api.get(`${BASE}/promotions`, { params: { page, limit, employeeId, ...(search ? { search } : {}) } }).then(r => r.data);
