@@ -92,6 +92,22 @@ export interface ImportJobPreview {
 // ─── CSV parser (RFC-4180-ish, no new dep) ────────────────────────────
 
 /**
+ * Normalize a CSV header cell to a schema `fieldKey`.
+ *
+ * Downloadable templates mark mandatory columns with a trailing `*`
+ * (`name*`). The row mapper matches headers to `fieldKey` by exact string,
+ * so without this a file downloaded from our own template would report every
+ * required field as empty and fail every row.
+ *
+ * Strips surrounding whitespace and at most ONE trailing asterisk, so a
+ * bare `fieldKey` — every CSV exported before templates gained the marker —
+ * passes through unchanged.
+ */
+export function normalizeImportHeader(header: string): string {
+  return header.trim().replace(/\s*\*$/, '').trim();
+}
+
+/**
  * Parse a CSV string into header[] + rows[][]. Handles quoted fields
  * with embedded commas, doubled-quote escapes, and CRLF line endings.
  * Not strict — institutions paste from Excel and we accept the
@@ -344,7 +360,8 @@ export async function uploadAndValidate(
     const cells = parsed.rows[i]!;
     const rawObj: Record<string, string> = {};
     parsed.headers.forEach((h, j) => {
-      rawObj[h] = cells[j] ?? '';
+      // Template headers carry a `*` on mandatory columns; map back to fieldKey.
+      rawObj[normalizeImportHeader(h)] = cells[j] ?? '';
     });
 
     // Run each schema field's validator. Coerced values get attached
