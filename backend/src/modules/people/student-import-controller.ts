@@ -18,7 +18,7 @@ import { AppError } from '../../middleware/errorHandler';
 import {
   uploadAndValidate, commitImportJob,
 } from '../platform/bulk-import-service';
-import { getImportSchema } from '../platform/bulk-import-registry';
+import { getImportSchema, serializeSchema } from '../platform/bulk-import-registry';
 import { importFileUpload, importMulterErrorHandler } from '../platform/bulk-import-controller';
 
 const ENTITY_TYPE = 'student';
@@ -30,15 +30,11 @@ export async function templateHandler(_req: AuthRequest, res: Response, next: Ne
   try {
     const def = getImportSchema(ENTITY_TYPE);
     if (!def) throw new AppError(500, 'Student import schema is not registered.');
-    res.json({
-      entityType: def.entityType,
-      label: def.label,
-      description: def.description,
-      fields: def.fields.map(({ fieldKey, label, type, required, meta }) => ({
-        fieldKey, label, type, required, meta,
-      })),
-      sampleRow: def.sampleRow,
-    });
+    // Reuse the registry's own serializer instead of hand-rolling the same
+    // field-mapping here — keeps this response byte-for-byte identical to
+    // /platform/bulk-imports' schema listing, with one source of truth for
+    // "what does a schema look like over the wire".
+    res.json(serializeSchema(def));
   } catch (e) { next(e); }
 }
 

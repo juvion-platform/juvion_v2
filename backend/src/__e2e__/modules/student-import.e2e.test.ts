@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { getTestApp, cleanupTestApp } from '../setup/test-app';
 import { seedBase, BaseFixtures } from '../setup/seed-base';
 import { createTestApi, TestApi } from '../helpers/request';
@@ -68,16 +68,66 @@ describe('POST /api/people/students/import/preview', () => {
     expect(res.body.previewRows[0].errors).toEqual([]);
   });
 
-  it('a Registrar can preview — the whole reason this facade exists', async () => {
-    const csv = 'name*,phone*,programmeCode*,admissionYear*\nB,9876543211,BTECH,2025';
-    const res = await api.as(registrar.token)
-      .post('/api/people/students/import/preview')
-      .attach('file', Buffer.from(csv), { filename: 's.csv', contentType: 'text/csv' });
-    expect(res.status).not.toBe(403);
-  });
-
   it('401 without auth', async () => {
     const res = await api.post('/api/people/students/import/preview').send({});
     expect(res.status).toBe(401);
+  });
+});
+
+// The e2e harness sets RBAC_ENFORCE='false' globally (see
+// setup/test-app.ts), which makes authorize() a pass-through for ANY
+// authenticated user regardless of module/action — so `expect(res.status)
+// .not.toBe(403)` against that default would pass identically whether the
+// route were wired to authorize('people', 'create') OR the wrong
+// authorize('platform', 'create'). That is not a real test of the
+// authorization boundary, which is the entire reason this facade exists.
+//
+// authorize() (middleware/authorize.ts) reads process.env.RBAC_ENFORCE on
+// every request rather than caching it at boot, so it can be flipped to
+// 'true' for just these tests — same technique already used by
+// workflows/01-auth-rbac.test.ts. seedBase() has already upserted the real
+// DEFAULT_POLICIES, so there is something for the engine to enforce.
+describe('RBAC enforcement — the gate is on people, not platform', () => {
+  let previousRbacEnforce: string | undefined;
+
+  beforeEach(() => {
+    previousRbacEnforce = process.env.RBAC_ENFORCE;
+    process.env.RBAC_ENFORCE = 'true';
+  });
+
+  afterEach(() => {
+    // Restore whatever the harness had before (normally 'false') so
+    // enforcement never leaks into a later test file sharing this worker.
+    if (previousRbacEnforce === undefined) delete process.env.RBAC_ENFORCE;
+    else process.env.RBAC_ENFORCE = previousRbacEnforce;
+  });
+
+  it('a Registrar (people:*, no platform:create) can preview AND commit — the whole reason this facade exists', async () => {
+    const csv = 'name*,phone*,programmeCode*,admissionYear*\nRbac Ok,9876500001,BTECH,2025';
+    const previewRes = await api.as(registrar.token)
+      .post('/api/people/students/import/preview')
+      .attach('file', Buffer.from(csv), { filename: 'rbac-ok.csv', contentType: 'text/csv' });
+    expect(previewRes.status).toBe(201);
+    expect(previewRes.body.previewRows[0].errors).toEqual([]);
+
+    const jobId = previewRes.body.job._id;
+    const commitRes = await api.as(registrar.token)
+      .post('/api/people/students/import/commit')
+      .send({ jobId });
+    expect(commitRes.status).toBe(200);
+    expect(commitRes.body.status).toBe('completed');
+  });
+
+  it('a Principal (platform:*, only people:read — no people:create) is rejected on preview — proves the gate checks people:create, not platform', async () => {
+    // DEFAULT_POLICIES gives principal `module:'*', action:'read'` plus
+    // `platform` a full wildcard, but nothing grants principal
+    // `people:create`. If this route were wired to
+    // authorize('platform','create') instead, principal would incorrectly
+    // pass. Real enforcement must reject it.
+    const csv = 'name*,phone*,programmeCode*,admissionYear*\nRbac Blocked,9876500002,BTECH,2025';
+    const res = await api.as(fx.principal.token)
+      .post('/api/people/students/import/preview')
+      .attach('file', Buffer.from(csv), { filename: 'rbac-blocked.csv', contentType: 'text/csv' });
+    expect(res.status).toBe(403);
   });
 });
