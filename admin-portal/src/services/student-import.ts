@@ -59,14 +59,22 @@ export const getStudentImportTemplate = (): Promise<ImportTemplate> =>
 export const previewStudentImport = (file: File): Promise<ImportPreview> => {
   const form = new FormData();
   form.append('file', file);
-  // The shared `api` instance defaults Content-Type to application/json.
-  // Left as-is, axios's default transformRequest sees that header, treats
-  // this FormData as JSON-serializable, and stringifies it — the file
-  // never goes out as multipart and the backend sees no req.file. The
-  // override below is stripped again by axios itself before the request
-  // goes out (browsers must set their own multipart boundary), but it is
-  // required here so the JSON short-circuit above never triggers. Same
-  // pattern as services/bulk-imports.ts:uploadImportFile.
+  // DO NOT remove this header override — it is load-bearing, not a stray
+  // default. The shared `api` instance sets Content-Type: application/json
+  // for every request. Without the override below, axios's default
+  // transformRequest sees that JSON header on a FormData body and
+  // JSON.stringify()s it right there — before the adapter ever gets a
+  // chance to let the browser set its own multipart boundary. The result
+  // is a request with an empty/garbage body and Content-Type: application/
+  // json; the backend sees no req.file and previewHandler 400s with "No
+  // file uploaded." Setting the header to 'multipart/form-data' here just
+  // dodges that early JSON branch — axios strips this value again right
+  // before the request goes out so the browser can add the real
+  // `boundary=...` parameter. Same pattern as
+  // services/bulk-imports.ts:uploadImportFile. Covered by the
+  // "sends a multipart Content-Type override" test in
+  // __tests__/student-import.test.ts — if that test goes red, so does
+  // every student CSV upload.
   return api
     .post(`${BASE}/preview`, form, { headers: { 'Content-Type': 'multipart/form-data' } })
     .then((r) => r.data);
@@ -87,6 +95,17 @@ function csvCell(value: string): string {
  * Mandatory columns get a trailing `*` so the operator can see what is
  * required without opening the schema panel. The server strips that marker
  * on upload (normalizeImportHeader), which is what makes the round-trip work.
+ *
+ * Header cells come from `fieldKey`, never from `label` — the backend
+ * matches uploaded columns back to a schema field by exact `fieldKey`
+ * string, so a header derived from the (operator-friendly, free-text)
+ * label would fail to map on upload.
+ *
+ * Caveat: normalizeImportHeader strips at most ONE trailing `*`, so a
+ * fieldKey that itself ends in `*` would not round-trip. No current field
+ * does; a registry-driven backend test
+ * (backend/src/modules/platform/__tests__/student-import-header-roundtrip.test.ts)
+ * checks every field automatically and will catch it the day one is added.
  */
 export function buildTemplateCsv(tpl: ImportTemplate): string {
   const header = tpl.fields
