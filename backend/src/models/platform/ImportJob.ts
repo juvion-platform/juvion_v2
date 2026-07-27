@@ -49,6 +49,12 @@ export interface IImportJobRowResult {
   error?: string;
   /** Raw input row (object keyed by header). Useful for retry / audit. */
   raw?: Record<string, unknown>;
+  /** What committing this row would do — set by the schema's optional validateRow hook. */
+  action?: 'create' | 'update' | 'blocked';
+  /** Advisory strings from validateRow (e.g. side effects the commit would cause). */
+  notes?: string[];
+  /** Label -> display value for codes this row resolved (programme, branch). */
+  resolved?: Record<string, string>;
 }
 
 export interface IImportJobSchemaField {
@@ -106,6 +112,9 @@ const rowResultSchema = new Schema<IImportJobRowResult>(
     createdId: { type: String },
     error: { type: String },
     raw: { type: Schema.Types.Mixed },
+    action: { type: String, enum: ['create', 'update', 'blocked'], required: false },
+    notes: { type: [String], required: false },
+    resolved: { type: Schema.Types.Mixed, required: false },
   },
   { _id: false },
 );

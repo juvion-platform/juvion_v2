@@ -49,6 +49,7 @@ import {
   serializeSchema,
   type ImportSchemaDefinition,
 } from './bulk-import-registry';
+import type { ImportRowAction } from './import-schemas/types';
 
 // ─── Public constants ─────────────────────────────────────────────────
 
@@ -84,9 +85,20 @@ export interface ImportJobPreview {
     raw: Record<string, string>;
     valid: boolean;
     errors: Array<{ field: string; error: string }>;
+    action?: ImportRowAction;
+    notes?: string[];
+    /** Label -> display value for codes this row resolved (programme, branch). */
+    resolved?: Record<string, string>;
   }>;
   validCount: number;
   errorCount: number;
+  /** How many rows would create, update, or are blocked. */
+  actionCounts: { create: number; update: number; blocked: number };
+  /**
+   * Schema-defined counters summed over every row — not just the previewed
+   * ones. Empty for schemas without a validateRow hook.
+   */
+  sideEffectTotals: Record<string, number>;
 }
 
 // ─── CSV parser (RFC-4180-ish, no new dep) ────────────────────────────
@@ -309,6 +321,8 @@ export async function uploadAndValidate(
       previewRows: [],
       validCount: 0,
       errorCount: 0,
+      actionCounts: { create: 0, update: 0, blocked: 0 },
+      sideEffectTotals: {},
     };
   }
 
@@ -337,6 +351,8 @@ export async function uploadAndValidate(
       previewRows: [],
       validCount: 0,
       errorCount: 0,
+      actionCounts: { create: 0, update: 0, blocked: 0 },
+      sideEffectTotals: {},
     };
   }
 
@@ -353,6 +369,8 @@ export async function uploadAndValidate(
   const previewRows: ImportJobPreview['previewRows'] = [];
   const results: IImportJobRowResult[] = [];
   let errorCount = 0;
+  const actionCounts = { create: 0, update: 0, blocked: 0 };
+  const sideEffectTotals: Record<string, number> = {};
   const ctx = { collegeId, performedBy };
 
   for (let i = 0; i < parsed.rows.length; i += 1) {
@@ -378,8 +396,43 @@ export async function uploadAndValidate(
       }
     }
 
-    const valid = errors.length === 0;
-    if (!valid) errorCount += 1;
+    let valid = errors.length === 0;
+    let blocked = false;
+    let action: ImportRowAction | undefined;
+    let notes: string[] | undefined;
+    let resolved: Record<string, string> | undefined;
+
+    // Async row check — DB-backed validation the sync field validators
+    // cannot do. Skipped for rows that already failed, so a broken row does
+    // not cost a query.
+    if (valid && def.validateRow) {
+      // eslint-disable-next-line no-await-in-loop
+      const rowRes = await def.validateRow(typedRow, rawObj, ctx);
+      if (!rowRes.ok) {
+        valid = false;
+        errors.push({ field: '_row', error: rowRes.error });
+      } else {
+        action = rowRes.action;
+        notes = rowRes.notes;
+        resolved = rowRes.resolved;
+        actionCounts[rowRes.action] += 1;
+        for (const [key, n] of Object.entries(rowRes.sideEffects ?? {})) {
+          sideEffectTotals[key] = (sideEffectTotals[key] ?? 0) + n;
+        }
+        // A blocked row is not an error — it's a valid row the business
+        // rules refuse (sealed/exited/alumni). It must never reach commit
+        // (outcome below still becomes 'error' so commitImportJob skips
+        // it), but it must NOT inflate errorCount, which is reserved for
+        // genuine validation/reference failures. actionCounts.blocked is
+        // the figure the operator sees for this bucket instead.
+        if (rowRes.action === 'blocked') {
+          valid = false;
+          blocked = true;
+        }
+      }
+    }
+
+    if (!valid && !blocked) errorCount += 1;
 
     // The row entry — `raw` keeps the raw input for commit replay
     // AND error messages reference the raw value the user typed.
@@ -388,6 +441,9 @@ export async function uploadAndValidate(
       outcome: valid ? 'success' : 'error',
       error: valid ? undefined : errors.map((e) => `${e.field}: ${e.error}`).join('; '),
       raw: valid ? typedRow : rawObj,
+      action,
+      notes,
+      resolved,
     });
 
     // Preview slice. Always include error rows. Cap success rows.
@@ -395,7 +451,7 @@ export async function uploadAndValidate(
     const includeThisRow =
       !valid || successPreviewCount < PREVIEW_SUCCESS_LIMIT;
     if (includeThisRow) {
-      previewRows.push({ row: rowIdx, raw: rawObj, valid, errors });
+      previewRows.push({ row: rowIdx, raw: rawObj, valid, errors, action, notes, resolved });
     }
   }
 
@@ -427,8 +483,12 @@ export async function uploadAndValidate(
     job,
     headers: parsed.headers,
     previewRows,
-    validCount: parsed.rows.length - errorCount,
+    // Blocked rows are neither errors nor committable — exclude them from
+    // both buckets. actionCounts.blocked is the figure for that bucket.
+    validCount: parsed.rows.length - errorCount - actionCounts.blocked,
     errorCount,
+    actionCounts,
+    sideEffectTotals,
   };
 }
 

@@ -18,42 +18,11 @@ import * as admissionsService from '../admissions/service';
 import * as academicsService from '../academics/service';
 import { IImportJobSchemaField } from '../../models/platform/ImportJob';
 
-export interface ImportCommitContext {
-  collegeId: string;
-  performedBy: string;
-}
+import type {
+  ImportCommitContext, ImportSchemaField, ImportSchemaDefinition,
+} from './import-schemas/types';
 
-export interface ImportSchemaField extends IImportJobSchemaField {
-  /**
-   * Validator. Receives the trimmed raw cell value AND the full row
-   * (so cross-field validation can run). Returns either `{ ok: true,
-   * value }` (the coerced typed value to pass to the commit handler)
-   * or `{ ok: false, error }` to mark the row failed.
-   */
-  validate: (
-    rawValue: string,
-    row: Record<string, string>,
-    ctx: ImportCommitContext,
-  ) => { ok: true; value: unknown } | { ok: false; error: string };
-}
-
-export interface ImportSchemaDefinition {
-  entityType: string;
-  label: string;
-  description: string;
-  fields: ImportSchemaField[];
-  /** Sample row for the downloadable CSV template. Keys must be `fieldKey`. */
-  sampleRow: Record<string, string>;
-  /**
-   * Given a fully-validated typed row, perform the create + return
-   * the _id. Throw `Error` on failure — the orchestrator catches and
-   * records the per-row error.
-   */
-  commitOne: (
-    typedRow: Record<string, unknown>,
-    ctx: ImportCommitContext,
-  ) => Promise<{ id: string }>;
-}
+export type { ImportCommitContext, ImportSchemaField, ImportSchemaDefinition };
 
 // ─── Shared validators ───────────────────────────────────────────────
 
