@@ -194,7 +194,8 @@ graduated record.
 
 Three tiers:
 
-1. **File** — not CSV, empty, no data rows below the header, or >5 MB. Rejects
+1. **File** — not CSV, empty, no data rows below the header, >10 MB, or >10,000
+   rows (`IMPORT_FILE_MAX_BYTES` / `IMPORT_MAX_ROWS`). Rejects
    the upload with a single message. Handled by existing multer config.
 2. **Row** — per-field validation errors collected; the row is marked failed and
    its siblings proceed. Existing behaviour.
@@ -265,4 +266,4 @@ appears in the list. Uses the `confirmDialog` helper.
 | Orphan `Person` on partial row failure | Compensating rollback, per the `programme-transfer-service` precedent |
 | Spreadsheet overwrites a sealed record | Blocked state; sealed/exited/alumni never written |
 | Unintended parent creation | Preview reports the count before any write; creation only at commit |
-| Large files time out | 5 MB cap (existing); commit already processes row-by-row and records per-row outcomes |
+| Large files time out | 10 MB / 10,000-row caps (existing); commit already processes row-by-row and records per-row outcomes |
