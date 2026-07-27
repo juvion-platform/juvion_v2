@@ -221,7 +221,11 @@ export const createExamRegistrationSchema = z.object({
 });
 export const updateExamRegistrationSchema = createExamRegistrationSchema.partial();
 
-export const createExamScheduleSchema = z.object({
+/**
+ * `endTime` after `startTime` is enforced here, not just in the form. HH:mm
+ * strings compare correctly lexically, so no parsing is needed.
+ */
+const examScheduleShape = z.object({
   semesterId: z.string().min(1),
   courseId: z.string().min(1),
   examType: z.enum(['regular', 'supplementary', 'improvement']),
@@ -231,7 +235,24 @@ export const createExamScheduleSchema = z.object({
   venue: z.string().optional(),
   status: z.enum(['scheduled', 'conducted', 'cancelled']).optional(),
 });
-export const updateExamScheduleSchema = createExamScheduleSchema.partial();
+
+function refineExamWindow<T extends { startTime?: string; endTime?: string }>(
+  data: T,
+  ctx: z.RefinementCtx,
+) {
+  if (!data.startTime || !data.endTime) return;
+  if (data.endTime <= data.startTime) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['endTime'],
+      message: 'End time must be after start time',
+    });
+  }
+}
+
+export const createExamScheduleSchema = examScheduleShape.superRefine(refineExamWindow);
+// .partial() must come off the raw shape — a ZodEffects has no .partial().
+export const updateExamScheduleSchema = examScheduleShape.partial().superRefine(refineExamWindow);
 
 export const createExternalMarkSchema = z.object({
   studentId: z.string().min(1),
