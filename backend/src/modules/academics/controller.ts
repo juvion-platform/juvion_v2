@@ -308,6 +308,10 @@ export async function deleteAttendanceSession(req: AuthRequest, res: Response, n
 }
 
 // ═══ Phase 4: Attendance Records ═══════════════════════════
+export async function getCourseOfferingRoster(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await svc.getCourseOfferingRoster(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }
+}
+
 export async function listAttendanceRecords(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await svc.listAttendanceRecords(req.collegeId!, req.params.sessionId as string)); } catch (e) { next(e); }
 }
@@ -321,7 +325,9 @@ export async function deleteAttendanceRecord(req: AuthRequest, res: Response, ne
   try { res.json(await svc.deleteAttendanceRecord(req.collegeId!, req.params.id as string, who(req))); } catch (e) { next(e); }
 }
 export async function bulkCreateAttendanceRecords(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.status(201).json(await svc.bulkCreateAttendanceRecords(req.collegeId!, req.body.records, who(req))); } catch (e) { next(e); }
+  // Passes the acting user's id (not name) so the service can resolve the
+  // Person that `markedBy` refs when the client doesn't supply one.
+  try { res.status(201).json(await svc.bulkUpsertAttendanceRecords(req.collegeId!, req.body.records, req.user?.id)); } catch (e) { next(e); }
 }
 
 // ═══ Phase 5: Internal Assessments ═════════════════════════
@@ -355,7 +361,7 @@ export async function deleteInternalMark(req: AuthRequest, res: Response, next: 
   try { res.json(await svc.deleteInternalMark(req.collegeId!, req.params.id as string, who(req))); } catch (e) { next(e); }
 }
 export async function bulkCreateInternalMarks(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.status(201).json(await svc.bulkCreateInternalMarks(req.collegeId!, req.body.marks, who(req))); } catch (e) { next(e); }
+  try { res.status(201).json(await svc.bulkUpsertInternalMarks(req.collegeId!, req.body.marks, who(req))); } catch (e) { next(e); }
 }
 
 // ═══ Phase 6: Exam Registration ════════════════════════════

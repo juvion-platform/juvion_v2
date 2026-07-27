@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useMemo } from 'react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Pencil, Loader2, AlertCircle, AlertTriangle } from 'lucide-react';
 import { getStudent } from '../../services/people';
@@ -11,6 +11,7 @@ import {
 import FeePinsPanel from '../../components/finance/FeePinsPanel';
 import StudentFeeStructurePanel from '../../components/finance/StudentFeeStructurePanel';
 import PersonPhotoBlock from '../../components/people/PersonPhotoBlock';
+import StudentPortfolioPanel from '../../components/student-dev/StudentPortfolioPanel';
 
 /** Returns the most recent non-archived pin, or undefined. */
 function pickActivePin(pins: IFeePin[]): IFeePin | undefined {
@@ -69,7 +70,8 @@ const ONBOARDING_COLOR: Record<string, string> = {
  * (no active pin). The dot is only rendered when the matching condition
  * is true at runtime.
  */
-type DetailTabKey = 'profile' | 'academic' | 'fees';
+type DetailTabKey = 'profile' | 'academic' | 'fees' | 'portfolio';
+const TAB_KEYS: DetailTabKey[] = ['profile', 'academic', 'fees', 'portfolio'];
 interface DetailTab {
   key: DetailTabKey;
   label: string;
@@ -78,17 +80,27 @@ const DETAIL_TABS: ReadonlyArray<DetailTab> = [
   { key: 'profile', label: 'Profile' },
   { key: 'academic', label: 'Academic Details' },
   { key: 'fees', label: 'Fee Structure' },
+  { key: 'portfolio', label: 'Portfolio' },
 ];
 
 export default function StudentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  // Tab state. Defaults to Profile so the page opens on identity
-  // information — the most common landing context. Local state only
-  // (no URL sync) — the page is short enough that browser-back is the
-  // dominant nav out of here, and remembering the tab across reloads
-  // would surprise more than help.
-  const [tab, setTab] = useState<DetailTabKey>('profile');
+  // Tab state lives in the URL (?tab=finance) so a specific tab can be
+  // deep-linked, shared and survives a refresh. Defaults to Profile.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab') as DetailTabKey | null;
+  const tab: DetailTabKey = tabParam && TAB_KEYS.includes(tabParam) ? tabParam : 'profile';
+  const setTab = (next: DetailTabKey) => {
+    // replace, not push — flipping tabs shouldn't stack history entries the
+    // user then has to click back through.
+    setSearchParams(prev => {
+      const p = new URLSearchParams(prev);
+      if (next === 'profile') p.delete('tab');
+      else p.set('tab', next);
+      return p;
+    }, { replace: true });
+  };
   const { data: s, isLoading, error } = useQuery({
     queryKey: ['student', id],
     queryFn: () => getStudent(id!),
@@ -427,6 +439,15 @@ export default function StudentDetailPage() {
               currentYearOfStudy={s.currentYearOfStudy ?? s.yearOfStudy}
             />
           )}
+        </div>
+      )}
+
+      {/* ── Portfolio tab ─────────────────────────────────────────
+          The Student Development portfolio API is student-scoped, so it
+          belongs here rather than on a college-wide admin list. */}
+      {tab === 'portfolio' && (
+        <div role="tabpanel" id="tabpanel-portfolio" aria-labelledby="tab-portfolio">
+          {id && <StudentPortfolioPanel studentId={id} />}
         </div>
       )}
     </div>

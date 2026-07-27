@@ -38,11 +38,13 @@ router.put('/applicants/:id', authorize('admissions', 'update'), validate(update
 router.get('/exam-scores', authorize('admissions', 'read'), ctrl.listExamScores);
 router.post('/exam-scores', authorize('admissions', 'create'), validate(createExamScoreSchema), ctrl.createExamScore);
 router.put('/exam-scores/:id', authorize('admissions', 'update'), validate(createExamScoreSchema.partial()), ctrl.updateExamScore);
+router.delete('/exam-scores/:id', authorize('admissions', 'delete'), ctrl.deleteExamScore);
 
 // Counseling Allotments
 router.get('/counseling', authorize('admissions', 'read'), ctrl.listCounselingAllotments);
 router.post('/counseling', authorize('admissions', 'create'), validate(createCounselingSchema), ctrl.createCounselingAllotment);
 router.put('/counseling/:id', authorize('admissions', 'update'), validate(createCounselingSchema.partial()), ctrl.updateCounselingAllotment);
+router.delete('/counseling/:id', authorize('admissions', 'delete'), ctrl.deleteCounselingAllotment);
 
 // Admission Offers
 router.get('/offers', authorize('admissions', 'read'), ctrl.listOffers);
@@ -58,6 +60,8 @@ router.put('/documents/:applicantId', authorize('admissions', 'update'), validat
 router.get('/enrollments', authorize('admissions', 'read'), ctrl.listAdmissions);
 router.get('/enrollments/:id', authorize('admissions', 'read'), ctrl.getAdmission);
 router.post('/enrollments', authorize('admissions', 'create'), validate(createAdmissionSchema), ctrl.createAdmission);
+router.put('/enrollments/:id', authorize('admissions', 'update'), validate(createAdmissionSchema.partial()), ctrl.updateAdmission);
+router.delete('/enrollments/:id', authorize('admissions', 'delete'), ctrl.deleteAdmission);
 
 // ─── Strategic Gap 5 — AssignmentRule CRUD + preview ─────────────
 // Static `/preview` path BEFORE the `/:id` route so it never gets

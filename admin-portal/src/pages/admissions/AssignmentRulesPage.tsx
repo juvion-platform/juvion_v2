@@ -11,6 +11,7 @@ import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
 import { Plus, Pencil, Trash2, Power, PowerOff, FlaskConical, ArrowDownAZ } from 'lucide-react';
+import { confirmAction } from '../../stores/confirmStore';
 
 // ─── Constants (mirror backend enums) ────────────────────────────
 const FIELDS: { value: AssignmentRuleField; label: string; type: 'string' | 'number' | 'enum'; options?: string[] }[] = [
@@ -254,7 +255,7 @@ export default function AssignmentRulesPage() {
           {r.enabled ? <PowerOff size={15} className="text-orange-500" /> : <Power size={15} className="text-green-600" />}
         </button>
         <button onClick={(e) => { e.stopPropagation(); openEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
-        <button onClick={(e) => { e.stopPropagation(); if (confirm(`Delete rule "${r.name}"?`)) deleteMut.mutate(r._id); }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
+        <button onClick={(e) => { e.stopPropagation(); void confirmAction({ title: `Delete rule "${r.name}"?`, tone: 'danger', confirmLabel: 'Delete' }).then((__c) => { if (__c.confirmed) { deleteMut.mutate(r._id); } }) }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
       </div>
     )},
   ];

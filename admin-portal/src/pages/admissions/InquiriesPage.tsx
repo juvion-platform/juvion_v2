@@ -8,6 +8,10 @@ import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
 import LeadGradeBadge from '../../components/admissions/LeadGradeBadge';
 import { Plus, Trash2, Pencil, ArrowRightCircle, Eye, Phone, Mail, RefreshCw, Sparkles } from 'lucide-react';
+import { confirmAction } from '../../stores/confirmStore';
+import Pagination from '../../components/ui/Pagination';
+import { useListControls } from '../../hooks/useListControls';
+import SearchInput from '../../components/ui/SearchInput';
 
 const STATUS_COLOR: Record<string, string> = {
   new: 'info', contacted: 'warning', follow_up: 'warning', interested: 'info',
@@ -21,7 +25,7 @@ const lbl = "block text-sm font-medium text-gray-700 mb-1";
 export default function InquiriesPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const [page, setPage] = useState(1);
+  const { page, setPage, limit, setLimit, search, setSearch } = useListControls();
   const [filterStatus, setFilterStatus] = useState('');
   // 001-ai-lead-scoring Story 4 — grade filter chip + score sort.
   const [filterGrade, setFilterGrade] = useState<'' | 'hot' | 'hot_warm'>('');
@@ -33,12 +37,12 @@ export default function InquiriesPage() {
   const [rescoreFlash, setRescoreFlash] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['inquiries', page, filterStatus, filterGrade, sortMode],
-    queryFn: () => listInquiries(page, 20, {
+    queryKey: ['inquiries', page, filterStatus, filterGrade, sortMode, limit, search],
+    queryFn: () => listInquiries(page, limit, {
       status: filterStatus || undefined,
       grade: filterGrade || undefined,
       sort: sortMode,
-    }),
+    }, search),
   });
 
   const deleteMut = useMutation({ mutationFn: deleteInquiry, onSuccess: () => { qc.invalidateQueries({ queryKey: ['inquiries'] }); qc.invalidateQueries({ queryKey: ['admissions-stats'] }); } });
@@ -104,7 +108,7 @@ export default function InquiriesPage() {
         {r.status !== 'converted' && r.status !== 'lost' && (
           <button onClick={(e) => { e.stopPropagation(); openConvert(r); }} className="p-1 rounded hover:bg-green-50" title="Convert to Applicant"><ArrowRightCircle size={15} className="text-green-500" /></button>
         )}
-        <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this inquiry?')) deleteMut.mutate(r._id); }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
+        <button onClick={(e) => { e.stopPropagation(); void confirmAction({ title: 'Delete this inquiry?', tone: 'danger', confirmLabel: 'Delete' }).then((__c) => { if (__c.confirmed) { deleteMut.mutate(r._id); } }) }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
       </div>
     )},
   ];
@@ -113,6 +117,8 @@ export default function InquiriesPage() {
     <div>
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-xl font-bold text-navy">Inquiries</h2>
+        <div className="flex items-center gap-3">
+          <SearchInput value={search} onChange={setSearch} placeholder="Search inquiries…" className="w-56" />
         <div className="flex gap-3 items-center">
           {/* 001-ai-lead-scoring Story 4 — grade filter chips */}
           <div className="inline-flex rounded-lg border border-gray-300 overflow-hidden text-xs">
@@ -130,6 +136,7 @@ export default function InquiriesPage() {
               onClick={() => { setFilterGrade('hot'); setPage(1); }}
               title="Show only hot leads"
             >Hot only</button>
+          </div>
           </div>
           <select
             value={sortMode}
@@ -162,15 +169,17 @@ export default function InquiriesPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={(r: any) => openDetail(r)}
+        emptyMessage={search ? `No inquiries match “${search}”.` : 'No inquiries yet.'}
       />
 
-      {data && data.pages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-4">
-          <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Prev</button>
-          <span className="text-sm text-gray-500">Page {page} of {data.pages}</span>
-          <button disabled={page >= data.pages} onClick={() => setPage(p => p + 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Next</button>
-        </div>
-      )}
+      <Pagination
+        page={page}
+        pages={data?.pages ?? 1}
+        total={data?.total}
+        limit={limit}
+        onPageChange={setPage}
+        onLimitChange={setLimit}
+      />
 
       {/* ── Detail View Modal ──────────────────────────── */}
       <Modal open={detailModalOpen} onClose={() => setDetailModalOpen(false)} title="Inquiry Details">

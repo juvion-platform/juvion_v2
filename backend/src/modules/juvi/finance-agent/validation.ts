@@ -63,10 +63,15 @@ export const riskScoresSchema = z.object({
  * POST /situations — only `force` (optional) is accepted; the server
  * resolves the college from `req.collegeId` only. `force` bypasses the
  * daily Redis cache and recomputes from scratch.
+ *
+ * `.strict()` is deliberate: the endpoint takes its tenant from the
+ * authenticated request, so a body carrying `collegeId` is either a client
+ * bug or an attempt to cross tenants, and should be rejected loudly rather
+ * than silently stripped. It was lost when `force` was added.
  */
 export const situationsSchema = z.object({
   force: z.boolean().optional(),
-});
+}).strict();
 
 /**
  * POST /reminder-drafts — agent-drafted fee reminders for a batch of

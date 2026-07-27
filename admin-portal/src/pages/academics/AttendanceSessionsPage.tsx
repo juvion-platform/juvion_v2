@@ -8,6 +8,11 @@ import Modal from '../../components/ui/Modal';
 import { Plus, Pencil, Trash2, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useViewEditMode } from '../../hooks/useViewEditMode';
+import { confirmAction } from '../../stores/confirmStore';
+import Pagination from '../../components/ui/Pagination';
+import { useListControls } from '../../hooks/useListControls';
+import SearchInput from '../../components/ui/SearchInput';
+import AttendanceMarkingPanel from '../../components/academics/AttendanceMarkingPanel';
 
 const STATUSES = ['open', 'closed'] as const;
 const STATUS_COLOR: Record<string, string> = { open: 'success', closed: 'default' };
@@ -19,10 +24,10 @@ const emptyForm = { courseOfferingId: '', date: '', period: '1', facultyId: '', 
 
 export default function AttendanceSessionsPage() {
   const qc = useQueryClient();
-  const [page, setPage] = useState(1);
+  const { page, setPage, limit, setLimit, search, setSearch } = useListControls();
   const [form, setForm] = useState(emptyForm);
 
-  const { data, isLoading } = useQuery({ queryKey: ['attendance-sessions', page], queryFn: () => listAttendanceSessions(page, 20) });
+  const { data, isLoading } = useQuery({ queryKey: ['attendance-sessions', page, limit, search], queryFn: () => listAttendanceSessions(page, limit, undefined, search) });
   const { data: offeringsData } = useQuery({ queryKey: ['offerings', 1, 200], queryFn: () => listCourseOfferings(1, 200) });
   const { data: facultyData } = useQuery({ queryKey: ['faculty-all'], queryFn: () => listFaculty(1, 200) });
   const faculty = facultyData?.items || [];
@@ -68,7 +73,7 @@ export default function AttendanceSessionsPage() {
     { key: 'actions', label: '', render: (r: any) => (
       <div className="flex gap-1">
         <button onClick={(e) => { e.stopPropagation(); vem.openForEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
-        <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete session and all records?')) deleteMut.mutate(r._id); }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
+        <button onClick={(e) => { e.stopPropagation(); void confirmAction({ title: 'Delete session and all records?', tone: 'danger', confirmLabel: 'Delete' }).then((__c) => { if (__c.confirmed) { deleteMut.mutate(r._id); } }) }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
       </div>
     )},
   ];
@@ -77,17 +82,23 @@ export default function AttendanceSessionsPage() {
     <div>
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-xl font-bold text-navy">Attendance Sessions</h2>
+        <div className="flex items-center gap-3">
+          <SearchInput value={search} onChange={setSearch} placeholder="Search attendance sessions…" className="w-56" />
         <button onClick={vem.openForCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700"><Plus size={16} className="text-white" /> New Session</button>
       </div>
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
-      {data && data.pages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-4">
-          <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Prev</button>
-          <span className="text-sm text-gray-500">Page {page} of {data.pages}</span>
-          <button disabled={page >= data.pages} onClick={() => setPage(p => p + 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Next</button>
-        </div>
-      )}
-      <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('Attendance Session')}>
+      </div>
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No attendance sessions match “${search}”.` : 'No attendance sessions yet.'}
+      />
+      <Pagination
+        page={page}
+        pages={data?.pages ?? 1}
+        total={data?.total}
+        limit={limit}
+        onPageChange={setPage}
+        onLimitChange={setLimit}
+      />
+      <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('Attendance Session')} widthClass="max-w-3xl">
         <form onSubmit={handleSubmit} className="space-y-4">
           <fieldset disabled={vem.isView} className="border-0 p-0 m-0 space-y-4">
             <div className="grid grid-cols-2 gap-4">
@@ -113,6 +124,24 @@ export default function AttendanceSessionsPage() {
               <div className="col-span-2"><label className={lbl}>Topic Covered</label><input value={form.topicCovered} onChange={e => setForm(f => ({ ...f, topicCovered: e.target.value }))} className={inp} /></div>
             </div>
           </fieldset>
+
+          {/* The register itself. Only meaningful once the session exists, so
+              it shows on view/edit of a saved session, not during create. */}
+          {vem.entity?._id && form.courseOfferingId && (
+            <div>
+              <label className={lbl}>Mark attendance</label>
+              <AttendanceMarkingPanel
+                sessionId={vem.entity._id}
+                courseOfferingId={form.courseOfferingId}
+                readOnly={form.status === 'closed'}
+              />
+              {form.status === 'closed' && (
+                <p className="mt-1 text-xs text-slate-500">
+                  This session is closed. Reopen it to change attendance.
+                </p>
+              )}
+            </div>
+          )}
           <div className="flex justify-end gap-3 pt-2 border-t">
             <button type="button" onClick={vem.close} className="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50">
               {vem.isView ? 'Close' : 'Cancel'}

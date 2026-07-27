@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { refineRequiredWhenStatus } from "../../shared/validation-helpers";
 
 // ═══ Accreditation Body ═════════════════════════════════════
 
@@ -40,7 +41,7 @@ export const updateComplianceCriteriaSchema = createComplianceCriteriaSchema.par
 
 // ═══ Regulatory Filing ══════════════════════════════════════
 
-export const createRegulatoryFilingSchema = z.object({
+const regulatoryFilingShape = z.object({
   body: z.enum(['aicte', 'ugc', 'jntu', 'state_govt', 'mhrd', 'other']),
   filingType: z.string().min(1),
   dueDate: z.string().min(1),
@@ -49,7 +50,16 @@ export const createRegulatoryFilingSchema = z.object({
   documentUrl: z.string().optional(),
   status: z.enum(['upcoming', 'in_progress', 'filed', 'overdue', 'approved', 'rejected']).optional(),
 });
-export const updateRegulatoryFilingSchema = createRegulatoryFilingSchema.partial();
+// A filing marked filed/approved with no filed date looks satisfied on a
+// compliance dashboard but carries no evidence date.
+const filedDateRequired = refineRequiredWhenStatus({
+  field: 'filedDate',
+  statusField: 'status',
+  whenStatusIn: ['filed', 'approved'],
+  message: 'Filed date is required once the filing is marked filed or approved',
+});
+export const createRegulatoryFilingSchema = regulatoryFilingShape.superRefine(filedDateRequired);
+export const updateRegulatoryFilingSchema = regulatoryFilingShape.partial().superRefine(filedDateRequired);
 
 // ═══ AICTE Approval ═════════════════════════════════════════
 

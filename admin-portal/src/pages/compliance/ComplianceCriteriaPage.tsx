@@ -1,11 +1,16 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { listComplianceCriteria, createComplianceCriteria, updateComplianceCriteria, deleteComplianceCriteria } from '../../services/compliance';
+import { listAccreditationCycles, listComplianceCriteria, createComplianceCriteria, updateComplianceCriteria, deleteComplianceCriteria } from '../../services/compliance';
 import DataTable from '../../components/ui/DataTable';
+import EntityPicker from '../../components/ui/EntityPicker';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { useViewEditMode } from '../../hooks/useViewEditMode';
+import { confirmAction } from '../../stores/confirmStore';
+import Pagination from '../../components/ui/Pagination';
+import { useListControls } from '../../hooks/useListControls';
+import SearchInput from '../../components/ui/SearchInput';
 
 const STATUSES = ['not_started', 'in_progress', 'submitted', 'reviewed'] as const;
 const STATUS_COLOR: Record<string, string> = { not_started: 'default', in_progress: 'warning', submitted: 'info', reviewed: 'success' };
@@ -19,10 +24,10 @@ const emptyForm = {
 
 export default function ComplianceCriteriaPage() {
   const qc = useQueryClient();
-  const [page, setPage] = useState(1);
+  const { page, setPage, limit, setLimit, search, setSearch } = useListControls();
   const [form, setForm] = useState(emptyForm);
 
-  const { data, isLoading } = useQuery({ queryKey: ['compliance-criteria', page], queryFn: () => listComplianceCriteria(page, 20) });
+  const { data, isLoading } = useQuery({ queryKey: ['compliance-criteria', page, limit, search], queryFn: () => listComplianceCriteria(page, limit, undefined, undefined, search) });
 
   const vem = useViewEditMode<any>({
     onOpenEntity: (row) => setForm({
@@ -63,7 +68,7 @@ export default function ComplianceCriteriaPage() {
     { key: 'actions', label: '', render: (r: any) => (
       <div className="flex gap-1">
         <button onClick={(e) => { e.stopPropagation(); vem.openForEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
-        <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this criterion?')) deleteMut.mutate(r._id); }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
+        <button onClick={(e) => { e.stopPropagation(); void confirmAction({ title: 'Delete this criterion?', tone: 'danger', confirmLabel: 'Delete' }).then((__c) => { if (__c.confirmed) { deleteMut.mutate(r._id); } }) }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
       </div>
     )},
   ];
@@ -72,27 +77,47 @@ export default function ComplianceCriteriaPage() {
     <div>
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-xl font-bold text-navy">Compliance Criteria</h2>
+        <div className="flex items-center gap-3">
+          <SearchInput value={search} onChange={setSearch} placeholder="Search compliance criteria…" className="w-56" />
         <button onClick={vem.openForCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700">
           <Plus size={16} className="text-white" /> New Criterion
         </button>
       </div>
+      </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No compliance criteria match “${search}”.` : 'No compliance criteria yet.'}
+      />
 
-      {data && data.pages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-4">
-          <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Prev</button>
-          <span className="text-sm text-gray-500">Page {page} of {data.pages}</span>
-          <button disabled={page >= data.pages} onClick={() => setPage(p => p + 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Next</button>
-        </div>
-      )}
+      <Pagination
+        page={page}
+        pages={data?.pages ?? 1}
+        total={data?.total}
+        limit={limit}
+        onPageChange={setPage}
+        onLimitChange={setLimit}
+      />
 
       <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('Criterion')}>
         <form onSubmit={handleSubmit} className="space-y-4">
           <fieldset disabled={vem.isView} className="border-0 p-0 m-0 space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <div><label className={lbl}>Accreditation Cycle ID *</label>
-                <input required value={form.accreditationCycleId} onChange={e => setForm(f => ({ ...f, accreditationCycleId: e.target.value }))} className={inp} />
+              <div>
+                <label className={lbl} htmlFor="criteria-cycle">Accreditation Cycle *</label>
+                <EntityPicker
+                  id="criteria-cycle"
+                  required
+                  disabled={vem.isView}
+                  queryKey={['accreditation-cycles', 'picker']}
+                  fetcher={(q) => listAccreditationCycles(1, 20, q || undefined)}
+                  value={form.accreditationCycleId}
+                  onChange={(v) => setForm(f => ({ ...f, accreditationCycleId: v }))}
+                  getId={(x: any) => x._id}
+                  getLabel={(c: any) => c.name || c.cycleNumber || c._id}
+                  getHint={(c: any) => c.status || undefined}
+                  fallbackLabel={vem.entity?.accreditationCycleId?.name}
+                  placeholder="Search accreditation cycle"
+                />
               </div>
               <div><label className={lbl}>Criterion Number *</label>
                 <input required value={form.criterionNumber} onChange={e => setForm(f => ({ ...f, criterionNumber: e.target.value }))} className={inp} placeholder="e.g. 1.1.1" />

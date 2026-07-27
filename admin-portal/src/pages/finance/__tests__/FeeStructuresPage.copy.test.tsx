@@ -141,18 +141,21 @@ describe('<FeeStructuresPage /> Copy flow', () => {
     expect(componentNameInputs).toHaveLength(2);
 
     // Combination fields are prefilled from the source row.
-    // Locate inputs by their adjacent label text + the input pattern in the form.
     const yearInputs = screen.getAllByDisplayValue('2');
     expect(yearInputs.length).toBeGreaterThan(0);
-    expect(screen.getByDisplayValue('Tuition')).toBeInTheDocument();
 
-    // Scan all selects/inputs in the document for the prefilled values
+    // Academic year, programme and branch are still plain <select>s.
     const allSelects = document.querySelectorAll('select');
     const selectValues = Array.from(allSelects).map((s) => (s as HTMLSelectElement).value);
     expect(selectValues).toContain(ACADEMIC_YEAR_ID);
     expect(selectValues).toContain(PROGRAMME_ID);
     expect(selectValues).toContain(BRANCH_ID);
-    expect(selectValues).toContain('management'); // quota
+
+    // Category and quota became multi-selects (one structure per
+    // category × quota), which render the selection as button text rather
+    // than a form value — so they are asserted by label, not display value.
+    expect(screen.getByRole('button', { name: 'Tuition' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'management — Management' })).toBeInTheDocument();
 
     // Components are prefilled too
     const componentAmountInputs = screen.getAllByPlaceholderText('Amount') as HTMLInputElement[];

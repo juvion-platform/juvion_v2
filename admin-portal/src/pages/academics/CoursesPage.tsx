@@ -6,6 +6,10 @@ import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { useViewEditMode } from '../../hooks/useViewEditMode';
+import { confirmAction } from '../../stores/confirmStore';
+import Pagination from '../../components/ui/Pagination';
+import { useListControls } from '../../hooks/useListControls';
+import SearchInput from '../../components/ui/SearchInput';
 
 const TYPES = ['theory', 'lab', 'project', 'seminar', 'audit'] as const;
 const TYPE_COLOR: Record<string, string> = { theory: 'info', lab: 'warning', project: 'success', seminar: 'default', audit: 'default' };
@@ -16,11 +20,11 @@ const emptyForm = { code: '', name: '', regulationId: '', departmentId: '', cred
 
 export default function CoursesPage() {
   const qc = useQueryClient();
-  const [page, setPage] = useState(1);
+  const { page, setPage, limit, setLimit, search, setSearch } = useListControls();
   const [filterRegulation, setFilterRegulation] = useState('');
   const [form, setForm] = useState(emptyForm);
 
-  const { data, isLoading } = useQuery({ queryKey: ['courses', page, filterRegulation], queryFn: () => listCourses(page, 20, filterRegulation || undefined) });
+  const { data, isLoading } = useQuery({ queryKey: ['courses', page, filterRegulation, limit, search], queryFn: () => listCourses(page, limit, filterRegulation || undefined, search) });
   const { data: regsData } = useQuery({ queryKey: ['regulations', 1, 100], queryFn: () => listRegulations(1, 100) });
   const { data: deptsData } = useQuery({ queryKey: ['departments', 1, 100], queryFn: () => listDepartments(1, 100) });
 
@@ -64,7 +68,7 @@ export default function CoursesPage() {
     { key: 'actions', label: '', render: (r: any) => (
       <div className="flex gap-1">
         <button onClick={(e) => { e.stopPropagation(); vem.openForEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
-        <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this course?')) deleteMut.mutate(r._id); }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
+        <button onClick={(e) => { e.stopPropagation(); void confirmAction({ title: 'Delete this course?', tone: 'danger', confirmLabel: 'Delete' }).then((__c) => { if (__c.confirmed) { deleteMut.mutate(r._id); } }) }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
       </div>
     )},
   ];
@@ -73,6 +77,8 @@ export default function CoursesPage() {
     <div>
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-xl font-bold text-navy">Courses</h2>
+        <div className="flex items-center gap-3">
+          <SearchInput value={search} onChange={setSearch} placeholder="Search courses…" className="w-56" />
         <div className="flex gap-3">
           <select value={filterRegulation} onChange={e => { setFilterRegulation(e.target.value); setPage(1); }} className="border rounded-lg px-3 py-2 text-sm">
             <option value="">All Regulations</option>
@@ -82,17 +88,21 @@ export default function CoursesPage() {
             <Plus size={16} className="text-white" /> New Course
           </button>
         </div>
+        </div>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No courses match “${search}”.` : 'No courses yet.'}
+      />
 
-      {data && data.pages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-4">
-          <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Prev</button>
-          <span className="text-sm text-gray-500">Page {page} of {data.pages}</span>
-          <button disabled={page >= data.pages} onClick={() => setPage(p => p + 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Next</button>
-        </div>
-      )}
+      <Pagination
+        page={page}
+        pages={data?.pages ?? 1}
+        total={data?.total}
+        limit={limit}
+        onPageChange={setPage}
+        onLimitChange={setLimit}
+      />
 
       <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('Course')}>
         <form onSubmit={handleSubmit} className="space-y-4">

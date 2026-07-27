@@ -10,6 +10,10 @@ import StudentFinanceReadinessCard from '../../components/StudentFinanceReadines
 import { ExternalLink, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useViewEditMode } from '../../hooks/useViewEditMode';
+import { confirmAction } from '../../stores/confirmStore';
+import Pagination from '../../components/ui/Pagination';
+import { useListControls } from '../../hooks/useListControls';
+import SearchInput from '../../components/ui/SearchInput';
 
 const STATUSES = ['applied', 'approved', 'disbursed', 'rejected'] as const;
 const STATUS_COLOR: Record<string, string> = { applied: 'default', approved: 'info', disbursed: 'success', rejected: 'danger' };
@@ -29,7 +33,7 @@ const emptyForm = {
 export default function ScholarshipAllocationsPage() {
   const qc = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [page, setPage] = useState(1);
+  const { page, setPage, limit, setLimit, search, setSearch } = useListControls();
   const [scholarshipFilter, setScholarshipFilter] = useState(searchParams.get('scholarshipId') || '');
   const [studentFilter, setStudentFilter] = useState(searchParams.get('studentId') || '');
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
@@ -49,8 +53,8 @@ export default function ScholarshipAllocationsPage() {
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ['scholarship-allocations', page, scholarshipFilter, studentFilter, statusFilter],
-    queryFn: () => listScholarshipAllocations(page, 20, scholarshipFilter || undefined, studentFilter || undefined, statusFilter || undefined),
+    queryKey: ['scholarship-allocations', page, scholarshipFilter, studentFilter, statusFilter, limit, search],
+    queryFn: () => listScholarshipAllocations(page, limit, scholarshipFilter || undefined, studentFilter || undefined, statusFilter || undefined, search),
   });
   const { data: scholarshipsData } = useQuery({ queryKey: ['scholarships-all'], queryFn: () => listScholarships(1, 100) });
   const { data: studentsData } = useQuery({ queryKey: ['students-all'], queryFn: () => listStudents(1, 100) });
@@ -134,7 +138,7 @@ export default function ScholarshipAllocationsPage() {
           </>
         )}
         <button onClick={(e) => { e.stopPropagation(); vem.openForEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
-        <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this scholarship allocation?')) deleteMut.mutate(r._id); }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
+        <button onClick={(e) => { e.stopPropagation(); void confirmAction({ title: 'Delete this scholarship allocation?', tone: 'danger', confirmLabel: 'Delete' }).then((__c) => { if (__c.confirmed) { deleteMut.mutate(r._id); } }) }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
       </div>
     )},
   ];
@@ -143,9 +147,12 @@ export default function ScholarshipAllocationsPage() {
     <div>
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-xl font-bold text-navy">Scholarship Allocations</h2>
+        <div className="flex items-center gap-3">
+          <SearchInput value={search} onChange={setSearch} placeholder="Search scholarship allocations…" className="w-56" />
         <button onClick={vem.openForCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700">
           <Plus size={16} className="text-white" /> New Allocation
         </button>
+      </div>
       </div>
 
       <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -196,13 +203,14 @@ export default function ScholarshipAllocationsPage() {
         }
       />
 
-      {data && data.pages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-4">
-          <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Prev</button>
-          <span className="text-sm text-gray-500">Page {page} of {data.pages}</span>
-          <button disabled={page >= data.pages} onClick={() => setPage((p) => p + 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Next</button>
-        </div>
-      )}
+      <Pagination
+        page={page}
+        pages={data?.pages ?? 1}
+        total={data?.total}
+        limit={limit}
+        onPageChange={setPage}
+        onLimitChange={setLimit}
+      />
 
       <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('Scholarship Allocation')}>
         <form onSubmit={handleSubmit} className="space-y-4">

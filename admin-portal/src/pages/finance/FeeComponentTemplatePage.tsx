@@ -6,6 +6,7 @@ import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
 import { useViewEditMode } from '../../hooks/useViewEditMode';
 import { useAuthStore } from '../../stores/authStore';
+import { confirmAction } from '../../stores/confirmStore';
 import {
   listComponents,
   createComponent,
@@ -187,9 +188,15 @@ export default function FeeComponentTemplatePage() {
     }
   }
 
-  function handleDelete(row: FeeComponentTemplateDoc) {
+  async function handleDelete(row: FeeComponentTemplateDoc) {
     if (row.isDefault) return;
-    if (!window.confirm(`Delete custom component "${row.displayLabel}"?`)) return;
+    const ok = await confirmAction({
+      title: `Delete custom component "${row.displayLabel}"?`,
+      message: 'This cannot be undone.',
+      tone: 'danger',
+      confirmLabel: 'Delete',
+    });
+    if (!ok.confirmed) return;
     deleteMut.mutate(row._id);
   }
 

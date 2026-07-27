@@ -12,6 +12,7 @@ import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
 import SuggestionCard, { type SuggestionStatus } from '../../components/platform/SuggestionCard';
 import { Settings, Plus, Pencil, Trash2, Save, Power, PowerOff, Sliders, Sparkles, AlertTriangle } from 'lucide-react';
+import { confirmAction } from '../../stores/confirmStore';
 
 const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none';
 const lbl = 'block text-sm font-medium text-gray-700 mb-1';
@@ -592,9 +593,15 @@ export default function SchemaConfigPage() {
       enabled: !entry.enabled,
     });
   }
-  function handleMultiDelete(entry: ConfigEntry) {
+  async function handleMultiDelete(entry: ConfigEntry) {
     if (!activeSchema) return;
-    if (!confirm(`Delete "${entry.identifier}"? This cannot be undone.`)) return;
+    const ok = await confirmAction({
+      title: `Delete "${entry.identifier}"?`,
+      message: 'This cannot be undone.',
+      tone: 'danger',
+      confirmLabel: 'Delete',
+    });
+    if (!ok.confirmed) return;
     deleteMut.mutate({ type: activeSchema.type, identifier: entry.identifier });
   }
 

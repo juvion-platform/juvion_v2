@@ -1,5 +1,5 @@
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   LayoutDashboard, UserPlus, Users, GraduationCap, IndianRupee,
   Briefcase, Heart, Building2, TrendingUp, Shield, Landmark,
@@ -42,6 +42,9 @@ const NAV_ITEMS: NavItem[] = [
     module: 'finance',
     children: [
       { to: '/finance/dashboard', label: 'Dashboard' },
+      // The full section-card hub lives at /finance/overview. It had no link
+      // anywhere in the UI, so it was reachable only by typing the URL.
+      { to: '/finance/overview', label: 'All Finance Sections' },
       { to: '/finance/fee-management', label: 'Fee Management' },
       { to: '/finance/scholarships-concessions', label: 'Scholarships & Concessions' },
       { to: '/finance/accounting', label: 'Accounting' },
@@ -58,10 +61,18 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/juvi', icon: Bot, label: 'Juvi AI', iconColor: 'text-purple-400', module: 'juvi' },
 ];
 
+const SIDEBAR_COLLAPSED_KEY = 'sidebarCollapsed';
+
 export default function DashboardLayout() {
-  const [collapsed, setCollapsed] = useState(false);
+  // Persisted so the sidebar doesn't spring back open on every refresh.
+  const [collapsed, setCollapsed] = useState(
+    () => localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true',
+  );
   const [profileOpen, setProfileOpen] = useState(false);
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
+  /** Which group's flyout is showing while the sidebar is collapsed. */
+  const [flyoutGroup, setFlyoutGroup] = useState<string | null>(null);
+  const profileRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const user = useAuthStore((s) => s.user);
@@ -89,6 +100,35 @@ export default function DashboardLayout() {
     setExpandedGroup((prev) => (prev === groupKey ? null : groupKey));
   };
 
+  function toggleCollapsed() {
+    setCollapsed((prev) => {
+      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(!prev));
+      return !prev;
+    });
+    setFlyoutGroup(null);
+  }
+
+  // The profile dropdown used to close only on clicks inside <main>, so it
+  // hung over the next page when the user clicked a sidebar link. Close it on
+  // any navigation, on Escape, and on any click outside the menu itself.
+  useEffect(() => { setProfileOpen(false); }, [location.pathname]);
+
+  useEffect(() => {
+    if (!profileOpen) return;
+    function onPointerDown(e: MouseEvent) {
+      if (!profileRef.current?.contains(e.target as Node)) setProfileOpen(false);
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setProfileOpen(false);
+    }
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [profileOpen]);
+
   // Decode user from token if user is null (page refresh)
   const displayName = user?.name || (() => {
     if (!token) return 'Admin';
@@ -106,12 +146,12 @@ export default function DashboardLayout() {
   }
 
   function handleSwitchCollege() {
-    // Clear the selected college so the selector shows
-    const { selectCollege } = useAuthStore.getState();
-    selectCollege('', '');
-    localStorage.removeItem('collegeId');
-    localStorage.removeItem('collegeName');
-    useAuthStore.setState({ collegeId: null, collegeName: null });
+    // clearCollege() nulls both the store and localStorage. The old path called
+    // selectCollege('', '') first, which left collegeId as '' — falsy, so
+    // RequireCollege happened to work, but any `=== null` check downstream
+    // would have silently disagreed.
+    useAuthStore.getState().clearCollege();
+    setProfileOpen(false);
     navigate('/select-college', { replace: true });
   }
 
@@ -134,7 +174,7 @@ export default function DashboardLayout() {
               Juvion
             </span>
           )}
-          <button onClick={() => setCollapsed(!collapsed)} className="p-1 rounded text-gray-400 hover:bg-white/10 hover:text-white transition-colors">
+          <button onClick={toggleCollapsed} aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"} className="p-1 rounded text-gray-400 hover:bg-white/10 hover:text-white transition-colors">
             {collapsed ? <Menu size={20} /> : <ChevronLeft size={20} />}
           </button>
         </div>
@@ -167,6 +207,10 @@ export default function DashboardLayout() {
                   key={to}
                   to={to}
                   end={to === '/'}
+                  // Collapsed mode is icon-only, so the label has to survive as
+                  // a tooltip and an accessible name.
+                  title={collapsed ? label : undefined}
+                  aria-label={collapsed ? label : undefined}
                   className={({ isActive }) => clsx(
                     'flex items-center gap-3 px-3 py-2 mx-1.5 rounded-lg text-sm transition-all duration-150',
                     isActive
@@ -180,11 +224,21 @@ export default function DashboardLayout() {
               );
             }
 
-            // Group entry: clicking navigates AND toggles expansion.
+            // Group entry: clicking navigates AND toggles expansion. When the
+            // sidebar is collapsed the submenu can't expand inline, so hovering
+            // the icon reveals a flyout — otherwise sub-pages like
+            // /finance/accounting are unreachable without expanding first.
             return (
-              <div key={to}>
+              <div
+                key={to}
+                className="relative"
+                onMouseEnter={() => collapsed && setFlyoutGroup(to)}
+                onMouseLeave={() => collapsed && setFlyoutGroup(null)}
+              >
                 <button
                   type="button"
+                  title={collapsed ? label : undefined}
+                  aria-label={collapsed ? label : undefined}
                   onClick={() => {
                     if (!collapsed) toggleGroup(to);
                     navigate(to);
@@ -210,6 +264,34 @@ export default function DashboardLayout() {
                     </>
                   )}
                 </button>
+
+                {collapsed && flyoutGroup === to && (
+                  <div className="absolute left-full top-0 z-50 ml-1 w-56 rounded-lg border border-white/10 py-1.5 shadow-xl"
+                       style={{ background: 'linear-gradient(180deg, #1A365D 0%, #0F2744 100%)' }}>
+                    <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+                      {label}
+                    </p>
+                    {children!.map((child, idx) =>
+                      child.section ? (
+                        <div key={`fsec-${idx}`} className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+                          {child.label}
+                        </div>
+                      ) : (
+                        <NavLink
+                          key={child.to}
+                          to={child.to}
+                          onClick={() => setFlyoutGroup(null)}
+                          className={({ isActive }) => clsx(
+                            'block px-3 py-1.5 text-xs transition-colors',
+                            isActive ? 'bg-teal-500/15 text-teal-300 font-medium' : 'text-gray-300 hover:bg-white/5 hover:text-white',
+                          )}
+                        >
+                          {child.label}
+                        </NavLink>
+                      ),
+                    )}
+                  </div>
+                )}
 
                 {isGroupExpanded && (
                   <div className="mt-0.5 mb-1 space-y-0.5">
@@ -267,7 +349,7 @@ export default function DashboardLayout() {
           <h1 className="text-lg font-semibold text-navy">
             {collegeName || 'College ERP'}
           </h1>
-          <div className="relative flex items-center gap-3">
+          <div ref={profileRef} className="relative flex items-center gap-3">
             <GlobalSearch />
             <span className="hidden md:inline text-sm text-gray-500">{displayName}</span>
             <button
@@ -318,7 +400,7 @@ export default function DashboardLayout() {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto p-6 bg-bg-app" onClick={() => profileOpen && setProfileOpen(false)}>
+        <main className="flex-1 overflow-y-auto p-6 bg-bg-app">
           <Outlet />
         </main>
       </div>

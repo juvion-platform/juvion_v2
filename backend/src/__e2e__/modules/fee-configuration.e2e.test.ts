@@ -548,14 +548,16 @@ describe('Fee Configuration — e2e workflow coverage (T18)', () => {
       totalAmount: 120_000,
     });
     await createFeeComponent(fx.collegeId, fsiCse._id, 'Tuition CSE', 120_000);
-    const fsiEce = await createActiveFSI({
-      collegeId: fx.collegeId,
-      programmeId: fx.btech._id,
-      branchId: fx.eceBranch._id,
-      academicYearId: fx.ay._id,
-      totalAmount: 115_000,
-    });
-    await createFeeComponent(fx.collegeId, fsiEce._id, 'Tuition ECE', 115_000);
+
+    // NOTE: the ECE FSI is deliberately NOT created yet.
+    //
+    // updateStudent tries to auto-rebind the pin first and only marks it
+    // stale when no matching FSI exists. Seeding the ECE FSI up front meant
+    // the rebind always succeeded, so this scenario silently stopped
+    // exercising the stale path it is named for — and duplicated scenario 6,
+    // which covers auto-rebind properly. Creating it after the branch change
+    // models the real sequence: the branch moves before Finance has published
+    // that branch's fee structure.
 
     const s = await createTestStudent(fx.collegeId, {
       programmeId: String(fx.btech._id),
@@ -589,7 +591,17 @@ describe('Fee Configuration — e2e workflow coverage (T18)', () => {
     expect(stalePin!.staleSince).toBeDefined();
     expect(stalePin!.staleSince).not.toBeNull();
 
-    // Principal re-pins to the ECE FSI.
+    // Finance now publishes the ECE structure…
+    const fsiEce = await createActiveFSI({
+      collegeId: fx.collegeId,
+      programmeId: fx.btech._id,
+      branchId: fx.eceBranch._id,
+      academicYearId: fx.ay._id,
+      totalAmount: 115_000,
+    });
+    await createFeeComponent(fx.collegeId, fsiEce._id, 'Tuition ECE', 115_000);
+
+    // …and the Principal re-pins to it.
     const newPin = await feePinService.rePin(sId, 2, {
       targetFeeStructureInstanceId: String(fsiEce._id),
       reason: 'branch_change',

@@ -172,6 +172,10 @@ router.delete('/curriculum/:id', authorize('academics', 'delete'), ctrl.deleteCu
 // Course Offerings
 router.get('/offerings', authorize('academics', 'read'), ctrl.listCourseOfferings);
 router.get('/offerings/delivery-overview', authorize('academics', 'read'), ctrl.getCourseDeliveryOverview);
+// Class roster for an offering — powers the attendance grid and the
+// internal-marks sheet. Declared before /offerings/:id so the extra segment
+// is not swallowed by the generic id route.
+router.get('/offerings/:id/roster', authorize('academics', 'read'), ctrl.getCourseOfferingRoster);
 router.get('/offerings/:id', authorize('academics', 'read'), ctrl.getCourseOffering);
 router.post('/offerings', authorize('academics', 'create'), validate(createCourseOfferingSchema), ctrl.createCourseOffering);
 router.put('/offerings/:id', authorize('academics', 'update'), validate(updateCourseOfferingSchema), ctrl.updateCourseOffering);

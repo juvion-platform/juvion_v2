@@ -9,6 +9,10 @@ import Modal from '../../components/ui/Modal';
 import { Plus, Pencil, Trash2, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useViewEditMode } from '../../hooks/useViewEditMode';
+import { confirmAction } from '../../stores/confirmStore';
+import Pagination from '../../components/ui/Pagination';
+import { useListControls } from '../../hooks/useListControls';
+import SearchInput from '../../components/ui/SearchInput';
 
 const STATUSES = ['active', 'vacated', 'transferred'] as const;
 const STATUS_COLOR: Record<string, string> = { active: 'success', vacated: 'default', transferred: 'warning' };
@@ -20,16 +24,21 @@ const emptyForm = { studentId: '', roomId: '', academicYearId: '', allocatedDate
 
 export default function HostelAllocationsPage() {
   const qc = useQueryClient();
-  const [page, setPage] = useState(1);
+  const { page, setPage, limit, setLimit, search, setSearch } = useListControls();
   const [form, setForm] = useState(emptyForm);
 
-  const { data, isLoading } = useQuery({ queryKey: ['hostel-allocations', page], queryFn: () => listHostelAllocations(page, 20) });
+  const { data, isLoading } = useQuery({ queryKey: ['hostel-allocations', page, limit, search], queryFn: () => listHostelAllocations(page, limit, undefined, undefined, search) });
   const { data: studentsData } = useQuery({ queryKey: ['students', 'all'], queryFn: () => listStudents(1, 200) });
   const { data: roomsData } = useQuery({ queryKey: ['hostel-rooms', 'all'], queryFn: () => listHostelRooms(1, 200) });
   const { data: ayData } = useQuery({ queryKey: ['academicYears', 'all'], queryFn: () => listAcademicYears(1, 100) });
 
   const students = studentsData?.items || [];
   const rooms = roomsData?.items || [];
+
+  // The model carries both `currentOccupancy` and a legacy `occupancy`; prefer
+  // the former and fall back so older records still report a real number.
+  const roomOccupancy = (r: any): number => Number(r?.currentOccupancy ?? r?.occupancy ?? 0);
+  const selectedRoom = rooms.find((r: any) => r._id === form.roomId);
   const academicYears = ayData?.items || [];
 
   const vem = useViewEditMode<any>({
@@ -71,7 +80,7 @@ export default function HostelAllocationsPage() {
     { key: 'actions', label: '', render: (r: any) => (
       <div className="flex gap-1">
         <button onClick={(e) => { e.stopPropagation(); vem.openForEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
-        <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this allocation?')) deleteMut.mutate(r._id); }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
+        <button onClick={(e) => { e.stopPropagation(); void confirmAction({ title: 'Delete this allocation?', tone: 'danger', confirmLabel: 'Delete' }).then((__c) => { if (__c.confirmed) { deleteMut.mutate(r._id); } }) }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
       </div>
     )},
   ];
@@ -80,9 +89,12 @@ export default function HostelAllocationsPage() {
     <div>
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-xl font-bold text-navy">Hostel Allocations</h2>
+        <div className="flex items-center gap-3">
+          <SearchInput value={search} onChange={setSearch} placeholder="Search hostel allocations…" className="w-56" />
         <button onClick={vem.openForCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700">
           <Plus size={16} className="text-white" /> New Allocation
         </button>
+      </div>
       </div>
 
       <DataTable
@@ -91,15 +103,17 @@ export default function HostelAllocationsPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No hostel allocations match “${search}”.` : 'No hostel allocations yet.'}
       />
 
-      {data && data.pages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-4">
-          <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Prev</button>
-          <span className="text-sm text-gray-500">Page {page} of {data.pages}</span>
-          <button disabled={page >= data.pages} onClick={() => setPage(p => p + 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Next</button>
-        </div>
-      )}
+      <Pagination
+        page={page}
+        pages={data?.pages ?? 1}
+        total={data?.total}
+        limit={limit}
+        onPageChange={setPage}
+        onLimitChange={setLimit}
+      />
 
       <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('Allocation')}>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -112,10 +126,32 @@ export default function HostelAllocationsPage() {
                 </select>
               </div>
               <div><label className={lbl}>Room * {!vem.isView && <Link to="/welfare/hostel-rooms" target="_blank" className={manageLink}>+ Manage <ExternalLink size={10} /></Link>}</label>
+                {/* Occupancy is shown per option and full rooms are disabled —
+                    the plain roomNumber list let a full room be allocated
+                    again with no warning at all. */}
                 <select required value={form.roomId} onChange={e => setForm(f => ({ ...f, roomId: e.target.value }))} className={inp}>
                   <option value="">Select room...</option>
-                  {rooms.map((r: any) => <option key={r._id} value={r._id}>{r.roomNumber}</option>)}
+                  {rooms.map((r: any) => {
+                    const occ = roomOccupancy(r);
+                    const isFull = r.capacity != null && occ >= r.capacity;
+                    // Never hide the currently-allocated room from its own edit form.
+                    const disabled = isFull && r._id !== form.roomId;
+                    return (
+                      <option key={r._id} value={r._id} disabled={disabled}>
+                        {r.roomNumber}
+                        {r.capacity != null ? ` — ${occ}/${r.capacity} occupied${isFull ? ' (full)' : ''}` : ''}
+                        {r.status && r.status !== 'available' ? ` · ${r.status}` : ''}
+                      </option>
+                    );
+                  })}
                 </select>
+                {selectedRoom && selectedRoom.capacity != null && (
+                  <p className={`mt-1 text-xs ${roomOccupancy(selectedRoom) >= selectedRoom.capacity ? 'text-red-600' : 'text-slate-500'}`}>
+                    {roomOccupancy(selectedRoom) >= selectedRoom.capacity
+                      ? 'This room is at capacity.'
+                      : `${selectedRoom.capacity - roomOccupancy(selectedRoom)} bed(s) free of ${selectedRoom.capacity}.`}
+                  </p>
+                )}
               </div>
               <div><label className={lbl}>Academic Year * {!vem.isView && <Link to="/academics/academic-years" target="_blank" className={manageLink}>+ Manage <ExternalLink size={10} /></Link>}</label>
                 <select required value={form.academicYearId} onChange={e => setForm(f => ({ ...f, academicYearId: e.target.value }))} className={inp}>
