@@ -1,6 +1,7 @@
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { Building2, Settings, ArrowRight } from 'lucide-react';
+import { confirmAction } from '../stores/confirmStore';
 
 export default function CollegeSelector() {
   const navigate = useNavigate();
@@ -18,7 +19,18 @@ export default function CollegeSelector() {
     } catch { return 'Super Admin'; }
   })();
 
-  function handleSelect(college: { _id: string; name: string }) {
+  async function handleSelect(college: { _id: string; name: string; status?: string }) {
+    // An inactive college was previously enterable with nothing but a small
+    // grey badge as a hint — easy to miss, and the data inside is stale.
+    if (college.status && college.status !== 'active') {
+      const { confirmed } = await confirmAction({
+        title: `${college.name} is ${college.status}`,
+        message: 'You can still open it, but its data is no longer being maintained and some operations may be blocked. Continue?',
+        tone: 'danger',
+        confirmLabel: 'Open anyway',
+      });
+      if (!confirmed) return;
+    }
     selectCollege(college._id, college.name);
     navigate('/', { replace: true });
   }
@@ -82,8 +94,12 @@ export default function CollegeSelector() {
             {colleges.map((college) => (
               <button
                 key={college._id}
-                onClick={() => handleSelect(college)}
-                className="group bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-6 text-left hover:bg-white/10 hover:border-teal-400/30 transition-all duration-200"
+                onClick={() => { void handleSelect(college); }}
+                className={`group rounded-xl border p-6 text-left backdrop-blur-sm transition-all duration-200 ${
+                  college.status === 'active'
+                    ? 'border-white/10 bg-white/5 hover:border-teal-400/30 hover:bg-white/10'
+                    : 'border-amber-400/20 bg-white/[0.02] opacity-70 hover:opacity-100'
+                }`}
               >
                 <div className="flex items-start justify-between mb-4">
                   <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-teal-500/20 to-cyan-500/20 flex items-center justify-center">

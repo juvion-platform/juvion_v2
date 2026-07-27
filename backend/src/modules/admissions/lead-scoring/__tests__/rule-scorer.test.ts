@@ -77,9 +77,14 @@ describe('computeRuleScore — interaction signals', () => {
   });
 
   it('scales with interaction count', () => {
-    const zero = computeRuleScore(baseInquiry({}), []).score;
-    const one = computeRuleScore(baseInquiry({}), [inter()]).score;
-    const four = computeRuleScore(baseInquiry({}), [inter(), inter(), inter(), inter()]).score;
+    // `now` must be pinned to the fixture date. Without it the scorer used the
+    // real clock, so once wall-clock time drifted more than 30 days past
+    // 2026-05-14 every interaction tripped the -20 dormancy penalty — which
+    // swamped the count credit this test is actually asserting on, and the
+    // test began failing on a date rather than on a code change.
+    const zero = computeRuleScore(baseInquiry({}), [], now).score;
+    const one = computeRuleScore(baseInquiry({}), [inter()], now).score;
+    const four = computeRuleScore(baseInquiry({}), [inter(), inter(), inter(), inter()], now).score;
     expect(one).toBeGreaterThan(zero);
     expect(four).toBeGreaterThan(one);
   });

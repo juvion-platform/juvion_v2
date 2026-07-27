@@ -8,6 +8,10 @@ import Modal from '../../components/ui/Modal';
 import { Plus, Pencil, Trash2, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useViewEditMode } from '../../hooks/useViewEditMode';
+import { confirmAction } from '../../stores/confirmStore';
+import Pagination from '../../components/ui/Pagination';
+import { useListControls } from '../../hooks/useListControls';
+import SearchInput from '../../components/ui/SearchInput';
 
 const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default";
 const lbl = "block text-sm font-medium text-gray-700 mb-1";
@@ -17,10 +21,10 @@ const emptyForm = { bookId:'', reservedBy:'', reservedDate:'', expiryDate:'', st
 
 export default function BookReservationsPage() {
   const qc = useQueryClient();
-  const [page, setPage] = useState(1);
+  const { page, setPage, limit, setLimit, search, setSearch } = useListControls();
   const [form, setForm] = useState(emptyForm);
 
-  const { data, isLoading } = useQuery({ queryKey: ['book-reservations', page], queryFn: () => listBookReservations(page, 20) });
+  const { data, isLoading } = useQuery({ queryKey: ['book-reservations', page, limit, search], queryFn: () => listBookReservations(page, limit, search) });
   const { data: booksData } = useQuery({ queryKey: ['books-ref','all'], queryFn: () => listBooks(1, 200) });
   const { data: personsData } = useQuery({ queryKey: ['persons-ref','all'], queryFn: () => listPersons(1, 200) });
   const books = booksData?.items || [];
@@ -52,16 +56,30 @@ export default function BookReservationsPage() {
     { key: 'reservedDate', label: 'Date', render: (r: any) => r.reservedDate?.slice(0,10)||'\u2014' },
     { key: 'expiryDate', label: 'Expiry', render: (r: any) => r.expiryDate?.slice(0,10)||'\u2014' },
     { key: 'status', label: 'Status', render: (r: any) => <Badge variant={r.status==='active'?'info':r.status==='fulfilled'?'success':r.status==='expired'?'danger':'default'}>{r.status}</Badge> },
-    { key: 'actions', label: '', render: (r: any) => (<div className="flex gap-1"><button onClick={e=>{e.stopPropagation();vem.openForEdit(r)}} className="p-1 rounded hover:bg-amber-50"><Pencil size={15} className="text-amber-500"/></button><button onClick={e=>{e.stopPropagation();if(confirm('Delete?'))deleteMut.mutate(r._id)}} className="p-1 rounded hover:bg-red-50"><Trash2 size={15} className="text-red-500"/></button></div>) },
+    { key: 'actions', label: '', render: (r: any) => (<div className="flex gap-1"><button onClick={e=>{e.stopPropagation();vem.openForEdit(r)}} className="p-1 rounded hover:bg-amber-50"><Pencil size={15} className="text-amber-500"/></button><button onClick={e=>{e.stopPropagation();void confirmAction({ title: 'Delete?', tone: 'danger', confirmLabel: 'Delete' }).then((__c) => { if (__c.confirmed) { deleteMut.mutate(r._id); } })}} className="p-1 rounded hover:bg-red-50"><Trash2 size={15} className="text-red-500"/></button></div>) },
   ];
 
   return (
     <div>
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-xl font-bold text-navy">Book Reservations</h2>
+        <div className="flex items-center gap-3">
+          <SearchInput value={search} onChange={setSearch} placeholder="Search book reservations…" className="w-56" />
         <button onClick={vem.openForCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700"><Plus size={16}/> New</button>
       </div>
-      <DataTable columns={columns} data={data?.items||[]} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}/>
+      </div>
+      <DataTable columns={columns} data={data?.items||[]} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No book reservations match “${search}”.` : 'No book reservations yet.'}
+      />
+
+      <Pagination
+        page={page}
+        pages={data?.pages ?? 1}
+        total={data?.total}
+        limit={limit}
+        onPageChange={setPage}
+        onLimitChange={setLimit}
+      />
       {data&&data.pages>1&&(<div className="flex items-center justify-center gap-2 mt-4"><button disabled={page<=1} onClick={()=>setPage(p=>p-1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Prev</button><span className="text-sm text-gray-500">Page {page} of {data.pages}</span><button disabled={page>=data.pages} onClick={()=>setPage(p=>p+1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Next</button></div>)}
       <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('Book Reservation')}>
         <form onSubmit={handleSubmit} className="space-y-4">

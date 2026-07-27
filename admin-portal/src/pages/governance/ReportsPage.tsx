@@ -190,8 +190,11 @@ function ReportRunner({ def, initialParams, onBack }: { def: ReportDefinition; i
     onError: (err: any) => alert(err?.response?.data?.error || err?.message || 'Run failed'),
   });
 
+  const isPhaseB = def.implementationStatus === 'phase_b';
+
   function handleRun(e: React.FormEvent) {
     e.preventDefault();
+    if (isPhaseB) return;
     runMut.mutate();
   }
 
@@ -239,10 +242,24 @@ function ReportRunner({ def, initialParams, onBack }: { def: ReportDefinition; i
             ))}
           </div>
         )}
-        <button type="submit" disabled={runMut.isPending} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
-          <Play size={14} className="text-white" />
-          {runMut.isPending ? 'Running…' : 'Run Report'}
-        </button>
+        {/* A Phase B report has no runner yet, so clicking Run only produced a
+            developer-facing "not yet implemented" message. Disable the button
+            and say why up front instead. */}
+        {isPhaseB ? (
+          <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+            <Construction size={18} className="mt-0.5 shrink-0 text-amber-600" />
+            <div className="text-sm text-amber-800">
+              <strong>Not available yet.</strong> This report&rsquo;s definition and parameters are
+              final, but the aggregation that produces its results is still being built.
+              You can review the parameters above; there is nothing to run.
+            </div>
+          </div>
+        ) : (
+          <button type="submit" disabled={runMut.isPending} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
+            <Play size={14} className="text-white" />
+            {runMut.isPending ? 'Running…' : 'Run Report'}
+          </button>
+        )}
       </form>
 
       {currentRun && (

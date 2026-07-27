@@ -40,8 +40,8 @@ export interface RbacPolicyInput {
   isActive?: boolean;
 }
 
-export const listRbacPolicies = (page = 1, limit = 50, role?: string, module?: string) =>
-  api.get(BASE, { params: { page, limit, role, module } }).then(r => r.data);
+export const listRbacPolicies = (page = 1, limit = 50, role?: string, module?: string, search?: string) =>
+  api.get(BASE, { params: { page, limit, role, module, ...(search ? { search } : {}) } }).then(r => r.data);
 
 export const getRbacPolicy = (id: string) =>
   api.get(`${BASE}/${id}`).then(r => r.data);

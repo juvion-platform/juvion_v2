@@ -6,6 +6,11 @@ import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { useViewEditMode } from '../../hooks/useViewEditMode';
+import { confirmAction } from '../../stores/confirmStore';
+import Pagination from '../../components/ui/Pagination';
+import { useListControls } from '../../hooks/useListControls';
+import SearchInput from '../../components/ui/SearchInput';
+import { rangeError } from '../../lib/validation';
 
 const EXAM_TYPES = ['regular', 'supplementary', 'improvement'] as const;
 const STATUSES = ['scheduled', 'conducted', 'cancelled'] as const;
@@ -17,10 +22,10 @@ const emptyForm = { semesterId: '', courseId: '', examType: 'regular', date: '',
 
 export default function ExamSchedulesPage() {
   const qc = useQueryClient();
-  const [page, setPage] = useState(1);
+  const { page, setPage, limit, setLimit, search, setSearch } = useListControls();
   const [form, setForm] = useState(emptyForm);
 
-  const { data, isLoading } = useQuery({ queryKey: ['exam-schedules', page], queryFn: () => listExamSchedules(page, 20) });
+  const { data, isLoading } = useQuery({ queryKey: ['exam-schedules', page, limit, search], queryFn: () => listExamSchedules(page, limit, undefined, search) });
   const { data: semData } = useQuery({ queryKey: ['semesters', 1, 100], queryFn: () => listSemesters(1, 100) });
   const { data: coursesData } = useQuery({ queryKey: ['courses', 1, 200], queryFn: () => listCourses(1, 200) });
 
@@ -42,9 +47,12 @@ export default function ExamSchedulesPage() {
   const createMut = useMutation({ mutationFn: createExamSchedule, onSuccess: () => { qc.invalidateQueries({ queryKey: ['exam-schedules'] }); vem.close(); } });
   const updateMut = useMutation({ mutationFn: ({ id, data }: any) => updateExamSchedule(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['exam-schedules'] }); vem.close(); } });
   const deleteMut = useMutation({ mutationFn: deleteExamSchedule, onSuccess: () => qc.invalidateQueries({ queryKey: ['exam-schedules'] }) });
+  const timeError = rangeError(form.startTime, form.endTime, { startLabel: 'start time', endLabel: 'end time' });
+
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (timeError) return;
     if (vem.isEdit && vem.entity) updateMut.mutate({ id: vem.entity._id, data: form });
     else createMut.mutate(form);
   }
@@ -61,7 +69,7 @@ export default function ExamSchedulesPage() {
     { key: 'actions', label: '', render: (r: any) => (
       <div className="flex gap-1">
         <button onClick={(e) => { e.stopPropagation(); vem.openForEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
-        <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete?')) deleteMut.mutate(r._id); }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
+        <button onClick={(e) => { e.stopPropagation(); void confirmAction({ title: 'Delete?', tone: 'danger', confirmLabel: 'Delete' }).then((__c) => { if (__c.confirmed) { deleteMut.mutate(r._id); } }) }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
       </div>
     )},
   ];
@@ -70,16 +78,22 @@ export default function ExamSchedulesPage() {
     <div>
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-xl font-bold text-navy">Exam Schedules</h2>
+        <div className="flex items-center gap-3">
+          <SearchInput value={search} onChange={setSearch} placeholder="Search exam schedules…" className="w-56" />
         <button onClick={vem.openForCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700"><Plus size={16} className="text-white" /> New Schedule</button>
       </div>
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
-      {data && data.pages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-4">
-          <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Prev</button>
-          <span className="text-sm text-gray-500">Page {page} of {data.pages}</span>
-          <button disabled={page >= data.pages} onClick={() => setPage(p => p + 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Next</button>
-        </div>
-      )}
+      </div>
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No exam schedules match “${search}”.` : 'No exam schedules yet.'}
+      />
+      <Pagination
+        page={page}
+        pages={data?.pages ?? 1}
+        total={data?.total}
+        limit={limit}
+        onPageChange={setPage}
+        onLimitChange={setLimit}
+      />
       <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('Exam Schedule')}>
         <form onSubmit={handleSubmit} className="space-y-4">
           <fieldset disabled={vem.isView} className="border-0 p-0 m-0 space-y-4">
@@ -104,6 +118,7 @@ export default function ExamSchedulesPage() {
               <div><label className={lbl}>Date *</label><input required type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} className={inp} /></div>
               <div><label className={lbl}>Start Time *</label><input required type="time" value={form.startTime} onChange={e => setForm(f => ({ ...f, startTime: e.target.value }))} className={inp} /></div>
               <div><label className={lbl}>End Time *</label><input required type="time" value={form.endTime} onChange={e => setForm(f => ({ ...f, endTime: e.target.value }))} className={inp} /></div>
+              {timeError && <p className="col-span-2 -mt-2 text-sm text-red-600" role="alert">{timeError}</p>}
               <div><label className={lbl}>Venue</label><input value={form.venue} onChange={e => setForm(f => ({ ...f, venue: e.target.value }))} className={inp} placeholder="e.g. Hall A" /></div>
               <div><label className={lbl}>Status</label>
                 <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className={inp}>
@@ -121,7 +136,7 @@ export default function ExamSchedulesPage() {
                 <Pencil size={14} /> Edit
               </button>
             ) : (
-              <button type="submit" disabled={saving} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
+              <button type="submit" disabled={saving || Boolean(timeError)} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
                 {saving ? 'Saving…' : vem.isEdit ? 'Update' : 'Create'}
               </button>
             )}

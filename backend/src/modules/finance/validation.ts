@@ -24,15 +24,19 @@ export const updateFeeStructureSchema = createFeeStructureSchema.partial();
 
 // ═══ Student Fee Account ══════════════════════════════════
 
+/**
+ * `totalPaid`, `totalWaived`, `totalRefunded` and `balance` are derived: the
+ * payment pipeline maintains them with $inc (see fee-lifecycle-service
+ * recordPayment / reversePayment). Accepting them from a client lets a stray
+ * form write silently desync an account from its transactions, so they are
+ * rejected here rather than merely hidden in the UI.
+ * `totalDue` is the assessed amount and remains caller-supplied at creation.
+ */
 export const createStudentFeeAccountSchema = z.object({
   studentId: z.string().min(1),
   totalDue: z.number().min(0).optional(),
-  totalPaid: z.number().min(0).optional(),
-  totalWaived: z.number().min(0).optional(),
-  totalRefunded: z.number().min(0).optional(),
-  balance: z.number().optional(),
   lastPaymentDate: z.string().optional(),
-});
+}).strict();
 export const updateStudentFeeAccountSchema = createStudentFeeAccountSchema.partial();
 
 // ═══ Fee Line Items ═══════════════════════════════════════

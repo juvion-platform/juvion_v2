@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getStats, listPersons, deletePerson } from '../services/people';
-import { Users, GraduationCap, Briefcase, UserCheck, Building2, Search, Trash2, Pencil, ChevronLeft, ChevronRight, IdCard } from 'lucide-react';
+import { Users, GraduationCap, Briefcase, UserCheck, Building2, Search, Trash2, Pencil, IdCard, DoorOpen, ClipboardCheck, FileText } from 'lucide-react';
 import Breadcrumbs from '../components/ui/Breadcrumbs';
 import DataTable from '../components/ui/DataTable';
+import Pagination from "../components/ui/Pagination";
 
 import StudentsPage from './people/StudentsPage';
 import FacultyPage from './people/FacultyPage';
@@ -20,6 +21,11 @@ import FacultyDocumentQueuePage from './people/FacultyDocumentQueuePage';
 import StaffDetailPage from './people/StaffDetailPage';
 import ParentDetailPage from './people/ParentDetailPage';
 import PersonaCatalogPage from './people/PersonaCatalogPage';
+import {
+  ExitRequestsPage, ClearanceWorkflowsPage, DocumentTemplatesPage, AlumniPage,
+} from './people/exit-alumni-pages';
+import { confirmAction } from '../stores/confirmStore';
+import { useListControls } from '../hooks/useListControls';
 
 const CARDS = [
   { to: 'students', icon: GraduationCap, label: 'Students', desc: 'Student profiles & enrollment', iconBg: 'bg-primary-50 text-primary-600', border: 'border-primary-200 hover:border-primary-400', statKey: 'students' },
@@ -28,6 +34,10 @@ const CARDS = [
   { to: 'parents', icon: UserCheck, label: 'Parents', desc: 'Guardian profiles & contacts', iconBg: 'bg-orange-50 text-orange-500', border: 'border-orange-200 hover:border-orange-400', statKey: 'parents' },
   { to: 'organizations', icon: Building2, label: 'Organizations', desc: 'Partner & external orgs', iconBg: 'bg-primary-100 text-primary-700', border: 'border-primary-200 hover:border-primary-400', statKey: 'organizations' },
   { to: 'personas', icon: IdCard, label: 'Persona Catalog', desc: 'Canonical persona/sub-persona codes', iconBg: 'bg-indigo-50 text-indigo-600', border: 'border-indigo-200 hover:border-indigo-400', statKey: 'personas' },
+  { to: 'exit-requests', icon: DoorOpen, label: 'Exit Requests', desc: 'Withdrawals, transfers, expulsions', iconBg: 'bg-rose-50 text-rose-600', border: 'border-rose-200 hover:border-rose-400', statKey: '' },
+  { to: 'clearance-workflows', icon: ClipboardCheck, label: 'Clearance', desc: 'Departmental no-dues on exit', iconBg: 'bg-amber-50 text-amber-600', border: 'border-amber-200 hover:border-amber-400', statKey: '' },
+  { to: 'document-templates', icon: FileText, label: 'Document Templates', desc: 'TC, bonafide, conduct templates', iconBg: 'bg-slate-50 text-slate-600', border: 'border-slate-200 hover:border-slate-400', statKey: '' },
+  { to: 'alumni', icon: GraduationCap, label: 'Alumni', desc: 'Graduated student records', iconBg: 'bg-teal-50 text-teal-600', border: 'border-teal-200 hover:border-teal-400', statKey: '' },
 ];
 
 const ROLE_ROUTE: Record<string, string> = {
@@ -50,12 +60,12 @@ function PeopleHome() {
   const qc = useQueryClient();
   const { data: stats } = useQuery({ queryKey: ['people-stats'], queryFn: getStats });
 
-  const [page, setPage] = useState(1);
+  const { page, setPage, limit, setLimit } = useListControls({ initialLimit: 10 });
   const [search, setSearch] = useState('');
 
   const { data: personsData, isLoading } = useQuery({
-    queryKey: ['persons', page, search],
-    queryFn: () => listPersons(page, 15, search || undefined),
+    queryKey: ['persons', page, search, limit],
+    queryFn: () => listPersons(page, limit, search || undefined),
   });
 
   const deleteMut = useMutation({
@@ -110,7 +120,7 @@ function PeopleHome() {
             <Pencil size={15} className="text-amber-500" />
           </button>
         ))}
-        <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this person? This will not delete linked student/faculty/staff records.')) deleteMut.mutate(r._id); }} className="p-1.5 rounded hover:bg-red-50" title="Delete">
+        <button onClick={(e) => { e.stopPropagation(); void confirmAction({ title: 'Delete this person? This will not delete linked student/faculty/staff records.', tone: 'danger', confirmLabel: 'Delete' }).then((__c) => { if (__c.confirmed) { deleteMut.mutate(r._id); } }) }} className="p-1.5 rounded hover:bg-red-50" title="Delete">
           <Trash2 size={15} className="text-red-500" />
         </button>
       </div>
@@ -125,7 +135,8 @@ function PeopleHome() {
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
         {CARDS.map(card => {
           const Icon = card.icon;
-          const count = stats ? (stats as any)[card.statKey] : '—';
+          const hasStat = Boolean(card.statKey);
+          const count = hasStat && stats ? ((stats as any)[card.statKey!] ?? 0) : null;
           return (
             <button
               key={card.to}
@@ -135,7 +146,9 @@ function PeopleHome() {
               <div className={`inline-flex p-2.5 rounded-lg mb-3 ${card.iconBg}`}>
                 <Icon size={22} />
               </div>
-              <div className="text-2xl font-bold text-navy mb-1">{count}</div>
+              {hasStat && (count === null
+                ? <div className="h-7 w-12 mb-1 animate-pulse rounded bg-slate-100" aria-hidden="true" />
+                : <div className="text-2xl font-bold text-navy mb-1">{count}</div>)}
               <div className="font-semibold text-navy-dark text-sm">{card.label}</div>
               <p className="text-xs text-gray-500 mt-1">{card.desc}</p>
             </button>
@@ -176,29 +189,17 @@ function PeopleHome() {
           }}
         />
 
-        {personsData && personsData.pages > 1 && (
-          <div className="flex items-center justify-between px-5 py-3 border-t">
-            <span className="text-sm text-gray-500">
-              Page {page} of {personsData.pages}
-            </span>
-            <div className="flex gap-2">
-              <button
-                disabled={page <= 1}
-                onClick={() => setPage(p => p - 1)}
-                className="flex items-center gap-1 px-3 py-1.5 border rounded-lg text-sm disabled:opacity-40 hover:bg-gray-50"
-              >
-                <ChevronLeft size={14} className="text-primary-500" /> Prev
-              </button>
-              <button
-                disabled={page >= personsData.pages}
-                onClick={() => setPage(p => p + 1)}
-                className="flex items-center gap-1 px-3 py-1.5 border rounded-lg text-sm disabled:opacity-40 hover:bg-gray-50"
-              >
-                Next <ChevronRight size={14} className="text-primary-500" />
-              </button>
-            </div>
-          </div>
-        )}
+        <div className="px-5 pb-3">
+          <Pagination
+            page={page}
+            pages={personsData?.pages ?? 1}
+            total={personsData?.total}
+            limit={limit}
+            onPageChange={setPage}
+            onLimitChange={setLimit}
+            itemLabel="people"
+          />
+        </div>
       </div>
     </div>
   );
@@ -243,6 +244,12 @@ export default function People() {
         <Route path="organizations" element={<OrganizationsPage />} />
         {/* Strategic Gap 7 — Persona Catalog (read-only reference) */}
         <Route path="personas" element={<PersonaCatalogPage />} />
+
+        {/* Exit / clearance / alumni — backends shipped without any UI. */}
+        <Route path="exit-requests" element={<ExitRequestsPage />} />
+        <Route path="clearance-workflows" element={<ClearanceWorkflowsPage />} />
+        <Route path="document-templates" element={<DocumentTemplatesPage />} />
+        <Route path="alumni" element={<AlumniPage />} />
       </Routes>
     </SubPageWrapper>
   );

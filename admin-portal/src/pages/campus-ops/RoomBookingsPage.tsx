@@ -8,6 +8,10 @@ import Modal from '../../components/ui/Modal';
 import { Plus, Pencil, Trash2, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useViewEditMode } from '../../hooks/useViewEditMode';
+import { confirmAction } from '../../stores/confirmStore';
+import Pagination from '../../components/ui/Pagination';
+import { useListControls } from '../../hooks/useListControls';
+import SearchInput from '../../components/ui/SearchInput';
 
 const STATUSES = ['pending','approved','rejected','cancelled'] as const;
 const STATUS_COLOR: Record<string,string> = { pending:'warning', approved:'success', rejected:'danger', cancelled:'default' };
@@ -19,10 +23,10 @@ const emptyForm = { roomId:'', bookedBy:'', date:'', startTime:'', endTime:'', p
 
 export default function RoomBookingsPage() {
   const qc = useQueryClient();
-  const [page, setPage] = useState(1);
+  const { page, setPage, limit, setLimit, search, setSearch } = useListControls();
   const [form, setForm] = useState(emptyForm);
 
-  const { data, isLoading } = useQuery({ queryKey: ['room-bookings', page], queryFn: () => listRoomBookings(page, 20) });
+  const { data, isLoading } = useQuery({ queryKey: ['room-bookings', page, limit, search], queryFn: () => listRoomBookings(page, limit, search) });
   const { data: roomData } = useQuery({ queryKey: ['rooms','all'], queryFn: () => listRooms(1, 200) });
   const { data: personData } = useQuery({ queryKey: ['persons','all'], queryFn: () => listPersons(1, 200) });
   const rooms = roomData?.items || [];
@@ -57,7 +61,7 @@ export default function RoomBookingsPage() {
     { key: 'actions', label: '', render: (r: any) => (
       <div className="flex gap-1">
         <button onClick={(e) => { e.stopPropagation(); vem.openForEdit(r); }} className="p-1 rounded hover:bg-amber-50"><Pencil size={15} className="text-amber-500" /></button>
-        <button onClick={(e) => { e.stopPropagation(); if(confirm('Delete?')) deleteMut.mutate(r._id); }} className="p-1 rounded hover:bg-red-50"><Trash2 size={15} className="text-red-500" /></button>
+        <button onClick={(e) => { e.stopPropagation(); void confirmAction({ title: 'Delete?', tone: 'danger', confirmLabel: 'Delete' }).then((__c) => { if (__c.confirmed) { deleteMut.mutate(r._id); } }) }} className="p-1 rounded hover:bg-red-50"><Trash2 size={15} className="text-red-500" /></button>
       </div>
     )},
   ];
@@ -66,10 +70,22 @@ export default function RoomBookingsPage() {
     <div>
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-xl font-bold text-navy">Room Bookings</h2>
+        <div className="flex items-center gap-3">
+          <SearchInput value={search} onChange={setSearch} placeholder="Search room bookings…" className="w-56" />
         <button onClick={vem.openForCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700"><Plus size={16} /> New Booking</button>
       </div>
-      <DataTable columns={columns} data={data?.items||[]} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
-      {data && data.pages > 1 && (<div className="flex items-center justify-center gap-2 mt-4"><button disabled={page<=1} onClick={()=>setPage(p=>p-1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Prev</button><span className="text-sm text-gray-500">Page {page} of {data.pages}</span><button disabled={page>=data.pages} onClick={()=>setPage(p=>p+1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Next</button></div>)}
+      </div>
+      <DataTable columns={columns} data={data?.items||[]} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No room bookings match “${search}”.` : 'No room bookings yet.'}
+      />
+      <Pagination
+        page={page}
+        pages={data?.pages ?? 1}
+        total={data?.total}
+        limit={limit}
+        onPageChange={setPage}
+        onLimitChange={setLimit}
+      />
       <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('Room Booking')}>
         <form onSubmit={handleSubmit} className="space-y-4">
           <fieldset disabled={vem.isView} className="border-0 p-0 m-0 space-y-4">

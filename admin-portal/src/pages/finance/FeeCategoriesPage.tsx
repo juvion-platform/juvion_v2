@@ -1,3 +1,4 @@
+import { useState } from 'react';
 /**
  * FeeCategoriesPage — CRUD for the per-college reservation-category catalog
  * (OC, OBC, SC, ST, NRI, …). Mounted under /finance/fee-management/fee-categories.
@@ -7,7 +8,6 @@
  * Category dropdown on FeeStructure forms.
  */
 
-import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, Copy } from 'lucide-react';
 
@@ -23,6 +23,9 @@ import {
   FeeCategoryDoc,
   FeeCategoryStatus,
 } from '../../services/fee-categories';
+import { confirmAction } from '../../stores/confirmStore';
+import Pagination from '../../components/ui/Pagination';
+import { useListControls } from '../../hooks/useListControls';
 
 const inp =
   'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default';
@@ -46,12 +49,12 @@ const emptyForm: FormState = {
 
 export default function FeeCategoriesPage() {
   const qc = useQueryClient();
-  const [page, setPage] = useState(1);
+  const { page, setPage, limit, setLimit, search } = useListControls();
   const [form, setForm] = useState<FormState>(emptyForm);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['fee-categories', page],
-    queryFn: () => listFeeCategories(page, 20),
+    queryKey: ['fee-categories', page, limit, search],
+    queryFn: () => listFeeCategories(page, limit),
   });
 
   const vem = useViewEditMode<FeeCategoryDoc>({
@@ -168,9 +171,7 @@ export default function FeeCategoriesPage() {
           <button
             onClick={(e) => {
               e.stopPropagation();
-              if (window.confirm(`Delete fee category "${r.name}"?`)) {
-                deleteMut.mutate(r._id);
-              }
+              void confirmAction({ title: `Delete fee category "${r.name}"?`, tone: 'danger', confirmLabel: 'Delete' }).then((__c) => { if (__c.confirmed) { deleteMut.mutate(r._id); } })
             }}
             className="p-1 rounded hover:bg-red-50"
             title="Delete"
@@ -208,27 +209,14 @@ export default function FeeCategoriesPage() {
         emptyState="No fee categories yet — click 'New Fee Category' to add one."
       />
 
-      {data && data.pages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-4">
-          <button
-            disabled={page <= 1}
-            onClick={() => setPage((p) => p - 1)}
-            className="px-3 py-1 border rounded text-sm disabled:opacity-40"
-          >
-            Prev
-          </button>
-          <span className="text-sm text-gray-500">
-            Page {page} of {data.pages}
-          </span>
-          <button
-            disabled={page >= data.pages}
-            onClick={() => setPage((p) => p + 1)}
-            className="px-3 py-1 border rounded text-sm disabled:opacity-40"
-          >
-            Next
-          </button>
-        </div>
-      )}
+      <Pagination
+        page={page}
+        pages={data?.pages ?? 1}
+        total={data?.total}
+        limit={limit}
+        onPageChange={setPage}
+        onLimitChange={setLimit}
+      />
 
       <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('Fee Category')}>
         <form onSubmit={handleSubmit} className="space-y-4">

@@ -9,6 +9,10 @@ import StudentFinanceReadinessCard from '../../components/StudentFinanceReadines
 import { Plus, Pencil, Trash2, ExternalLink } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useViewEditMode } from '../../hooks/useViewEditMode';
+import { confirmAction } from '../../stores/confirmStore';
+import Pagination from '../../components/ui/Pagination';
+import { useListControls } from '../../hooks/useListControls';
+import SearchInput from '../../components/ui/SearchInput';
 
 const PAYMENT_MODES = ['cash', 'cheque', 'dd', 'online', 'upi', 'neft', 'rtgs', 'card'] as const;
 const STATUSES = ['success', 'pending', 'failed', 'reversed'] as const;
@@ -22,7 +26,7 @@ const emptyForm = { studentId: '', receiptNumber: '', amount: '', paymentMode: '
 export default function PaymentsPage() {
   const qc = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [page, setPage] = useState(1);
+  const { page, setPage, limit, setLimit, search, setSearch } = useListControls();
   const [studentFilter, setStudentFilter] = useState(searchParams.get('studentId') || '');
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
   const [form, setForm] = useState(emptyForm);
@@ -43,8 +47,8 @@ export default function PaymentsPage() {
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ['payments', page, studentFilter, statusFilter],
-    queryFn: () => listPayments(page, 20, studentFilter || undefined, statusFilter || undefined),
+    queryKey: ['payments', page, studentFilter, statusFilter, limit, search],
+    queryFn: () => listPayments(page, limit, studentFilter || undefined, statusFilter || undefined, search),
   });
   const { data: students } = useQuery({ queryKey: ['students-all'], queryFn: () => listStudents(1, 100) });
   const { data: selectedStudent, isFetching: studentReadinessLoading } = useQuery({
@@ -114,7 +118,7 @@ export default function PaymentsPage() {
           </button>
         )}
         <button onClick={(e) => { e.stopPropagation(); vem.openForEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
-        <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this payment?')) deleteMut.mutate(r._id); }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
+        <button onClick={(e) => { e.stopPropagation(); void confirmAction({ title: 'Delete this payment?', tone: 'danger', confirmLabel: 'Delete' }).then((__c) => { if (__c.confirmed) { deleteMut.mutate(r._id); } }) }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
       </div>
     )},
   ];
@@ -123,9 +127,12 @@ export default function PaymentsPage() {
     <div>
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-xl font-bold text-navy">Payments</h2>
+        <div className="flex items-center gap-3">
+          <SearchInput value={search} onChange={setSearch} placeholder="Search payments…" className="w-56" />
         <button onClick={vem.openForCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700">
           <Plus size={16} className="text-white" /> New Payment
         </button>
+      </div>
       </div>
 
       <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -159,15 +166,17 @@ export default function PaymentsPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No payments match “${search}”.` : 'No payments yet.'}
       />
 
-      {data && data.pages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-4">
-          <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Prev</button>
-          <span className="text-sm text-gray-500">Page {page} of {data.pages}</span>
-          <button disabled={page >= data.pages} onClick={() => setPage(p => p + 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Next</button>
-        </div>
-      )}
+      <Pagination
+        page={page}
+        pages={data?.pages ?? 1}
+        total={data?.total}
+        limit={limit}
+        onPageChange={setPage}
+        onLimitChange={setLimit}
+      />
 
       <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('Payment')}>
         <form onSubmit={handleSubmit} className="space-y-4">

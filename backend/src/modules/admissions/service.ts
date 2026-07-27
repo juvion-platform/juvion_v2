@@ -301,6 +301,13 @@ export async function updateExamScore(collegeId: string, id: string, data: any, 
   return doc;
 }
 
+export async function deleteExamScore(collegeId: string, id: string, performedBy: string) {
+  const doc = await EntranceExamScore.findOneAndDelete({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Exam score not found');
+  await createAuditLog({ collegeId, entityType: 'EntranceExamScore', entityId: id, entityName: `${doc.examType}`, action: 'delete', changes: [], performedBy });
+  return { deleted: true };
+}
+
 // ─── Counseling Allotments ───────────────────────────────────
 
 export async function listCounselingAllotments(collegeId: string, page: number, limit: number, applicantId?: string, authScope?: AuthScope) {
@@ -321,6 +328,13 @@ export async function updateCounselingAllotment(collegeId: string, id: string, d
   if (!doc) throw new AppError(404, 'Counseling allotment not found');
   await createAuditLog({ collegeId, entityType: 'CounselingAllotment', entityId: id, entityName: `Round-${doc.round}`, action: 'update', changes: [], performedBy });
   return doc;
+}
+
+export async function deleteCounselingAllotment(collegeId: string, id: string, performedBy: string) {
+  const doc = await CounselingAllotment.findOneAndDelete({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Counseling allotment not found');
+  await createAuditLog({ collegeId, entityType: 'CounselingAllotment', entityId: id, entityName: `Round-${doc.round}`, action: 'delete', changes: [], performedBy });
+  return { deleted: true };
 }
 
 // ─── Admission Offers ────────────────────────────────────────
@@ -389,6 +403,45 @@ export async function createAdmission(collegeId: string, data: any, performedBy:
   // Update applicant status to enrolled
   await Applicant.findByIdAndUpdate(data.applicantId, { status: 'enrolled' });
   await createAuditLog({ collegeId, entityType: 'Admission', entityId: String(doc._id), entityName: `Admission`, action: 'create', changes: [], performedBy });
+  return doc;
+}
+
+/**
+ * Enrollments were create-only, so a typo in an admission number or seat type
+ * could not be corrected from the UI at all. `applicantId` is intentionally
+ * not updatable — re-pointing an admission at a different applicant would
+ * leave the original applicant marked enrolled.
+ */
+/**
+ * Deleting an enrollment reverts the applicant to `accepted`. createAdmission
+ * flips them to `enrolled` as a side effect, so removing the record without
+ * undoing that would leave an applicant marked enrolled with nothing backing
+ * it — which is exactly the kind of orphan the admissions funnel reports on.
+ */
+export async function deleteAdmission(collegeId: string, id: string, performedBy: string) {
+  const doc = await Admission.findOneAndDelete({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Admission not found');
+  if (doc.applicantId) {
+    await Applicant.findOneAndUpdate(
+      { _id: doc.applicantId, collegeId, status: 'enrolled' },
+      { status: 'accepted' },
+    );
+  }
+  await createAuditLog({
+    collegeId, entityType: 'Admission', entityId: id,
+    entityName: 'Admission', action: 'delete', changes: [], performedBy,
+  });
+  return { deleted: true };
+}
+
+export async function updateAdmission(collegeId: string, id: string, data: any, performedBy: string) {
+  const { applicantId: _ignored, collegeId: _cid, ...patch } = data ?? {};
+  const doc = await Admission.findOneAndUpdate({ _id: id, collegeId }, patch, { new: true });
+  if (!doc) throw new AppError(404, 'Admission not found');
+  await createAuditLog({
+    collegeId, entityType: 'Admission', entityId: String(doc._id),
+    entityName: 'Admission', action: 'update', changes: [], performedBy,
+  });
   return doc;
 }
 

@@ -98,7 +98,14 @@ export default function SearchResultsDropdown(props: SearchResultsDropdownProps)
   if (state === 'empty') {
     return (
       <div className="p-6 text-center text-sm text-gray-500" role="status">
-        No people match &ldquo;{query}&rdquo;.
+        <p>No people match &ldquo;{query}&rdquo;.</p>
+        {/* Global search covers people only. Saying so here is the difference
+            between "there is no such record" and "you searched the wrong
+            index" — courses, branches and fees each have their own search. */}
+        <p className="mt-1.5 text-xs text-gray-400">
+          This searches students, faculty, staff, parents and alumni. For courses,
+          branches or fees, use the search box on that module&rsquo;s page.
+        </p>
       </div>
     );
   }

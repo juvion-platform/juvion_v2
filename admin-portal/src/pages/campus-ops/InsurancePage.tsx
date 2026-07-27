@@ -6,6 +6,10 @@ import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { useViewEditMode } from '../../hooks/useViewEditMode';
+import { confirmAction } from '../../stores/confirmStore';
+import Pagination from '../../components/ui/Pagination';
+import { useListControls } from '../../hooks/useListControls';
+import SearchInput from '../../components/ui/SearchInput';
 
 const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default";
 const lbl = "block text-sm font-medium text-gray-700 mb-1";
@@ -14,10 +18,10 @@ const emptyForm = { policyNumber:'', provider:'', type:'property', coverageAmoun
 
 export default function InsurancePage() {
   const qc = useQueryClient();
-  const [page, setPage] = useState(1);
+  const { page, setPage, limit, setLimit, search, setSearch } = useListControls();
   const [form, setForm] = useState(emptyForm);
 
-  const { data, isLoading } = useQuery({ queryKey: ['insurances', page], queryFn: () => listInsurances(page, 20) });
+  const { data, isLoading } = useQuery({ queryKey: ['insurances', page, limit, search], queryFn: () => listInsurances(page, limit, search) });
 
   const vem = useViewEditMode<any>({
     onOpenEntity: (row) => setForm({ policyNumber: row.policyNumber||'', provider: row.provider||'', type: row.type||'property', coverageAmount: String(row.coverageAmount??''), premium: String(row.premium??''), startDate: row.startDate?.slice(0,10)||'', endDate: row.endDate?.slice(0,10)||'', status: row.status||'active' }),
@@ -48,16 +52,30 @@ export default function InsurancePage() {
     { key: 'coverageAmount', label: 'Coverage', render: (r: any) => `\u20B9${(r.coverageAmount||0).toLocaleString()}` },
     { key: 'endDate', label: 'Expiry', render: (r: any) => r.endDate?.slice(0,10)||'\u2014' },
     { key: 'status', label: 'Status', render: (r: any) => <Badge variant={r.status==='active'?'success':r.status==='expired'?'danger':'warning'}>{r.status}</Badge> },
-    { key: 'actions', label: '', render: (r: any) => (<div className="flex gap-1"><button onClick={e=>{e.stopPropagation();vem.openForEdit(r)}} className="p-1 rounded hover:bg-amber-50"><Pencil size={15} className="text-amber-500"/></button><button onClick={e=>{e.stopPropagation();if(confirm('Delete?'))deleteMut.mutate(r._id)}} className="p-1 rounded hover:bg-red-50"><Trash2 size={15} className="text-red-500"/></button></div>) },
+    { key: 'actions', label: '', render: (r: any) => (<div className="flex gap-1"><button onClick={e=>{e.stopPropagation();vem.openForEdit(r)}} className="p-1 rounded hover:bg-amber-50"><Pencil size={15} className="text-amber-500"/></button><button onClick={e=>{e.stopPropagation();void confirmAction({ title: 'Delete?', tone: 'danger', confirmLabel: 'Delete' }).then((__c) => { if (__c.confirmed) { deleteMut.mutate(r._id); } })}} className="p-1 rounded hover:bg-red-50"><Trash2 size={15} className="text-red-500"/></button></div>) },
   ];
 
   return (
     <div>
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-xl font-bold text-navy">Insurance Policies</h2>
+        <div className="flex items-center gap-3">
+          <SearchInput value={search} onChange={setSearch} placeholder="Search insurance policies…" className="w-56" />
         <button onClick={vem.openForCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700"><Plus size={16}/> New</button>
       </div>
-      <DataTable columns={columns} data={data?.items||[]} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}/>
+      </div>
+      <DataTable columns={columns} data={data?.items||[]} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No insurance policies match “${search}”.` : 'No insurance policies yet.'}
+      />
+
+      <Pagination
+        page={page}
+        pages={data?.pages ?? 1}
+        total={data?.total}
+        limit={limit}
+        onPageChange={setPage}
+        onLimitChange={setLimit}
+      />
       {data&&data.pages>1&&(<div className="flex items-center justify-center gap-2 mt-4"><button disabled={page<=1} onClick={()=>setPage(p=>p-1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Prev</button><span className="text-sm text-gray-500">Page {page} of {data.pages}</span><button disabled={page>=data.pages} onClick={()=>setPage(p=>p+1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Next</button></div>)}
       <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('Insurance Policy')}>
         <form onSubmit={handleSubmit} className="space-y-4">

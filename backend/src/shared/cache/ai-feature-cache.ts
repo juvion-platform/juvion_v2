@@ -74,6 +74,27 @@ export async function deleteAICache(key: string): Promise<void> {
 }
 
 /**
+ * Drops every `juvi:ai:*` entry.
+ *
+ * Needed by tests, which would otherwise see one test's cached AI output
+ * served to the next (the keys are per-college-per-day, so within a run they
+ * collide). Also usable operationally to force a re-generation before the
+ * midnight TTL. Uses SCAN rather than KEYS so it never blocks Redis.
+ */
+export async function clearAICache(): Promise<void> {
+  try {
+    let cursor = '0';
+    do {
+      const [next, keys] = await redis.scan(cursor, 'MATCH', 'juvi:ai:*', 'COUNT', 200);
+      cursor = next;
+      if (keys.length > 0) await redis.del(...keys);
+    } while (cursor !== '0');
+  } catch {
+    // Non-fatal — a cache we cannot clear is still only a cache.
+  }
+}
+
+/**
  * Parallel-fetch cache entries for a list of students.
  * Returns a Map of studentId → AICacheEntry; misses are absent.
  */

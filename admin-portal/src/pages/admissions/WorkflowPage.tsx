@@ -12,6 +12,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import DataTable from '../../components/ui/DataTable';
+import Pagination from "../../components/ui/Pagination";
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
 import StatCard from '../../components/ui/StatCard';
@@ -30,6 +31,7 @@ import {
 } from '../../services/admissions';
 import { listAcademicYears, listBranches, listProgrammes } from '../../services/academics';
 import { getStudent } from '../../services/people';
+import { useListControls } from '../../hooks/useListControls';
 
 const STATUS_VARIANT: Record<string, string> = {
   active: 'info',
@@ -886,7 +888,7 @@ function TaskActionModal({
 
 export default function WorkflowPage() {
   const qc = useQueryClient();
-  const [page, setPage] = useState(1);
+  const { page, setPage, limit, search, setLimit } = useListControls();
   const [statusFilter, setStatusFilter] = useState('');
   const [taskFilter, setTaskFilter] = useState('pending');
   const [taskPhaseFilter, setTaskPhaseFilter] = useState('');
@@ -902,8 +904,8 @@ export default function WorkflowPage() {
     refetchInterval: liveMode ? 10000 : false,
   });
   const { data: instances, isLoading: instancesLoading } = useQuery({
-    queryKey: ['workflow-instances', page, statusFilter],
-    queryFn: () => listWorkflowInstances(page, 20, statusFilter || undefined),
+    queryKey: ['workflow-instances', page, statusFilter, limit, search],
+    queryFn: () => listWorkflowInstances(page, limit, statusFilter || undefined, search),
     refetchInterval: liveMode ? 10000 : false,
   });
   const { data: taskQueue, isLoading: queueLoading } = useQuery({
@@ -1173,13 +1175,15 @@ export default function WorkflowPage() {
 
           <DataTable columns={instanceColumns} data={workflowInstances} loading={instancesLoading} onRowClick={(row: any) => setSelectedInstanceId(row._id)} />
 
-          {instances && instances.pages > 1 && (
-            <div className="flex items-center justify-center gap-2">
-              <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="rounded border px-3 py-1 text-sm disabled:opacity-40">Prev</button>
-              <span className="text-sm text-gray-500">Page {page} of {instances.pages}</span>
-              <button disabled={page >= instances.pages} onClick={() => setPage((p) => p + 1)} className="rounded border px-3 py-1 text-sm disabled:opacity-40">Next</button>
-            </div>
-          )}
+          <Pagination
+            page={page}
+            pages={instances?.pages ?? 1}
+            total={instances?.total}
+            limit={limit}
+            onPageChange={setPage}
+            onLimitChange={setLimit}
+            itemLabel="instances"
+          />
         </section>
 
         <section className="space-y-4">

@@ -6,8 +6,8 @@ const BASE = '/compliance';
 export const getComplianceStats = () => api.get(`${BASE}/stats`).then(r => r.data);
 
 // ─── Accreditation Bodies ─────────────────────────────────
-export const listAccreditationBodies = (page = 1, limit = 20) =>
-  api.get(`${BASE}/accreditation-bodies`, { params: { page, limit } }).then(r => r.data);
+export const listAccreditationBodies = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/accreditation-bodies`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getAccreditationBody = (id: string) =>
   api.get(`${BASE}/accreditation-bodies/${id}`).then(r => r.data);
 export const createAccreditationBody = (data: any) =>
@@ -18,8 +18,8 @@ export const deleteAccreditationBody = (id: string) =>
   api.delete(`${BASE}/accreditation-bodies/${id}`).then(r => r.data);
 
 // ─── Accreditation Cycles ─────────────────────────────────
-export const listAccreditationCycles = (page = 1, limit = 20, bodyId?: string, status?: string) =>
-  api.get(`${BASE}/accreditation-cycles`, { params: { page, limit, bodyId, status } }).then(r => r.data);
+export const listAccreditationCycles = (page = 1, limit = 20, bodyId?: string, status?: string, search?: string) =>
+  api.get(`${BASE}/accreditation-cycles`, { params: { page, limit, bodyId, status, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getAccreditationCycle = (id: string) =>
   api.get(`${BASE}/accreditation-cycles/${id}`).then(r => r.data);
 export const createAccreditationCycle = (data: any) =>
@@ -30,8 +30,8 @@ export const deleteAccreditationCycle = (id: string) =>
   api.delete(`${BASE}/accreditation-cycles/${id}`).then(r => r.data);
 
 // ─── Compliance Criteria ──────────────────────────────────
-export const listComplianceCriteria = (page = 1, limit = 20, accreditationCycleId?: string, status?: string) =>
-  api.get(`${BASE}/compliance-criteria`, { params: { page, limit, accreditationCycleId, status } }).then(r => r.data);
+export const listComplianceCriteria = (page = 1, limit = 20, accreditationCycleId?: string, status?: string, search?: string) =>
+  api.get(`${BASE}/compliance-criteria`, { params: { page, limit, accreditationCycleId, status, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getComplianceCriteriaById = (id: string) =>
   api.get(`${BASE}/compliance-criteria/${id}`).then(r => r.data);
 export const createComplianceCriteria = (data: any) =>
@@ -42,8 +42,8 @@ export const deleteComplianceCriteria = (id: string) =>
   api.delete(`${BASE}/compliance-criteria/${id}`).then(r => r.data);
 
 // ─── Regulatory Filings ──────────────────────────────────
-export const listRegulatoryFilings = (page = 1, limit = 20, body?: string, status?: string) =>
-  api.get(`${BASE}/regulatory-filings`, { params: { page, limit, body, status } }).then(r => r.data);
+export const listRegulatoryFilings = (page = 1, limit = 20, body?: string, status?: string, search?: string) =>
+  api.get(`${BASE}/regulatory-filings`, { params: { page, limit, body, status, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getRegulatoryFiling = (id: string) =>
   api.get(`${BASE}/regulatory-filings/${id}`).then(r => r.data);
 export const createRegulatoryFiling = (data: any) =>
@@ -54,8 +54,8 @@ export const deleteRegulatoryFiling = (id: string) =>
   api.delete(`${BASE}/regulatory-filings/${id}`).then(r => r.data);
 
 // ─── AICTE Approvals ─────────────────────────────────────
-export const listAICTEApprovals = (page = 1, limit = 20, status?: string) =>
-  api.get(`${BASE}/aicte-approvals`, { params: { page, limit, status } }).then(r => r.data);
+export const listAICTEApprovals = (page = 1, limit = 20, status?: string, search?: string) =>
+  api.get(`${BASE}/aicte-approvals`, { params: { page, limit, status, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getAICTEApproval = (id: string) =>
   api.get(`${BASE}/aicte-approvals/${id}`).then(r => r.data);
 export const createAICTEApproval = (data: any) =>
@@ -66,8 +66,8 @@ export const deleteAICTEApproval = (id: string) =>
   api.delete(`${BASE}/aicte-approvals/${id}`).then(r => r.data);
 
 // ─── Affiliation Statuses ────────────────────────────────
-export const listAffiliationStatuses = (page = 1, limit = 20, status?: string) =>
-  api.get(`${BASE}/affiliation-statuses`, { params: { page, limit, status } }).then(r => r.data);
+export const listAffiliationStatuses = (page = 1, limit = 20, status?: string, search?: string) =>
+  api.get(`${BASE}/affiliation-statuses`, { params: { page, limit, status, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getAffiliationStatus = (id: string) =>
   api.get(`${BASE}/affiliation-statuses/${id}`).then(r => r.data);
 export const createAffiliationStatus = (data: any) =>
@@ -78,8 +78,8 @@ export const deleteAffiliationStatus = (id: string) =>
   api.delete(`${BASE}/affiliation-statuses/${id}`).then(r => r.data);
 
 // ─── Audit Findings ──────────────────────────────────────
-export const listAuditFindings = (page = 1, limit = 20, auditType?: string, status?: string) =>
-  api.get(`${BASE}/audit-findings`, { params: { page, limit, auditType, status } }).then(r => r.data);
+export const listAuditFindings = (page = 1, limit = 20, auditType?: string, status?: string, search?: string) =>
+  api.get(`${BASE}/audit-findings`, { params: { page, limit, auditType, status, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getAuditFinding = (id: string) =>
   api.get(`${BASE}/audit-findings/${id}`).then(r => r.data);
 export const createAuditFinding = (data: any) =>
@@ -90,8 +90,8 @@ export const deleteAuditFinding = (id: string) =>
   api.delete(`${BASE}/audit-findings/${id}`).then(r => r.data);
 
 // ─── IQAC Reports ────────────────────────────────────────
-export const listIQACReports = (page = 1, limit = 20, reportType?: string, status?: string) =>
-  api.get(`${BASE}/iqac-reports`, { params: { page, limit, reportType, status } }).then(r => r.data);
+export const listIQACReports = (page = 1, limit = 20, reportType?: string, status?: string, search?: string) =>
+  api.get(`${BASE}/iqac-reports`, { params: { page, limit, reportType, status, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getIQACReport = (id: string) =>
   api.get(`${BASE}/iqac-reports/${id}`).then(r => r.data);
 export const createIQACReport = (data: any) =>
@@ -102,8 +102,8 @@ export const deleteIQACReport = (id: string) =>
   api.delete(`${BASE}/iqac-reports/${id}`).then(r => r.data);
 
 // ─── RTI Requests ────────────────────────────────────────
-export const listRTIRequests = (page = 1, limit = 20, status?: string) =>
-  api.get(`${BASE}/rti-requests`, { params: { page, limit, status } }).then(r => r.data);
+export const listRTIRequests = (page = 1, limit = 20, status?: string, search?: string) =>
+  api.get(`${BASE}/rti-requests`, { params: { page, limit, status, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getRTIRequest = (id: string) =>
   api.get(`${BASE}/rti-requests/${id}`).then(r => r.data);
 export const createRTIRequest = (data: any) =>
@@ -114,8 +114,8 @@ export const deleteRTIRequest = (id: string) =>
   api.delete(`${BASE}/rti-requests/${id}`).then(r => r.data);
 
 // ─── Legal Cases ─────────────────────────────────────────
-export const listLegalCases = (page = 1, limit = 20, caseType?: string, status?: string) =>
-  api.get(`${BASE}/legal-cases`, { params: { page, limit, caseType, status } }).then(r => r.data);
+export const listLegalCases = (page = 1, limit = 20, caseType?: string, status?: string, search?: string) =>
+  api.get(`${BASE}/legal-cases`, { params: { page, limit, caseType, status, ...(search ? { search } : {}) } }).then(r => r.data);
 export const getLegalCase = (id: string) =>
   api.get(`${BASE}/legal-cases/${id}`).then(r => r.data);
 export const createLegalCase = (data: any) =>

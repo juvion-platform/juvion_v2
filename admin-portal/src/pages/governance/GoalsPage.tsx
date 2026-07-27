@@ -8,6 +8,10 @@ import Modal from '../../components/ui/Modal';
 import { Plus, Pencil, Trash2, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useViewEditMode } from '../../hooks/useViewEditMode';
+import { confirmAction } from '../../stores/confirmStore';
+import Pagination from '../../components/ui/Pagination';
+import { useListControls } from '../../hooks/useListControls';
+import SearchInput from '../../components/ui/SearchInput';
 
 const CATEGORIES = ['academic_excellence', 'research', 'infrastructure', 'placement', 'accreditation', 'outreach', 'revenue'] as const;
 const STATUSES = ['active', 'achieved', 'on_track', 'at_risk', 'missed'] as const;
@@ -16,27 +20,35 @@ const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ri
 const lbl = "block text-sm font-medium text-gray-700 mb-1";
 const manageLink = "inline-flex items-center gap-0.5 text-xs text-primary-500 hover:text-primary-700 font-medium ml-1";
 
-const emptyForm = { title: '', description: '', category: 'academic_excellence', targetDate: '', ownerId: '', status: 'active', kpis: '' };
+/** Form-shaped KPI: numbers stay strings while editing so inputs stay controlled. */
+interface KpiRow { metric: string; target: string; current: string }
 
-function kpisToText(kpis: any[]): string {
-  if (!kpis || !kpis.length) return '';
-  return kpis.map(k => `${k.metric}|${k.target}|${k.current ?? 0}`).join('\n');
+const emptyForm: {
+  title: string; description: string; category: string; targetDate: string;
+  ownerId: string; status: string; kpis: KpiRow[];
+} = { title: '', description: '', category: 'academic_excellence', targetDate: '', ownerId: '', status: 'active', kpis: [] };
+
+function kpisToRows(kpis: any[]): KpiRow[] {
+  if (!kpis?.length) return [];
+  return kpis.map(k => ({
+    metric: k.metric ?? '',
+    target: k.target != null ? String(k.target) : '',
+    current: k.current != null ? String(k.current) : '',
+  }));
 }
 
-function textToKpis(text: string): any[] {
-  if (!text.trim()) return [];
-  return text.split('\n').filter(Boolean).map(line => {
-    const [metric, target, current] = line.split('|');
-    return { metric: metric?.trim() || '', target: Number(target) || 0, current: Number(current) || 0 };
-  });
+function rowsToKpis(rows: KpiRow[]): any[] {
+  return rows
+    .filter(r => r.metric.trim())
+    .map(r => ({ metric: r.metric.trim(), target: Number(r.target) || 0, current: Number(r.current) || 0 }));
 }
 
 export default function GoalsPage() {
   const qc = useQueryClient();
-  const [page, setPage] = useState(1);
+  const { page, setPage, limit, setLimit, search, setSearch } = useListControls();
   const [form, setForm] = useState(emptyForm);
 
-  const { data, isLoading } = useQuery({ queryKey: ['gov-goals', page], queryFn: () => listGoals(page, 20) });
+  const { data, isLoading } = useQuery({ queryKey: ['gov-goals', page, limit, search], queryFn: () => listGoals(page, limit, undefined, undefined, search) });
   const { data: persons } = useQuery({ queryKey: ['persons', 'all'], queryFn: () => listPersons(1, 200) });
 
   const vem = useViewEditMode<any>({
@@ -47,7 +59,7 @@ export default function GoalsPage() {
       targetDate: row.targetDate ? row.targetDate.slice(0, 10) : '',
       ownerId: row.ownerId?._id || row.ownerId || '',
       status: row.status || 'active',
-      kpis: kpisToText(row.kpis),
+      kpis: kpisToRows(row.kpis),
     }),
     onOpenCreate: () => setForm(emptyForm),
     onClose: () => setForm(emptyForm),
@@ -57,9 +69,25 @@ export default function GoalsPage() {
   const updateMut = useMutation({ mutationFn: ({ id, data }: any) => updateGoal(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['gov-goals'] }); vem.close(); } });
   const deleteMut = useMutation({ mutationFn: deleteGoal, onSuccess: () => { qc.invalidateQueries({ queryKey: ['gov-goals'] }); } });
 
+  function addKpi() {
+    setForm(f => ({ ...f, kpis: [...f.kpis, { metric: '', target: '', current: '' }] }));
+  }
+  function removeKpi(index: number) {
+    setForm(f => ({ ...f, kpis: f.kpis.filter((_, i) => i !== index) }));
+  }
+  function updateKpi(index: number, patch: Partial<KpiRow>) {
+    setForm(f => ({ ...f, kpis: f.kpis.map((k, i) => (i === index ? { ...k, ...patch } : k)) }));
+  }
+
+  // A row with a metric but a non-numeric target used to save as NaN → 0.
+  const kpiError = form.kpis.some(k => k.metric.trim() && (k.target === '' || Number.isNaN(Number(k.target))))
+    ? 'Every KPI needs a numeric target.'
+    : null;
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const payload: any = { ...form, kpis: textToKpis(form.kpis) };
+    if (kpiError) return;
+    const payload: any = { ...form, kpis: rowsToKpis(form.kpis) };
     if (!payload.description) delete payload.description;
     if (!payload.ownerId) delete payload.ownerId;
     if (vem.isEdit && vem.entity) updateMut.mutate({ id: vem.entity._id, data: payload });
@@ -85,7 +113,7 @@ export default function GoalsPage() {
     { key: 'actions', label: '', render: (r: any) => (
       <div className="flex gap-1">
         <button onClick={(e) => { e.stopPropagation(); vem.openForEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
-        <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this goal?')) deleteMut.mutate(r._id); }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
+        <button onClick={(e) => { e.stopPropagation(); void confirmAction({ title: 'Delete this goal?', tone: 'danger', confirmLabel: 'Delete' }).then((__c) => { if (__c.confirmed) { deleteMut.mutate(r._id); } }) }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
       </div>
     )},
   ];
@@ -94,9 +122,12 @@ export default function GoalsPage() {
     <div>
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-xl font-bold text-navy">Strategic Goals</h2>
+        <div className="flex items-center gap-3">
+          <SearchInput value={search} onChange={setSearch} placeholder="Search strategic goals…" className="w-56" />
         <button onClick={vem.openForCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700">
           <Plus size={16} className="text-white" /> New Goal
         </button>
+      </div>
       </div>
 
       <DataTable
@@ -105,15 +136,17 @@ export default function GoalsPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No strategic goals match “${search}”.` : 'No strategic goals yet.'}
       />
 
-      {data && data.pages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-4">
-          <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Prev</button>
-          <span className="text-sm text-gray-500">Page {page} of {data.pages}</span>
-          <button disabled={page >= data.pages} onClick={() => setPage(p => p + 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Next</button>
-        </div>
-      )}
+      <Pagination
+        page={page}
+        pages={data?.pages ?? 1}
+        total={data?.total}
+        limit={limit}
+        onPageChange={setPage}
+        onLimitChange={setLimit}
+      />
 
       <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('Goal')}>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -141,9 +174,71 @@ export default function GoalsPage() {
                   {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
+              {/* Was a pipe-delimited textarea: "Pass Rate|90|75". Any other
+                  separator parsed to NaN and saved silently, and view mode
+                  showed the raw string. Structured rows remove both problems. */}
               <div className="col-span-2">
-                <label className={lbl}>KPIs (metric|target|current, one per line)</label>
-                <textarea value={form.kpis} onChange={e => setForm(f => ({ ...f, kpis: e.target.value }))} className={inp} rows={3} placeholder="e.g. Pass Rate|90|75" />
+                <label className={lbl}>KPIs</label>
+                <div className="space-y-2">
+                  {form.kpis.length === 0 && (
+                    <p className="text-sm text-gray-400">No KPIs yet.</p>
+                  )}
+                  {form.kpis.map((kpi, i) => (
+                    <div key={i} className="flex items-start gap-2">
+                      <div className="flex-1">
+                        <input
+                          value={kpi.metric}
+                          onChange={e => updateKpi(i, { metric: e.target.value })}
+                          className={inp}
+                          placeholder="Metric, e.g. Pass Rate"
+                          aria-label={`KPI ${i + 1} metric`}
+                        />
+                      </div>
+                      <div className="w-28">
+                        <input
+                          type="number"
+                          step="any"
+                          value={kpi.target}
+                          onChange={e => updateKpi(i, { target: e.target.value })}
+                          className={inp}
+                          placeholder="Target"
+                          aria-label={`KPI ${i + 1} target`}
+                        />
+                      </div>
+                      <div className="w-28">
+                        <input
+                          type="number"
+                          step="any"
+                          value={kpi.current}
+                          onChange={e => updateKpi(i, { current: e.target.value })}
+                          className={inp}
+                          placeholder="Current"
+                          aria-label={`KPI ${i + 1} current`}
+                        />
+                      </div>
+                      {!vem.isView && (
+                        <button
+                          type="button"
+                          onClick={() => removeKpi(i)}
+                          aria-label={`Remove KPI ${i + 1}`}
+                          className="mt-2 rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {!vem.isView && (
+                  <button
+                    type="button"
+                    onClick={addKpi}
+                    className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-primary-600 hover:text-primary-700"
+                  >
+                    <Plus size={14} /> Add KPI
+                  </button>
+                )}
+                {kpiError && <p className="mt-1 text-sm text-red-600" role="alert">{kpiError}</p>}
               </div>
             </div>
           </fieldset>
@@ -156,7 +251,7 @@ export default function GoalsPage() {
                 <Pencil size={14} /> Edit
               </button>
             ) : (
-              <button type="submit" disabled={saving} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
+              <button type="submit" disabled={saving || Boolean(kpiError)} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
                 {saving ? 'Saving…' : vem.isEdit ? 'Update' : 'Create'}
               </button>
             )}

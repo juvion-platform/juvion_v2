@@ -29,6 +29,7 @@ import {
   FacultyPatentStatus, FacultyPatentInventorRole,
   FacultyProjectStatus, FacultyProjectAgencyType, FacultyProjectInvestigatorRole,
 } from '../../services/faculty-teaching';
+import { confirmAction } from '../../stores/confirmStore';
 
 const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none disabled:bg-gray-50 disabled:text-gray-700';
 const lbl = 'block text-xs font-medium text-gray-700 mb-1';
@@ -955,7 +956,7 @@ function RowActions({ onEdit, onArchive }: { onEdit: () => void; onArchive: () =
       <button
         type="button"
         onClick={() => {
-          if (window.confirm('Archive this entry?')) onArchive();
+          void confirmAction({ title: 'Archive this entry?', tone: 'danger', confirmLabel: 'Archive' }).then((__c) => { if (__c.confirmed) { onArchive(); } })
         }}
         className="p-1 rounded hover:bg-red-50 text-red-600"
         title="Archive"

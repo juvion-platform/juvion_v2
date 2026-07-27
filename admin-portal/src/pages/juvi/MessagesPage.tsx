@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { listMessages, createMessage, updateMessage, deleteMessage, listConversations } from '../../services/juvi';
+import { listMessages, createMessage, updateMessage, listConversations } from '../../services/juvi';
 import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
-import { Plus, Pencil, Trash2, ExternalLink } from 'lucide-react';
+import { Pencil, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useViewEditMode } from '../../hooks/useViewEditMode';
+import Pagination from '../../components/ui/Pagination';
+import { useListControls } from '../../hooks/useListControls';
+import SearchInput from '../../components/ui/SearchInput';
 
 const ROLES = ['user', 'assistant', 'system', 'tool'] as const;
 const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default";
@@ -17,10 +20,10 @@ const emptyForm = { conversationId: '', role: 'user' as string, content: '', int
 
 export default function MessagesPage() {
   const qc = useQueryClient();
-  const [page, setPage] = useState(1);
+  const { page, setPage, limit, setLimit, search, setSearch } = useListControls();
   const [form, setForm] = useState(emptyForm);
 
-  const { data, isLoading } = useQuery({ queryKey: ['juvi-messages', page], queryFn: () => listMessages(page, 20) });
+  const { data, isLoading } = useQuery({ queryKey: ['juvi-messages', page, limit, search], queryFn: () => listMessages(page, limit, undefined, search) });
   const { data: conversations } = useQuery({ queryKey: ['juvi-conversations-all'], queryFn: () => listConversations(1, 200) });
 
   const vem = useViewEditMode<any>({
@@ -37,7 +40,6 @@ export default function MessagesPage() {
 
   const createMut = useMutation({ mutationFn: createMessage, onSuccess: () => { qc.invalidateQueries({ queryKey: ['juvi-messages'] }); vem.close(); } });
   const updateMut = useMutation({ mutationFn: ({ id, data }: any) => updateMessage(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['juvi-messages'] }); vem.close(); } });
-  const deleteMut = useMutation({ mutationFn: deleteMessage, onSuccess: () => { qc.invalidateQueries({ queryKey: ['juvi-messages'] }); } });
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -66,7 +68,6 @@ export default function MessagesPage() {
     { key: 'actions', label: '', render: (r: any) => (
       <div className="flex gap-1">
         <button onClick={(e) => { e.stopPropagation(); vem.openForEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
-        <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this message?')) deleteMut.mutate(r._id); }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
       </div>
     )},
   ];
@@ -75,20 +76,24 @@ export default function MessagesPage() {
     <div>
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-xl font-bold text-navy">Messages</h2>
-        <button onClick={vem.openForCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700">
-          <Plus size={16} className="text-white" /> New Message
-        </button>
+        <div className="flex items-center gap-3">
+          <SearchInput value={search} onChange={setSearch} placeholder="Search messages…" className="w-56" />
+        <span className="text-xs text-slate-400">Read-only · Messages are recorded by Juvi as a conversation happens.</span>
+      </div>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No messages match “${search}”.` : 'No messages yet.'}
+      />
 
-      {data && data.pages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-4">
-          <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Prev</button>
-          <span className="text-sm text-gray-500">Page {page} of {data.pages}</span>
-          <button disabled={page >= data.pages} onClick={() => setPage(p => p + 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Next</button>
-        </div>
-      )}
+      <Pagination
+        page={page}
+        pages={data?.pages ?? 1}
+        total={data?.total}
+        limit={limit}
+        onPageChange={setPage}
+        onLimitChange={setLimit}
+      />
 
       <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('Message')}>
         <form onSubmit={handleSubmit} className="space-y-4">

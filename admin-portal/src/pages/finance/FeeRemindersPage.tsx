@@ -9,6 +9,10 @@ import StudentFinanceReadinessCard from '../../components/StudentFinanceReadines
 import { ExternalLink, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useViewEditMode } from '../../hooks/useViewEditMode';
+import { confirmAction } from '../../stores/confirmStore';
+import Pagination from '../../components/ui/Pagination';
+import { useListControls } from '../../hooks/useListControls';
+import SearchInput from '../../components/ui/SearchInput';
 
 const CHANNELS = ['sms', 'email', 'whatsapp', 'app'] as const;
 const STATUSES = ['sent', 'delivered', 'failed'] as const;
@@ -28,7 +32,7 @@ const emptyForm = {
 export default function FeeRemindersPage() {
   const qc = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [page, setPage] = useState(1);
+  const { page, setPage, limit, setLimit, search, setSearch } = useListControls();
   const [studentFilter, setStudentFilter] = useState(searchParams.get('studentId') || '');
   const [channelFilter, setChannelFilter] = useState(searchParams.get('channel') || '');
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
@@ -47,8 +51,8 @@ export default function FeeRemindersPage() {
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ['fee-reminders', page, studentFilter, channelFilter, statusFilter],
-    queryFn: () => listFeeReminders(page, 20, studentFilter || undefined, channelFilter || undefined, statusFilter || undefined),
+    queryKey: ['fee-reminders', page, studentFilter, channelFilter, statusFilter, limit, search],
+    queryFn: () => listFeeReminders(page, limit, studentFilter || undefined, channelFilter || undefined, statusFilter || undefined, search),
   });
   const { data: studentsData } = useQuery({ queryKey: ['students-all'], queryFn: () => listStudents(1, 100) });
   const { data: lineItemsData } = useQuery({ queryKey: ['fee-line-items-all'], queryFn: () => listFeeLineItems(1, 100) });
@@ -119,7 +123,7 @@ export default function FeeRemindersPage() {
           </button>
         )}
         <button onClick={(e) => { e.stopPropagation(); vem.openForEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
-        <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this reminder?')) deleteMut.mutate(r._id); }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
+        <button onClick={(e) => { e.stopPropagation(); void confirmAction({ title: 'Delete this reminder?', tone: 'danger', confirmLabel: 'Delete' }).then((__c) => { if (__c.confirmed) { deleteMut.mutate(r._id); } }) }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
       </div>
     )},
   ];
@@ -128,9 +132,12 @@ export default function FeeRemindersPage() {
     <div>
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-xl font-bold text-navy">Fee Reminders</h2>
+        <div className="flex items-center gap-3">
+          <SearchInput value={search} onChange={setSearch} placeholder="Search fee reminders…" className="w-56" />
         <button onClick={vem.openForCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700">
           <Plus size={16} className="text-white" /> New Reminder
         </button>
+      </div>
       </div>
 
       <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -181,13 +188,14 @@ export default function FeeRemindersPage() {
         }
       />
 
-      {data && data.pages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-4">
-          <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Prev</button>
-          <span className="text-sm text-gray-500">Page {page} of {data.pages}</span>
-          <button disabled={page >= data.pages} onClick={() => setPage((p) => p + 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Next</button>
-        </div>
-      )}
+      <Pagination
+        page={page}
+        pages={data?.pages ?? 1}
+        total={data?.total}
+        limit={limit}
+        onPageChange={setPage}
+        onLimitChange={setLimit}
+      />
 
       <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('Fee Reminder')}>
         <form onSubmit={handleSubmit} className="space-y-4">

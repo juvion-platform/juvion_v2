@@ -6,12 +6,20 @@ import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { useViewEditMode } from '../../hooks/useViewEditMode';
+import { confirmAction } from '../../stores/confirmStore';
+import Pagination from '../../components/ui/Pagination';
+import { useListControls } from '../../hooks/useListControls';
+import SearchInput from '../../components/ui/SearchInput';
+import { requiredWhenStatus } from '../../lib/validation';
 
 const BODIES = ['aicte', 'ugc', 'jntu', 'state_govt', 'mhrd', 'other'] as const;
 const STATUSES = ['upcoming', 'in_progress', 'filed', 'overdue', 'approved', 'rejected'] as const;
 const STATUS_COLOR: Record<string, string> = { upcoming: 'default', in_progress: 'warning', filed: 'info', overdue: 'danger', approved: 'success', rejected: 'danger' };
 const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default";
 const lbl = "block text-sm font-medium text-gray-700 mb-1";
+
+// Statuses that assert the filing actually went out.
+const FILED_STATUSES = ['filed', 'approved'];
 
 const emptyForm = {
   body: 'aicte' as string, filingType: '', dueDate: '', filedDate: '',
@@ -20,10 +28,10 @@ const emptyForm = {
 
 export default function RegulatoryFilingsPage() {
   const qc = useQueryClient();
-  const [page, setPage] = useState(1);
+  const { page, setPage, limit, setLimit, search, setSearch } = useListControls();
   const [form, setForm] = useState(emptyForm);
 
-  const { data, isLoading } = useQuery({ queryKey: ['regulatory-filings', page], queryFn: () => listRegulatoryFilings(page, 20) });
+  const { data, isLoading } = useQuery({ queryKey: ['regulatory-filings', page, limit, search], queryFn: () => listRegulatoryFilings(page, limit, undefined, undefined, search) });
 
   const vem = useViewEditMode<any>({
     onOpenEntity: (row) => setForm({
@@ -43,8 +51,13 @@ export default function RegulatoryFilingsPage() {
   const updateMut = useMutation({ mutationFn: ({ id, data }: any) => updateRegulatoryFiling(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['regulatory-filings'] }); vem.close(); } });
   const deleteMut = useMutation({ mutationFn: deleteRegulatoryFiling, onSuccess: () => { qc.invalidateQueries({ queryKey: ['regulatory-filings'] }); } });
 
+  // A filing marked "filed" with no filed-date is an incomplete compliance
+  // record — it looks satisfied on a dashboard but has no evidence date.
+  const filedDateError = requiredWhenStatus(form.filedDate, form.status, FILED_STATUSES, 'Filed Date');
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (filedDateError) return;
     const payload: any = { ...form };
     if (!form.filedDate) delete payload.filedDate;
     if (!form.referenceNumber) delete payload.referenceNumber;
@@ -65,7 +78,7 @@ export default function RegulatoryFilingsPage() {
     { key: 'actions', label: '', render: (r: any) => (
       <div className="flex gap-1">
         <button onClick={(e) => { e.stopPropagation(); vem.openForEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
-        <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this filing?')) deleteMut.mutate(r._id); }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
+        <button onClick={(e) => { e.stopPropagation(); void confirmAction({ title: 'Delete this filing?', tone: 'danger', confirmLabel: 'Delete' }).then((__c) => { if (__c.confirmed) { deleteMut.mutate(r._id); } }) }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
       </div>
     )},
   ];
@@ -74,20 +87,26 @@ export default function RegulatoryFilingsPage() {
     <div>
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-xl font-bold text-navy">Regulatory Filings</h2>
+        <div className="flex items-center gap-3">
+          <SearchInput value={search} onChange={setSearch} placeholder="Search regulatory filings…" className="w-56" />
         <button onClick={vem.openForCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700">
           <Plus size={16} className="text-white" /> New Filing
         </button>
       </div>
+      </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No regulatory filings match “${search}”.` : 'No regulatory filings yet.'}
+      />
 
-      {data && data.pages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-4">
-          <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Prev</button>
-          <span className="text-sm text-gray-500">Page {page} of {data.pages}</span>
-          <button disabled={page >= data.pages} onClick={() => setPage(p => p + 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Next</button>
-        </div>
-      )}
+      <Pagination
+        page={page}
+        pages={data?.pages ?? 1}
+        total={data?.total}
+        limit={limit}
+        onPageChange={setPage}
+        onLimitChange={setLimit}
+      />
 
       <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('Regulatory Filing')}>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -104,8 +123,16 @@ export default function RegulatoryFilingsPage() {
               <div><label className={lbl}>Due Date *</label>
                 <input required type="date" value={form.dueDate} onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))} className={inp} />
               </div>
-              <div><label className={lbl}>Filed Date</label>
-                <input type="date" value={form.filedDate} onChange={e => setForm(f => ({ ...f, filedDate: e.target.value }))} className={inp} />
+              <div><label className={lbl}>Filed Date{FILED_STATUSES.includes(form.status) && ' *'}</label>
+                <input
+                  type="date"
+                  required={FILED_STATUSES.includes(form.status)}
+                  aria-invalid={Boolean(filedDateError)}
+                  value={form.filedDate}
+                  onChange={e => setForm(f => ({ ...f, filedDate: e.target.value }))}
+                  className={inp}
+                />
+                {filedDateError && <p className="mt-1 text-sm text-red-600" role="alert">{filedDateError}</p>}
               </div>
               <div><label className={lbl}>Reference Number</label>
                 <input value={form.referenceNumber} onChange={e => setForm(f => ({ ...f, referenceNumber: e.target.value }))} className={inp} />
@@ -129,7 +156,7 @@ export default function RegulatoryFilingsPage() {
                 <Pencil size={14} /> Edit
               </button>
             ) : (
-              <button type="submit" disabled={saving} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
+              <button type="submit" disabled={saving || Boolean(filedDateError)} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
                 {saving ? 'Saving…' : vem.isEdit ? 'Update' : 'Create'}
               </button>
             )}
