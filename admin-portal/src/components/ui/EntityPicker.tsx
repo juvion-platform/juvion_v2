@@ -109,15 +109,20 @@ export default function EntityPicker<T>({
         </span>
       </button>
 
-      {/* Keeps native form validation working for required pickers. */}
+      {/* Mirrors the selection into a real input so native form validation
+          still blocks submit on a required picker. It must stay technically
+          focusable — a zero-sized or display:none required control makes
+          Chrome abort submission with "not focusable" and no visible reason —
+          hence 1px + opacity-0 rather than h-0/hidden. */}
       {required && (
         <input
           tabIndex={-1}
-          aria-hidden="true"
+          aria-label={`${placeholder} (required)`}
           required
           value={value}
           onChange={() => {}}
-          className="pointer-events-none absolute bottom-1 left-3 h-0 w-0 opacity-0"
+          onFocus={() => setOpen(true)}
+          className="pointer-events-none absolute bottom-1 left-3 h-px w-px opacity-0"
         />
       )}
 

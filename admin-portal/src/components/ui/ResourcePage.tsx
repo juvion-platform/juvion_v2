@@ -179,8 +179,9 @@ export default function ResourcePage({ config }: { config: ResourceConfig }) {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const payload = formToPayload(config.fields, form);
-    if (vem.isEdit && vem.entity) updateMut.mutate({ id: vem.entity._id, data: payload });
+    const isEdit = Boolean(vem.isEdit && vem.entity);
+    const payload = formToPayload(config.fields, form, { isEdit });
+    if (isEdit) updateMut.mutate({ id: vem.entity._id, data: payload });
     else createMut.mutate(payload);
   }
 
@@ -341,15 +342,26 @@ function rowToForm(fields: FieldDef[], row: any): Record<string, any> {
   return out;
 }
 
-function formToPayload(fields: FieldDef[], form: Record<string, any>): Record<string, any> {
+function formToPayload(
+  fields: FieldDef[],
+  form: Record<string, any>,
+  { isEdit }: { isEdit: boolean },
+): Record<string, any> {
   const out: Record<string, any> = {};
   for (const f of fields) {
     if (f.readOnly) continue;
     const v = form[f.name];
     if (f.type === 'boolean') { out[f.name] = Boolean(v); continue; }
-    // Omit blanks so optional fields aren't sent as empty strings, which
-    // Zod's .optional() rejects and Mongoose would store as ''.
-    if (v === '' || v == null) continue;
+
+    if (v === '' || v == null) {
+      // On create, omit blanks: sending '' where the server expects a real
+      // value (or nothing) just trips validation.
+      // On edit, a blank the user deliberately cleared has to be sent, or the
+      // field can never be emptied — the server would keep the old value.
+      // Required fields are never blanked; the browser blocks submit first.
+      if (isEdit && !f.required) out[f.name] = f.type === 'number' ? null : '';
+      continue;
+    }
     out[f.name] = f.type === 'number' ? Number(v) : v;
   }
   return out;
