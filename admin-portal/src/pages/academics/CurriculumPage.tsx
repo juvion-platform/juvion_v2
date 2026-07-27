@@ -85,7 +85,9 @@ export default function CurriculumPage() {
         </div>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No curriculum map match “${search}”.` : 'No curriculum map yet.'}
+      />
 
       <Pagination
         page={page}

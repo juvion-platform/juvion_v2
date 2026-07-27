@@ -77,6 +77,7 @@ export default function TrainingAttendancePage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No training attendance match “${search}”.` : 'No training attendance yet.'}
       />
       <Pagination
         page={page}

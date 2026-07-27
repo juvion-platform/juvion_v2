@@ -100,6 +100,7 @@ export default function BudgetsPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No budgets match “${search}”.` : 'No budgets yet.'}
       />
 
       <Pagination

@@ -91,6 +91,7 @@ export default function RecruitmentsPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No recruitments match “${search}”.` : 'No recruitments yet.'}
       />
 
       <Pagination

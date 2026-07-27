@@ -77,7 +77,9 @@ export default function BatchesPage() {
       </div>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No batches match “${search}”.` : 'No batches yet.'}
+      />
 
       <Pagination
         page={page}

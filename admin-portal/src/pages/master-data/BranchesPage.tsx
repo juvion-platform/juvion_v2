@@ -92,6 +92,7 @@ export default function BranchesPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No branches match “${search}”.` : 'No branches yet.'}
       />
 
       <Pagination

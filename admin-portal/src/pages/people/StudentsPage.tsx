@@ -141,6 +141,7 @@ export default function StudentsPage() {
         onRowClick={(r: any) => navigate(`/people/students/${r._id}`)}
         rowKey={(r: any) => r._id}
         rowProps={(r: any) => highlightAttrs(r.person?._id ?? r.personId?._id)}
+        emptyMessage={search ? `No students match “${search}”.` : 'No students yet.'}
       />
 
       <Pagination

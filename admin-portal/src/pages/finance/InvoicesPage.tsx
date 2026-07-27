@@ -170,6 +170,7 @@ export default function InvoicesPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No invoices match “${search}”.` : 'No invoices yet.'}
       />
 
       <Pagination

@@ -123,6 +123,7 @@ export default function PayrollPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No payroll match “${search}”.` : 'No payroll yet.'}
       />
 
       <Pagination

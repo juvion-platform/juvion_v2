@@ -100,6 +100,7 @@ export default function AppraisalsPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No appraisals match “${search}”.` : 'No appraisals yet.'}
       />
 
       <Pagination

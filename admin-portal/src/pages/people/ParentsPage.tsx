@@ -228,6 +228,7 @@ export default function ParentsPage() {
         onRowClick={(r: any) => navigate(`/people/parents/${r._id}`)}
         rowKey={(r: any) => r._id}
         rowProps={(r: any) => highlightAttrs(r.person?._id ?? r.personId?._id)}
+        emptyMessage={search ? `No parents match “${search}”.` : 'No parents yet.'}
       />
 
       <Pagination

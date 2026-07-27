@@ -159,7 +159,9 @@ export default function ApplicantsPage() {
         </div>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} />
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading}
+        emptyMessage={search ? `No applicants match “${search}”.` : 'No applicants yet.'}
+      />
 
       <Pagination
         page={page}

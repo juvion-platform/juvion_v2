@@ -87,7 +87,9 @@ export default function ActionsPage() {
       </div>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No actions match “${search}”.` : 'No actions yet.'}
+      />
 
       <Pagination
         page={page}

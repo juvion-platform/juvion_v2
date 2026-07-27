@@ -85,7 +85,9 @@ export default function SMSLogsPage() {
       </div>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No sms logs match “${search}”.` : 'No sms logs yet.'}
+      />
 
       <Pagination
         page={page}

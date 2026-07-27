@@ -92,6 +92,7 @@ export default function MeetingsPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No committee meetings match “${search}”.` : 'No committee meetings yet.'}
       />
 
       <Pagination

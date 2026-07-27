@@ -88,6 +88,7 @@ export default function InternshipPostingsPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No internship postings match “${search}”.` : 'No internship postings yet.'}
       />
       <Pagination
         page={page}

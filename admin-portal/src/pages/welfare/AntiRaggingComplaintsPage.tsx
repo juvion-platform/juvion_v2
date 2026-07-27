@@ -129,6 +129,7 @@ export default function AntiRaggingComplaintsPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No anti-ragging complaints match “${search}”.` : 'No anti-ragging complaints yet.'}
       />
 
       <Pagination

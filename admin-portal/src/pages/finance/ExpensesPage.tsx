@@ -97,6 +97,7 @@ export default function ExpensesPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No expenses match “${search}”.` : 'No expenses yet.'}
       />
 
       <Pagination

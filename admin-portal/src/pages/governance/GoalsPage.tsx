@@ -136,6 +136,7 @@ export default function GoalsPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No strategic goals match “${search}”.` : 'No strategic goals yet.'}
       />
 
       <Pagination

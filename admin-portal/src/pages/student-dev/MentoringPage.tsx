@@ -88,7 +88,9 @@ export default function MentoringPage() {
       </div>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No mentoring match “${search}”.` : 'No mentoring yet.'}
+      />
 
       <Pagination
         page={page}

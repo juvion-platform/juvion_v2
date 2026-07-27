@@ -79,7 +79,9 @@ export default function EmailLogsPage() {
       </div>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No email logs match “${search}”.` : 'No email logs yet.'}
+      />
 
       <Pagination
         page={page}

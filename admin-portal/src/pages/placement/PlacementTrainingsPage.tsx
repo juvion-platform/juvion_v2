@@ -83,6 +83,7 @@ export default function PlacementTrainingsPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No placement trainings match “${search}”.` : 'No placement trainings yet.'}
       />
       <Pagination
         page={page}

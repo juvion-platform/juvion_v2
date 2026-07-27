@@ -85,7 +85,9 @@ export default function PersonaConfigsPage() {
       </div>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No persona configs match “${search}”.` : 'No persona configs yet.'}
+      />
 
       <Pagination
         page={page}

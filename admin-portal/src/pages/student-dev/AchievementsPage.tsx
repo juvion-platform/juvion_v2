@@ -91,7 +91,9 @@ export default function AchievementsPage() {
       </div>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No achievements match “${search}”.` : 'No achievements yet.'}
+      />
 
       <Pagination
         page={page}

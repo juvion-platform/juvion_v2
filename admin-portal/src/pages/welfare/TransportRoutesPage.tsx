@@ -108,6 +108,7 @@ export default function TransportRoutesPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No transport routes match “${search}”.` : 'No transport routes yet.'}
       />
 
       <Pagination

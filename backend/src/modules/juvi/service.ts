@@ -17,6 +17,7 @@ export async function getStats(collegeId: string) {
   const [
     conversations, activeConversations, messages, insights,
     activeInsights, knowledgeBase, personas, activePersonas,
+    actions, feedback, usageMetrics,
   ] = await Promise.all([
     JuviConversation.countDocuments({ collegeId }),
     JuviConversation.countDocuments({ collegeId, status: 'active' }),
@@ -26,11 +27,17 @@ export async function getStats(collegeId: string) {
     JuviKnowledgeBase.countDocuments({ collegeId }),
     JuviPersonaConfig.countDocuments({ collegeId }),
     JuviPersonaConfig.countDocuments({ collegeId, isActive: true }),
+    // The Actions, Feedback and Usage Metrics hub cards had no stat to read,
+    // so they rendered blank however long you waited.
+    JuviAction.countDocuments({ collegeId }),
+    JuviFeedback.countDocuments({ collegeId }),
+    JuviUsageMetric.countDocuments({ collegeId }),
   ]);
 
   return {
     conversations, activeConversations, messages, insights,
     activeInsights, knowledgeBase, personas, activePersonas,
+    actions, feedback, usageMetrics,
   };
 }
 

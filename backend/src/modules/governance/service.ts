@@ -8,6 +8,7 @@ import { createAuditLog } from '../../shared/audit';
 import { AppError } from '../../middleware/errorHandler';
 import { AuthScope } from '../../shared/rbac/types';
 import { applyAuthScope } from '../../shared/rbac/apply-scope';
+import { REPORT_REGISTRY } from './report-registry';
 
 // ─── Dashboard Stats ──────────────────────────────────────
 export async function getStats(collegeId: string) {
@@ -32,6 +33,12 @@ export async function getStats(collegeId: string) {
     committees, activeCommittees, meetings, scheduledMeetings,
     policies, activePolicies, boardMembers, activeBoardMembers,
     goals, activeGoals, atRiskGoals,
+    // The Reports hub card had no stat to read. Reports are a code registry
+    // (report-registry.ts), not a collection, so the count comes from there.
+    // `runnableReports` excludes Phase B definitions, whose runners don't
+    // exist yet — the headline number should reflect what can actually run.
+    reports: REPORT_REGISTRY.length,
+    runnableReports: REPORT_REGISTRY.filter((r) => r.implementationStatus !== 'phase_b').length,
   };
 }
 

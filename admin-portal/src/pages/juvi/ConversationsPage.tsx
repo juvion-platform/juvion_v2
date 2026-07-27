@@ -73,7 +73,9 @@ export default function ConversationsPage() {
       </div>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No conversations match “${search}”.` : 'No conversations yet.'}
+      />
 
       <Pagination
         page={page}

@@ -88,6 +88,7 @@ export default function RoundResultsPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No round results match “${search}”.` : 'No round results yet.'}
       />
       <Pagination
         page={page}

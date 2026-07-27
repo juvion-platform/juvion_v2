@@ -106,6 +106,7 @@ export default function MessMenusPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No mess menus match “${search}”.` : 'No mess menus yet.'}
       />
 
       <Pagination

@@ -86,6 +86,7 @@ export default function LeaveTypesPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No leave types match “${search}”.` : 'No leave types yet.'}
       />
 
       <Pagination

@@ -87,6 +87,7 @@ export default function EntrepreneurProfilesPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No entrepreneur profiles match “${search}”.` : 'No entrepreneur profiles yet.'}
       />
       <Pagination
         page={page}

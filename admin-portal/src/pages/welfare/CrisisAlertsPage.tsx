@@ -120,6 +120,7 @@ export default function CrisisAlertsPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No crisis alerts match “${search}”.` : 'No crisis alerts yet.'}
       />
 
       <Pagination

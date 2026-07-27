@@ -82,7 +82,9 @@ export default function MessagesPage() {
       </div>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No messages match “${search}”.` : 'No messages yet.'}
+      />
 
       <Pagination
         page={page}

@@ -94,6 +94,7 @@ export default function HealthRecordsPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No health records match “${search}”.` : 'No health records yet.'}
       />
 
       <Pagination

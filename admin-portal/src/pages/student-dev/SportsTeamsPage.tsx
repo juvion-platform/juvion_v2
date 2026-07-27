@@ -84,7 +84,9 @@ export default function SportsTeamsPage() {
       </div>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No sports teams match “${search}”.` : 'No sports teams yet.'}
+      />
 
       <Pagination
         page={page}

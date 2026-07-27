@@ -99,7 +99,7 @@ function GovernanceHome() {
         {[
           { to: 'board-members', icon: Crown, label: 'Governing Body', desc: 'Board members & roles', iconBg: 'bg-amber-50 text-amber-600', border: 'border-amber-200 hover:border-amber-400', statKey: 'boardMembers' },
           { to: 'goals', icon: Target, label: 'Strategic Goals', desc: 'KPIs & targets', iconBg: 'bg-violet-50 text-violet-600', border: 'border-violet-200 hover:border-violet-400', statKey: 'goals' },
-          { to: 'reports', icon: FileText, label: 'Reports', desc: 'Institution reports with parameter inputs', iconBg: 'bg-rose-50 text-rose-600', border: 'border-rose-200 hover:border-rose-400' },
+          { to: 'reports', icon: FileText, label: 'Reports', desc: 'Institution reports with parameter inputs', iconBg: 'bg-rose-50 text-rose-600', border: 'border-rose-200 hover:border-rose-400', statKey: 'reports' },
         ].map(card => {
           const Icon = card.icon;
           const hasStat = Boolean(card.statKey);

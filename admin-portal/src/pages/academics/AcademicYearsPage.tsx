@@ -73,7 +73,9 @@ export default function AcademicYearsPage() {
       </div>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No academic years match “${search}”.` : 'No academic years yet.'}
+      />
 
       <Pagination
         page={page}

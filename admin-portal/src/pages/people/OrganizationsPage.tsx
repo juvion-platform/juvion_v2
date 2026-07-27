@@ -147,7 +147,9 @@ export default function OrganizationsPage() {
         </div>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} />
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading}
+        emptyMessage={search ? `No organizations match “${search}”.` : 'No organizations yet.'}
+      />
 
       <Pagination
         page={page}

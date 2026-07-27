@@ -89,6 +89,7 @@ export default function MessFeedbackPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No mess feedback match “${search}”.` : 'No mess feedback yet.'}
       />
 
       <Pagination

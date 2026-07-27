@@ -88,7 +88,9 @@ export default function AccreditationCyclesPage() {
       </div>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No accreditation cycles match “${search}”.` : 'No accreditation cycles yet.'}
+      />
 
       <Pagination
         page={page}

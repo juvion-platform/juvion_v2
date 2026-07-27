@@ -91,6 +91,7 @@ export default function PlacementOffersPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No placement offers match “${search}”.` : 'No placement offers yet.'}
       />
       <Pagination
         page={page}

@@ -96,6 +96,7 @@ export default function HostelVisitorLogsPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No hostel visitor logs match “${search}”.` : 'No hostel visitor logs yet.'}
       />
 
       <Pagination

@@ -91,7 +91,9 @@ export default function AnnouncementsPage() {
       </div>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No announcements match “${search}”.` : 'No announcements yet.'}
+      />
 
       <Pagination
         page={page}

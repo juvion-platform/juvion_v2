@@ -90,7 +90,9 @@ export default function NotificationsPage() {
       </div>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No notifications match “${search}”.` : 'No notifications yet.'}
+      />
 
       <Pagination
         page={page}

@@ -85,7 +85,9 @@ export default function ClubMembershipsPage() {
       </div>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No club memberships match “${search}”.` : 'No club memberships yet.'}
+      />
 
       <Pagination
         page={page}

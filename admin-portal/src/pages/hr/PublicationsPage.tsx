@@ -96,6 +96,7 @@ export default function PublicationsPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No publications match “${search}”.` : 'No publications yet.'}
       />
 
       <Pagination

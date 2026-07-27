@@ -81,6 +81,7 @@ export default function CompaniesPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No companies match “${search}”.` : 'No companies yet.'}
       />
       <Pagination
         page={page}

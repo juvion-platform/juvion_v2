@@ -90,7 +90,9 @@ export default function FeedbackSurveysPage() {
       </div>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No feedback surveys match “${search}”.` : 'No feedback surveys yet.'}
+      />
 
       <Pagination
         page={page}

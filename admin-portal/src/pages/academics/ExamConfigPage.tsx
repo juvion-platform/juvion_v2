@@ -280,6 +280,7 @@ function EntityCRUDPage({ entity }: { entity: EntityDescriptor }) {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={(r: any) => openEdit(r)}
+        emptyMessage={search ? `No {entity.label} match “${search}”.` : 'No {entity.label} yet.'}
       />
 
       {entity.cardinality === 'paged' && (

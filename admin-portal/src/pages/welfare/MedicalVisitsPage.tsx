@@ -93,6 +93,7 @@ export default function MedicalVisitsPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No medical visits match “${search}”.` : 'No medical visits yet.'}
       />
 
       <Pagination

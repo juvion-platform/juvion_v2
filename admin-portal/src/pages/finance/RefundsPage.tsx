@@ -131,6 +131,7 @@ export default function RefundsPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No refunds match “${search}”.` : 'No refunds yet.'}
       />
 
       <Pagination

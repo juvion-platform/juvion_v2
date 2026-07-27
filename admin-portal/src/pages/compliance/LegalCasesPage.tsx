@@ -92,7 +92,9 @@ export default function LegalCasesPage() {
       </div>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No legal cases match “${search}”.` : 'No legal cases yet.'}
+      />
 
       <Pagination
         page={page}

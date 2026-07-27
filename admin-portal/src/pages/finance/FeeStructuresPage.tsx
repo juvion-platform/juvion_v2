@@ -252,6 +252,7 @@ export default function FeeStructuresPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No fee structures match “${search}”.` : 'No fee structures yet.'}
       />
 
       <Pagination

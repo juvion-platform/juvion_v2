@@ -94,6 +94,7 @@ export default function TransportAllocationsPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No transport allocations match “${search}”.` : 'No transport allocations yet.'}
       />
 
       <Pagination

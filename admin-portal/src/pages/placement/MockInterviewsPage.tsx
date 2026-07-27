@@ -87,6 +87,7 @@ export default function MockInterviewsPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No mock interviews match “${search}”.` : 'No mock interviews yet.'}
       />
       <Pagination
         page={page}

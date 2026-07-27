@@ -93,6 +93,7 @@ export default function GrievancesPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No grievances match “${search}”.` : 'No grievances yet.'}
       />
 
       <Pagination

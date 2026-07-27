@@ -259,3 +259,30 @@ export const deleteSponsorship = (id: string) =>
   api.delete(`${BASE}/sponsorships/${id}`).then(r => r.data);
 export const listSponsorContacts = (page = 1, limit = 20, search?: string) =>
   api.get(`${BASE}/sponsor-contacts`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
+
+// ─── Portfolios ───────────────────────────────────────────
+// Student-scoped rather than a college-wide list, so these back the panel on
+// the student detail page rather than an admin list page.
+export interface PortfolioGapAnalysis {
+  missingAreas: string[];
+  recommendations: string[];
+}
+export interface PortfolioCompleteness {
+  score: number;
+  gapAnalysis: PortfolioGapAnalysis;
+}
+
+export const getStudentPortfolio = (studentId: string) =>
+  api.get(`${BASE}/portfolios/${studentId}`).then(r => r.data);
+export const getPortfolioCompleteness = (studentId: string): Promise<PortfolioCompleteness> =>
+  api.get(`${BASE}/portfolios/${studentId}/completeness`).then(r => r.data);
+export const assemblePortfolio = (studentId: string) =>
+  api.post(`${BASE}/portfolios/assemble`, { studentId }).then(r => r.data);
+export const publishPortfolio = (studentId: string) =>
+  api.post(`${BASE}/portfolios/publish`, { studentId }).then(r => r.data);
+export const unpublishPortfolio = (studentId: string) =>
+  api.post(`${BASE}/portfolios/unpublish`, { studentId }).then(r => r.data);
+export const finalisePortfolio = (studentId: string) =>
+  api.post(`${BASE}/portfolios/${studentId}/finalise`, {}).then(r => r.data);
+export const listPortfolioEntries = (portfolioId: string, page = 1, limit = 100) =>
+  api.get(`${BASE}/portfolio-entries`, { params: { portfolioId, page, limit } }).then(r => r.data);
