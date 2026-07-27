@@ -56,6 +56,25 @@ interface SeedPlan {
 }
 
 /**
+ * Academic year covering today.
+ *
+ * This used to be hard-coded to 2025-26. resolveStudentYearOfStudy picks the
+ * AcademicYear whose [startDate, endDate] window contains `new Date()`, so
+ * once real time moved past 2026-05-31 no AY matched, every student became
+ * "unresolvable", and all four scenarios failed on a date rather than on a
+ * code change. Deriving the window from today keeps the fixture's intent —
+ * students admitted this AY are in year 1 — permanently true.
+ *
+ * Indian academic years run June–May, so before June we are still inside the
+ * year that started last calendar year.
+ */
+const AY_START_YEAR = new Date().getMonth() >= 5 // 5 = June
+  ? new Date().getFullYear()
+  : new Date().getFullYear() - 1;
+const AY_END_YEAR = AY_START_YEAR + 1;
+const AY_LABEL = `${AY_START_YEAR}-${String(AY_END_YEAR).slice(2)}`;
+
+/**
  * Seed 100 students for a college:
  *   - 80 resolve to a matching FSI (pinnable)
  *   - 15 have valid yearOfStudy but NO matching FSI (unpinnable)
@@ -103,33 +122,33 @@ async function seedMixedData(): Promise<SeedPlan> {
     regulationId,
   });
 
-  // AcademicYear: 2025-26 window so AY.startYear = 2025
+  // AcademicYear window covering today, so AY.startYear = AY_START_YEAR
   await AcademicYear.create({
     _id: academicYearId,
     collegeId,
-    code: '2025-26',
-    label: '2025-26',
-    startDate: new Date('2025-06-01'),
-    endDate: new Date('2026-05-31'),
+    code: AY_LABEL,
+    label: AY_LABEL,
+    startDate: new Date(`${AY_START_YEAR}-06-01`),
+    endDate: new Date(`${AY_END_YEAR}-05-31`),
     isCurrent: true,
   });
 
-  // Batch (admissionYear = 2025 → students are Y1 in AY 2025-26)
+  // Batch: admitted this AY, so students are Y1
   await Batch.create({
     _id: batchId,
     collegeId,
-    code: 'B-BTCSE-2025',
-    name: 'BTech CSE 2025',
-    admissionYear: 2025,
+    code: `B-BTCSE-${AY_START_YEAR}`,
+    name: `BTech CSE ${AY_START_YEAR}`,
+    admissionYear: AY_START_YEAR,
     programmeId,
     regulationId,
   });
   await Batch.create({
     _id: validBatchId,
     collegeId,
-    code: 'B-BTECE-2025',
-    name: 'BTech ECE 2025',
-    admissionYear: 2025,
+    code: `B-BTECE-${AY_START_YEAR}`,
+    name: `BTech ECE ${AY_START_YEAR}`,
+    admissionYear: AY_START_YEAR,
     programmeId: unpinnableProgrammeId,
     regulationId,
   });
@@ -151,7 +170,7 @@ async function seedMixedData(): Promise<SeedPlan> {
     await Student.create({
       collegeId,
       personId: oid(),
-      admissionYear: 2025,
+      admissionYear: AY_START_YEAR,
       programmeId,
       branchId,
       batchId,
@@ -167,7 +186,7 @@ async function seedMixedData(): Promise<SeedPlan> {
     await Student.create({
       collegeId,
       personId: oid(),
-      admissionYear: 2025,
+      admissionYear: AY_START_YEAR,
       programmeId: unpinnableProgrammeId,
       branchId,
       batchId: validBatchId,
@@ -183,7 +202,7 @@ async function seedMixedData(): Promise<SeedPlan> {
     await Student.create({
       collegeId,
       personId: oid(),
-      admissionYear: 2025,
+      admissionYear: AY_START_YEAR,
       programmeId,
       branchId,
       batchId: missingBatchIdRef,
