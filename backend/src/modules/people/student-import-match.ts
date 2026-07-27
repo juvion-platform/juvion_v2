@@ -48,22 +48,29 @@ export async function matchExistingStudent(
       .select('_id status isSealed').lean() as FoundStudent | null;
   }
 
-  // 2. aadhaar — lives on Person, so resolve through it.
+  // 2. aadhaar — lives on Person, so resolve through it. Aadhaar is supposed
+  //    to be unique per person, so more than one match is a data-quality
+  //    problem rather than a normal case — but check all of them anyway;
+  //    the $in form costs nothing and a single findOne would silently pick
+  //    an arbitrary one if duplicates exist.
   if (!found && aadhaar) {
-    const person = await Person.findOne({ collegeId, aadhaar }).select('_id').lean();
-    if (person) {
-      found = await Student.findOne({ collegeId, personId: person._id })
+    const persons = await Person.find({ collegeId, aadhaar }).select('_id').lean();
+    if (persons.length) {
+      found = await Student.findOne({ collegeId, personId: { $in: persons.map((p) => p._id) } })
         .select('_id status isSealed').lean() as FoundStudent | null;
     }
   }
 
-  // 3. phone + admissionYear — weakest key, so it is last and requires both.
-  //    Phone alone would collide across siblings sharing a family number.
+  // 3. phone + admissionYear — weakest key, so last, requires both.
+  //    A family phone can belong to several people, so check them all.
   if (!found && phone && admissionYear) {
-    const person = await Person.findOne({ collegeId, phone }).select('_id').lean();
-    if (person) {
-      found = await Student.findOne({ collegeId, personId: person._id, admissionYear: Number(admissionYear) })
-        .select('_id status isSealed').lean() as FoundStudent | null;
+    const persons = await Person.find({ collegeId, phone }).select('_id').lean();
+    if (persons.length) {
+      found = await Student.findOne({
+        collegeId,
+        personId: { $in: persons.map((p) => p._id) },
+        admissionYear: Number(admissionYear),
+      }).select('_id status isSealed').lean() as FoundStudent | null;
     }
   }
 

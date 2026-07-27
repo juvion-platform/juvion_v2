@@ -58,6 +58,28 @@ describe('matchExistingStudent', () => {
     expect(res.action).toBe('create');
   });
 
+  it('picks the right sibling when two students share a family phone', async () => {
+    // The WRONG student is created first, so a plain Person.findOne (which
+    // returns whichever doc sorts first with no explicit sort — typically
+    // insertion order) would resolve to them, not the row's actual match.
+    // Each sibling gets a distinct rollNumber only so the two Student.create
+    // calls don't collide on the (collegeId, rollNumber) unique index — the
+    // match row itself carries no rollNumber, so that key is never consulted.
+    const wrongPerson = await Person.create({ collegeId, name: 'Older Sibling', phone: '9000000005' });
+    const wrongStudent = await Student.create({
+      collegeId, personId: wrongPerson._id, admissionYear: 2023, status: 'active', rollNumber: 'SIB-OLD',
+    });
+    const rightPerson = await Person.create({ collegeId, name: 'Younger Sibling', phone: '9000000005' });
+    const rightStudent = await Student.create({
+      collegeId, personId: rightPerson._id, admissionYear: 2025, status: 'active', rollNumber: 'SIB-NEW',
+    });
+
+    const res = await matchExistingStudent(collegeId, { phone: '9000000005', admissionYear: 2025 });
+    expect(res.action).toBe('update');
+    expect(res.studentId).toBe(String(rightStudent._id));
+    expect(res.studentId).not.toBe(String(wrongStudent._id));
+  });
+
   it('never matches across colleges', async () => {
     await makeStudent({ rollNumber: 'R1' });
     const res = await matchExistingStudent(String(oid()), { rollNumber: 'R1' });
