@@ -2,29 +2,38 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listPersonaConfigs, createPersonaConfig, updatePersonaConfig, deletePersonaConfig } from '../../services/juvi';
 import DataTable from '../../components/ui/DataTable';
+import MultiSelect, { type MultiSelectOption } from '../../components/ui/MultiSelect';
+import { MODULE_OPTIONS } from '../../lib/modules';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { useViewEditMode } from '../../hooks/useViewEditMode';
+import { confirmAction } from '../../stores/confirmStore';
+import Pagination from '../../components/ui/Pagination';
+import { useListControls } from '../../hooks/useListControls';
+import SearchInput from '../../components/ui/SearchInput';
 
 const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default";
 const lbl = "block text-sm font-medium text-gray-700 mb-1";
 
-const emptyForm = { personaType: '', displayName: '', systemPrompt: '', availableModules: '', availableActions: '', maxTokensPerResponse: '2000', isActive: true };
+const emptyForm: {
+  personaType: string; displayName: string; systemPrompt: string;
+  availableModules: string[]; availableActions: string; maxTokensPerResponse: string; isActive: boolean;
+} = { personaType: '', displayName: '', systemPrompt: '', availableModules: [], availableActions: '', maxTokensPerResponse: '2000', isActive: true };
 
 export default function PersonaConfigsPage() {
   const qc = useQueryClient();
-  const [page, setPage] = useState(1);
+  const { page, setPage, limit, setLimit, search, setSearch } = useListControls();
   const [form, setForm] = useState(emptyForm);
 
-  const { data, isLoading } = useQuery({ queryKey: ['juvi-persona-configs', page], queryFn: () => listPersonaConfigs(page, 20) });
+  const { data, isLoading } = useQuery({ queryKey: ['juvi-persona-configs', page, limit, search], queryFn: () => listPersonaConfigs(page, limit, search) });
 
   const vem = useViewEditMode<any>({
     onOpenEntity: (row) => setForm({
       personaType: row.personaType || '',
       displayName: row.displayName || '',
       systemPrompt: row.systemPrompt || '',
-      availableModules: (row.availableModules || []).join(', '),
+      availableModules: row.availableModules || [],
       availableActions: (row.availableActions || []).join(', '),
       maxTokensPerResponse: row.maxTokensPerResponse != null ? String(row.maxTokensPerResponse) : '2000',
       isActive: row.isActive ?? true,
@@ -40,7 +49,7 @@ export default function PersonaConfigsPage() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const payload: any = { ...form };
-    payload.availableModules = form.availableModules ? form.availableModules.split(',').map(s => s.trim()).filter(Boolean) : [];
+    payload.availableModules = form.availableModules;
     payload.availableActions = form.availableActions ? form.availableActions.split(',').map(s => s.trim()).filter(Boolean) : [];
     if (form.maxTokensPerResponse) payload.maxTokensPerResponse = Number(form.maxTokensPerResponse);
     else delete payload.maxTokensPerResponse;
@@ -59,7 +68,7 @@ export default function PersonaConfigsPage() {
     { key: 'actions', label: '', render: (r: any) => (
       <div className="flex gap-1">
         <button onClick={(e) => { e.stopPropagation(); vem.openForEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
-        <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this persona config?')) deleteMut.mutate(r._id); }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
+        <button onClick={(e) => { e.stopPropagation(); void confirmAction({ title: 'Delete this persona config?', tone: 'danger', confirmLabel: 'Delete' }).then((__c) => { if (__c.confirmed) { deleteMut.mutate(r._id); } }) }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
       </div>
     )},
   ];
@@ -68,20 +77,24 @@ export default function PersonaConfigsPage() {
     <div>
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-xl font-bold text-navy">Persona Configs</h2>
+        <div className="flex items-center gap-3">
+          <SearchInput value={search} onChange={setSearch} placeholder="Search persona configs…" className="w-56" />
         <button onClick={vem.openForCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700">
           <Plus size={16} className="text-white" /> New Persona
         </button>
       </div>
+      </div>
 
       <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
 
-      {data && data.pages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-4">
-          <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Prev</button>
-          <span className="text-sm text-gray-500">Page {page} of {data.pages}</span>
-          <button disabled={page >= data.pages} onClick={() => setPage(p => p + 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Next</button>
-        </div>
-      )}
+      <Pagination
+        page={page}
+        pages={data?.pages ?? 1}
+        total={data?.total}
+        limit={limit}
+        onPageChange={setPage}
+        onLimitChange={setLimit}
+      />
 
       <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('Persona Config')}>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -90,7 +103,17 @@ export default function PersonaConfigsPage() {
               <div><label className={lbl}>Persona Type *</label><input required value={form.personaType} onChange={e => setForm(f => ({ ...f, personaType: e.target.value }))} className={inp} placeholder="admin, faculty, student" /></div>
               <div><label className={lbl}>Display Name *</label><input required value={form.displayName} onChange={e => setForm(f => ({ ...f, displayName: e.target.value }))} className={inp} /></div>
               <div className="col-span-2"><label className={lbl}>System Prompt *</label><textarea required rows={4} value={form.systemPrompt} onChange={e => setForm(f => ({ ...f, systemPrompt: e.target.value }))} className={inp} /></div>
-              <div><label className={lbl}>Available Modules (comma-separated)</label><input value={form.availableModules} onChange={e => setForm(f => ({ ...f, availableModules: e.target.value }))} className={inp} placeholder="finance, academics, hr" /></div>
+              <div>
+                <label className={lbl}>Available Modules</label>
+                {/* Was comma-separated free text: a typo like "financee" saved
+                    happily and then matched nothing at runtime. */}
+                <MultiSelect
+                  options={MODULE_OPTIONS as unknown as MultiSelectOption[]}
+                  value={form.availableModules}
+                  onChange={(v) => setForm(f => ({ ...f, availableModules: v }))}
+                  disabled={vem.isView}
+                />
+              </div>
               <div><label className={lbl}>Available Actions (comma-separated)</label><input value={form.availableActions} onChange={e => setForm(f => ({ ...f, availableActions: e.target.value }))} className={inp} placeholder="query, create, update" /></div>
               <div><label className={lbl}>Max Tokens Per Response</label><input type="number" min={1} value={form.maxTokensPerResponse} onChange={e => setForm(f => ({ ...f, maxTokensPerResponse: e.target.value }))} className={inp} /></div>
               <div className="flex items-center gap-2 pt-6">

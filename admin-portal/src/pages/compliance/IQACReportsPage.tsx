@@ -1,11 +1,17 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listIQACReports, createIQACReport, updateIQACReport, deleteIQACReport } from '../../services/compliance';
+import { listAcademicYears } from '../../services/academics';
 import DataTable from '../../components/ui/DataTable';
+import EntityPicker from '../../components/ui/EntityPicker';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { useViewEditMode } from '../../hooks/useViewEditMode';
+import { confirmAction } from '../../stores/confirmStore';
+import Pagination from '../../components/ui/Pagination';
+import { useListControls } from '../../hooks/useListControls';
+import SearchInput from '../../components/ui/SearchInput';
 
 const REPORT_TYPES = ['aqar', 'ssr', 'annual_report', 'best_practices', 'feedback_analysis'] as const;
 const STATUSES = ['draft', 'review', 'submitted', 'accepted'] as const;
@@ -19,10 +25,10 @@ const emptyForm = {
 
 export default function IQACReportsPage() {
   const qc = useQueryClient();
-  const [page, setPage] = useState(1);
+  const { page, setPage, limit, setLimit, search, setSearch } = useListControls();
   const [form, setForm] = useState(emptyForm);
 
-  const { data, isLoading } = useQuery({ queryKey: ['iqac-reports', page], queryFn: () => listIQACReports(page, 20) });
+  const { data, isLoading } = useQuery({ queryKey: ['iqac-reports', page, limit, search], queryFn: () => listIQACReports(page, limit, undefined, undefined, search) });
 
   const vem = useViewEditMode<any>({
     onOpenEntity: (row) => setForm({
@@ -57,7 +63,7 @@ export default function IQACReportsPage() {
     { key: 'actions', label: '', render: (r: any) => (
       <div className="flex gap-1">
         <button onClick={(e) => { e.stopPropagation(); vem.openForEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
-        <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this report?')) deleteMut.mutate(r._id); }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
+        <button onClick={(e) => { e.stopPropagation(); void confirmAction({ title: 'Delete this report?', tone: 'danger', confirmLabel: 'Delete' }).then((__c) => { if (__c.confirmed) { deleteMut.mutate(r._id); } }) }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
       </div>
     )},
   ];
@@ -66,27 +72,45 @@ export default function IQACReportsPage() {
     <div>
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-xl font-bold text-navy">IQAC Reports</h2>
+        <div className="flex items-center gap-3">
+          <SearchInput value={search} onChange={setSearch} placeholder="Search iqac reports…" className="w-56" />
         <button onClick={vem.openForCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700">
           <Plus size={16} className="text-white" /> New Report
         </button>
       </div>
+      </div>
 
       <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
 
-      {data && data.pages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-4">
-          <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Prev</button>
-          <span className="text-sm text-gray-500">Page {page} of {data.pages}</span>
-          <button disabled={page >= data.pages} onClick={() => setPage(p => p + 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Next</button>
-        </div>
-      )}
+      <Pagination
+        page={page}
+        pages={data?.pages ?? 1}
+        total={data?.total}
+        limit={limit}
+        onPageChange={setPage}
+        onLimitChange={setLimit}
+      />
 
       <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('IQAC Report')}>
         <form onSubmit={handleSubmit} className="space-y-4">
           <fieldset disabled={vem.isView} className="border-0 p-0 m-0 space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <div><label className={lbl}>Academic Year ID *</label>
-                <input required value={form.academicYearId} onChange={e => setForm(f => ({ ...f, academicYearId: e.target.value }))} className={inp} />
+              <div>
+                <label className={lbl} htmlFor="iqac-year">Academic Year *</label>
+                <EntityPicker
+                  id="iqac-year"
+                  required
+                  disabled={vem.isView}
+                  queryKey={['academic-years', 'picker']}
+                  fetcher={(q) => listAcademicYears(1, 20, q || undefined)}
+                  value={form.academicYearId}
+                  onChange={(v) => setForm(f => ({ ...f, academicYearId: v }))}
+                  getId={(x: any) => x._id}
+                  getLabel={(y: any) => y.label || y.code || y._id}
+                  getHint={(y: any) => y.startDate ? new Date(y.startDate).getFullYear().toString() : undefined}
+                  fallbackLabel={vem.entity?.academicYearId?.label}
+                  placeholder="Search academic year"
+                />
               </div>
               <div><label className={lbl}>Report Type *</label>
                 <select required value={form.reportType} onChange={e => setForm(f => ({ ...f, reportType: e.target.value }))} className={inp}>

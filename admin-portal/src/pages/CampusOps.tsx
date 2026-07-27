@@ -6,12 +6,13 @@ import {
   ShieldCheck, Users, AlertTriangle, Camera, Phone,
   FlaskConical, ParkingCircle, Zap, Leaf, Droplets,
   Package, ArrowRightLeft, Wrench, CalendarCheck, HardHat,
-  Store, ClipboardList, Boxes, ArrowDownUp,
+  Store, ClipboardList, Boxes, ArrowDownUp, ClipboardCheck, UserCheck,
   Laptop, Network, ShieldAlert, Gauge, Trash2,
   BookOpen, BookMarked, BookCopy, IdCard, Banknote,
   DoorClosed, Globe, Newspaper,
 } from 'lucide-react';
 import Breadcrumbs from '../components/ui/Breadcrumbs';
+import { StatBannerSkeleton } from '../components/ui/Skeleton';
 
 import AllocationProposalsPage from './campus/AllocationProposalsPage';
 import MyCampusServicesPage from './campus/MyCampusServicesPage';
@@ -62,7 +63,9 @@ function CampusOpsHome() {
       <h2 className="text-2xl font-bold text-navy mb-6">Campus Operations</h2>
 
       {/* KPI Banner */}
-      {stats && (
+      {!stats ? (
+        <StatBannerSkeleton count={4} />
+        ) : (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
             <span className="text-xs font-medium text-blue-600 uppercase">Buildings</span>
@@ -83,6 +86,25 @@ function CampusOpsHome() {
         </div>
       )}
 
+      {/* Service Allocations — these two routes existed but no card linked to
+          them, so they were reachable only by typing the URL. */}
+      <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Service Allocations</h3>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        {([
+          { to: 'allocation-proposals', icon: ClipboardCheck, label: 'Allocation Proposals', desc: 'Review hostel & transport proposals', iconBg: 'bg-emerald-50 text-emerald-600', border: 'border-emerald-200 hover:border-emerald-400' },
+          { to: 'my-services', icon: UserCheck, label: 'My Campus Services', desc: 'Your own hostel & transport allocations', iconBg: 'bg-sky-50 text-sky-600', border: 'border-sky-200 hover:border-sky-400' },
+        ] as const).map(card => {
+          const Icon = card.icon;
+          return (
+            <button key={card.to} onClick={() => navigate(card.to)} className={`bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all ${card.border}`}>
+              <div className={`inline-flex p-2.5 rounded-lg mb-3 ${card.iconBg}`}><Icon size={22} /></div>
+              <div className="font-semibold text-navy-dark text-sm">{card.label}</div>
+              <p className="text-xs text-gray-500 mt-1">{card.desc}</p>
+            </button>
+          );
+        })}
+      </div>
+
       {/* Campus Infrastructure */}
       <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Campus Infrastructure</h3>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -94,11 +116,14 @@ function CampusOpsHome() {
           { to: 'labs', icon: FlaskConical, label: 'Labs', desc: 'Laboratory management', iconBg: 'bg-cyan-50 text-cyan-600', border: 'border-cyan-200 hover:border-cyan-400', statKey: 'labs' },
         ] as const).map(card => {
           const Icon = card.icon;
-          const count = stats ? (stats as any)[card.statKey] : '\u2014';
+          const hasStat = Boolean(card.statKey);
+          const count = hasStat && stats ? ((stats as any)[card.statKey!] ?? 0) : null;
           return (
             <button key={card.to} onClick={() => navigate(card.to)} className={`bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all ${card.border}`}>
               <div className={`inline-flex p-2.5 rounded-lg mb-3 ${card.iconBg}`}><Icon size={22} /></div>
-              <div className="text-2xl font-bold text-navy mb-1">{count}</div>
+              {hasStat && (count === null
+                ? <div className="h-7 w-12 mb-1 animate-pulse rounded bg-slate-100" aria-hidden="true" />
+                : <div className="text-2xl font-bold text-navy mb-1">{count}</div>)}
               <div className="font-semibold text-navy-dark text-sm">{card.label}</div>
               <p className="text-xs text-gray-500 mt-1">{card.desc}</p>
             </button>
@@ -117,11 +142,14 @@ function CampusOpsHome() {
           { to: 'emergency-contacts', icon: Phone, label: 'Emergency Contacts', desc: 'Emergency numbers', iconBg: 'bg-rose-50 text-rose-600', border: 'border-rose-200 hover:border-rose-400', statKey: 'emergencyContacts' },
         ] as const).map(card => {
           const Icon = card.icon;
-          const count = stats ? (stats as any)[card.statKey] : '\u2014';
+          const hasStat = Boolean(card.statKey);
+          const count = hasStat && stats ? ((stats as any)[card.statKey!] ?? 0) : null;
           return (
             <button key={card.to} onClick={() => navigate(card.to)} className={`bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all ${card.border}`}>
               <div className={`inline-flex p-2.5 rounded-lg mb-3 ${card.iconBg}`}><Icon size={22} /></div>
-              <div className="text-2xl font-bold text-navy mb-1">{count}</div>
+              {hasStat && (count === null
+                ? <div className="h-7 w-12 mb-1 animate-pulse rounded bg-slate-100" aria-hidden="true" />
+                : <div className="text-2xl font-bold text-navy mb-1">{count}</div>)}
               <div className="font-semibold text-navy-dark text-sm">{card.label}</div>
               <p className="text-xs text-gray-500 mt-1">{card.desc}</p>
             </button>
@@ -141,11 +169,14 @@ function CampusOpsHome() {
           { to: 'waste-management', icon: Trash2, label: 'Waste Management', desc: 'Waste disposal', iconBg: 'bg-lime-50 text-lime-600', border: 'border-lime-200 hover:border-lime-400', statKey: 'wasteManagements' },
         ] as const).map(card => {
           const Icon = card.icon;
-          const count = stats ? (stats as any)[card.statKey] : '\u2014';
+          const hasStat = Boolean(card.statKey);
+          const count = hasStat && stats ? ((stats as any)[card.statKey!] ?? 0) : null;
           return (
             <button key={card.to} onClick={() => navigate(card.to)} className={`bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all ${card.border}`}>
               <div className={`inline-flex p-2.5 rounded-lg mb-3 ${card.iconBg}`}><Icon size={22} /></div>
-              <div className="text-2xl font-bold text-navy mb-1">{count}</div>
+              {hasStat && (count === null
+                ? <div className="h-7 w-12 mb-1 animate-pulse rounded bg-slate-100" aria-hidden="true" />
+                : <div className="text-2xl font-bold text-navy mb-1">{count}</div>)}
               <div className="font-semibold text-navy-dark text-sm">{card.label}</div>
               <p className="text-xs text-gray-500 mt-1">{card.desc}</p>
             </button>
@@ -166,11 +197,14 @@ function CampusOpsHome() {
           { to: 'insurance', icon: ShieldAlert, label: 'Insurance', desc: 'Insurance policies', iconBg: 'bg-rose-50 text-rose-600', border: 'border-rose-200 hover:border-rose-400', statKey: 'insurances' },
         ] as const).map(card => {
           const Icon = card.icon;
-          const count = stats ? (stats as any)[card.statKey] : '\u2014';
+          const hasStat = Boolean(card.statKey);
+          const count = hasStat && stats ? ((stats as any)[card.statKey!] ?? 0) : null;
           return (
             <button key={card.to} onClick={() => navigate(card.to)} className={`bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all ${card.border}`}>
               <div className={`inline-flex p-2.5 rounded-lg mb-3 ${card.iconBg}`}><Icon size={22} /></div>
-              <div className="text-2xl font-bold text-navy mb-1">{count}</div>
+              {hasStat && (count === null
+                ? <div className="h-7 w-12 mb-1 animate-pulse rounded bg-slate-100" aria-hidden="true" />
+                : <div className="text-2xl font-bold text-navy mb-1">{count}</div>)}
               <div className="font-semibold text-navy-dark text-sm">{card.label}</div>
               <p className="text-xs text-gray-500 mt-1">{card.desc}</p>
             </button>
@@ -187,11 +221,14 @@ function CampusOpsHome() {
           { to: 'construction-projects', icon: HardHat, label: 'Construction Projects', desc: 'Building & renovation', iconBg: 'bg-orange-50 text-orange-600', border: 'border-orange-200 hover:border-orange-400', statKey: 'constructionProjects' },
         ] as const).map(card => {
           const Icon = card.icon;
-          const count = stats ? (stats as any)[card.statKey] : '\u2014';
+          const hasStat = Boolean(card.statKey);
+          const count = hasStat && stats ? ((stats as any)[card.statKey!] ?? 0) : null;
           return (
             <button key={card.to} onClick={() => navigate(card.to)} className={`bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all ${card.border}`}>
               <div className={`inline-flex p-2.5 rounded-lg mb-3 ${card.iconBg}`}><Icon size={22} /></div>
-              <div className="text-2xl font-bold text-navy mb-1">{count}</div>
+              {hasStat && (count === null
+                ? <div className="h-7 w-12 mb-1 animate-pulse rounded bg-slate-100" aria-hidden="true" />
+                : <div className="text-2xl font-bold text-navy mb-1">{count}</div>)}
               <div className="font-semibold text-navy-dark text-sm">{card.label}</div>
               <p className="text-xs text-gray-500 mt-1">{card.desc}</p>
             </button>
@@ -207,11 +244,14 @@ function CampusOpsHome() {
           { to: 'network-infra', icon: Network, label: 'Network Infra', desc: 'Network equipment', iconBg: 'bg-blue-50 text-blue-600', border: 'border-blue-200 hover:border-blue-400', statKey: 'networkInfras' },
         ] as const).map(card => {
           const Icon = card.icon;
-          const count = stats ? (stats as any)[card.statKey] : '\u2014';
+          const hasStat = Boolean(card.statKey);
+          const count = hasStat && stats ? ((stats as any)[card.statKey!] ?? 0) : null;
           return (
             <button key={card.to} onClick={() => navigate(card.to)} className={`bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all ${card.border}`}>
               <div className={`inline-flex p-2.5 rounded-lg mb-3 ${card.iconBg}`}><Icon size={22} /></div>
-              <div className="text-2xl font-bold text-navy mb-1">{count}</div>
+              {hasStat && (count === null
+                ? <div className="h-7 w-12 mb-1 animate-pulse rounded bg-slate-100" aria-hidden="true" />
+                : <div className="text-2xl font-bold text-navy mb-1">{count}</div>)}
               <div className="font-semibold text-navy-dark text-sm">{card.label}</div>
               <p className="text-xs text-gray-500 mt-1">{card.desc}</p>
             </button>
@@ -234,11 +274,14 @@ function CampusOpsHome() {
           { to: 'periodical-subscriptions', icon: Newspaper, label: 'Periodicals', desc: 'Journals & magazines', iconBg: 'bg-amber-50 text-amber-600', border: 'border-amber-200 hover:border-amber-400', statKey: 'periodicalSubscriptions' },
         ] as const).map(card => {
           const Icon = card.icon;
-          const count = stats ? (stats as any)[card.statKey] : '\u2014';
+          const hasStat = Boolean(card.statKey);
+          const count = hasStat && stats ? ((stats as any)[card.statKey!] ?? 0) : null;
           return (
             <button key={card.to} onClick={() => navigate(card.to)} className={`bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all ${card.border}`}>
               <div className={`inline-flex p-2.5 rounded-lg mb-3 ${card.iconBg}`}><Icon size={22} /></div>
-              <div className="text-2xl font-bold text-navy mb-1">{count}</div>
+              {hasStat && (count === null
+                ? <div className="h-7 w-12 mb-1 animate-pulse rounded bg-slate-100" aria-hidden="true" />
+                : <div className="text-2xl font-bold text-navy mb-1">{count}</div>)}
               <div className="font-semibold text-navy-dark text-sm">{card.label}</div>
               <p className="text-xs text-gray-500 mt-1">{card.desc}</p>
             </button>

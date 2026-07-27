@@ -15,8 +15,13 @@ import governanceRouter from '../modules/governance/routes';
 import platformRouter from '../modules/platform/routes';
 import juviRouter from '../modules/juvi/routes';
 import collegesRouter from '../modules/colleges/routes';
+import { listContextMiddleware } from '../shared/request-context';
 
 const router = Router();
+
+// Makes `?search=` available to paginate() on every list endpoint below.
+// See shared/request-context.ts for why this is ambient rather than threaded.
+router.use(listContextMiddleware);
 
 // M01–M12 + Juvi module routes
 router.use('/admissions', admissionsRouter);    // M01

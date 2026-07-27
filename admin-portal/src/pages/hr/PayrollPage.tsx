@@ -7,6 +7,10 @@ import Modal from '../../components/ui/Modal';
 import { Plus, Pencil, Trash2, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useViewEditMode } from '../../hooks/useViewEditMode';
+import { confirmAction } from '../../stores/confirmStore';
+import Pagination from '../../components/ui/Pagination';
+import { useListControls } from '../../hooks/useListControls';
+import SearchInput from '../../components/ui/SearchInput';
 
 const STATUSES = ['draft', 'processed', 'paid', 'hold'] as const;
 const STATUS_COLOR: Record<string, string> = { draft: 'default', processed: 'info', paid: 'success', hold: 'warning' };
@@ -21,10 +25,10 @@ const emptyForm = {
 
 export default function PayrollPage() {
   const qc = useQueryClient();
-  const [page, setPage] = useState(1);
+  const { page, setPage, limit, setLimit, search, setSearch } = useListControls();
   const [form, setForm] = useState(emptyForm);
 
-  const { data, isLoading } = useQuery({ queryKey: ['payroll', page], queryFn: () => listPayrolls(page, 20) });
+  const { data, isLoading } = useQuery({ queryKey: ['payroll', page, limit, search], queryFn: () => listPayrolls(page, limit, undefined, undefined, undefined, search) });
   const { data: empData } = useQuery({ queryKey: ['employees-all'], queryFn: () => listEmployees(1, 200) });
 
   const employees = empData?.items || [];
@@ -51,19 +55,27 @@ export default function PayrollPage() {
     onClose: () => setForm(emptyForm),
   });
 
+  // Derived totals — recomputed on every keystroke so the operator sees the
+  // payslip add up as they type instead of having to do the arithmetic.
+  const num = (v: string) => Number(v || 0);
+  const grossPay = num(form.basicPay) + num(form.hra) + num(form.da) + num(form.otherAllowances);
+  const totalDeductions = num(form.pf) + num(form.esi) + num(form.tds) + num(form.otherDeductions);
+  const netPay = grossPay - totalDeductions;
+
   const createMut = useMutation({ mutationFn: createPayroll, onSuccess: () => { qc.invalidateQueries({ queryKey: ['payroll'] }); vem.close(); } });
   const updateMut = useMutation({ mutationFn: ({ id, data }: any) => updatePayroll(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['payroll'] }); vem.close(); } });
   const deleteMut = useMutation({ mutationFn: deletePayroll, onSuccess: () => { qc.invalidateQueries({ queryKey: ['payroll'] }); } });
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (netPay < 0) return; // guarded in the UI too; belt and braces
     const payload: any = {
       ...form,
       month: Number(form.month),
       year: Number(form.year),
       basicPay: Number(form.basicPay),
-      grossPay: Number(form.grossPay),
-      netPay: Number(form.netPay),
+      grossPay,
+      netPay,
     };
     if (form.hra) payload.hra = Number(form.hra); else delete payload.hra;
     if (form.da) payload.da = Number(form.da); else delete payload.da;
@@ -88,7 +100,7 @@ export default function PayrollPage() {
     { key: 'actions', label: '', render: (r: any) => (
       <div className="flex gap-1">
         <button onClick={(e) => { e.stopPropagation(); vem.openForEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
-        <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this payroll record?')) deleteMut.mutate(r._id); }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
+        <button onClick={(e) => { e.stopPropagation(); void confirmAction({ title: 'Delete this payroll record?', tone: 'danger', confirmLabel: 'Delete' }).then((__c) => { if (__c.confirmed) { deleteMut.mutate(r._id); } }) }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
       </div>
     )},
   ];
@@ -97,9 +109,12 @@ export default function PayrollPage() {
     <div>
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-xl font-bold text-navy">Payroll</h2>
+        <div className="flex items-center gap-3">
+          <SearchInput value={search} onChange={setSearch} placeholder="Search payroll…" className="w-56" />
         <button onClick={vem.openForCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700">
           <Plus size={16} className="text-white" /> New Payroll
         </button>
+      </div>
       </div>
 
       <DataTable
@@ -110,13 +125,14 @@ export default function PayrollPage() {
         onRowClick={vem.openForView}
       />
 
-      {data && data.pages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-4">
-          <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Prev</button>
-          <span className="text-sm text-gray-500">Page {page} of {data.pages}</span>
-          <button disabled={page >= data.pages} onClick={() => setPage(p => p + 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Next</button>
-        </div>
-      )}
+      <Pagination
+        page={page}
+        pages={data?.pages ?? 1}
+        total={data?.total}
+        limit={limit}
+        onPageChange={setPage}
+        onLimitChange={setLimit}
+      />
 
       <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('Payroll')}>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -135,12 +151,40 @@ export default function PayrollPage() {
               <div><label className={lbl}>HRA</label><input type="number" min={0} value={form.hra} onChange={e => setForm(f => ({ ...f, hra: e.target.value }))} className={inp} /></div>
               <div><label className={lbl}>DA</label><input type="number" min={0} value={form.da} onChange={e => setForm(f => ({ ...f, da: e.target.value }))} className={inp} /></div>
               <div><label className={lbl}>Other Allowances</label><input type="number" min={0} value={form.otherAllowances} onChange={e => setForm(f => ({ ...f, otherAllowances: e.target.value }))} className={inp} /></div>
-              <div><label className={lbl}>Gross Pay *</label><input required type="number" min={0} value={form.grossPay} onChange={e => setForm(f => ({ ...f, grossPay: e.target.value }))} className={inp} /></div>
               <div><label className={lbl}>PF</label><input type="number" min={0} value={form.pf} onChange={e => setForm(f => ({ ...f, pf: e.target.value }))} className={inp} /></div>
               <div><label className={lbl}>ESI</label><input type="number" min={0} value={form.esi} onChange={e => setForm(f => ({ ...f, esi: e.target.value }))} className={inp} /></div>
               <div><label className={lbl}>TDS</label><input type="number" min={0} value={form.tds} onChange={e => setForm(f => ({ ...f, tds: e.target.value }))} className={inp} /></div>
               <div><label className={lbl}>Other Deductions</label><input type="number" min={0} value={form.otherDeductions} onChange={e => setForm(f => ({ ...f, otherDeductions: e.target.value }))} className={inp} /></div>
-              <div><label className={lbl}>Net Pay *</label><input required type="number" min={0} value={form.netPay} onChange={e => setForm(f => ({ ...f, netPay: e.target.value }))} className={inp} /></div>
+
+              {/* Gross and net are arithmetic on the fields above. Asking an
+                  operator to re-add them by hand every month is how payslips
+                  end up disagreeing with their own components. */}
+              <div className="col-span-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-500">Gross Pay</p>
+                    <p className="text-lg font-semibold text-slate-800">₹{grossPay.toLocaleString('en-IN')}</p>
+                    <p className="text-xs text-slate-400">Basic + HRA + DA + Other allowances</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-500">Total Deductions</p>
+                    <p className="text-lg font-semibold text-slate-800">₹{totalDeductions.toLocaleString('en-IN')}</p>
+                    <p className="text-xs text-slate-400">PF + ESI + TDS + Other</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-500">Net Pay</p>
+                    <p className={`text-lg font-semibold ${netPay < 0 ? 'text-red-600' : 'text-teal-700'}`}>
+                      ₹{netPay.toLocaleString('en-IN')}
+                    </p>
+                    <p className="text-xs text-slate-400">Gross − deductions</p>
+                  </div>
+                </div>
+                {netPay < 0 && (
+                  <p className="mt-2 text-sm text-red-600" role="alert">
+                    Deductions exceed gross pay. Check the component amounts before saving.
+                  </p>
+                )}
+              </div>
               <div><label className={lbl}>Status *</label>
                 <select required value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className={inp}>
                   {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}

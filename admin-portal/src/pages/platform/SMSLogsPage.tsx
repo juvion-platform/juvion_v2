@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { listSMSLogs, createSMSLog, updateSMSLog, deleteSMSLog } from '../../services/platform';
+import { listSMSLogs, createSMSLog, updateSMSLog } from '../../services/platform';
 import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Pencil } from 'lucide-react';
 import { useViewEditMode } from '../../hooks/useViewEditMode';
+import Pagination from '../../components/ui/Pagination';
+import { useListControls } from '../../hooks/useListControls';
+import SearchInput from '../../components/ui/SearchInput';
 
 const STATUSES = ['queued', 'sent', 'delivered', 'failed', 'bounced'] as const;
 const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default";
@@ -15,10 +18,10 @@ const emptyForm = { recipientPhone: '', recipientId: '', message: '', templateId
 
 export default function SMSLogsPage() {
   const qc = useQueryClient();
-  const [page, setPage] = useState(1);
+  const { page, setPage, limit, setLimit, search, setSearch } = useListControls();
   const [form, setForm] = useState(emptyForm);
 
-  const { data, isLoading } = useQuery({ queryKey: ['sms-logs', page], queryFn: () => listSMSLogs(page, 20) });
+  const { data, isLoading } = useQuery({ queryKey: ['sms-logs', page, limit, search], queryFn: () => listSMSLogs(page, limit, undefined, search) });
 
   const vem = useViewEditMode<any>({
     onOpenEntity: (row) => setForm({
@@ -36,7 +39,6 @@ export default function SMSLogsPage() {
 
   const createMut = useMutation({ mutationFn: createSMSLog, onSuccess: () => { qc.invalidateQueries({ queryKey: ['sms-logs'] }); vem.close(); } });
   const updateMut = useMutation({ mutationFn: ({ id, data }: any) => updateSMSLog(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['sms-logs'] }); vem.close(); } });
-  const deleteMut = useMutation({ mutationFn: deleteSMSLog, onSuccess: () => { qc.invalidateQueries({ queryKey: ['sms-logs'] }); } });
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -69,7 +71,6 @@ export default function SMSLogsPage() {
     { key: 'actions', label: '', render: (r: any) => (
       <div className="flex gap-1">
         <button onClick={(e) => { e.stopPropagation(); vem.openForEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
-        <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this SMS log?')) deleteMut.mutate(r._id); }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
       </div>
     )},
   ];
@@ -78,20 +79,22 @@ export default function SMSLogsPage() {
     <div>
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-xl font-bold text-navy">SMS Logs</h2>
-        <button onClick={vem.openForCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700">
-          <Plus size={16} className="text-white" /> New SMS Log
-        </button>
+        <div className="flex items-center gap-3">
+          <SearchInput value={search} onChange={setSearch} placeholder="Search sms logs…" className="w-56" />
+        <span className="text-xs text-slate-400">Read-only · SMS delivery logs are written by the notification pipeline.</span>
+      </div>
       </div>
 
       <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
 
-      {data && data.pages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-4">
-          <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Prev</button>
-          <span className="text-sm text-gray-500">Page {page} of {data.pages}</span>
-          <button disabled={page >= data.pages} onClick={() => setPage(p => p + 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Next</button>
-        </div>
-      )}
+      <Pagination
+        page={page}
+        pages={data?.pages ?? 1}
+        total={data?.total}
+        limit={limit}
+        onPageChange={setPage}
+        onLimitChange={setLimit}
+      />
 
       <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('SMS Log')}>
         <form onSubmit={handleSubmit} className="space-y-4">

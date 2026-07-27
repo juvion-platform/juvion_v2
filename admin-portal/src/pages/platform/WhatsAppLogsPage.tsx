@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { listWhatsAppLogs, createWhatsAppLog, updateWhatsAppLog, deleteWhatsAppLog } from '../../services/platform';
+import { listWhatsAppLogs, createWhatsAppLog, updateWhatsAppLog } from '../../services/platform';
 import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Pencil } from 'lucide-react';
+import Pagination from '../../components/ui/Pagination';
+import { useListControls } from '../../hooks/useListControls';
+import SearchInput from '../../components/ui/SearchInput';
 
 const STATUSES = ['queued', 'sent', 'delivered', 'read', 'failed'] as const;
 const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none";
@@ -12,22 +15,18 @@ const lbl = "block text-sm font-medium text-gray-700 mb-1";
 
 export default function WhatsAppLogsPage() {
   const qc = useQueryClient();
-  const [page, setPage] = useState(1);
+  const { page, setPage, limit, setLimit, search, setSearch } = useListControls();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [form, setForm] = useState({ recipientPhone: '', recipientId: '', templateName: '', message: '', mediaUrl: '', status: 'queued' });
 
-  const { data, isLoading } = useQuery({ queryKey: ['whatsapp-logs', page], queryFn: () => listWhatsAppLogs(page, 20) });
+  const { data, isLoading } = useQuery({ queryKey: ['whatsapp-logs', page, limit, search], queryFn: () => listWhatsAppLogs(page, limit, undefined, search) });
 
   const createMut = useMutation({ mutationFn: createWhatsAppLog, onSuccess: () => { qc.invalidateQueries({ queryKey: ['whatsapp-logs'] }); closeModal(); } });
   const updateMut = useMutation({ mutationFn: ({ id, data }: any) => updateWhatsAppLog(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['whatsapp-logs'] }); closeModal(); } });
-  const deleteMut = useMutation({ mutationFn: deleteWhatsAppLog, onSuccess: () => { qc.invalidateQueries({ queryKey: ['whatsapp-logs'] }); } });
 
-  function openCreate() {
-    setEditing(null);
-    setForm({ recipientPhone: '', recipientId: '', templateName: '', message: '', mediaUrl: '', status: 'queued' });
-    setModalOpen(true);
-  }
+  // No openCreate: WhatsApp logs are written by the notification pipeline, so
+  // the page is a viewer/editor for delivery status, not an authoring surface.
   function openEdit(row: any) {
     setEditing(row);
     setForm({
@@ -69,7 +68,6 @@ export default function WhatsAppLogsPage() {
     { key: 'actions', label: '', render: (r: any) => (
       <div className="flex gap-1">
         <button onClick={(e) => { e.stopPropagation(); openEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
-        <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this WhatsApp log?')) deleteMut.mutate(r._id); }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
       </div>
     )},
   ];
@@ -78,20 +76,22 @@ export default function WhatsAppLogsPage() {
     <div>
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-xl font-bold text-navy">WhatsApp Logs</h2>
-        <button onClick={openCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700">
-          <Plus size={16} className="text-white" /> New WhatsApp Log
-        </button>
+        <div className="flex items-center gap-3">
+          <SearchInput value={search} onChange={setSearch} placeholder="Search whatsapp logs…" className="w-56" />
+          <span className="text-xs text-slate-400">Read-only · WhatsApp delivery logs are written by the notification pipeline.</span>
+      </div>
       </div>
 
       <DataTable columns={columns} data={data?.items || []} loading={isLoading} />
 
-      {data && data.pages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-4">
-          <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Prev</button>
-          <span className="text-sm text-gray-500">Page {page} of {data.pages}</span>
-          <button disabled={page >= data.pages} onClick={() => setPage(p => p + 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Next</button>
-        </div>
-      )}
+      <Pagination
+        page={page}
+        pages={data?.pages ?? 1}
+        total={data?.total}
+        limit={limit}
+        onPageChange={setPage}
+        onLimitChange={setLimit}
+      />
 
       <Modal open={modalOpen} onClose={closeModal} title={editing ? 'Edit WhatsApp Log' : 'New WhatsApp Log'}>
         <form onSubmit={handleSubmit} className="space-y-4">

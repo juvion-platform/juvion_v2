@@ -8,6 +8,10 @@ import StudentFinanceReadinessCard from '../../components/StudentFinanceReadines
 import { ExternalLink, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useViewEditMode } from '../../hooks/useViewEditMode';
+import { confirmAction } from '../../stores/confirmStore';
+import Pagination from '../../components/ui/Pagination';
+import { useListControls } from '../../hooks/useListControls';
+import SearchInput from '../../components/ui/SearchInput';
 
 const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default";
 const lbl = "block text-sm font-medium text-gray-700 mb-1";
@@ -25,7 +29,7 @@ const emptyForm = {
 
 export default function StudentFeeAccountsPage() {
   const qc = useQueryClient();
-  const [page, setPage] = useState(1);
+  const { page, setPage, limit, setLimit, search, setSearch } = useListControls();
   const [form, setForm] = useState(emptyForm);
 
   const vem = useViewEditMode<any>({
@@ -42,7 +46,7 @@ export default function StudentFeeAccountsPage() {
     onClose: () => setForm(emptyForm),
   });
 
-  const { data, isLoading } = useQuery({ queryKey: ['student-fee-accounts', page], queryFn: () => listStudentFeeAccounts(page, 20) });
+  const { data, isLoading } = useQuery({ queryKey: ['student-fee-accounts', page, limit, search], queryFn: () => listStudentFeeAccounts(page, limit, search) });
   const { data: studentsData } = useQuery({ queryKey: ['students-all'], queryFn: () => listStudents(1, 100) });
   const { data: selectedStudent, isFetching: studentReadinessLoading } = useQuery({
     queryKey: ['student-finance-readiness', form.studentId],
@@ -61,11 +65,9 @@ export default function StudentFeeAccountsPage() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const payload: any = { studentId: form.studentId };
+    // Only the assessed amount is caller-supplied; totalPaid/Waived/Refunded
+    // and balance are owned by the payment pipeline and rejected by the API.
     if (form.totalDue !== '') payload.totalDue = Number(form.totalDue);
-    if (form.totalPaid !== '') payload.totalPaid = Number(form.totalPaid);
-    if (form.totalWaived !== '') payload.totalWaived = Number(form.totalWaived);
-    if (form.totalRefunded !== '') payload.totalRefunded = Number(form.totalRefunded);
-    if (form.balance !== '') payload.balance = Number(form.balance);
     if (form.lastPaymentDate) payload.lastPaymentDate = form.lastPaymentDate;
 
     if (vem.isEdit && vem.entity) updateMut.mutate({ id: vem.entity._id, data: payload });
@@ -85,7 +87,7 @@ export default function StudentFeeAccountsPage() {
     { key: 'actions', label: '', render: (r: any) => (
       <div className="flex gap-1">
         <button onClick={(e) => { e.stopPropagation(); vem.openForEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
-        <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this fee account?')) deleteMut.mutate(r._id); }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
+        <button onClick={(e) => { e.stopPropagation(); void confirmAction({ title: 'Delete this fee account?', tone: 'danger', confirmLabel: 'Delete' }).then((__c) => { if (__c.confirmed) { deleteMut.mutate(r._id); } }) }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
       </div>
     )},
   ];
@@ -94,9 +96,12 @@ export default function StudentFeeAccountsPage() {
     <div>
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-xl font-bold text-navy">Student Fee Accounts</h2>
+        <div className="flex items-center gap-3">
+          <SearchInput value={search} onChange={setSearch} placeholder="Search student fee accounts…" className="w-56" />
         <button onClick={vem.openForCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700">
           <Plus size={16} className="text-white" /> New Fee Account
         </button>
+      </div>
       </div>
 
       <DataTable
@@ -113,13 +118,14 @@ export default function StudentFeeAccountsPage() {
         }
       />
 
-      {data && data.pages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-4">
-          <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Prev</button>
-          <span className="text-sm text-gray-500">Page {page} of {data.pages}</span>
-          <button disabled={page >= data.pages} onClick={() => setPage((p) => p + 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Next</button>
-        </div>
-      )}
+      <Pagination
+        page={page}
+        pages={data?.pages ?? 1}
+        total={data?.total}
+        limit={limit}
+        onPageChange={setPage}
+        onLimitChange={setLimit}
+      />
 
       <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('Student Fee Account')}>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -138,11 +144,37 @@ export default function StudentFeeAccountsPage() {
                   ))}
                 </select>
               </div>
-              <div><label className={lbl}>Balance</label><input type="number" min={0} value={form.balance} onChange={(e) => setForm((f) => ({ ...f, balance: e.target.value }))} className={inp} /></div>
               <div><label className={lbl}>Total Due</label><input type="number" min={0} value={form.totalDue} onChange={(e) => setForm((f) => ({ ...f, totalDue: e.target.value }))} className={inp} /></div>
-              <div><label className={lbl}>Total Paid</label><input type="number" min={0} value={form.totalPaid} onChange={(e) => setForm((f) => ({ ...f, totalPaid: e.target.value }))} className={inp} /></div>
-              <div><label className={lbl}>Total Waived</label><input type="number" min={0} value={form.totalWaived} onChange={(e) => setForm((f) => ({ ...f, totalWaived: e.target.value }))} className={inp} /></div>
-              <div><label className={lbl}>Total Refunded</label><input type="number" min={0} value={form.totalRefunded} onChange={(e) => setForm((f) => ({ ...f, totalRefunded: e.target.value }))} className={inp} /></div>
+
+              {/* Derived from the payment ledger — the backend maintains these
+                  with $inc on every payment/waiver/refund. Editing them by hand
+                  desyncs the account from its transactions, so they are shown
+                  read-only rather than as inputs. */}
+              <div className="col-span-2">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Computed from payments — not editable
+                  </p>
+                  <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm sm:grid-cols-4">
+                    {([
+                      ['Total Paid', form.totalPaid],
+                      ['Total Waived', form.totalWaived],
+                      ['Total Refunded', form.totalRefunded],
+                      ['Balance', form.balance],
+                    ] as const).map(([label, value]) => (
+                      <div key={label}>
+                        <dt className="text-xs text-slate-500">{label}</dt>
+                        <dd className="font-medium text-slate-800">
+                          ₹{Number(value || 0).toLocaleString('en-IN')}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                  <p className="mt-2 text-xs text-slate-400">
+                    Record a payment, waiver or refund to change these figures.
+                  </p>
+                </div>
+              </div>
               <div><label className={lbl}>Last Payment Date</label><input type="date" value={form.lastPaymentDate} onChange={(e) => setForm((f) => ({ ...f, lastPaymentDate: e.target.value }))} className={inp} /></div>
             </div>
           </fieldset>

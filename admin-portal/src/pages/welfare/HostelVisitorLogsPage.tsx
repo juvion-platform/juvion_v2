@@ -7,6 +7,11 @@ import Modal from '../../components/ui/Modal';
 import { Plus, Pencil, Trash2, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useViewEditMode } from '../../hooks/useViewEditMode';
+import { confirmAction } from '../../stores/confirmStore';
+import Pagination from '../../components/ui/Pagination';
+import { useListControls } from '../../hooks/useListControls';
+import SearchInput from '../../components/ui/SearchInput';
+import { rangeError } from '../../lib/validation';
 
 const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default";
 const lbl = "block text-sm font-medium text-gray-700 mb-1";
@@ -16,10 +21,10 @@ const emptyForm = { studentId: '', visitorName: '', visitorRelation: '', visitor
 
 export default function HostelVisitorLogsPage() {
   const qc = useQueryClient();
-  const [page, setPage] = useState(1);
+  const { page, setPage, limit, setLimit, search, setSearch } = useListControls();
   const [form, setForm] = useState(emptyForm);
 
-  const { data, isLoading } = useQuery({ queryKey: ['hostel-visitor-logs', page], queryFn: () => listHostelVisitorLogs(page, 20) });
+  const { data, isLoading } = useQuery({ queryKey: ['hostel-visitor-logs', page, limit, search], queryFn: () => listHostelVisitorLogs(page, limit, undefined, search) });
   const { data: studentsData } = useQuery({ queryKey: ['students', 'all'], queryFn: () => listStudents(1, 200) });
   const students = studentsData?.items || [];
 
@@ -40,9 +45,12 @@ export default function HostelVisitorLogsPage() {
   const createMut = useMutation({ mutationFn: createHostelVisitorLog, onSuccess: () => { qc.invalidateQueries({ queryKey: ['hostel-visitor-logs'] }); vem.close(); } });
   const updateMut = useMutation({ mutationFn: ({ id, data }: any) => updateHostelVisitorLog(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['hostel-visitor-logs'] }); vem.close(); } });
   const deleteMut = useMutation({ mutationFn: deleteHostelVisitorLog, onSuccess: () => { qc.invalidateQueries({ queryKey: ['hostel-visitor-logs'] }); } });
+  const timeError = rangeError(form.inTime, form.outTime, { startLabel: 'in-time', endLabel: 'out-time' });
+
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (timeError) return;
     const payload: any = { ...form };
     if (!payload.inTime) delete payload.inTime;
     if (!payload.outTime) delete payload.outTime;
@@ -65,7 +73,7 @@ export default function HostelVisitorLogsPage() {
     { key: 'actions', label: '', render: (r: any) => (
       <div className="flex gap-1">
         <button onClick={(e) => { e.stopPropagation(); vem.openForEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
-        <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this log?')) deleteMut.mutate(r._id); }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
+        <button onClick={(e) => { e.stopPropagation(); void confirmAction({ title: 'Delete this log?', tone: 'danger', confirmLabel: 'Delete' }).then((__c) => { if (__c.confirmed) { deleteMut.mutate(r._id); } }) }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
       </div>
     )},
   ];
@@ -74,9 +82,12 @@ export default function HostelVisitorLogsPage() {
     <div>
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-xl font-bold text-navy">Hostel Visitor Logs</h2>
+        <div className="flex items-center gap-3">
+          <SearchInput value={search} onChange={setSearch} placeholder="Search hostel visitor logs…" className="w-56" />
         <button onClick={vem.openForCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700">
           <Plus size={16} className="text-white" /> New Entry
         </button>
+      </div>
       </div>
 
       <DataTable
@@ -87,13 +98,14 @@ export default function HostelVisitorLogsPage() {
         onRowClick={vem.openForView}
       />
 
-      {data && data.pages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-4">
-          <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Prev</button>
-          <span className="text-sm text-gray-500">Page {page} of {data.pages}</span>
-          <button disabled={page >= data.pages} onClick={() => setPage(p => p + 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Next</button>
-        </div>
-      )}
+      <Pagination
+        page={page}
+        pages={data?.pages ?? 1}
+        total={data?.total}
+        limit={limit}
+        onPageChange={setPage}
+        onLimitChange={setLimit}
+      />
 
       <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('Visitor Log')}>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -110,6 +122,7 @@ export default function HostelVisitorLogsPage() {
               <div><label className={lbl}>Phone *</label><input required value={form.visitorPhone} onChange={e => setForm(f => ({ ...f, visitorPhone: e.target.value }))} className={inp} /></div>
               <div><label className={lbl}>In Time</label><input type="datetime-local" value={form.inTime} onChange={e => setForm(f => ({ ...f, inTime: e.target.value }))} className={inp} /></div>
               <div><label className={lbl}>Out Time</label><input type="datetime-local" value={form.outTime} onChange={e => setForm(f => ({ ...f, outTime: e.target.value }))} className={inp} /></div>
+              {timeError && <p className="col-span-2 -mt-2 text-sm text-red-600" role="alert">{timeError}</p>}
               <div className="col-span-2"><label className={lbl}>Purpose *</label><input required value={form.purpose} onChange={e => setForm(f => ({ ...f, purpose: e.target.value }))} className={inp} /></div>
             </div>
           </fieldset>
@@ -122,7 +135,7 @@ export default function HostelVisitorLogsPage() {
                 <Pencil size={14} /> Edit
               </button>
             ) : (
-              <button type="submit" disabled={saving} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
+              <button type="submit" disabled={saving || Boolean(timeError)} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
                 {saving ? 'Saving…' : vem.isEdit ? 'Update' : 'Create'}
               </button>
             )}

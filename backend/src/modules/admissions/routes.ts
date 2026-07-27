@@ -58,6 +58,7 @@ router.put('/documents/:applicantId', authorize('admissions', 'update'), validat
 router.get('/enrollments', authorize('admissions', 'read'), ctrl.listAdmissions);
 router.get('/enrollments/:id', authorize('admissions', 'read'), ctrl.getAdmission);
 router.post('/enrollments', authorize('admissions', 'create'), validate(createAdmissionSchema), ctrl.createAdmission);
+router.put('/enrollments/:id', authorize('admissions', 'update'), validate(createAdmissionSchema.partial()), ctrl.updateAdmission);
 
 // ─── Strategic Gap 5 — AssignmentRule CRUD + preview ─────────────
 // Static `/preview` path BEFORE the `/:id` route so it never gets

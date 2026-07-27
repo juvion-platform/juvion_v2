@@ -13,6 +13,9 @@ import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
 import { Plus, Pencil, Trash2, Shield } from 'lucide-react';
 import { useViewEditMode } from '../../hooks/useViewEditMode';
+import { confirmAction } from '../../stores/confirmStore';
+import Pagination from '../../components/ui/Pagination';
+import { useListControls } from '../../hooks/useListControls';
 
 const ROLES = ['super_admin', 'admin', 'principal', 'hod', 'faculty', 'staff', 'student', 'parent', '*'] as const;
 const MODULES = ['admissions', 'people', 'academics', 'finance', 'hr', 'welfare', 'placement', 'campus', 'student-dev', 'compliance', 'governance', 'platform', 'juvi', '*'] as const;
@@ -55,13 +58,13 @@ function isSystemDefault(p: RbacPolicy): boolean {
 
 export default function RbacPolicies() {
   const qc = useQueryClient();
-  const [page, setPage] = useState(1);
+  const { page, setPage, limit, setLimit, search } = useListControls();
   const [filterRole, setFilterRole] = useState('');
   const [filterModule, setFilterModule] = useState('');
   const [form, setForm] = useState(EMPTY_FORM);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['rbac-policies', page, filterRole, filterModule],
+    queryKey: ['rbac-policies', page, filterRole, filterModule, limit, search],
     queryFn: () => listRbacPolicies(page, 50, filterRole || undefined, filterModule || undefined),
   });
 
@@ -191,7 +194,7 @@ export default function RbacPolicies() {
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                if (confirm('Delete this policy override?')) deleteMut.mutate(r._id);
+                void confirmAction({ title: 'Delete this policy override?', tone: 'danger', confirmLabel: 'Delete' }).then((__c) => { if (__c.confirmed) { deleteMut.mutate(r._id); } })
               }}
               className="p-1 rounded hover:bg-red-50"
               title="Delete"
@@ -249,13 +252,14 @@ export default function RbacPolicies() {
       />
 
       {/* Pagination */}
-      {data && data.pages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-4">
-          <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Prev</button>
-          <span className="text-sm text-gray-500">Page {page} of {data.pages}</span>
-          <button disabled={page >= data.pages} onClick={() => setPage(p => p + 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Next</button>
-        </div>
-      )}
+      <Pagination
+        page={page}
+        pages={data?.pages ?? 1}
+        total={data?.total}
+        limit={limit}
+        onPageChange={setPage}
+        onLimitChange={setLimit}
+      />
 
       {/* Create/Edit Modal */}
       <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('RBAC Policy')} widthClass="max-w-xl">

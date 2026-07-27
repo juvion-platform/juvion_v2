@@ -31,6 +31,7 @@ import {
   type ImportJobDoc,
   type ImportJobStatus,
 } from '../../services/bulk-imports';
+import { confirmAction } from '../../stores/confirmStore';
 
 type Mode =
   | { kind: 'list' }
@@ -181,7 +182,7 @@ function RecentJobsList({ onOpen }: { onOpen: (job: ImportJobDoc) => void }) {
                 <button
                   type="button"
                   onClick={() => {
-                    if (window.confirm(`Archive import "${j.fileName}"?`)) archiveMut.mutate(j._id);
+                    void confirmAction({ title: `Archive import "${j.fileName}"?`, tone: 'danger', confirmLabel: 'Archive' }).then((__c) => { if (__c.confirmed) { archiveMut.mutate(j._id); } })
                   }}
                   className="p-1 rounded hover:bg-red-50 text-red-600"
                   title="Archive"

@@ -4,6 +4,7 @@ import { getFinanceStats } from '../services/finance';
 import { getStats as getPeopleStats } from '../services/people';
 import { Landmark, CreditCard, GraduationCap, HandCoins, RotateCcw, Gavel, FileText, Wallet, Receipt, BookOpen, Users, ShieldAlert, CircleCheckBig, LayoutList, BarChart3 } from 'lucide-react';
 import Breadcrumbs from '../components/ui/Breadcrumbs';
+import { StatBannerSkeleton } from '../components/ui/Skeleton';
 
 import FeeDashboardPage from './finance/FeeDashboardPage';
 import FeeManagementPage from './finance/FeeManagementPage';
@@ -20,7 +21,9 @@ function FinanceHome() {
       <h2 className="text-2xl font-bold text-navy mb-6">Finance</h2>
 
       {/* KPI Banner */}
-      {stats && (
+      {!stats ? (
+        <StatBannerSkeleton count={4} />
+        ) : (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4">
             <span className="text-xs font-medium text-green-600 uppercase">Total Collected</span>
@@ -101,11 +104,14 @@ function FinanceHome() {
           { to: 'holds', icon: ShieldAlert, label: 'Financial Holds', desc: 'Approve / waive exam-debarment holds', iconBg: 'bg-rose-50 text-rose-600', border: 'border-rose-200 hover:border-rose-400', statKey: null },
         ].map(card => {
           const Icon = card.icon;
-          const count = card.statKey && stats ? (stats as any)[card.statKey] : '—';
+          const hasStat = Boolean(card.statKey);
+          const count = hasStat && stats ? ((stats as any)[card.statKey!] ?? 0) : null;
           return (
             <button key={card.to} onClick={() => navigate(card.to)} className={`bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all ${card.border}`}>
               <div className={`inline-flex p-2.5 rounded-lg mb-3 ${card.iconBg}`}><Icon size={22} /></div>
-              <div className="text-2xl font-bold text-navy mb-1">{count}</div>
+              {hasStat && (count === null
+                ? <div className="h-7 w-12 mb-1 animate-pulse rounded bg-slate-100" aria-hidden="true" />
+                : <div className="text-2xl font-bold text-navy mb-1">{count}</div>)}
               <div className="font-semibold text-navy-dark text-sm">{card.label}</div>
               <p className="text-xs text-gray-500 mt-1">{card.desc}</p>
             </button>
@@ -123,11 +129,14 @@ function FinanceHome() {
           { to: 'refunds', icon: RotateCcw, label: 'Refunds', desc: 'Refund processing', iconBg: 'bg-teal-50 text-teal-600', border: 'border-teal-200 hover:border-teal-400', statKey: 'refunds' },
         ].map(card => {
           const Icon = card.icon;
-          const count = card.statKey && stats ? (stats as any)[card.statKey] : '—';
+          const hasStat = Boolean(card.statKey);
+          const count = hasStat && stats ? ((stats as any)[card.statKey!] ?? 0) : null;
           return (
             <button key={card.to} onClick={() => navigate(card.to)} className={`bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all ${card.border}`}>
               <div className={`inline-flex p-2.5 rounded-lg mb-3 ${card.iconBg}`}><Icon size={22} /></div>
-              <div className="text-2xl font-bold text-navy mb-1">{count}</div>
+              {hasStat && (count === null
+                ? <div className="h-7 w-12 mb-1 animate-pulse rounded bg-slate-100" aria-hidden="true" />
+                : <div className="text-2xl font-bold text-navy mb-1">{count}</div>)}
               <div className="font-semibold text-navy-dark text-sm">{card.label}</div>
               <p className="text-xs text-gray-500 mt-1">{card.desc}</p>
             </button>
@@ -144,11 +153,14 @@ function FinanceHome() {
           { to: 'ledger', icon: BookOpen, label: 'Ledger', desc: 'Financial journal', iconBg: 'bg-cyan-50 text-cyan-600', border: 'border-cyan-200 hover:border-cyan-400', statKey: null },
         ].map(card => {
           const Icon = card.icon;
-          const count = card.statKey && stats ? (stats as any)[card.statKey] : '—';
+          const hasStat = Boolean(card.statKey);
+          const count = hasStat && stats ? ((stats as any)[card.statKey!] ?? 0) : null;
           return (
             <button key={card.to} onClick={() => navigate(card.to)} className={`bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all ${card.border}`}>
               <div className={`inline-flex p-2.5 rounded-lg mb-3 ${card.iconBg}`}><Icon size={22} /></div>
-              <div className="text-2xl font-bold text-navy mb-1">{count}</div>
+              {hasStat && (count === null
+                ? <div className="h-7 w-12 mb-1 animate-pulse rounded bg-slate-100" aria-hidden="true" />
+                : <div className="text-2xl font-bold text-navy mb-1">{count}</div>)}
               <div className="font-semibold text-navy-dark text-sm">{card.label}</div>
               <p className="text-xs text-gray-500 mt-1">{card.desc}</p>
             </button>

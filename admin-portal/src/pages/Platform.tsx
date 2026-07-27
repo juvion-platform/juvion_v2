@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getPlatformStats } from '../services/platform';
 import { Megaphone, FileText, Bell, ClipboardList, MessageSquare, Mail, Smartphone, MessageCircle, Shield, Upload, Settings, Plug } from 'lucide-react';
 import Breadcrumbs from '../components/ui/Breadcrumbs';
+import { StatBannerSkeleton } from '../components/ui/Skeleton';
 
 import AnnouncementsPage from './platform/AnnouncementsPage';
 import CircularsPage from './platform/CircularsPage';
@@ -26,7 +27,9 @@ function PlatformHome() {
       <h2 className="text-2xl font-bold text-navy mb-6">Platform & Communication</h2>
 
       {/* KPI Banner */}
-      {stats && (
+      {!stats ? (
+        <StatBannerSkeleton count={4} />
+        ) : (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
             <span className="text-xs font-medium text-blue-600 uppercase">Announcements</span>
@@ -56,11 +59,14 @@ function PlatformHome() {
           { to: 'notifications', icon: Bell, label: 'Notifications', desc: 'Push & in-app alerts', iconBg: 'bg-amber-50 text-amber-600', border: 'border-amber-200 hover:border-amber-400', statKey: 'notifications' },
         ].map(card => {
           const Icon = card.icon;
-          const count = card.statKey && stats ? (stats as any)[card.statKey] : '\u2014';
+          const hasStat = Boolean(card.statKey);
+          const count = hasStat && stats ? ((stats as any)[card.statKey!] ?? 0) : null;
           return (
             <button key={card.to} onClick={() => navigate(card.to)} className={`bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all ${card.border}`}>
               <div className={`inline-flex p-2.5 rounded-lg mb-3 ${card.iconBg}`}><Icon size={22} /></div>
-              <div className="text-2xl font-bold text-navy mb-1">{count}</div>
+              {hasStat && (count === null
+                ? <div className="h-7 w-12 mb-1 animate-pulse rounded bg-slate-100" aria-hidden="true" />
+                : <div className="text-2xl font-bold text-navy mb-1">{count}</div>)}
               <div className="font-semibold text-navy-dark text-sm">{card.label}</div>
               <p className="text-xs text-gray-500 mt-1">{card.desc}</p>
             </button>
@@ -76,11 +82,14 @@ function PlatformHome() {
           { to: 'survey-responses', icon: MessageSquare, label: 'Survey Responses', desc: 'View responses', iconBg: 'bg-cyan-50 text-cyan-600', border: 'border-cyan-200 hover:border-cyan-400', statKey: 'surveyResponses' },
         ].map(card => {
           const Icon = card.icon;
-          const count = card.statKey && stats ? (stats as any)[card.statKey] : '\u2014';
+          const hasStat = Boolean(card.statKey);
+          const count = hasStat && stats ? ((stats as any)[card.statKey!] ?? 0) : null;
           return (
             <button key={card.to} onClick={() => navigate(card.to)} className={`bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all ${card.border}`}>
               <div className={`inline-flex p-2.5 rounded-lg mb-3 ${card.iconBg}`}><Icon size={22} /></div>
-              <div className="text-2xl font-bold text-navy mb-1">{count}</div>
+              {hasStat && (count === null
+                ? <div className="h-7 w-12 mb-1 animate-pulse rounded bg-slate-100" aria-hidden="true" />
+                : <div className="text-2xl font-bold text-navy mb-1">{count}</div>)}
               <div className="font-semibold text-navy-dark text-sm">{card.label}</div>
               <p className="text-xs text-gray-500 mt-1">{card.desc}</p>
             </button>
@@ -97,11 +106,14 @@ function PlatformHome() {
           { to: 'whatsapp-logs', icon: MessageCircle, label: 'WhatsApp Logs', desc: 'WhatsApp message tracking', iconBg: 'bg-green-50 text-green-600', border: 'border-green-200 hover:border-green-400', statKey: 'whatsAppLogs' },
         ].map(card => {
           const Icon = card.icon;
-          const count = card.statKey && stats ? (stats as any)[card.statKey] : '\u2014';
+          const hasStat = Boolean(card.statKey);
+          const count = hasStat && stats ? ((stats as any)[card.statKey!] ?? 0) : null;
           return (
             <button key={card.to} onClick={() => navigate(card.to)} className={`bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all ${card.border}`}>
               <div className={`inline-flex p-2.5 rounded-lg mb-3 ${card.iconBg}`}><Icon size={22} /></div>
-              <div className="text-2xl font-bold text-navy mb-1">{count}</div>
+              {hasStat && (count === null
+                ? <div className="h-7 w-12 mb-1 animate-pulse rounded bg-slate-100" aria-hidden="true" />
+                : <div className="text-2xl font-bold text-navy mb-1">{count}</div>)}
               <div className="font-semibold text-navy-dark text-sm">{card.label}</div>
               <p className="text-xs text-gray-500 mt-1">{card.desc}</p>
             </button>

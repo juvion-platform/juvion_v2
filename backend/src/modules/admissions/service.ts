@@ -392,6 +392,23 @@ export async function createAdmission(collegeId: string, data: any, performedBy:
   return doc;
 }
 
+/**
+ * Enrollments were create-only, so a typo in an admission number or seat type
+ * could not be corrected from the UI at all. `applicantId` is intentionally
+ * not updatable — re-pointing an admission at a different applicant would
+ * leave the original applicant marked enrolled.
+ */
+export async function updateAdmission(collegeId: string, id: string, data: any, performedBy: string) {
+  const { applicantId: _ignored, collegeId: _cid, ...patch } = data ?? {};
+  const doc = await Admission.findOneAndUpdate({ _id: id, collegeId }, patch, { new: true });
+  if (!doc) throw new AppError(404, 'Admission not found');
+  await createAuditLog({
+    collegeId, entityType: 'Admission', entityId: String(doc._id),
+    entityName: 'Admission', action: 'update', changes: [], performedBy,
+  });
+  return doc;
+}
+
 // ─── Strategic Gap 5 — AssignmentRule CRUD + evaluator ───────────────
 
 export async function listAssignmentRules(collegeId: string) {

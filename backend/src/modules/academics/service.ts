@@ -610,6 +610,45 @@ export async function deleteAttendanceSession(collegeId: string, id: string, _pe
   return { deleted: true };
 }
 
+/**
+ * The student roster for a course offering.
+ *
+ * Attendance marking and internal-marks entry both need "who is in this
+ * class". An offering points at a Section; a Section either carries an
+ * explicit `studentIds` list or is defined by its (batch, branch) pair, so we
+ * prefer the explicit roster and fall back to the structural one.
+ */
+export async function getCourseOfferingRoster(collegeId: string, courseOfferingId: string) {
+  const offering = await CourseOffering.findOne({ _id: courseOfferingId, collegeId })
+    .select('sectionId courseId')
+    .lean();
+  if (!offering) throw new AppError(404, 'Course offering not found');
+
+  const section = await Section.findOne({ _id: offering.sectionId, collegeId })
+    .select('name branchId batchId studentIds')
+    .lean();
+  if (!section) throw new AppError(404, 'Section not found for this course offering');
+
+  const explicit = (section.studentIds ?? []) as unknown[];
+  const filter: Record<string, unknown> = explicit.length > 0
+    ? { collegeId, _id: { $in: explicit } }
+    // Exclude students who have left; they should not appear on a register.
+    : { collegeId, batchId: section.batchId, branchId: section.branchId, status: { $nin: ['exited', 'alumni', 'graduated'] } };
+
+  const students = await Student.find(filter)
+    .select('rollNumber personId status')
+    .populate({ path: 'personId', select: 'name' })
+    .sort({ rollNumber: 1 })
+    .lean();
+
+  return {
+    sectionId: String(section._id),
+    sectionName: section.name,
+    source: explicit.length > 0 ? 'section-roster' : 'batch-branch',
+    students,
+  };
+}
+
 // ═══ Phase 4: Attendance Records ═══════════════════════════
 
 export async function listAttendanceRecords(collegeId: string, sessionId: string) {
@@ -624,9 +663,67 @@ export async function updateAttendanceRecord(collegeId: string, id: string, data
   if (!doc) throw new AppError(404, 'Attendance record not found');
   return doc;
 }
-export async function bulkCreateAttendanceRecords(collegeId: string, records: any[], _performedBy: string) {
-  const docs = records.map(r => ({ ...r, collegeId }));
-  return AttendanceRecord.insertMany(docs);
+/**
+ * Upserts a whole session's attendance in one write.
+ *
+ * Upsert rather than insertMany: marking a register is iterative — the
+ * operator saves, spots a wrong toggle, and saves again. insertMany blew up on
+ * the unique (collegeId, sessionId, studentId) index the second time, which
+ * made correcting a mistake impossible.
+ *
+ * `markedBy` refs a Person. Callers may pass it; otherwise it resolves from
+ * the acting user's linked person record.
+ */
+export async function bulkUpsertAttendanceRecords(
+  collegeId: string,
+  records: any[],
+  actingUserId?: string,
+) {
+  if (!Array.isArray(records) || records.length === 0) {
+    throw new AppError(400, 'No attendance records supplied');
+  }
+
+  let fallbackMarkedBy: string | undefined;
+  if (records.some((r) => !r.markedBy)) {
+    fallbackMarkedBy = actingUserId ? await resolvePersonIdForUser(actingUserId) : undefined;
+    if (!fallbackMarkedBy) {
+      throw new AppError(400, 'Your account is not linked to a person record, so attendance cannot be attributed. Ask an admin to link it, or supply markedBy.');
+    }
+  }
+
+  // No $setOnInsert needed: on upsert MongoDB seeds the new document from the
+  // filter's equality conditions, so collegeId/sessionId/studentId carry over.
+  const ops = records.map((r) => ({
+    updateOne: {
+      filter: { collegeId, sessionId: r.sessionId, studentId: r.studentId },
+      update: {
+        $set: {
+          status: r.status,
+          remarks: r.remarks ?? '',
+          markedBy: r.markedBy ?? fallbackMarkedBy,
+        },
+      },
+      upsert: true,
+    },
+  }));
+
+  const res = await AttendanceRecord.bulkWrite(ops, { ordered: false });
+  return {
+    upserted: res.upsertedCount ?? 0,
+    modified: res.modifiedCount ?? 0,
+    total: records.length,
+  };
+}
+
+/** Back-compat alias — the route name predates the upsert semantics. */
+export const bulkCreateAttendanceRecords = bulkUpsertAttendanceRecords;
+
+/** Resolves the Person a User is linked to, if any. */
+async function resolvePersonIdForUser(userId: string): Promise<string | undefined> {
+  const { User } = await import('../../models/User');
+  const user = await User.findById(userId).select('personId').lean();
+  const personId = (user as { personId?: unknown } | null)?.personId;
+  return personId ? String(personId) : undefined;
 }
 export async function deleteAttendanceRecord(collegeId: string, id: string, _performedBy: string) {
   const doc = await AttendanceRecord.findOneAndDelete({ _id: id, collegeId });
@@ -678,10 +775,54 @@ export async function updateInternalMark(collegeId: string, id: string, data: an
   if (!doc) throw new AppError(404, 'Internal mark not found');
   return doc;
 }
-export async function bulkCreateInternalMarks(collegeId: string, marks: any[], _performedBy: string) {
-  const docs = marks.map(m => ({ ...m, collegeId }));
-  return InternalMark.insertMany(docs);
+/**
+ * Upserts a whole assessment's marks in one write — same reasoning as
+ * bulkUpsertAttendanceRecords: re-saving a corrected sheet must not collide
+ * with the unique (collegeId, assessmentId, studentId) index.
+ * Marks are validated against the assessment's maxMarks before writing.
+ */
+export async function bulkUpsertInternalMarks(collegeId: string, marks: any[], _performedBy: string) {
+  if (!Array.isArray(marks) || marks.length === 0) {
+    throw new AppError(400, 'No marks supplied');
+  }
+
+  const assessmentId = marks[0]?.assessmentId;
+  if (!assessmentId || marks.some((m) => String(m.assessmentId) !== String(assessmentId))) {
+    throw new AppError(400, 'All marks in a bulk write must belong to the same assessment');
+  }
+
+  const assessment = await InternalAssessment.findOne({ _id: assessmentId, collegeId }).lean();
+  if (!assessment) throw new AppError(404, 'Internal assessment not found');
+
+  const maxMarks = (assessment as { maxMarks?: number }).maxMarks;
+  if (typeof maxMarks === 'number') {
+    const bad = marks.find((m) => Number(m.marksObtained) < 0 || Number(m.marksObtained) > maxMarks);
+    if (bad) {
+      throw new AppError(400, `Marks must be between 0 and ${maxMarks}. Got ${bad.marksObtained}.`);
+    }
+  }
+
+  // See bulkUpsertAttendanceRecords — the filter seeds the inserted document.
+  const ops = marks.map((m) => ({
+    updateOne: {
+      filter: { collegeId, assessmentId: m.assessmentId, studentId: m.studentId },
+      update: {
+        $set: { marksObtained: Number(m.marksObtained), remarks: m.remarks ?? '' },
+      },
+      upsert: true,
+    },
+  }));
+
+  const res = await InternalMark.bulkWrite(ops, { ordered: false });
+  return {
+    upserted: res.upsertedCount ?? 0,
+    modified: res.modifiedCount ?? 0,
+    total: marks.length,
+  };
 }
+
+/** Back-compat alias — the route name predates the upsert semantics. */
+export const bulkCreateInternalMarks = bulkUpsertInternalMarks;
 export async function deleteInternalMark(collegeId: string, id: string, _performedBy: string) {
   const doc = await InternalMark.findOneAndDelete({ _id: id, collegeId });
   if (!doc) throw new AppError(404, 'Internal mark not found');

@@ -6,6 +6,10 @@ import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { useViewEditMode } from '../../hooks/useViewEditMode';
+import { confirmAction } from '../../stores/confirmStore';
+import Pagination from '../../components/ui/Pagination';
+import { useListControls } from '../../hooks/useListControls';
+import SearchInput from '../../components/ui/SearchInput';
 
 const ENTRY_TYPES = ['income', 'expense', 'transfer', 'adjustment'] as const;
 const ENTRY_COLOR: Record<string, string> = { income: 'success', expense: 'danger', transfer: 'info', adjustment: 'warning' };
@@ -16,10 +20,11 @@ const emptyForm = { entryDate: '', entryType: 'income', category: '', descriptio
 
 export default function LedgerPage() {
   const qc = useQueryClient();
-  const [page, setPage] = useState(1);
+  const { page, setPage, limit, setLimit, search, setSearch } = useListControls();
   const [form, setForm] = useState(emptyForm);
+  const [amountError, setAmountError] = useState<string | null>(null);
 
-  const { data, isLoading } = useQuery({ queryKey: ['ledger', page], queryFn: () => listFinancialLedger(page, 20) });
+  const { data, isLoading } = useQuery({ queryKey: ['ledger', page, limit, search], queryFn: () => listFinancialLedger(page, limit, search) });
 
   const vem = useViewEditMode<any>({
     onOpenEntity: (row) => setForm({
@@ -42,10 +47,27 @@ export default function LedgerPage() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const debit = Number(form.debit || 0);
+    const credit = Number(form.credit || 0);
+
+    // A ledger line has to move money. Leaving both blank previously saved a
+    // ₹0/₹0 entry that contributed nothing but still showed up in the journal.
+    if (debit <= 0 && credit <= 0) {
+      setAmountError('Enter a debit or a credit amount greater than zero.');
+      return;
+    }
+    // Single-sided entries only — a line that is both a debit and a credit is
+    // two entries, and silently accepting it makes the journal unbalanceable.
+    if (debit > 0 && credit > 0) {
+      setAmountError('An entry is either a debit or a credit, not both. Clear one of the two.');
+      return;
+    }
+    setAmountError(null);
+
     const payload: any = { ...form };
-    if (form.debit) payload.debit = Number(form.debit);
+    if (debit > 0) payload.debit = debit;
     else delete payload.debit;
-    if (form.credit) payload.credit = Number(form.credit);
+    if (credit > 0) payload.credit = credit;
     else delete payload.credit;
     if (!payload.referenceId) delete payload.referenceId;
     if (!payload.referenceType) delete payload.referenceType;
@@ -66,7 +88,7 @@ export default function LedgerPage() {
     { key: 'actions', label: '', render: (r: any) => (
       <div className="flex gap-1">
         <button onClick={(e) => { e.stopPropagation(); vem.openForEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
-        <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this entry?')) deleteMut.mutate(r._id); }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
+        <button onClick={(e) => { e.stopPropagation(); void confirmAction({ title: 'Delete this entry?', tone: 'danger', confirmLabel: 'Delete' }).then((__c) => { if (__c.confirmed) { deleteMut.mutate(r._id); } }) }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
       </div>
     )},
   ];
@@ -75,9 +97,12 @@ export default function LedgerPage() {
     <div>
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-xl font-bold text-navy">Financial Ledger</h2>
+        <div className="flex items-center gap-3">
+          <SearchInput value={search} onChange={setSearch} placeholder="Search financial ledger…" className="w-56" />
         <button onClick={vem.openForCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700">
           <Plus size={16} className="text-white" /> New Entry
         </button>
+      </div>
       </div>
 
       <DataTable
@@ -88,13 +113,14 @@ export default function LedgerPage() {
         onRowClick={vem.openForView}
       />
 
-      {data && data.pages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-4">
-          <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Prev</button>
-          <span className="text-sm text-gray-500">Page {page} of {data.pages}</span>
-          <button disabled={page >= data.pages} onClick={() => setPage(p => p + 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Next</button>
-        </div>
-      )}
+      <Pagination
+        page={page}
+        pages={data?.pages ?? 1}
+        total={data?.total}
+        limit={limit}
+        onPageChange={setPage}
+        onLimitChange={setLimit}
+      />
 
       <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('Ledger Entry')}>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -108,8 +134,11 @@ export default function LedgerPage() {
               </div>
               <div><label className={lbl}>Category *</label><input required value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className={inp} /></div>
               <div><label className={lbl}>Description *</label><input required value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className={inp} /></div>
-              <div><label className={lbl}>Debit</label><input type="number" min={0} value={form.debit} onChange={e => setForm(f => ({ ...f, debit: e.target.value }))} className={inp} /></div>
-              <div><label className={lbl}>Credit</label><input type="number" min={0} value={form.credit} onChange={e => setForm(f => ({ ...f, credit: e.target.value }))} className={inp} /></div>
+              <div><label className={lbl}>Debit</label><input type="number" min={0} step="0.01" value={form.debit} onChange={e => { setAmountError(null); setForm(f => ({ ...f, debit: e.target.value })); }} className={inp} aria-invalid={Boolean(amountError)} /></div>
+              <div><label className={lbl}>Credit</label><input type="number" min={0} step="0.01" value={form.credit} onChange={e => { setAmountError(null); setForm(f => ({ ...f, credit: e.target.value })); }} className={inp} aria-invalid={Boolean(amountError)} /></div>
+              {amountError && (
+                <p className="col-span-2 -mt-2 text-sm text-red-600" role="alert">{amountError}</p>
+              )}
               <div><label className={lbl}>Reference ID</label><input value={form.referenceId} onChange={e => setForm(f => ({ ...f, referenceId: e.target.value }))} className={inp} placeholder="Optional" /></div>
               <div><label className={lbl}>Reference Type</label><input value={form.referenceType} onChange={e => setForm(f => ({ ...f, referenceType: e.target.value }))} className={inp} placeholder="Optional" /></div>
             </div>

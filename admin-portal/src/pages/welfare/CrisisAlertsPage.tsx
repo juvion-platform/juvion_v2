@@ -8,6 +8,10 @@ import Modal from '../../components/ui/Modal';
 import { Plus, Pencil, Trash2, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useViewEditMode } from '../../hooks/useViewEditMode';
+import { confirmAction } from '../../stores/confirmStore';
+import Pagination from '../../components/ui/Pagination';
+import { useListControls } from '../../hooks/useListControls';
+import SearchInput from '../../components/ui/SearchInput';
 
 const TYPES = ['mental_health', 'ragging', 'harassment', 'medical_emergency', 'substance_abuse', 'other'] as const;
 const SEVERITIES = ['low', 'medium', 'high', 'critical'] as const;
@@ -22,10 +26,10 @@ const emptyForm = { reportedBy: '', studentId: '', type: 'other', severity: 'med
 
 export default function CrisisAlertsPage() {
   const qc = useQueryClient();
-  const [page, setPage] = useState(1);
+  const { page, setPage, limit, setLimit, search, setSearch } = useListControls();
   const [form, setForm] = useState(emptyForm);
 
-  const { data, isLoading } = useQuery({ queryKey: ['crisis-alerts', page], queryFn: () => listCrisisAlerts(page, 20) });
+  const { data, isLoading } = useQuery({ queryKey: ['crisis-alerts', page, limit, search], queryFn: () => listCrisisAlerts(page, limit, undefined, search) });
   const { data: studentsData } = useQuery({ queryKey: ['students', 'all'], queryFn: () => listStudents(1, 200) });
   const { data: personsData } = useQuery({ queryKey: ['persons', 'all'], queryFn: () => listPersons(1, 200) });
 
@@ -74,7 +78,26 @@ export default function CrisisAlertsPage() {
     { key: 'actions', label: '', render: (r: any) => (
       <div className="flex gap-1">
         <button onClick={(e) => { e.stopPropagation(); vem.openForEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit"><Pencil size={15} className="text-amber-500" /></button>
-        <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this alert?')) deleteMut.mutate(r._id); }} className="p-1 rounded hover:bg-red-50" title="Delete"><Trash2 size={15} className="text-red-500" /></button>
+        {/* Crisis alerts are safeguarding records — the same hard-delete
+            gating as anti-ragging complaints applies. */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            void confirmAction({
+              title: 'Permanently delete this crisis alert?',
+              message: 'Crisis alerts form part of the student-safeguarding trail. Deleting removes the alert and its escalation history for good — prefer resolving the alert instead.',
+              tone: 'danger',
+              confirmLabel: 'Delete permanently',
+              requireTypedConfirmation: 'DELETE',
+              requireReason: true,
+              reasonLabel: 'Reason for deletion (recorded on the audit trail)',
+            }).then((__c) => { if (__c.confirmed) { deleteMut.mutate(r._id); } });
+          }}
+          className="p-1 rounded hover:bg-red-50"
+          title="Delete"
+        >
+          <Trash2 size={15} className="text-red-500" />
+        </button>
       </div>
     )},
   ];
@@ -83,9 +106,12 @@ export default function CrisisAlertsPage() {
     <div>
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-xl font-bold text-navy">Crisis Alerts</h2>
+        <div className="flex items-center gap-3">
+          <SearchInput value={search} onChange={setSearch} placeholder="Search crisis alerts…" className="w-56" />
         <button onClick={vem.openForCreate} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700">
           <Plus size={16} className="text-white" /> New Alert
         </button>
+      </div>
       </div>
 
       <DataTable
@@ -96,13 +122,14 @@ export default function CrisisAlertsPage() {
         onRowClick={vem.openForView}
       />
 
-      {data && data.pages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-4">
-          <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Prev</button>
-          <span className="text-sm text-gray-500">Page {page} of {data.pages}</span>
-          <button disabled={page >= data.pages} onClick={() => setPage(p => p + 1)} className="px-3 py-1 border rounded text-sm disabled:opacity-40">Next</button>
-        </div>
-      )}
+      <Pagination
+        page={page}
+        pages={data?.pages ?? 1}
+        total={data?.total}
+        limit={limit}
+        onPageChange={setPage}
+        onLimitChange={setLimit}
+      />
 
       <Modal open={vem.isOpen} onClose={vem.close} title={vem.titleFor('Crisis Alert')}>
         <form onSubmit={handleSubmit} className="space-y-4">
