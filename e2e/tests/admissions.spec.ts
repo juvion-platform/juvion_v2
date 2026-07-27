@@ -16,6 +16,7 @@
 
 import { test, expect } from './fixtures/auth-fixture';
 import { createInquiryViaUI } from './utils/inquiry-factory';
+import { confirmDialog } from './utils/confirm-dialog';
 
 test.describe('Admissions — Inquiry CRUD', () => {
   test('AC4.6 principal: create inquiry from form → appears in list', async ({ page, loginAs }) => {
@@ -65,16 +66,16 @@ test.describe('Admissions — Inquiry CRUD', () => {
     await loginAs('principal');
     const inquiry = await createInquiryViaUI(page);
 
-    // Delete uses a native `confirm()` dialog — accept it before click.
-    // page.on() must be wired BEFORE the click so the listener catches
-    // the synchronous dialog event.
-    page.once('dialog', (dialog) => dialog.accept());
-
     // See AC4.7 comment — filter by visible text instead of getByRole
     // name, because <tr> elements have no accessible name by default.
     const row = page.locator('tr').filter({ hasText: inquiry.name });
     await expect(row).toBeVisible();
     await row.getByTitle('Delete').click();
+
+    // Delete now goes through the in-app confirmation dialog rather than the
+    // browser's native confirm(), so there is no `dialog` event to accept —
+    // the modal has to be driven like any other UI.
+    await confirmDialog(page);
 
     // After delete, the row vanishes from the listing.
     await expect(page.getByText(inquiry.name)).toBeHidden({ timeout: 10_000 });

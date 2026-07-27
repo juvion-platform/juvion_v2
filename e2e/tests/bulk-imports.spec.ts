@@ -23,10 +23,14 @@ test.describe('Platform — Bulk imports', () => {
     // "New import" CTA is the primary entry point.
     await expect(page.getByRole('button', { name: /^new import$/i })).toBeVisible();
 
-    // The recent-jobs table renders unconditionally — empty or
-    // populated, the `<table>` element is always in the DOM (cells
-    // vary). Asserting on the table element itself is the
-    // deterministic signal that the page chunk fully hydrated.
-    await expect(page.locator('table')).toBeVisible();
+    // The recent-jobs section renders either a <table> of past jobs or, when
+    // there are none, an empty-state panel — the page does NOT render a table
+    // unconditionally, contrary to what this test used to assume. The e2e
+    // seed creates no import jobs, so the empty state is the expected shape
+    // here; accepting either keeps the assertion honest without coupling it
+    // to seed contents.
+    await expect(
+      page.locator('table').or(page.getByText(/no imports yet/i)),
+    ).toBeVisible({ timeout: 10_000 });
   });
 });
