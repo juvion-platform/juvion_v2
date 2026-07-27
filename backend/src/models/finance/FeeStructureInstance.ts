@@ -90,4 +90,12 @@ schema.index({ collegeId: 1, academicYearId: 1, programmeId: 1, status: 1 });
 // field don't appear empty-keyed in the index.
 schema.index({ collegeId: 1, programmeId: 1, yearOfStudy: 1 }, { sparse: true });
 
+// NOTE: we deliberately do NOT enforce a unique "one active FSI per slot"
+// index. The matcher (resolveMatchingFeeStructureInstance) intentionally
+// tolerates multiple active FSIs for the same axis tuple and resolves the
+// ambiguity by most-recent `approvedAt` — a documented, tested contract
+// ("Preference tie-break by most recent approvedAt"). activateFeeStructure
+// supersedes the prior same-slot active as the primary mechanism; the
+// scorer's tie-break is the read-time backstop.
+
 export const FeeStructureInstance = model<IFeeStructureInstance>('FeeStructureInstance', schema);
