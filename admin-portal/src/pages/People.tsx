@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getStats, listPersons, deletePerson } from '../services/people';
-import { Users, GraduationCap, Briefcase, UserCheck, Building2, Search, Trash2, Pencil, IdCard } from 'lucide-react';
+import { Users, GraduationCap, Briefcase, UserCheck, Building2, Search, Trash2, Pencil, IdCard, DoorOpen, ClipboardCheck, FileText } from 'lucide-react';
 import Breadcrumbs from '../components/ui/Breadcrumbs';
 import DataTable from '../components/ui/DataTable';
 import Pagination from "../components/ui/Pagination";
@@ -21,6 +21,9 @@ import FacultyDocumentQueuePage from './people/FacultyDocumentQueuePage';
 import StaffDetailPage from './people/StaffDetailPage';
 import ParentDetailPage from './people/ParentDetailPage';
 import PersonaCatalogPage from './people/PersonaCatalogPage';
+import {
+  ExitRequestsPage, ClearanceWorkflowsPage, DocumentTemplatesPage, AlumniPage,
+} from './people/exit-alumni-pages';
 import { confirmAction } from '../stores/confirmStore';
 import { useListControls } from '../hooks/useListControls';
 
@@ -31,6 +34,10 @@ const CARDS = [
   { to: 'parents', icon: UserCheck, label: 'Parents', desc: 'Guardian profiles & contacts', iconBg: 'bg-orange-50 text-orange-500', border: 'border-orange-200 hover:border-orange-400', statKey: 'parents' },
   { to: 'organizations', icon: Building2, label: 'Organizations', desc: 'Partner & external orgs', iconBg: 'bg-primary-100 text-primary-700', border: 'border-primary-200 hover:border-primary-400', statKey: 'organizations' },
   { to: 'personas', icon: IdCard, label: 'Persona Catalog', desc: 'Canonical persona/sub-persona codes', iconBg: 'bg-indigo-50 text-indigo-600', border: 'border-indigo-200 hover:border-indigo-400', statKey: 'personas' },
+  { to: 'exit-requests', icon: DoorOpen, label: 'Exit Requests', desc: 'Withdrawals, transfers, expulsions', iconBg: 'bg-rose-50 text-rose-600', border: 'border-rose-200 hover:border-rose-400', statKey: '' },
+  { to: 'clearance-workflows', icon: ClipboardCheck, label: 'Clearance', desc: 'Departmental no-dues on exit', iconBg: 'bg-amber-50 text-amber-600', border: 'border-amber-200 hover:border-amber-400', statKey: '' },
+  { to: 'document-templates', icon: FileText, label: 'Document Templates', desc: 'TC, bonafide, conduct templates', iconBg: 'bg-slate-50 text-slate-600', border: 'border-slate-200 hover:border-slate-400', statKey: '' },
+  { to: 'alumni', icon: GraduationCap, label: 'Alumni', desc: 'Graduated student records', iconBg: 'bg-teal-50 text-teal-600', border: 'border-teal-200 hover:border-teal-400', statKey: '' },
 ];
 
 const ROLE_ROUTE: Record<string, string> = {
@@ -237,6 +244,12 @@ export default function People() {
         <Route path="organizations" element={<OrganizationsPage />} />
         {/* Strategic Gap 7 — Persona Catalog (read-only reference) */}
         <Route path="personas" element={<PersonaCatalogPage />} />
+
+        {/* Exit / clearance / alumni — backends shipped without any UI. */}
+        <Route path="exit-requests" element={<ExitRequestsPage />} />
+        <Route path="clearance-workflows" element={<ClearanceWorkflowsPage />} />
+        <Route path="document-templates" element={<DocumentTemplatesPage />} />
+        <Route path="alumni" element={<AlumniPage />} />
       </Routes>
     </SubPageWrapper>
   );

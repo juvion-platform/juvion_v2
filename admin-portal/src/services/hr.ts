@@ -258,3 +258,104 @@ export const updateResearchProject = (id: string, data: any) =>
   api.put(`${BASE}/research-projects/${id}`, data).then(r => r.data);
 export const deleteResearchProject = (id: string) =>
   api.delete(`${BASE}/research-projects/${id}`).then(r => r.data);
+
+// ═══════════════════════════════════════════════════════════
+// Entities with complete backends that had no frontend at all
+// ═══════════════════════════════════════════════════════════
+
+// ─── FDP records & compliance ─────────────────────────────
+export const listFDPRecords = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/fdp-records`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
+export const createFDPRecord = (data: any) =>
+  api.post(`${BASE}/fdp-records`, data).then(r => r.data);
+export const updateFDPRecord = (id: string, data: any) =>
+  api.put(`${BASE}/fdp-records/${id}`, data).then(r => r.data);
+export const deleteFDPRecord = (id: string) =>
+  api.delete(`${BASE}/fdp-records/${id}`).then(r => r.data);
+export const verifyFDPRecord = (id: string) =>
+  api.post(`${BASE}/fdp-records/${id}/verify`, {}).then(r => r.data);
+
+export const listFDPCompliance = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/fdp-compliance`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
+export const computeFDPCompliance = () =>
+  api.post(`${BASE}/fdp-compliance/compute`, {}).then(r => r.data);
+export const nudgeFDPCompliance = () =>
+  api.post(`${BASE}/fdp-compliance/nudge`, {}).then(r => r.data);
+
+// ─── Separation lifecycle ─────────────────────────────────
+export const listSeparationRequests = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/separation-requests`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
+export const createSeparationRequest = (data: any) =>
+  api.post(`${BASE}/separation-requests`, data).then(r => r.data);
+export const updateSeparationRequest = (id: string, data: any) =>
+  api.put(`${BASE}/separation-requests/${id}`, data).then(r => r.data);
+export const deleteSeparationRequest = (id: string) =>
+  api.delete(`${BASE}/separation-requests/${id}`).then(r => r.data);
+
+export const listExitClearances = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/exit-clearances`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
+export const createExitClearance = (data: any) =>
+  api.post(`${BASE}/exit-clearances`, data).then(r => r.data);
+export const updateExitClearance = (id: string, data: any) =>
+  api.put(`${BASE}/exit-clearances/${id}`, data).then(r => r.data);
+export const deleteExitClearance = (id: string) =>
+  api.delete(`${BASE}/exit-clearances/${id}`).then(r => r.data);
+
+export const listHandoverRecords = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/handover-records`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
+export const createHandoverRecord = (data: any) =>
+  api.post(`${BASE}/handover-records`, data).then(r => r.data);
+export const updateHandoverRecord = (id: string, data: any) =>
+  api.put(`${BASE}/handover-records/${id}`, data).then(r => r.data);
+export const deleteHandoverRecord = (id: string) =>
+  api.delete(`${BASE}/handover-records/${id}`).then(r => r.data);
+
+export const listFinalSettlements = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/final-settlements`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
+export const createFinalSettlement = (data: any) =>
+  api.post(`${BASE}/final-settlements`, data).then(r => r.data);
+export const updateFinalSettlement = (id: string, data: any) =>
+  api.put(`${BASE}/final-settlements/${id}`, data).then(r => r.data);
+export const deleteFinalSettlement = (id: string) =>
+  api.delete(`${BASE}/final-settlements/${id}`).then(r => r.data);
+
+// ─── Disciplinary ─────────────────────────────────────────
+export const listDisciplinaryCases = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/disciplinary-cases-list`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
+export const createDisciplinaryCase = (data: any) =>
+  api.post(`${BASE}/disciplinary-cases-crud`, data).then(r => r.data);
+export const updateDisciplinaryCase = (id: string, data: any) =>
+  api.put(`${BASE}/disciplinary-cases/${id}/crud`, data).then(r => r.data);
+export const deleteDisciplinaryCase = (id: string) =>
+  api.delete(`${BASE}/disciplinary-cases/${id}`).then(r => r.data);
+
+export const listDisciplinaryOutcomes = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/disciplinary-outcomes`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
+export const createDisciplinaryOutcome = (data: any) =>
+  api.post(`${BASE}/disciplinary-outcomes`, data).then(r => r.data);
+export const updateDisciplinaryOutcome = (id: string, data: any) =>
+  api.put(`${BASE}/disciplinary-outcomes/${id}`, data).then(r => r.data);
+export const deleteDisciplinaryOutcome = (id: string) =>
+  api.delete(`${BASE}/disciplinary-outcomes/${id}`).then(r => r.data);
+
+// ─── Payroll extracts ─────────────────────────────────────
+export const listPayrollExtracts = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/payroll-extracts`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
+export const generatePayrollExtract = (data: any) =>
+  api.post(`${BASE}/payroll-extracts/generate`, data).then(r => r.data);
+export const reviewPayrollExtract = (id: string) =>
+  api.post(`${BASE}/payroll-extracts/${id}/review`, {}).then(r => r.data);
+export const releasePayrollExtract = (id: string) =>
+  api.post(`${BASE}/payroll-extracts/${id}/release`, {}).then(r => r.data);
+export const deletePayrollExtract = (id: string) =>
+  api.delete(`${BASE}/payroll-extracts/${id}`).then(r => r.data);
+
+// ─── Attendance anomalies ─────────────────────────────────
+export const listAttendanceAnomalies = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/attendance-anomalies`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
+export const createAttendanceAnomaly = (data: any) =>
+  api.post(`${BASE}/attendance-anomalies`, data).then(r => r.data);
+export const updateAttendanceAnomaly = (id: string, data: any) =>
+  api.put(`${BASE}/attendance-anomalies/${id}`, data).then(r => r.data);
+export const deleteAttendanceAnomaly = (id: string) =>
+  api.delete(`${BASE}/attendance-anomalies/${id}`).then(r => r.data);

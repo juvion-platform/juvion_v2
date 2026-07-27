@@ -154,3 +154,62 @@ export const getOrganization = (id: string) => api.get(`${BASE}/organizations/${
 export const createOrganization = (data: any) => api.post(`${BASE}/organizations`, data).then(r => r.data);
 export const updateOrganization = (id: string, data: any) => api.put(`${BASE}/organizations/${id}`, data).then(r => r.data);
 export const deleteOrganization = (id: string) => api.delete(`${BASE}/organizations/${id}`).then(r => r.data);
+
+// ═══════════════════════════════════════════════════════════
+// Exit / clearance / alumni workflow
+// Complete backends (people/routes.ts) that had no frontend at all.
+// ═══════════════════════════════════════════════════════════
+
+// ─── Exit requests ────────────────────────────────────────
+export const listExitRequests = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/exit-requests`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
+export const getExitRequest = (id: string) =>
+  api.get(`${BASE}/exit-requests/${id}`).then(r => r.data);
+export const submitExitRequest = (studentId: string, data: any) =>
+  api.post(`${BASE}/students/${studentId}/exit-request`, data).then(r => r.data);
+export const approveExitRequest = (id: string, data: Record<string, unknown> = {}) =>
+  api.put(`${BASE}/exit-requests/${id}/approve`, data).then(r => r.data);
+export const rejectExitRequest = (id: string, reason?: string) =>
+  api.put(`${BASE}/exit-requests/${id}/reject`, { reason }).then(r => r.data);
+export const cancelExitRequest = (id: string) =>
+  api.put(`${BASE}/exit-requests/${id}/cancel`, {}).then(r => r.data);
+export const getStudentExitSummary = (studentId: string) =>
+  api.get(`${BASE}/students/${studentId}/exit-summary`).then(r => r.data);
+
+// ─── Clearance ────────────────────────────────────────────
+export const getClearanceDashboard = () =>
+  api.get(`${BASE}/clearance-dashboard`).then(r => r.data);
+export const listClearanceWorkflows = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/clearance-workflows`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
+export const getClearanceWorkflow = (id: string) =>
+  api.get(`${BASE}/clearance-workflows/${id}`).then(r => r.data);
+export const initiateClearance = (data: any) =>
+  api.post(`${BASE}/clearance-workflows`, data).then(r => r.data);
+export const listPendingClearanceItems = () =>
+  api.get(`${BASE}/clearance-items/pending`).then(r => r.data);
+export const completeClearanceItem = (id: string, data: Record<string, unknown> = {}) =>
+  api.put(`${BASE}/clearance-items/${id}/complete`, data).then(r => r.data);
+export const waiveClearanceItem = (id: string, reason?: string) =>
+  api.put(`${BASE}/clearance-items/${id}/waive`, { reason }).then(r => r.data);
+
+// ─── Exit documents ───────────────────────────────────────
+export const listDocumentTemplates = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/document-templates`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
+export const createDocumentTemplate = (data: any) =>
+  api.post(`${BASE}/document-templates`, data).then(r => r.data);
+export const generateExitDocument = (data: any) =>
+  api.post(`${BASE}/documents/generate`, data).then(r => r.data);
+export const signExitDocument = (id: string, data: Record<string, unknown> = {}) =>
+  api.put(`${BASE}/documents/${id}/sign`, data).then(r => r.data);
+export const issueExitDocument = (id: string, data: Record<string, unknown> = {}) =>
+  api.post(`${BASE}/documents/${id}/issue`, data).then(r => r.data);
+export const revokeExitDocument = (id: string, reason?: string) =>
+  api.put(`${BASE}/documents/${id}/revoke`, { reason }).then(r => r.data);
+
+// ─── Alumni ───────────────────────────────────────────────
+export const listAlumni = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/alumni`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
+export const getAlumni = (id: string) =>
+  api.get(`${BASE}/alumni/${id}`).then(r => r.data);
+export const createAlumniRecord = (data: any) =>
+  api.post(`${BASE}/alumni`, data).then(r => r.data);

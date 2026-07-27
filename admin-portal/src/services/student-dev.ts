@@ -172,3 +172,90 @@ export const updateLeadershipRole = (id: string, data: any) =>
   api.put(`${BASE}/leadership-roles/${id}`, data).then(r => r.data);
 export const deleteLeadershipRole = (id: string) =>
   api.delete(`${BASE}/leadership-roles/${id}`).then(r => r.data);
+
+// ═══════════════════════════════════════════════════════════
+// W09 workflow surfaces
+// Complete backends that had no frontend at all.
+// ═══════════════════════════════════════════════════════════
+
+// ─── Fests ────────────────────────────────────────────────
+export const listFests = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/fests`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
+export const proposeFest = (data: any) =>
+  api.post(`${BASE}/fests/propose`, data).then(r => r.data);
+export const approveFest = (id: string) =>
+  api.post(`${BASE}/fests/${id}/approve`, {}).then(r => r.data);
+export const rejectFest = (id: string, rejectedReason?: string) =>
+  api.post(`${BASE}/fests/${id}/reject`, { rejectedReason }).then(r => r.data);
+export const closeFest = (id: string) =>
+  api.post(`${BASE}/fests/${id}/close`, {}).then(r => r.data);
+export const cancelFest = (id: string, reason?: string) =>
+  api.post(`${BASE}/fests/${id}/cancel`, { reason }).then(r => r.data);
+
+// ─── Competitions ─────────────────────────────────────────
+export const listCompetitions = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/competitions`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
+export const proposeCompetition = (data: any) =>
+  api.post(`${BASE}/competitions/propose`, data).then(r => r.data);
+export const approveCompetition = (id: string) =>
+  api.post(`${BASE}/competitions/${id}/approve`, {}).then(r => r.data);
+export const closeCompetition = (id: string) =>
+  api.post(`${BASE}/competitions/${id}/close`, {}).then(r => r.data);
+
+// ─── Workshops ────────────────────────────────────────────
+export const listWorkshops = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/workshops`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
+export const proposeWorkshop = (data: any) =>
+  api.post(`${BASE}/workshops/propose`, data).then(r => r.data);
+export const approveWorkshop = (id: string) =>
+  api.post(`${BASE}/workshops/${id}/approve`, {}).then(r => r.data);
+export const completeWorkshop = (id: string) =>
+  api.post(`${BASE}/workshops/${id}/complete`, {}).then(r => r.data);
+
+// ─── SD Programmes (NCC / NSS / NSO / YRC) ────────────────
+export const listSDProgrammes = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/programmes`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
+export const createSDProgramme = (data: any) =>
+  api.post(`${BASE}/programmes`, data).then(r => r.data);
+
+// ─── Awards ───────────────────────────────────────────────
+export const listAwards = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/awards`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
+export const createAward = (data: any) =>
+  api.post(`${BASE}/awards`, data).then(r => r.data);
+export const updateAward = (id: string, data: any) =>
+  api.put(`${BASE}/awards/${id}`, data).then(r => r.data);
+export const deleteAward = (id: string) =>
+  api.delete(`${BASE}/awards/${id}`).then(r => r.data);
+
+// ─── Certificates ─────────────────────────────────────────
+export const listCertificates = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/certificates`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
+export const generateCertificate = (data: any) =>
+  api.post(`${BASE}/certificates/generate`, data).then(r => r.data);
+export const issueCertificate = (id: string) =>
+  api.post(`${BASE}/certificates/${id}/issue`, {}).then(r => r.data);
+export const revokeCertificate = (id: string, reason?: string) =>
+  api.post(`${BASE}/certificates/${id}/revoke`, { reason }).then(r => r.data);
+
+// ─── Activity budgets ─────────────────────────────────────
+export const listActivityBudgets = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/budgets`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
+export const requestActivityBudget = (data: any) =>
+  api.post(`${BASE}/budgets/request`, data).then(r => r.data);
+export const approveActivityBudget = (id: string) =>
+  api.post(`${BASE}/budgets/${id}/approve`, {}).then(r => r.data);
+export const rejectActivityBudget = (id: string, rejectedReason?: string) =>
+  api.post(`${BASE}/budgets/${id}/reject`, { rejectedReason }).then(r => r.data);
+export const reconcileActivityBudget = (id: string) =>
+  api.post(`${BASE}/budgets/${id}/reconcile`, {}).then(r => r.data);
+
+// ─── Sponsorships ─────────────────────────────────────────
+export const listSponsorships = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/sponsorships`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
+export const createSponsorship = (data: any) =>
+  api.post(`${BASE}/sponsorships`, data).then(r => r.data);
+export const deleteSponsorship = (id: string) =>
+  api.delete(`${BASE}/sponsorships/${id}`).then(r => r.data);
+export const listSponsorContacts = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/sponsor-contacts`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
