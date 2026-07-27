@@ -52,7 +52,7 @@ function JuviHome() {
         {[
           { to: 'conversations', icon: MessageSquare, label: 'Conversations', desc: 'Chat sessions & history', iconBg: 'bg-blue-50 text-blue-600', border: 'border-blue-200 hover:border-blue-400', statKey: 'conversations' },
           { to: 'messages', icon: Mail, label: 'Messages', desc: 'Individual messages', iconBg: 'bg-purple-50 text-purple-600', border: 'border-purple-200 hover:border-purple-400', statKey: 'messages' },
-          { to: 'actions', icon: Zap, label: 'Actions', desc: 'Executed operations', iconBg: 'bg-orange-50 text-orange-600', border: 'border-orange-200 hover:border-orange-400', statKey: null },
+          { to: 'actions', icon: Zap, label: 'Actions', desc: 'Executed operations', iconBg: 'bg-orange-50 text-orange-600', border: 'border-orange-200 hover:border-orange-400', statKey: 'actions' },
         ].map(card => {
           const Icon = card.icon;
           const hasStat = Boolean(card.statKey);
@@ -119,8 +119,8 @@ function JuviHome() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { to: 'persona-configs', icon: UserCog, label: 'Persona Configs', desc: 'Role-based AI configs', iconBg: 'bg-indigo-50 text-indigo-600', border: 'border-indigo-200 hover:border-indigo-400', statKey: 'personas' },
-          { to: 'feedback', icon: ThumbsUp, label: 'Feedback', desc: 'User ratings & comments', iconBg: 'bg-pink-50 text-pink-600', border: 'border-pink-200 hover:border-pink-400', statKey: null },
-          { to: 'usage-metrics', icon: BarChart3, label: 'Usage Metrics', desc: 'Analytics & performance', iconBg: 'bg-cyan-50 text-cyan-600', border: 'border-cyan-200 hover:border-cyan-400', statKey: null },
+          { to: 'feedback', icon: ThumbsUp, label: 'Feedback', desc: 'User ratings & comments', iconBg: 'bg-pink-50 text-pink-600', border: 'border-pink-200 hover:border-pink-400', statKey: 'feedback' },
+          { to: 'usage-metrics', icon: BarChart3, label: 'Usage Metrics', desc: 'Analytics & performance', iconBg: 'bg-cyan-50 text-cyan-600', border: 'border-cyan-200 hover:border-cyan-400', statKey: 'usageMetrics' },
         ].map(card => {
           const Icon = card.icon;
           const hasStat = Boolean(card.statKey);

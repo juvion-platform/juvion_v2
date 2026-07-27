@@ -91,6 +91,7 @@ export default function PromotionsPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No promotions match “${search}”.` : 'No promotions yet.'}
       />
 
       <Pagination

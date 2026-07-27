@@ -91,6 +91,7 @@ export default function ResearchProjectsPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No research projects match “${search}”.` : 'No research projects yet.'}
       />
 
       <Pagination

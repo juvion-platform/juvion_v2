@@ -96,6 +96,7 @@ export default function ExitProcessPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No exit processes match “${search}”.` : 'No exit processes yet.'}
       />
 
       <Pagination

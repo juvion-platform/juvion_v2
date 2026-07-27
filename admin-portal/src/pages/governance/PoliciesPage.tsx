@@ -98,6 +98,7 @@ export default function PoliciesPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No policies match “${search}”.` : 'No policies yet.'}
       />
 
       <Pagination

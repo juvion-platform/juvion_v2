@@ -93,6 +93,7 @@ export default function EmployeesPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No employees match “${search}”.` : 'No employees yet.'}
       />
 
       <Pagination

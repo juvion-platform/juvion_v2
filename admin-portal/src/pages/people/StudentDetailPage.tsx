@@ -11,6 +11,7 @@ import {
 import FeePinsPanel from '../../components/finance/FeePinsPanel';
 import StudentFeeStructurePanel from '../../components/finance/StudentFeeStructurePanel';
 import PersonPhotoBlock from '../../components/people/PersonPhotoBlock';
+import StudentPortfolioPanel from '../../components/student-dev/StudentPortfolioPanel';
 
 /** Returns the most recent non-archived pin, or undefined. */
 function pickActivePin(pins: IFeePin[]): IFeePin | undefined {
@@ -69,8 +70,8 @@ const ONBOARDING_COLOR: Record<string, string> = {
  * (no active pin). The dot is only rendered when the matching condition
  * is true at runtime.
  */
-type DetailTabKey = 'profile' | 'academic' | 'fees';
-const TAB_KEYS: DetailTabKey[] = ['profile', 'academic', 'fees'];
+type DetailTabKey = 'profile' | 'academic' | 'fees' | 'portfolio';
+const TAB_KEYS: DetailTabKey[] = ['profile', 'academic', 'fees', 'portfolio'];
 interface DetailTab {
   key: DetailTabKey;
   label: string;
@@ -79,6 +80,7 @@ const DETAIL_TABS: ReadonlyArray<DetailTab> = [
   { key: 'profile', label: 'Profile' },
   { key: 'academic', label: 'Academic Details' },
   { key: 'fees', label: 'Fee Structure' },
+  { key: 'portfolio', label: 'Portfolio' },
 ];
 
 export default function StudentDetailPage() {
@@ -437,6 +439,15 @@ export default function StudentDetailPage() {
               currentYearOfStudy={s.currentYearOfStudy ?? s.yearOfStudy}
             />
           )}
+        </div>
+      )}
+
+      {/* ── Portfolio tab ─────────────────────────────────────────
+          The Student Development portfolio API is student-scoped, so it
+          belongs here rather than on a college-wide admin list. */}
+      {tab === 'portfolio' && (
+        <div role="tabpanel" id="tabpanel-portfolio" aria-labelledby="tab-portfolio">
+          {id && <StudentPortfolioPanel studentId={id} />}
         </div>
       )}
     </div>

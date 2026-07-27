@@ -82,7 +82,9 @@ export default function WhatsAppLogsPage() {
       </div>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} />
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading}
+        emptyMessage={search ? `No whatsapp logs match “${search}”.` : 'No whatsapp logs yet.'}
+      />
 
       <Pagination
         page={page}

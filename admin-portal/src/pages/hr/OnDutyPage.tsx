@@ -87,6 +87,7 @@ export default function OnDutyPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No on duty match “${search}”.` : 'No on duty yet.'}
       />
 
       <Pagination

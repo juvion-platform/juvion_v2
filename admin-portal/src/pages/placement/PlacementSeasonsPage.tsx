@@ -88,6 +88,7 @@ export default function PlacementSeasonsPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No placement seasons match “${search}”.` : 'No placement seasons yet.'}
       />
       <Pagination
         page={page}

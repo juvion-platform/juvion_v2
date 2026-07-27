@@ -90,6 +90,7 @@ export default function PlacementRoundsPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No placement rounds match “${search}”.` : 'No placement rounds yet.'}
       />
       <Pagination
         page={page}

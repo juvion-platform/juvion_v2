@@ -75,7 +75,9 @@ export default function SurveyResponsesPage() {
       </div>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No survey responses match “${search}”.` : 'No survey responses yet.'}
+      />
 
       <Pagination
         page={page}

@@ -91,6 +91,7 @@ export default function FacultyPage() {
         onRowClick={(r: any) => navigate(`/people/faculty/${r._id}`)}
         rowKey={(r: any) => r._id}
         rowProps={(r: any) => highlightAttrs(r.person?._id ?? r.personId?._id)}
+        emptyMessage={search ? `No faculty match “${search}”.` : 'No faculty yet.'}
       />
 
       <Pagination

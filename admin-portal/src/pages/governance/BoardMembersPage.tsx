@@ -96,6 +96,7 @@ export default function BoardMembersPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No governing body members match “${search}”.` : 'No governing body members yet.'}
       />
 
       <Pagination

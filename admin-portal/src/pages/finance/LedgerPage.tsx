@@ -111,6 +111,7 @@ export default function LedgerPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No financial ledger match “${search}”.` : 'No financial ledger yet.'}
       />
 
       <Pagination

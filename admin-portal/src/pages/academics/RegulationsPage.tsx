@@ -82,7 +82,9 @@ export default function RegulationsPage() {
       </div>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No regulations match “${search}”.` : 'No regulations yet.'}
+      />
 
       <Pagination
         page={page}

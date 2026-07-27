@@ -101,6 +101,7 @@ export default function ParentMeetingsPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No parent meetings match “${search}”.` : 'No parent meetings yet.'}
       />
 
       <Pagination

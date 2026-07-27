@@ -95,7 +95,9 @@ export default function RegulatoryFilingsPage() {
       </div>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No regulatory filings match “${search}”.` : 'No regulatory filings yet.'}
+      />
 
       <Pagination
         page={page}

@@ -77,7 +77,9 @@ export default function NSSParticipantsPage() {
       </div>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No nss participants match “${search}”.` : 'No nss participants yet.'}
+      />
 
       <Pagination
         page={page}

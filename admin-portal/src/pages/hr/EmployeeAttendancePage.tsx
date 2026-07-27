@@ -90,6 +90,7 @@ export default function EmployeeAttendancePage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No employee attendance match “${search}”.` : 'No employee attendance yet.'}
       />
 
       <Pagination

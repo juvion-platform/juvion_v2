@@ -92,6 +92,7 @@ export default function ProgrammesPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No programmes match “${search}”.` : 'No programmes yet.'}
       />
 
       <Pagination

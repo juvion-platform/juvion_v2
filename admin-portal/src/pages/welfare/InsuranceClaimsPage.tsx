@@ -95,6 +95,7 @@ export default function InsuranceClaimsPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No insurance claims match “${search}”.` : 'No insurance claims yet.'}
       />
 
       <Pagination

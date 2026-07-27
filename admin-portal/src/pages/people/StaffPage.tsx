@@ -90,6 +90,7 @@ export default function StaffPage() {
         onRowClick={(r: any) => navigate(`/people/staff/${r._id}`)}
         rowKey={(r: any) => r._id}
         rowProps={(r: any) => highlightAttrs(r.person?._id ?? r.personId?._id)}
+        emptyMessage={search ? `No staff match “${search}”.` : 'No staff yet.'}
       />
 
       <Pagination

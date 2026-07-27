@@ -125,6 +125,7 @@ export default function ConcessionsPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No concessions match “${search}”.` : 'No concessions yet.'}
       />
 
       <Pagination

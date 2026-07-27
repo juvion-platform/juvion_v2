@@ -85,6 +85,7 @@ import { FeeReminder } from '../../models/finance/FeeReminder';
 import { AgentAction } from '../../models/juvi/AgentAction';
 import { AgentConversation } from '../../models/juvi/AgentConversation';
 import { SituationDismissal } from '../../models/juvi/SituationDismissal';
+import { clearAICache } from '../../shared/cache/ai-feature-cache';
 
 let api: TestApi;
 let fx: BaseFixtures;
@@ -260,10 +261,17 @@ afterAll(async () => {
   await cleanupTestApp();
 });
 
-beforeEach(() => {
+beforeEach(async () => {
   completeMock.mockReset();
   streamMock.mockReset();
   addJobMock.mockClear();
+
+  // Drop the server-side daily AI cache (shared/cache/ai-feature-cache.ts).
+  // Its keys are collegeId + date, so without this every test after the first
+  // gets the previous test's cached narrative/situations/scores and never
+  // reaches the mocked LLM at all — which made the degraded-path and
+  // per-request assertions below silently test the cache instead.
+  await clearAICache();
 });
 
 afterEach(async () => {
@@ -472,9 +480,11 @@ describe('POST /api/juvi/finance-agent/risk-scores', () => {
       .send({ studentIds: ids })
       .expect(200);
 
-    expect(Array.isArray(res.body)).toBe(true);
-    expect(res.body).toHaveLength(3);
-    for (const r of res.body) {
+    // The daily AI cache changed this response from a bare array to
+    // { scores, cachedAt } so the client can show cache provenance.
+    expect(Array.isArray(res.body.scores)).toBe(true);
+    expect(res.body.scores).toHaveLength(3);
+    for (const r of res.body.scores) {
       expect(r.studentId).toBeTruthy();
       expect(r.tier).toMatch(/low|medium|high|critical|insufficient-data/);
       expect(Array.isArray(r.factors)).toBe(true);
@@ -500,8 +510,8 @@ describe('POST /api/juvi/finance-agent/risk-scores', () => {
       .send({ studentIds: ids, includeNarrative: true })
       .expect(200);
 
-    expect(res.body).toHaveLength(2);
-    for (const r of res.body) {
+    expect(res.body.scores).toHaveLength(2);
+    for (const r of res.body.scores) {
       expect(r.narrative).toBe('High risk because of long overdue.');
     }
   });
@@ -586,9 +596,11 @@ describe('POST /api/juvi/finance-agent/situations', () => {
       .send({})
       .expect(200);
 
-    expect(Array.isArray(res.body)).toBe(true);
-    expect(res.body.length).toBeGreaterThanOrEqual(1);
-    const s = res.body[0];
+    // The daily AI cache changed this response from a bare array to
+    // { situations, cachedAt } so the client can show cache provenance.
+    expect(Array.isArray(res.body.situations)).toBe(true);
+    expect(res.body.situations.length).toBeGreaterThanOrEqual(1);
+    const s = res.body.situations[0];
     expect(s.id).toBeTruthy();
     expect(s.fingerprint).toBeTruthy();
     expect(s.kind).toBe('holds-without-review');

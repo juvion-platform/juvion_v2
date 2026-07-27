@@ -96,6 +96,7 @@ export default function CounselingSessionsPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No counseling sessions match “${search}”.` : 'No counseling sessions yet.'}
       />
 
       <Pagination

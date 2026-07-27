@@ -95,6 +95,7 @@ export default function AlumniProfilesPage() {
         rowProps={(r: any) => highlightAttrs(
           typeof r.personId === 'string' ? r.personId : r.personId?._id,
         )}
+        emptyMessage={search ? `No alumni profiles match “${search}”.` : 'No alumni profiles yet.'}
       />
       <Pagination
         page={page}

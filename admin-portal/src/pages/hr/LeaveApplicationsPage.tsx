@@ -176,6 +176,7 @@ export default function LeaveApplicationsPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No leave applications match “${search}”.` : 'No leave applications yet.'}
       />
 
       <Pagination

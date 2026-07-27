@@ -166,6 +166,7 @@ export default function PaymentsPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No payments match “${search}”.` : 'No payments yet.'}
       />
 
       <Pagination

@@ -85,7 +85,9 @@ export default function ComplianceCriteriaPage() {
       </div>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No compliance criteria match “${search}”.` : 'No compliance criteria yet.'}
+      />
 
       <Pagination
         page={page}

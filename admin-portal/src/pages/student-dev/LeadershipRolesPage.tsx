@@ -86,7 +86,9 @@ export default function LeadershipRolesPage() {
       </div>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No leadership roles match “${search}”.` : 'No leadership roles yet.'}
+      />
 
       <Pagination
         page={page}

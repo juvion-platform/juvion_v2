@@ -99,7 +99,9 @@ export default function StudentProjectsPage() {
       </div>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No student projects match “${search}”.` : 'No student projects yet.'}
+      />
 
       <Pagination
         page={page}

@@ -80,7 +80,9 @@ export default function CourseOfferingsPage() {
       </div>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No course offerings match “${search}”.` : 'No course offerings yet.'}
+      />
 
       <Pagination
         page={page}

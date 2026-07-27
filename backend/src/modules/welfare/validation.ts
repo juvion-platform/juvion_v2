@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { refineRange } from "../../shared/validation-helpers";
 
 // ═══ Hostel Block ════════════════════════════════════════
 export const createHostelBlockSchema = z.object({
@@ -34,7 +35,7 @@ export const createHostelAllocationSchema = z.object({
 export const updateHostelAllocationSchema = createHostelAllocationSchema.partial();
 
 // ═══ Hostel Visitor Log ══════════════════════════════════
-export const createHostelVisitorLogSchema = z.object({
+const hostelVisitorLogShape = z.object({
   studentId: z.string().min(1),
   visitorName: z.string().min(1),
   visitorRelation: z.string().min(1),
@@ -43,7 +44,15 @@ export const createHostelVisitorLogSchema = z.object({
   outTime: z.string().optional(),
   purpose: z.string().min(1),
 });
-export const updateHostelVisitorLogSchema = createHostelVisitorLogSchema.partial();
+// A visitor leaving before they arrived was accepted silently.
+const visitTimeRange = refineRange({
+  startField: 'inTime',
+  endField: 'outTime',
+  allowEqual: false,
+  message: 'Out-time must be after in-time',
+});
+export const createHostelVisitorLogSchema = hostelVisitorLogShape.superRefine(visitTimeRange);
+export const updateHostelVisitorLogSchema = hostelVisitorLogShape.partial().superRefine(visitTimeRange);
 
 // ═══ Mess Menu ═══════════════════════════════════════════
 export const createMessMenuSchema = z.object({

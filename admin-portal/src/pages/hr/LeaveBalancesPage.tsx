@@ -100,6 +100,7 @@ export default function LeaveBalancesPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No leave balances match “${search}”.` : 'No leave balances yet.'}
       />
 
       <Pagination

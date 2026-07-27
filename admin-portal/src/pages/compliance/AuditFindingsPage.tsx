@@ -91,7 +91,9 @@ export default function AuditFindingsPage() {
       </div>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No audit findings match “${search}”.` : 'No audit findings yet.'}
+      />
 
       <Pagination
         page={page}

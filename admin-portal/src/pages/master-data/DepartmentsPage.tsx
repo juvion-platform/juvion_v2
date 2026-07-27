@@ -93,6 +93,7 @@ export default function DepartmentsPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No departments match “${search}”.` : 'No departments yet.'}
       />
 
       <Pagination

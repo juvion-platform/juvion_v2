@@ -89,6 +89,7 @@ export default function AlumniEventsPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No alumni events match “${search}”.` : 'No alumni events yet.'}
       />
       <Pagination
         page={page}

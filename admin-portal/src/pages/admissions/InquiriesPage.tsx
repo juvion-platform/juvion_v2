@@ -169,6 +169,7 @@ export default function InquiriesPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={(r: any) => openDetail(r)}
+        emptyMessage={search ? `No inquiries match “${search}”.` : 'No inquiries yet.'}
       />
 
       <Pagination

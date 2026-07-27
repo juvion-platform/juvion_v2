@@ -95,6 +95,7 @@ export default function HostelRoomsPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No hostel rooms match “${search}”.` : 'No hostel rooms yet.'}
       />
 
       <Pagination

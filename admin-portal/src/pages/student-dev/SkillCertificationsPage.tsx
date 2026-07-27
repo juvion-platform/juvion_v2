@@ -85,7 +85,9 @@ export default function SkillCertificationsPage() {
       </div>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No skill certifications match “${search}”.` : 'No skill certifications yet.'}
+      />
 
       <Pagination
         page={page}

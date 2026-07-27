@@ -84,7 +84,9 @@ export default function ClubsPage() {
       </div>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No clubs match “${search}”.` : 'No clubs yet.'}
+      />
 
       <Pagination
         page={page}

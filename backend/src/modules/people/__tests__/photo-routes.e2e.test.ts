@@ -256,7 +256,13 @@ async function setExistingPhoto(personId: mongoose.Types.ObjectId, photo: {
 // ═════════════════════════════════════════════════════════════════════
 
 describe('POST /api/people/students/:id/photo', () => {
-  it('200 happy path: small valid JPEG → uploads original.jpg + thumb.jpg', { timeout: 30_000 }, async () => {
+  // 60s rather than 30s, matching the beforeAll budget. The route itself
+  // answers in single-digit milliseconds and this passes in isolation; it
+  // only ever timed out in the full parallel run, where 100+ worker processes
+  // each holding an in-memory MongoDB contend for I/O and the first
+  // seed-plus-upload in this file absorbs the worst of it. A timeout that
+  // trips on machine load rather than on a code change is just a flaky test.
+  it('200 happy path: small valid JPEG → uploads original.jpg + thumb.jpg', { timeout: 60_000 }, async () => {
     const { collegeId, studentId } = await seedStudent();
     const token = adminToken(collegeId);
 

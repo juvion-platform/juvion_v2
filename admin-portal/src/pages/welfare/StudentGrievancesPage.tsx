@@ -101,6 +101,7 @@ export default function StudentGrievancesPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No student grievances match “${search}”.` : 'No student grievances yet.'}
       />
 
       <Pagination

@@ -75,7 +75,9 @@ export default function AccreditationBodiesPage() {
       </div>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No accreditation bodies match “${search}”.` : 'No accreditation bodies yet.'}
+      />
 
       <Pagination
         page={page}

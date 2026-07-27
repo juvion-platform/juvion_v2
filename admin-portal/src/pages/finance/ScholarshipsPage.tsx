@@ -93,6 +93,7 @@ export default function ScholarshipsPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No scholarships match “${search}”.` : 'No scholarships yet.'}
       />
 
       <Pagination

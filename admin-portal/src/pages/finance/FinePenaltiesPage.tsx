@@ -118,6 +118,7 @@ export default function FinePenaltiesPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No fines & penalties match “${search}”.` : 'No fines & penalties yet.'}
       />
 
       <Pagination

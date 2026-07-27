@@ -80,7 +80,9 @@ export default function IQACReportsPage() {
       </div>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No iqac reports match “${search}”.` : 'No iqac reports yet.'}
+      />
 
       <Pagination
         page={page}

@@ -92,6 +92,7 @@ export default function PayStructuresPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No pay structures match “${search}”.` : 'No pay structures yet.'}
       />
 
       <Pagination

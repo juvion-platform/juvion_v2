@@ -86,7 +86,9 @@ export default function EventRegistrationsPage() {
       </div>
       </div>
 
-      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView} />
+      <DataTable columns={columns} data={data?.items || []} loading={isLoading} rowKey={(r: any) => r._id} onRowClick={vem.openForView}
+        emptyMessage={search ? `No event registrations match “${search}”.` : 'No event registrations yet.'}
+      />
 
       <Pagination
         page={page}

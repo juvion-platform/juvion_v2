@@ -96,6 +96,7 @@ export default function TrainingsPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No trainings match “${search}”.` : 'No trainings yet.'}
       />
 
       <Pagination

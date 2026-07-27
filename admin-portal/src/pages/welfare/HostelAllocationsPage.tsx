@@ -103,6 +103,7 @@ export default function HostelAllocationsPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No hostel allocations match “${search}”.` : 'No hostel allocations yet.'}
       />
 
       <Pagination

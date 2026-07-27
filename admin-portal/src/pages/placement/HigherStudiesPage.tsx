@@ -93,6 +93,7 @@ export default function HigherStudiesPage() {
         loading={isLoading}
         rowKey={(r: any) => r._id}
         onRowClick={vem.openForView}
+        emptyMessage={search ? `No higher studies applications match “${search}”.` : 'No higher studies applications yet.'}
       />
       <Pagination
         page={page}

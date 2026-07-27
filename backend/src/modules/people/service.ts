@@ -13,6 +13,7 @@ import * as feePinService from '../finance/fee-pin-service';
 import { resolveStudentYearOfStudy } from '../finance/resolve-year-of-study';
 import { AuthScope } from '../../shared/rbac/types';
 import { applyAuthScope } from '../../shared/rbac/apply-scope';
+import { ALL_PERSONAS } from '../../shared/rbac/personas';
 import {
   getFacultyProfileCompleteness,
   getOrganizationProfileCompleteness,
@@ -76,6 +77,10 @@ export async function getDashboardStats(collegeId: string) {
     onboardingCompleted,
     onboardingNeedsAttention,
     missingFeeResponsibleGuardians,
+    // The Persona Catalog card had no stat to read, so it rendered blank.
+    // Personas are a static code list (shared/rbac/personas.ts), not a
+    // collection, so the count comes from there rather than a countDocuments.
+    personas: ALL_PERSONAS.length,
   };
 }
 
