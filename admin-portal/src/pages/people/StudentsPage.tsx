@@ -6,11 +6,13 @@ import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import PersonThumbnail from '../../components/people/PersonThumbnail';
 import { useHighlightRow } from '../../hooks/useHighlightRow';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Upload } from 'lucide-react';
 import { confirmAction } from '../../stores/confirmStore';
 import Pagination from '../../components/ui/Pagination';
 import { useListControls } from '../../hooks/useListControls';
 import SearchInput from '../../components/ui/SearchInput';
+import StudentImportDrawer from '../../components/people/StudentImportDrawer';
+import { useAuthStore } from '../../stores/authStore';
 
 const STATUS_COLOR: Record<string, string> = {
   prospective: 'default', active: 'success', year_back: 'warning', detained: 'danger',
@@ -28,6 +30,8 @@ export default function StudentsPage() {
   const [filterOnboardingStatus, setFilterOnboardingStatus] = useState(searchParams.get('onboardingStatus') || '');
   const [needsAttention, setNeedsAttention] = useState(searchParams.get('needsAttention') === 'true' || searchParams.get('needsAttention') === '1');
   const [search, setSearch] = useState(searchParams.get('search') || '');
+  const [importOpen, setImportOpen] = useState(false);
+  const canCreate = useAuthStore((s) => s.hasPermission('people', 'create'));
 
   function syncSearchParams(next: { status?: string; onboardingStatus?: string; search?: string; needsAttention?: boolean }) {
     const params = new URLSearchParams();
@@ -128,6 +132,14 @@ export default function StudentsPage() {
             }} className="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
             Needs action
           </label>
+          {canCreate && (
+            <button
+              onClick={() => setImportOpen(true)}
+              className="flex items-center gap-2 rounded-lg border border-primary-200 px-4 py-2 text-sm text-primary-700 transition hover:bg-primary-50"
+            >
+              <Upload size={16} /> Import
+            </button>
+          )}
           <button onClick={() => navigate('/people/students/new')} className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700">
             <Plus size={16} className="text-white" /> Add Student
           </button>
@@ -152,6 +164,8 @@ export default function StudentsPage() {
         onPageChange={setPage}
         onLimitChange={setLimit}
       />
+
+      <StudentImportDrawer open={importOpen} onClose={() => setImportOpen(false)} />
     </div>
   );
 }
