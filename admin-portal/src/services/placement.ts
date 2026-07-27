@@ -178,3 +178,119 @@ export const createPlacementReport = (data: any) =>
   api.post(`${BASE}/reports`, data).then(r => r.data);
 export const deletePlacementReport = (id: string) =>
   api.delete(`${BASE}/reports/${id}`).then(r => r.data);
+
+// ═══════════════════════════════════════════════════════════
+// W04 workflow surfaces
+// These endpoints existed server-side with no frontend at all.
+// ═══════════════════════════════════════════════════════════
+
+// ─── Drives ───────────────────────────────────────────────
+export const listDrives = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/drives`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
+export const getDrive = (id: string) =>
+  api.get(`${BASE}/drives/${id}`).then(r => r.data);
+export const createDrive = (data: any) =>
+  api.post(`${BASE}/drives`, data).then(r => r.data);
+export const updateDriveStatus = (id: string, status: string) =>
+  api.put(`${BASE}/drives/${id}/status`, { status }).then(r => r.data);
+export const cancelDrive = (id: string, reason?: string) =>
+  api.post(`${BASE}/drives/${id}/cancel`, { reason }).then(r => r.data);
+export const closeDrive = (id: string) =>
+  api.put(`${BASE}/drives/${id}/close`, {}).then(r => r.data);
+export const generateDriveShortlist = (id: string) =>
+  api.post(`${BASE}/drives/${id}/generate-shortlist`, {}).then(r => r.data);
+export const releaseDriveShortlist = (id: string) =>
+  api.put(`${BASE}/drives/${id}/release-shortlist`, {}).then(r => r.data);
+
+// ─── Drive applications ───────────────────────────────────
+export const listDriveApplications = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/drive-applications`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
+export const withdrawDriveApplication = (id: string, withdrawalReason?: string) =>
+  api.post(`${BASE}/drive-applications/${id}/withdraw`, { withdrawalReason }).then(r => r.data);
+
+// ─── Interview schedules ──────────────────────────────────
+export const listInterviewSchedules = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/interview-schedules`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
+export const setInterviewOutcome = (id: string, outcome: string) =>
+  api.put(`${BASE}/interview-schedules/${id}/outcome`, { outcome }).then(r => r.data);
+
+// ─── Career profiles ──────────────────────────────────────
+export const listCareerProfiles = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/career-profiles`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
+export const updateCareerProfile = (id: string, data: any) =>
+  api.put(`${BASE}/career-profiles/${id}`, data).then(r => r.data);
+export const refreshCareerProfileAcademic = (id: string) =>
+  api.post(`${BASE}/career-profiles/${id}/refresh-academic`, {}).then(r => r.data);
+
+// ─── Readiness scores (computed; no manual create) ────────
+export const listReadinessScores = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/readiness-scores`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
+export const computeReadinessScores = () =>
+  api.post(`${BASE}/readiness-scores/compute-batch`, {}).then(r => r.data);
+
+// ─── Skill records ────────────────────────────────────────
+export const listSkillRecords = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/skill-records`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
+export const createSkillRecord = (data: any) =>
+  api.post(`${BASE}/skill-records`, data).then(r => r.data);
+export const updateSkillRecord = (id: string, data: any) =>
+  api.put(`${BASE}/skill-records/${id}`, data).then(r => r.data);
+export const deleteSkillRecord = (id: string) =>
+  api.delete(`${BASE}/skill-records/${id}`).then(r => r.data);
+
+// ─── Placement bars ───────────────────────────────────────
+export const listPlacementBars = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/placement-bars`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
+export const createPlacementBar = (data: any) =>
+  api.post(`${BASE}/placement-bars`, data).then(r => r.data);
+export const liftPlacementBar = (id: string, liftConditions?: string) =>
+  api.put(`${BASE}/placement-bars/${id}/lift`, { liftConditions }).then(r => r.data);
+
+// ─── Opt-outs ─────────────────────────────────────────────
+export const listOptOuts = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/opt-outs`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
+export const createOptOut = (data: any) =>
+  api.post(`${BASE}/opt-outs`, data).then(r => r.data);
+export const voidOptOut = (id: string, voidReason?: string) =>
+  api.put(`${BASE}/opt-outs/${id}/void`, { voidReason }).then(r => r.data);
+
+// ─── Recruiter accounts ───────────────────────────────────
+export const listRecruiterAccounts = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/recruiter-accounts`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
+export const createRecruiterAccount = (data: any) =>
+  api.post(`${BASE}/recruiter-accounts`, data).then(r => r.data);
+export const verifyRecruiterAccount = (id: string) =>
+  api.put(`${BASE}/recruiter-accounts/${id}/verify`, {}).then(r => r.data);
+export const deactivateRecruiterAccount = (id: string, deactivationReason?: string) =>
+  api.put(`${BASE}/recruiter-accounts/${id}/deactivate`, { deactivationReason }).then(r => r.data);
+
+// ─── Alumni career records ────────────────────────────────
+export const listAlumniCareerRecords = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/alumni-career-records`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
+export const createAlumniCareerRecord = (data: any) =>
+  api.post(`${BASE}/alumni-career-records`, data).then(r => r.data);
+export const updateAlumniCareerRecord = (id: string, data: any) =>
+  api.put(`${BASE}/alumni-career-records/${id}`, data).then(r => r.data);
+
+// ─── Alumni engagements ───────────────────────────────────
+export const listAlumniEngagements = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/alumni-engagements`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
+
+// ─── Mentor matches ───────────────────────────────────────
+export const listMentorMatches = (page = 1, limit = 20, search?: string) =>
+  api.get(`${BASE}/mentor-matches`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
+export const createAlumniEngagement = (data: any) =>
+  api.post(`${BASE}/alumni-engagements`, data).then(r => r.data);
+export const remindAlumniEngagement = (id: string) =>
+  api.post(`${BASE}/alumni-engagements/${id}/remind`, {}).then(r => r.data);
+
+export const createMentorMatch = (data: any) =>
+  api.post(`${BASE}/mentor-matches`, data).then(r => r.data);
+export const approveMentorMatch = (id: string) =>
+  api.post(`${BASE}/mentor-matches/${id}/approve`, {}).then(r => r.data);
+export const introduceMentorMatch = (id: string) =>
+  api.post(`${BASE}/mentor-matches/${id}/introduce`, {}).then(r => r.data);
+export const activateMentorMatch = (id: string) =>
+  api.post(`${BASE}/mentor-matches/${id}/activate`, {}).then(r => r.data);
+export const closeMentorMatch = (id: string) =>
+  api.post(`${BASE}/mentor-matches/${id}/close`, {}).then(r => r.data);
