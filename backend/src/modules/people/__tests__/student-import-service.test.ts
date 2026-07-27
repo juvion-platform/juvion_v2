@@ -129,6 +129,30 @@ describe('parentExistsByPhone', () => {
     const { parentExistsByPhone } = await import('../student-import-service');
     expect(await parentExistsByPhone(collegeId, baseRow().phone)).toBe(false);
   });
+
+  // Two-Person variant that actually distinguishes "search for an existing
+  // Parent across every matching Person" from "exclude Student/Faculty
+  // Persons FIRST, then search among what's left". A single matching
+  // Person can never tell these apart (there's no ambiguity to resolve).
+  it('ignores a legacy self-guardian Parent on a Student and still agrees with what commit would do', async () => {
+    const { id } = await commitStudentRow({ ...baseRow(), rollNumber: 'R3' }, ctx());
+    const student = await Student.findById(id);
+
+    // Simulate data corrupted by the pre-override code path: a Parent
+    // record wrongly attached directly to the student's OWN Person.
+    await Parent.create({ collegeId, personId: student!.personId, relationship: 'guardian' });
+
+    // A second, unrelated Person shares the same phone (the realistic
+    // shared-family-number case) and is not a Student or Faculty member.
+    await Person.create({ collegeId, name: 'Family Member', phone: baseRow().phone });
+
+    const { parentExistsByPhone } = await import('../student-import-service');
+    // The corrupted self-guardian Parent must not count: commit's
+    // linkOrCreateParent would ignore it too (it excludes Student Persons
+    // before searching for an existing Parent) and would create a FRESH
+    // guardian attached to the eligible non-student Person instead.
+    expect(await parentExistsByPhone(collegeId, baseRow().phone)).toBe(false);
+  });
 });
 
 describe('commitStudentRow — update', () => {
@@ -137,6 +161,77 @@ describe('commitStudentRow — update', () => {
     const second = await commitStudentRow({ ...baseRow(), rollNumber: 'R1', category: 'OC' }, ctx());
     expect(second.id).toBe(first.id);
     expect(await Student.countDocuments({ collegeId })).toBe(1);
+  });
+
+  // Spec: "match found; the row's supplied fields are applied." A column
+  // the re-import omits must never overwrite a value already on file.
+  it('does not wipe a stored address when the re-import row omits address columns', async () => {
+    const first = await commitStudentRow(
+      { ...baseRow(), rollNumber: 'R1', addressLine1: 'MG Road', city: 'Pune', state: 'MH', pincode: '411001' },
+      ctx(),
+    );
+    const studentBefore = await Student.findById(first.id);
+    const personBefore = await Person.findById(studentBefore!.personId);
+    expect(personBefore!.address.line1).toBe('MG Road');
+
+    // Re-import carries no address columns at all — only category changed.
+    const second = await commitStudentRow({ ...baseRow(), rollNumber: 'R1', category: 'OC' }, ctx());
+    expect(second.id).toBe(first.id);
+
+    const personAfter = await Person.findById(studentBefore!.personId);
+    expect(personAfter!.address.line1).toBe('MG Road');
+    expect(personAfter!.address.city).toBe('Pune');
+    expect(personAfter!.address.state).toBe('MH');
+    expect(personAfter!.address.pincode).toBe('411001');
+  });
+
+  // year_back/withdrawn/expelled/deceased are not in BLOCKED_STATUSES, so a
+  // naive unconditional `status: cell(...) || 'active'` on update silently
+  // reactivates them on every re-import that doesn't carry a status column.
+  // That default is spec'd for CREATE only ("an imported student is
+  // normally already admitted").
+  it('does not reset a non-blocked lifecycle status back to active on re-import', async () => {
+    const first = await commitStudentRow({ ...baseRow(), rollNumber: 'R1' }, ctx());
+    await Student.findByIdAndUpdate(first.id, { status: 'year_back' });
+
+    const second = await commitStudentRow({ ...baseRow(), rollNumber: 'R1', category: 'OC' }, ctx());
+    expect(second.id).toBe(first.id);
+
+    expect((await Student.findById(second.id))!.status).toBe('year_back');
+  });
+});
+
+describe('commitStudentRow — update rollback', () => {
+  it('restores the Person to its prior values when the Student update fails', async () => {
+    const first = await commitStudentRow(
+      { ...baseRow(), rollNumber: 'R1', email: 'aarav@example.com', addressLine1: 'Old House', city: 'Hyderabad' },
+      ctx(),
+    );
+    const studentBefore = await Student.findById(first.id);
+    const personId = studentBefore!.personId;
+
+    vi.spyOn(Student, 'updateOne').mockRejectedValueOnce(new Error('E11000 duplicate key'));
+
+    await expect(
+      commitStudentRow(
+        {
+          ...baseRow(), rollNumber: 'R1', email: 'changed@example.com',
+          addressLine1: 'New House', city: 'Bengaluru', category: 'OC',
+        },
+        ctx(),
+      ),
+    ).rejects.toThrow(/duplicate key/);
+
+    // The Person write that happened BEFORE the failing Student write must
+    // be rolled back to its pre-update values — not left half-applied.
+    const personAfter = await Person.findById(personId);
+    expect(personAfter!.email).toBe('aarav@example.com');
+    expect(personAfter!.address.line1).toBe('Old House');
+    expect(personAfter!.address.city).toBe('Hyderabad');
+
+    // And the Student itself must be untouched by the failed update.
+    const studentAfter = await Student.findById(first.id);
+    expect(studentAfter!.category).toBeUndefined();
   });
 });
 
