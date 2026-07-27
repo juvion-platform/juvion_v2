@@ -60,4 +60,16 @@ describe('student import schema', () => {
     expect(y.validate('1', {}, { collegeId: 'c', performedBy: 'p' }).ok).toBe(true);
     expect(y.validate('9', {}, { collegeId: 'c', performedBy: 'p' }).ok).toBe(false);
   });
+
+  // Regression test: Aadhaar is printed on the physical card grouped as
+  // "XXXX XXXX XXXX", so operators paste it that way. The value stored must
+  // be the normalized 12-digit form (not the spaced original) so it stays
+  // consistent with the exact-equality Aadhaar lookup in
+  // matchExistingStudent (Person.find({ collegeId, aadhaar })).
+  it('accepts a grouped-format Aadhaar and normalizes it to 12 digits', () => {
+    const a = def!.fields.find((f) => f.fieldKey === 'aadhaar')!;
+    const res = a.validate('2345 6789 0101', {}, { collegeId: 'c', performedBy: 'p' });
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.value).toBe('234567890101');
+  });
 });

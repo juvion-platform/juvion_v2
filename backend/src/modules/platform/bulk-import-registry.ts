@@ -7,10 +7,10 @@
  * to turn a parsed CSV row into the canonical write to the target
  * collection.
  *
- * Strategic Gap 2 Phase A ships only the 'student' entry as proof-of-
- * pattern. Phase B will extend with applicants / faculty / staff /
- * subjects / fee-structures by appending more entries here — zero
- * new infrastructure code required.
+ * Strategic Gap 2 Phase A shipped the 'student' entry as proof-of-pattern;
+ * Phase B added faculty / staff / applicant / programme. Future phases can
+ * extend with subjects / fee-structures by appending more entries here —
+ * zero new infrastructure code required.
  */
 
 import * as peopleService from '../people/service';

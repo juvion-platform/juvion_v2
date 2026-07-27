@@ -59,6 +59,16 @@ export function validEnum(opts: { required: boolean; values: ReadonlyArray<strin
   };
 }
 
+/**
+ * Deliberately strict: 10 bare digits, no `+91`, spaces, or hyphens tolerated.
+ * This matches the inline validator it replaced exactly (no widening), and
+ * `phone` is used as an exact-equality natural key in several places —
+ * `Person.find({ collegeId, phone })` in student-import-service.ts
+ * (linkOrCreateParent / parentExistsByPhone) and the phone+admissionYear
+ * fallback in matchExistingStudent. Accepting punctuated input would require
+ * normalizing to a single canonical stored form everywhere that key is
+ * compared, which is a separate, deliberate decision this fix does not make.
+ */
 export function validPhone(opts: { required: boolean }) {
   return (raw: string): Res<string> => {
     const v = raw.trim();
@@ -68,15 +78,29 @@ export function validPhone(opts: { required: boolean }) {
   };
 }
 
+/**
+ * Strips internal whitespace before validating/storing. Aadhaar is printed
+ * on the physical card in a grouped "XXXX XXXX XXXX" format, so operators
+ * commonly paste it that way — the inline validator this replaced stripped
+ * whitespace for exactly this reason (`.replace(/\s+/g, '')`), and dropping
+ * that in the extraction was a regression. The stored `value` is the
+ * normalized 12-digit form, not the spaced original, so it stays consistent
+ * with the exact-equality Aadhaar lookup in matchExistingStudent
+ * (`Person.find({ collegeId, aadhaar })`) — a spaced value stored today would
+ * never match a compact value looked up tomorrow.
+ */
 export function validAadhaar(opts: { required: boolean }) {
   return (raw: string): Res<string> => {
-    const v = raw.trim();
+    const v = raw.trim().replace(/\s+/g, '');
     if (!v) return opts.required ? { ok: false, error: 'required' } : { ok: true, value: '' };
     if (!/^[0-9]{12}$/.test(v)) return { ok: false, error: 'must be 12 digits' };
     return { ok: true, value: v };
   };
 }
 
+// Checked against the inline validator it replaced: no internal-whitespace
+// stripping there either, and a YYYY-MM-DD date isn't realistically pasted
+// with internal spaces the way a grouped Aadhaar number is. No change needed.
 export function validDate(opts: { required: boolean }) {
   return (raw: string): Res<string> => {
     const v = raw.trim();
@@ -87,6 +111,8 @@ export function validDate(opts: { required: boolean }) {
   };
 }
 
+// Checked against the inline validator it replaced: identical regex, no
+// whitespace-stripping there either. No change needed.
 export function validEmail(opts: { required: boolean }) {
   return (raw: string): Res<string> => {
     const v = raw.trim();
