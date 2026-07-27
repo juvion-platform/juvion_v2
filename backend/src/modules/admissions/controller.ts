@@ -68,6 +68,10 @@ export async function updateExamScore(req: AuthRequest, res: Response, next: Nex
   try { res.json(await svc.updateExamScore(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
 }
 
+export async function deleteExamScore(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await svc.deleteExamScore(req.collegeId!, req.params.id as string, who(req))); } catch (e) { next(e); }
+}
+
 // ─── Counseling Allotments ───────────────────────────────────
 export async function listCounselingAllotments(req: AuthRequest, res: Response, next: NextFunction) {
   try {
@@ -82,6 +86,10 @@ export async function createCounselingAllotment(req: AuthRequest, res: Response,
 
 export async function updateCounselingAllotment(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await svc.updateCounselingAllotment(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
+}
+
+export async function deleteCounselingAllotment(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await svc.deleteCounselingAllotment(req.collegeId!, req.params.id as string, who(req))); } catch (e) { next(e); }
 }
 
 // ─── Admission Offers ────────────────────────────────────────
@@ -130,6 +138,10 @@ export async function getAdmission(req: AuthRequest, res: Response, next: NextFu
 
 export async function createAdmission(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.status(201).json(await svc.createAdmission(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
+}
+
+export async function deleteAdmission(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await svc.deleteAdmission(req.collegeId!, req.params.id as string, who(req))); } catch (e) { next(e); }
 }
 
 export async function updateAdmission(req: AuthRequest, res: Response, next: NextFunction) {

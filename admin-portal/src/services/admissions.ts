@@ -60,6 +60,9 @@ export const createExamScore = (data: any) =>
 export const updateExamScore = (id: string, data: any) =>
   api.put(`${BASE}/exam-scores/${id}`, data).then(r => r.data);
 
+export const deleteExamScore = (id: string) =>
+  api.delete(`${BASE}/exam-scores/${id}`).then(r => r.data);
+
 // ─── Counseling ────────────────────────────────────────
 export const listCounseling = (page = 1, limit = 20, applicantId?: string, search?: string) =>
   api.get(`${BASE}/counseling`, { params: { page, limit, applicantId, ...(search ? { search } : {}) } }).then(r => r.data);
@@ -69,6 +72,9 @@ export const createCounseling = (data: any) =>
 
 export const updateCounseling = (id: string, data: any) =>
   api.put(`${BASE}/counseling/${id}`, data).then(r => r.data);
+
+export const deleteCounseling = (id: string) =>
+  api.delete(`${BASE}/counseling/${id}`).then(r => r.data);
 
 // ─── Offers ────────────────────────────────────────────
 export const listOffers = (page = 1, limit = 20, status?: string, search?: string) =>
@@ -99,6 +105,9 @@ export const createEnrollment = (data: any) =>
 
 export const updateEnrollment = (id: string, data: any) =>
   api.put(`${BASE}/enrollments/${id}`, data).then(r => r.data);
+
+export const deleteEnrollment = (id: string) =>
+  api.delete(`${BASE}/enrollments/${id}`).then(r => r.data);
 
 // ─── Workflow ──────────────────────────────────────────
 export const getWorkflowStats = () =>

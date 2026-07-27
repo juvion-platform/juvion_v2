@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { listExamScores, createExamScore, updateExamScore, listApplicants } from '../../services/admissions';
+import { listExamScores, createExamScore, updateExamScore, listApplicants , deleteExamScore} from '../../services/admissions';
 import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
-import { Plus, Pencil, ExternalLink } from 'lucide-react';
+import { Plus, Pencil, ExternalLink , Trash2} from 'lucide-react';
 import { useViewEditMode } from '../../hooks/useViewEditMode';
 import Pagination from '../../components/ui/Pagination';
 import { useListControls } from '../../hooks/useListControls';
+import { confirmDelete } from '../../stores/confirmStore';
 
 const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default";
 const manageLink = "inline-flex items-center gap-0.5 text-xs text-primary-500 hover:text-primary-700 font-medium ml-1";
@@ -53,6 +54,12 @@ export default function ExamScoresPage() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['exam-scores'] }); vem.close(); },
   });
 
+  const deleteMut = useMutation({
+    mutationFn: deleteExamScore,
+    meta: { action: 'delete' },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['exam-scores'] }); },
+  });
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const payload = {
@@ -75,9 +82,21 @@ export default function ExamScoresPage() {
     { key: 'year', label: 'Year' },
     { key: 'createdAt', label: 'Recorded', render: (r: any) => new Date(r.createdAt).toLocaleDateString() },
     { key: 'actions', label: '', sortable: false, render: (r: any) => (
-      <button onClick={(e) => { e.stopPropagation(); vem.openForEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit">
+      <div className="flex gap-1">
+        <button onClick={(e) => { e.stopPropagation(); vem.openForEdit(r); }} className="p-1 rounded hover:bg-amber-50" title="Edit">
         <Pencil size={15} className="text-amber-500" />
       </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            void confirmDelete('exam score').then((ok) => { if (ok) deleteMut.mutate(r._id); });
+          }}
+          className="p-1 rounded hover:bg-red-50"
+          title="Delete"
+        >
+          <Trash2 size={15} className="text-red-500" />
+        </button>
+      </div>
     )},
   ];
 
