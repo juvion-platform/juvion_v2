@@ -80,9 +80,35 @@ export const previewStudentImport = (file: File): Promise<ImportPreview> => {
     .then((r) => r.data);
 };
 
-export const commitStudentImport = (
-  jobId: string,
-): Promise<{ successCount: number; failureCount: number }> =>
+/**
+ * What the commit endpoint actually returns — a trimmed summary, not the
+ * whole ImportJob.
+ *
+ * The failed and blocked rows travel WITH the response on purpose. Per-row
+ * commit errors are recorded on the job, but the facade exposes only
+ * template / preview / commit and a Registrar cannot open
+ * /platform/bulk-imports to read a job (they hold people:*, not
+ * platform:read). If the counts and rows did not come back here, a 300-row
+ * import that half-failed would be indistinguishable from a clean one for
+ * the only persona this door exists for.
+ *
+ * Per-row detail is capped server-side at 100 entries; the counts are exact.
+ */
+export interface ImportCommitSummary {
+  jobId: string;
+  status: string;
+  totalRows: number;
+  successCount: number;
+  /** Rows that were attempted and threw. Blocked rows are NOT counted here. */
+  failureCount: number;
+  /** Rows the business rules refused to write. Never attempted. */
+  blockedCount: number;
+  errorSummary?: string;
+  failedRows: Array<{ row: number; error: string }>;
+  blockedRows: Array<{ row: number; reason: string }>;
+}
+
+export const commitStudentImport = (jobId: string): Promise<ImportCommitSummary> =>
   api.post(`${BASE}/commit`, { jobId }).then((r) => r.data);
 
 function csvCell(value: string): string {

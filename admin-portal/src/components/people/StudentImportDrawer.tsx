@@ -4,9 +4,10 @@ import { Upload, Download, Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import Modal from '../ui/Modal';
 import Badge from '../ui/Badge';
 import { confirmAction } from '../../stores/confirmStore';
+import { toast } from '../../stores/toastStore';
 import {
   getStudentImportTemplate, previewStudentImport, commitStudentImport, buildTemplateCsv,
-  type ImportPreview, type ImportPreviewRow,
+  type ImportPreview, type ImportPreviewRow, type ImportCommitSummary,
 } from '../../services/student-import';
 
 interface Props { open: boolean; onClose: () => void; }
@@ -15,6 +16,7 @@ export default function StudentImportDrawer({ open, onClose }: Props) {
   const qc = useQueryClient();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
+  const [result, setResult] = useState<ImportCommitSummary | null>(null);
 
   const { data: tpl } = useQuery({
     queryKey: ['student-import-template'],
@@ -32,16 +34,39 @@ export default function StudentImportDrawer({ open, onClose }: Props) {
 
   const commitMut = useMutation({
     mutationFn: (jobId: string) => commitStudentImport(jobId),
-    meta: { successMessage: 'Import committed' },
-    onSuccess: () => {
+    // The fixed "Import committed" toast used to fire whatever happened, and
+    // the response was thrown away — a half-failed import looked identical to
+    // a clean one. Per-row commit errors are recorded on the job, which a
+    // Registrar can never open (no platform:read, and the facade exposes no
+    // job endpoint), so the drawer is the only place they can ever surface.
+    // Toasting is handled below so it can tell the truth.
+    meta: { silent: true },
+    onSuccess: (summary) => {
       qc.invalidateQueries({ queryKey: ['students'] });
       qc.invalidateQueries({ queryKey: ['people-stats'] });
-      reset();
-      onClose();
+
+      const clean = summary.failureCount === 0 && summary.blockedCount === 0;
+      if (clean) {
+        toast.success(
+          `Imported ${summary.successCount} student${summary.successCount === 1 ? '' : 's'}`,
+        );
+        reset();
+        onClose();
+        return;
+      }
+      // Something did not land. Stay open, stay factual, and show which rows
+      // so the operator can fix the file rather than guess.
+      toast.warning(
+        'Import finished with problems',
+        summary.errorSummary
+          ?? `${summary.successCount} imported, ${summary.failureCount} failed, `
+            + `${summary.blockedCount} blocked.`,
+      );
+      setResult(summary);
     },
   });
 
-  function reset() { setFile(null); setPreview(null); }
+  function reset() { setFile(null); setPreview(null); setResult(null); }
 
   function downloadTemplate() {
     if (!tpl) return;
@@ -99,7 +124,81 @@ export default function StudentImportDrawer({ open, onClose }: Props) {
           </button>
         </div>
 
-        {!preview && (
+        {result && (
+          <div className="space-y-3" data-testid="import-result">
+            <div className="rounded-lg border border-amber-300 bg-amber-50 p-3">
+              <p className="text-sm font-semibold text-amber-900">
+                Import finished with problems
+              </p>
+              <p className="mt-1 text-sm text-amber-900">
+                {result.successCount} imported · {result.failureCount} failed
+                {result.blockedCount > 0 ? ` · ${result.blockedCount} blocked` : ''} of{' '}
+                {result.totalRows} row{result.totalRows === 1 ? '' : 's'}.
+              </p>
+              <p className="mt-1 text-xs text-amber-800">
+                Rows listed below were not written. Fix them in the source file and upload it
+                again — re-importing is safe, matched rows are updated rather than duplicated.
+              </p>
+            </div>
+
+            {result.failedRows.length > 0 && (
+              <div className="max-h-56 overflow-auto rounded-lg border">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-medium text-gray-600">Row</th>
+                      <th className="px-3 py-2 text-left font-medium text-gray-600">Failed because</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {result.failedRows.map((r) => (
+                      <tr key={`f-${r.row}`}>
+                        <td className="px-3 py-2 text-gray-500">{r.row}</td>
+                        <td className="px-3 py-2 text-xs text-red-700">{r.error}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {result.blockedRows.length > 0 && (
+              <div className="max-h-56 overflow-auto rounded-lg border">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-medium text-gray-600">Row</th>
+                      <th className="px-3 py-2 text-left font-medium text-gray-600">Blocked because</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {result.blockedRows.map((r) => (
+                      <tr key={`b-${r.row}`}>
+                        <td className="px-3 py-2 text-gray-500">{r.row}</td>
+                        <td className="px-3 py-2 text-xs text-amber-800">{r.reason}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 border-t pt-3">
+              <button type="button" onClick={reset} className="rounded-lg border px-4 py-2 text-sm">
+                Import another file
+              </button>
+              <button
+                type="button"
+                onClick={() => { reset(); onClose(); }}
+                className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!preview && !result && (
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700" htmlFor="student-import-file">
               CSV file
@@ -129,7 +228,7 @@ export default function StudentImportDrawer({ open, onClose }: Props) {
           </div>
         )}
 
-        {preview && (
+        {preview && !result && (
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-3 text-sm" data-testid="import-summary">
               <span className="inline-flex items-center gap-1 text-teal-700">
