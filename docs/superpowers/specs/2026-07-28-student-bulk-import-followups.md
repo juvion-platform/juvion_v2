@@ -1,12 +1,26 @@
 # Student Bulk Import — Known Follow-ups
 
 **Date:** 2026-07-28
-**Branch:** `feat/student-bulk-import`
-**Status:** Not blockers. The final whole-branch review returned SHIP with these logged.
+**Origin branch:** `feat/student-bulk-import` (merged as `1bb7f35`)
+**Status:** None were merge blockers. The final whole-branch review returned SHIP
+with these logged.
 
 These came out of the review passes and were deliberately left for later. They are
 recorded here because the review artifacts that produced them are scratch and do
 not survive.
+
+| # | Item | State |
+|---|------|-------|
+| 1 | Programme-less students have no route | Closed — premise was wrong; misleading message fixed |
+| 2 | All-blocked job reports `completed` | Closed — working as intended |
+| 3 | `validPhone` does no separator stripping | **Open**, deliberately deferred |
+| 4 | Audit `changes: []` on update | **Open**, house convention |
+| 5 | Non-deterministic guardian pick | Fixed |
+| 6 | No job-read endpoint for a Registrar | **Open**, needs a new endpoint |
+
+Items 3, 4 and 6 are the ones still worth doing. 3 is a scoped key-normalisation
+change; 4 is a codebase-wide convention question rather than a bug in this
+feature; 6 is a small new endpoint plus a UI affordance.
 
 ## 1. ~~Legacy students with no programme have no route to get one~~ — RESOLVED, and the premise was wrong
 
@@ -42,8 +56,16 @@ misdescribes the system is worse than no note.
 
 ## 2. An all-blocked job reports `status: 'completed'`
 
-`platform/bulk-import-service.ts:605`. A job whose every row was blocked finishes
-as `completed` with zero writes. Cosmetic, but it reads as success in the job list.
+**Closed 2026-07-28 as working-as-intended.** `platform/bulk-import-service.ts`.
+A job whose every row was blocked does finish as `completed` with zero writes,
+but the status ladder deliberately excludes blocked rows — the code says why: "a
+job whose only anomaly is a sealed record did not partially fail, it did exactly
+what preview said it would." And `errorSummary` is not silent about it; it reads
+`Committed 0 of 3 rows; 3 blocked and not written.`
+
+Adding a `blocked` value to the status enum would ripple into the platform UI's
+status badges and filters for no information gain over the summary already
+persisted. Left alone.
 
 ## 3. `validPhone` does no separator stripping
 
@@ -61,11 +83,18 @@ changed, never *what*. This is the pervasive house convention (72 uses in
 it is precisely what would have made the address-wipe and status-flip defects
 found in review detectable after the fact rather than only by reading the diff.
 
-## 5. Non-deterministic guardian pick
+## 5. ~~Non-deterministic guardian pick~~ — FIXED
 
-`people/student-import-service.ts`. When several non-student, non-faculty Persons
-share a phone, the guardian chosen is `eligible[0]` with no explicit sort. Stable
-in practice, arbitrary in principle.
+**Closed 2026-07-28.** Both reads in `linkOrCreateParent` now `.sort({ _id: 1 })`
+— the `Person.find` by phone and the existing-`Parent` lookup among eligible
+Persons. ObjectIds are monotonic by creation time, so the rule is "prefer the
+person who has existed longest": arbitrary, but stable and explainable.
+
+Note the accompanying test is a **guard, not a regression test**. It passes with
+the sort removed, because `mongodb-memory-server` returns insertion order anyway.
+Real MongoDB guarantees no natural order, so the sort matters in production and
+cannot be proven here. The test comment says as much, so nobody deletes the sort
+because "the test still passes without it."
 
 ## 6. Commit returns a trimmed summary, but there is still no job-read endpoint
 
