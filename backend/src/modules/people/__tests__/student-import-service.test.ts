@@ -5,8 +5,10 @@ import { Person } from '../../../models/people/Person';
 import { Student } from '../../../models/people/Student';
 import { Parent } from '../../../models/people/Parent';
 import { Programme } from '../../../models/academic-structure/Programme';
+import { Branch } from '../../../models/academic-structure/Branch';
 import { Regulation } from '../../../models/academic-structure/Regulation';
 import { FeeCategory } from '../../../models/finance/FeeCategory';
+import { FeeQuota } from '../../../models/finance/FeeQuota';
 import { commitStudentRow } from '../student-import-service';
 
 const oid = () => new mongoose.Types.ObjectId();
@@ -173,9 +175,14 @@ describe('parentExistsByPhone', () => {
 });
 
 describe('commitStudentRow — update', () => {
+  // The "something changed" marker on these re-imports is deliberately a
+  // NON-fee-axis column (email). quota/category/branch/programme changes on a
+  // matched student are Blocked by owner ruling A — see the fee-axis suite.
   it('updates the matched student rather than creating a duplicate', async () => {
     const first = await commitStudentRow({ ...baseRow(), rollNumber: 'R1' }, ctx());
-    const second = await commitStudentRow({ ...baseRow(), rollNumber: 'R1', category: 'OC' }, ctx());
+    const second = await commitStudentRow(
+      { ...baseRow(), rollNumber: 'R1', email: 'aarav@example.com' }, ctx(),
+    );
     expect(second.id).toBe(first.id);
     expect(await Student.countDocuments({ collegeId })).toBe(1);
   });
@@ -191,8 +198,10 @@ describe('commitStudentRow — update', () => {
     const personBefore = await Person.findById(studentBefore!.personId);
     expect(personBefore!.address.line1).toBe('MG Road');
 
-    // Re-import carries no address columns at all — only category changed.
-    const second = await commitStudentRow({ ...baseRow(), rollNumber: 'R1', category: 'OC' }, ctx());
+    // Re-import carries no address columns at all — only email changed.
+    const second = await commitStudentRow(
+      { ...baseRow(), rollNumber: 'R1', email: 'aarav@example.com' }, ctx(),
+    );
     expect(second.id).toBe(first.id);
 
     const personAfter = await Person.findById(studentBefore!.personId);
@@ -200,6 +209,52 @@ describe('commitStudentRow — update', () => {
     expect(personAfter!.address.city).toBe('Pune');
     expect(personAfter!.address.state).toBe('MH');
     expect(personAfter!.address.pincode).toBe('411001');
+  });
+
+  // The mirror image of the test above, and the one the branch was missing:
+  // "supplied fields only" is one edit away from becoming "never written",
+  // and every other update test asserts a value did NOT change. Without this
+  // the update branch could regress to a no-op with the suite still green.
+  it('DOES write address, status and identity columns when the re-import row supplies them', async () => {
+    const first = await commitStudentRow(
+      { ...baseRow(), rollNumber: 'R1', addressLine1: 'Old House', city: 'Pune' },
+      ctx(),
+    );
+    const studentBefore = await Student.findById(first.id);
+    expect(studentBefore!.status).toBe('active');
+
+    const second = await commitStudentRow(
+      {
+        ...baseRow(),
+        rollNumber: 'R1',
+        name: 'Aarav Kumar Sharma',
+        email: 'aarav.new@example.com',
+        gender: 'male',
+        addressLine1: 'New House',
+        addressLine2: 'Flat 4',
+        city: 'Bengaluru',
+        state: 'KA',
+        pincode: '560001',
+        status: 'prospective',
+        studyYearAtAdmission: 2,
+      },
+      ctx(),
+    );
+    expect(second.id).toBe(first.id);
+
+    const personAfter = await Person.findById(studentBefore!.personId);
+    expect(personAfter!.name).toBe('Aarav Kumar Sharma');
+    expect(personAfter!.email).toBe('aarav.new@example.com');
+    expect(personAfter!.gender).toBe('male');
+    expect(personAfter!.address.line1).toBe('New House');
+    expect(personAfter!.address.line2).toBe('Flat 4');
+    expect(personAfter!.address.city).toBe('Bengaluru');
+    expect(personAfter!.address.state).toBe('KA');
+    expect(personAfter!.address.pincode).toBe('560001');
+
+    const studentAfter = await Student.findById(second.id);
+    expect(studentAfter!.status).toBe('prospective');
+    expect(studentAfter!.studyYearAtAdmission).toBe(2);
   });
 
   // year_back/withdrawn/expelled/deceased are not in BLOCKED_STATUSES, so a
@@ -211,10 +266,120 @@ describe('commitStudentRow — update', () => {
     const first = await commitStudentRow({ ...baseRow(), rollNumber: 'R1' }, ctx());
     await Student.findByIdAndUpdate(first.id, { status: 'year_back' });
 
-    const second = await commitStudentRow({ ...baseRow(), rollNumber: 'R1', category: 'OC' }, ctx());
+    const second = await commitStudentRow(
+      { ...baseRow(), rollNumber: 'R1', email: 'aarav@example.com' }, ctx(),
+    );
     expect(second.id).toBe(first.id);
 
     expect((await Student.findById(second.id))!.status).toBe('year_back');
+  });
+});
+
+/**
+ * Owner ruling A. programmeCode is mandatory on every row, so before this
+ * guard a re-import `$set` programmeId straight onto the matched student —
+ * an unguarded programme transfer that bypasses the 403 in
+ * people/service.ts:437 ("use the programme-transfer endpoint to ensure fee
+ * pins are rebound atomically") and leaves Student.feePins bound to the OLD
+ * programme's FeeStructureInstance. branchId / quota / category are fee axes
+ * too (CLAUDE.md, Fee-Pin Pipeline): people/service.ts:499 either auto-rebinds
+ * or marks the pin stale when they change; the import did neither.
+ *
+ * Import stays out of the fee-pin business entirely: the row is Blocked at
+ * preview and nothing is written.
+ */
+describe('commitStudentRow — fee-axis changes on an existing student are blocked', () => {
+  async function seedSecondProgramme() {
+    const regulationId = oid();
+    await Regulation.create({
+      _id: regulationId, collegeId, code: 'R21', name: 'R21', effectiveFromYear: 2021,
+      totalCredits: 80, maxYears: 2,
+    });
+    await Programme.create({
+      collegeId, code: 'MTECH', name: 'MTech CSE', level: 'PG', durationYears: 2, regulationId,
+    });
+  }
+
+  it('refuses a programme change and names the transfer workflow', async () => {
+    const first = await commitStudentRow({ ...baseRow(), rollNumber: 'R1' }, ctx());
+    const programmeBefore = (await Student.findById(first.id))!.programmeId;
+    await seedSecondProgramme();
+
+    await expect(
+      commitStudentRow({ ...baseRow(), rollNumber: 'R1', programmeCode: 'MTECH' }, ctx()),
+    ).rejects.toThrow(/programme change is not allowed on import/i);
+
+    const after = await Student.findById(first.id);
+    expect(String(after!.programmeId)).toBe(String(programmeBefore));
+  });
+
+  it('refuses a branch change', async () => {
+    const programme = await Programme.findOne({ collegeId, code: 'BTCSE' });
+    await Branch.create({
+      collegeId, code: 'CSE', name: 'Computer Science',
+      programmeId: programme!._id, departmentId: oid(), intake: 60,
+    });
+    await Branch.create({
+      collegeId, code: 'ECE', name: 'Electronics',
+      programmeId: programme!._id, departmentId: oid(), intake: 60,
+    });
+
+    const first = await commitStudentRow(
+      { ...baseRow(), rollNumber: 'R1', branchCode: 'CSE' }, ctx(),
+    );
+    const branchBefore = (await Student.findById(first.id))!.branchId;
+
+    await expect(
+      commitStudentRow({ ...baseRow(), rollNumber: 'R1', branchCode: 'ECE' }, ctx()),
+    ).rejects.toThrow(/branch change is not allowed on import/i);
+
+    expect(String((await Student.findById(first.id))!.branchId)).toBe(String(branchBefore));
+  });
+
+  it('refuses a quota change', async () => {
+    await FeeQuota.create({ collegeId, code: 'convener', name: 'Convener', status: 'active' });
+    await FeeQuota.create({ collegeId, code: 'management', name: 'Management', status: 'active' });
+
+    const first = await commitStudentRow({ ...baseRow(), rollNumber: 'R1', quota: 'convener' }, ctx());
+    await expect(
+      commitStudentRow({ ...baseRow(), rollNumber: 'R1', quota: 'management' }, ctx()),
+    ).rejects.toThrow(/quota change is not allowed on import/i);
+    expect((await Student.findById(first.id))!.quota).toBe('convener');
+  });
+
+  it('refuses a category change', async () => {
+    await FeeCategory.create({ collegeId, code: 'BC', name: 'Backward Class' });
+    const first = await commitStudentRow({ ...baseRow(), rollNumber: 'R1', category: 'OC' }, ctx());
+    await expect(
+      commitStudentRow({ ...baseRow(), rollNumber: 'R1', category: 'BC' }, ctx()),
+    ).rejects.toThrow(/category change is not allowed on import/i);
+    expect((await Student.findById(first.id))!.category).toBe('OC');
+  });
+
+  it('still allows a re-import that repeats the same axes unchanged', async () => {
+    await FeeQuota.create({ collegeId, code: 'convener', name: 'Convener', status: 'active' });
+    const first = await commitStudentRow(
+      { ...baseRow(), rollNumber: 'R1', quota: 'convener', category: 'OC' }, ctx(),
+    );
+    const second = await commitStudentRow(
+      { ...baseRow(), rollNumber: 'R1', quota: 'convener', category: 'OC', email: 'new@example.com' },
+      ctx(),
+    );
+    expect(second.id).toBe(first.id);
+    const student = await Student.findById(second.id);
+    expect((await Person.findById(student!.personId))!.email).toBe('new@example.com');
+  });
+
+  it('does not block a row that simply omits the optional axis columns', async () => {
+    await FeeQuota.create({ collegeId, code: 'convener', name: 'Convener', status: 'active' });
+    const first = await commitStudentRow(
+      { ...baseRow(), rollNumber: 'R1', quota: 'convener', category: 'OC' }, ctx(),
+    );
+    const second = await commitStudentRow({ ...baseRow(), rollNumber: 'R1' }, ctx());
+    expect(second.id).toBe(first.id);
+    const student = await Student.findById(second.id);
+    expect(student!.quota).toBe('convener');
+    expect(student!.category).toBe('OC');
   });
 });
 
@@ -233,7 +398,7 @@ describe('commitStudentRow — update rollback', () => {
       commitStudentRow(
         {
           ...baseRow(), rollNumber: 'R1', email: 'changed@example.com',
-          addressLine1: 'New House', city: 'Bengaluru', category: 'OC',
+          addressLine1: 'New House', city: 'Bengaluru', status: 'prospective',
         },
         ctx(),
       ),
@@ -248,7 +413,7 @@ describe('commitStudentRow — update rollback', () => {
 
     // And the Student itself must be untouched by the failed update.
     const studentAfter = await Student.findById(first.id);
-    expect(studentAfter!.category).toBeUndefined();
+    expect(studentAfter!.status).toBe('active');
   });
 });
 

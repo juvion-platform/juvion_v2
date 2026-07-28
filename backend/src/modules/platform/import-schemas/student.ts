@@ -1,6 +1,6 @@
 import { commitStudentRow, parentExistsByPhone } from '../../people/student-import-service';
 import { resolveStudentRefs, validateCatalogCodes } from '../../people/student-import-refs';
-import { matchExistingStudent } from '../../people/student-import-match';
+import { matchExistingStudent, feeAxisConflicts } from '../../people/student-import-match';
 import type { ImportSchemaDefinition } from './types';
 import {
   validString, validNumber, validEnum, validDate, validPhone, validAadhaar, validEmail,
@@ -98,6 +98,15 @@ export const studentImportSchema: ImportSchemaDefinition = {
     const match = await matchExistingStudent(ctx.collegeId, typedRow);
     if (match.action === 'blocked') {
       return { ok: true, action: 'blocked', notes: [match.reason ?? 'blocked'], resolved };
+    }
+
+    // Owner ruling A — a row that would move a fee axis on an existing
+    // student is Blocked, never applied. Surfacing it here rather than at
+    // commit is the whole point: the registrar sees WHY and what to do
+    // instead before confirming, and nothing is written either way.
+    if (match.action === 'update' && match.existing) {
+      const conflicts = feeAxisConflicts(match.existing, refs.value, typedRow);
+      if (conflicts.length) return { ok: true, action: 'blocked', notes: conflicts, resolved };
     }
 
     // Report guardian side effects before they happen. Both columns can name

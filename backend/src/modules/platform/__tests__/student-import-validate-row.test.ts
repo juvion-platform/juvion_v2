@@ -113,10 +113,70 @@ describe('studentImportSchema.validateRow — resolution + action', () => {
 
   it('returns update for a row matching a live (non-blocked) student', async () => {
     const person = await Person.create({ collegeId, name: 'Existing', phone: '9000000002' });
+    // Must already sit on the row's programme: moving a matched student onto
+    // a different programme (or onto one at all) is Blocked by owner ruling A.
+    const programme = await Programme.findOne({ collegeId, code: 'BTCSE' });
     await Student.create({
       collegeId, personId: person._id, admissionYear: 2025, status: 'active', rollNumber: 'LIVE-1',
+      programmeId: programme!._id,
     });
     const res = await callValidateRow({ ...baseRow(), rollNumber: 'LIVE-1' });
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.action).toBe('update');
+  });
+});
+
+/**
+ * Owner ruling A — the preview half. A fee-axis change on a matched student
+ * must surface as Blocked BEFORE the operator confirms, not as a per-row
+ * error after the write was attempted. Nothing is written either way, but
+ * only preview can put the message in front of a registrar.
+ */
+describe('studentImportSchema.validateRow — fee-axis changes block the row', () => {
+  async function existingStudent(fields: Record<string, unknown>) {
+    const person = await Person.create({ collegeId, name: 'Existing', phone: '9000000010' });
+    const programme = await Programme.findOne({ collegeId, code: 'BTCSE' });
+    return Student.create({
+      collegeId, personId: person._id, admissionYear: 2025, status: 'active',
+      rollNumber: 'AXIS-1', programmeId: programme!._id, ...fields,
+    });
+  }
+
+  it('blocks a programme change and points at the transfer screen', async () => {
+    await existingStudent({});
+    const regulationId = oid();
+    await Regulation.create({
+      _id: regulationId, collegeId, code: 'R21', name: 'R21', effectiveFromYear: 2021,
+      totalCredits: 80, maxYears: 2,
+    });
+    await Programme.create({
+      collegeId, code: 'MTECH', name: 'MTech CSE', level: 'PG', durationYears: 2, regulationId,
+    });
+
+    const res = await callValidateRow({ ...baseRow(), rollNumber: 'AXIS-1', programmeCode: 'MTECH' });
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.action).toBe('blocked');
+      expect(res.notes?.join(' ')).toMatch(/programme change is not allowed on import/i);
+      expect(res.notes?.join(' ')).toMatch(/programme transfer/i);
+    }
+  });
+
+  it('blocks a quota change on a matched student', async () => {
+    await existingStudent({ quota: 'convener' });
+    await FeeQuota.create({ collegeId, code: 'management', name: 'Management', status: 'active' });
+
+    const res = await callValidateRow({ ...baseRow(), rollNumber: 'AXIS-1', quota: 'management' });
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.action).toBe('blocked');
+      expect(res.notes?.join(' ')).toMatch(/quota change is not allowed on import/i);
+    }
+  });
+
+  it('leaves an unchanged re-import as a plain update', async () => {
+    await existingStudent({ quota: 'convener' });
+    const res = await callValidateRow({ ...baseRow(), rollNumber: 'AXIS-1', quota: 'convener' });
     expect(res.ok).toBe(true);
     if (res.ok) expect(res.action).toBe('update');
   });

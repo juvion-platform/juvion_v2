@@ -21,7 +21,7 @@ import { Faculty } from '../../models/people/Faculty';
 import { AppError } from '../../middleware/errorHandler';
 import { createAuditLog } from '../../shared/audit';
 import { resolveStudentRefs, validateCatalogCodes, ResolvedRefs } from './student-import-refs';
-import { matchExistingStudent } from './student-import-match';
+import { matchExistingStudent, feeAxisConflicts } from './student-import-match';
 
 interface Ctx { collegeId: string; performedBy: string; }
 
@@ -352,6 +352,17 @@ export async function commitStudentRow(
   const match = await matchExistingStudent(collegeId, typedRow);
   if (match.action === 'blocked') {
     throw new AppError(409, `Cannot import: ${match.reason}`);
+  }
+
+  // Owner ruling A. Preview already resolves these rows to Blocked (see
+  // studentImportSchema.validateRow), so a row reaching here with a fee-axis
+  // conflict means the DB moved between preview and commit. Re-check rather
+  // than trust the preview verdict: this is the write path, and a silent
+  // programme/branch/quota/category move desynchronises Student.feePins with
+  // no marker to find it by. See feeAxisConflicts() for the full rationale.
+  if (match.action === 'update' && match.existing) {
+    const conflicts = feeAxisConflicts(match.existing, refs.value, typedRow);
+    if (conflicts.length) throw new AppError(409, `Cannot import: ${conflicts.join(' ')}`);
   }
 
   const compensations: Compensation[] = [];
