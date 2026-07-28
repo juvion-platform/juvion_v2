@@ -46,7 +46,7 @@ Two roles are covered in Phase A:
 ## Acceptance Criteria
 
 - [ ] **AC-1** Test infra installed: Playwright dependencies added to `admin-portal` only (backend keeps vitest). One `playwright.config.ts` checked in. `npm run test:e2e` runs the suite.
-- [ ] **AC-2** Test users seeded: dedicated `seed-e2e-users` script creates two known users — `e2e_super@juvion.test` and `e2e_principal@juvion.test` — each with a fixed password (`E2ETestPassword!`) and the appropriate role + collegeId. Script is idempotent (re-runnable).
+- [ ] **AC-2** Test users seeded: dedicated `seed-e2e-users` script creates three known users — `e2e_super@juvion.test`, `e2e_principal@juvion.test` and `e2e_registrar@juvion.test` — each with a fixed password (`E2ETestPassword!`) and the appropriate role + collegeId. Script is idempotent (re-runnable). The registrar row (`staff` / `ST-REG`) was added on 2026-07-28: `DEFAULT_POLICIES` grants it `people: *` and not `platform: *`, so it is the only seeded persona that can prove a `people:create`-gated surface actually enforces its gate — the other two both hold the `*:*` wildcard.
 - [ ] **AC-3** Auth fixture: a Playwright fixture `loginAs(role)` performs the form-based login in a fresh browser context and returns a page where the user is authenticated. Other test suites in Phase B+ reuse this fixture.
 - [ ] **AC-4** Five auth tests pass:
   - [ ] `auth.spec.ts › super_admin: login succeeds and lands at /select-college`

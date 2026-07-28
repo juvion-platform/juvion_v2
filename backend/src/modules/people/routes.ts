@@ -18,6 +18,7 @@ import {
 } from './photo-controller';
 import * as facultyDocCtrl from './faculty-document-controller';
 import * as facultyTeachingCtrl from './faculty-teaching-controller';
+import * as studentImportCtrl from './student-import-controller';
 import { searchPeopleController } from './search-controller';
 import { searchQuerySchema } from './search-validation';
 import {
@@ -60,6 +61,22 @@ router.delete('/persons/:id', authorize('people', 'delete'), ctrl.deletePerson);
 
 // Students
 router.get('/students', authorize('people', 'read'), ctrl.listStudents);
+
+// ── Student bulk import ────────────────────────────────────
+// people-gated facade over the shared import engine; see
+// student-import-controller.ts for why this exists alongside
+// /platform/bulk-imports. Static paths registered BEFORE
+// /students/:id so Express doesn't swallow "import" as an :id.
+router.get('/students/import/template', authorize('people', 'read'), studentImportCtrl.templateHandler);
+router.post(
+  '/students/import/preview',
+  authorize('people', 'create'),
+  studentImportCtrl.studentImportUpload.single('file'),
+  studentImportCtrl.studentImportMulterErrorHandler,
+  studentImportCtrl.previewHandler,
+);
+router.post('/students/import/commit', authorize('people', 'create'), studentImportCtrl.commitHandler);
+
 router.get('/students/:id', authorize('people', 'read'), ctrl.getStudent);
 router.post('/students', authorize('people', 'create'), validate(createStudentSchema), ctrl.createStudent);
 router.put('/students/:id', authorize('people', 'update'), validate(updateStudentSchema), ctrl.updateStudent);

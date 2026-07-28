@@ -2,11 +2,12 @@
  * seed-e2e-users — idempotent fixture for the Playwright E2E suite.
  * Spec: .captain/specs/playwright-e2e/spec.md §AC-2
  *
- * Creates two dedicated users that the Playwright auth tests log in as:
+ * Creates three dedicated users that the Playwright tests log in as:
  *   - e2e_super@juvion.test       (super_admin, no collegeId)
  *   - e2e_principal@juvion.test   (principal, collegeId = DEV_COLLEGE_ID)
+ *   - e2e_registrar@juvion.test   (staff / ST-REG, collegeId = DEV_COLLEGE_ID)
  *
- * Both share a known password: E2ETestPassword!
+ * All three share a known password: E2ETestPassword!
  *
  * The script is safe to re-run. It upserts by email so:
  *   - First run: creates both rows.
@@ -42,7 +43,7 @@ export const E2E_TEST_PASSWORD = 'E2ETestPassword!';
 export interface E2EUserDefinition {
   email: string;
   name: string;
-  role: 'super_admin' | 'admin';
+  role: 'super_admin' | 'admin' | 'staff';
   personaType: string;
   /** Empty string means "no collegeId" — the super_admin case. */
   collegeId?: string;
@@ -75,6 +76,21 @@ export const E2E_USER_DEFINITIONS: E2EUserDefinition[] = [
     personaType: 'L-PRIN',
     collegeId: process.env.DEV_COLLEGE_ID || '000000000000000000000001',
   },
+  {
+    // The Registrar. DEFAULT_POLICIES grants staff/ST-REG `people: *`
+    // (shared/rbac/defaults.ts) and NOT `platform: *`, which is exactly the
+    // persona the student-import facade exists for: full authority over
+    // student records, no access to /platform/bulk-imports. Any Playwright
+    // test that claims to prove the people-gated import surface works must
+    // log in as this user — `e2e_principal` is role 'admin' and holds the
+    // `*:*` wildcard, so it can never distinguish a working gate from an
+    // absent one.
+    email: 'e2e_registrar@juvion.test',
+    name: 'E2E Registrar',
+    role: 'staff',
+    personaType: 'ST-REG',
+    collegeId: process.env.DEV_COLLEGE_ID || '000000000000000000000001',
+  },
 ];
 
 export interface SeedResult {
@@ -99,7 +115,7 @@ export async function seedE2EUsers(): Promise<SeedResult> {
   for (const def of E2E_USER_DEFINITIONS) {
     // findOneAndUpdate with upsert is the idempotent path. We need to
     // know whether the row pre-existed to count create-vs-update, so
-    // pre-check + write in two steps (cheap on a 2-row script).
+    // pre-check + write in two steps (cheap on a 3-row script).
     const existing = await User.findOne({ email: def.email }).lean();
 
     const updateDoc: Record<string, unknown> = {

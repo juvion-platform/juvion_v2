@@ -42,13 +42,25 @@ export type ImportJobStatus = (typeof IMPORT_JOB_STATUSES)[number];
 export interface IImportJobRowResult {
   /** 1-based row number in the input CSV (1 = first data row, not header). */
   row: number;
-  outcome: 'success' | 'error';
+  /**
+   * `blocked` is a valid row the business rules refuse to write (a sealed /
+   * exited / alumni record, or a change import is not allowed to make). It
+   * is deliberately NOT an error: it never reaches commit and never counts
+   * toward failureCount. Only schemas with a validateRow hook can produce it.
+   */
+  outcome: 'success' | 'error' | 'blocked';
   /** Mongo _id of the row created on success — empty on error. */
   createdId?: string;
   /** Human-readable failure reason. */
   error?: string;
   /** Raw input row (object keyed by header). Useful for retry / audit. */
   raw?: Record<string, unknown>;
+  /** What committing this row would do — set by the schema's optional validateRow hook. */
+  action?: 'create' | 'update' | 'blocked';
+  /** Advisory strings from validateRow (e.g. side effects the commit would cause). */
+  notes?: string[];
+  /** Label -> display value for codes this row resolved (programme, branch). */
+  resolved?: Record<string, string>;
 }
 
 export interface IImportJobSchemaField {
@@ -72,8 +84,13 @@ export interface IImportJob extends Document {
 
   /** Original filename uploaded by the operator. */
   fileName: string;
-  /** S3 location of the uploaded source file. */
-  s3Key: string;
+  /**
+   * S3 location of the uploaded source file. Undefined when the archive
+   * was never attempted because `AWS_S3_BUCKET` was not configured at
+   * upload time — the archive is an audit convenience, not a correctness
+   * requirement, so an unconfigured bucket must not block the import.
+   */
+  s3Key?: string;
   mimeType: string;
   sizeBytes: number;
 
@@ -84,6 +101,12 @@ export interface IImportJob extends Document {
   /** Set during commit. */
   successCount: number;
   failureCount: number;
+  /**
+   * Rows the business rules refused to write. Tallied at preview and carried
+   * through commit. Kept separate from failureCount so a job whose only
+   * anomaly is a sealed record does not report a failure that never happened.
+   */
+  blockedCount: number;
 
   /** Per-row outcomes — populated during validation + commit. */
   results: IImportJobRowResult[];
@@ -102,10 +125,13 @@ export interface IImportJob extends Document {
 const rowResultSchema = new Schema<IImportJobRowResult>(
   {
     row: { type: Number, required: true },
-    outcome: { type: String, enum: ['success', 'error'], required: true },
+    outcome: { type: String, enum: ['success', 'error', 'blocked'], required: true },
     createdId: { type: String },
     error: { type: String },
     raw: { type: Schema.Types.Mixed },
+    action: { type: String, enum: ['create', 'update', 'blocked'], required: false },
+    notes: { type: [String], required: false },
+    resolved: { type: Schema.Types.Mixed, required: false },
   },
   { _id: false },
 );
@@ -134,7 +160,7 @@ const schema = new Schema<IImportJob>(
     schemaSnapshot: { type: [schemaFieldSchema], required: true },
 
     fileName: { type: String, required: true },
-    s3Key: { type: String, required: true },
+    s3Key: { type: String, required: false },
     mimeType: { type: String, required: true },
     sizeBytes: { type: Number, required: true },
 
@@ -148,6 +174,7 @@ const schema = new Schema<IImportJob>(
     totalRows: { type: Number, required: true, default: 0 },
     successCount: { type: Number, required: true, default: 0 },
     failureCount: { type: Number, required: true, default: 0 },
+    blockedCount: { type: Number, required: true, default: 0 },
 
     results: { type: [rowResultSchema], default: [] },
 

@@ -43,12 +43,14 @@ import {
 import {
   putObject,
   getPresignedUrl,
+  isS3Configured,
 } from '../../shared/s3/s3-client';
 import {
   getImportSchema,
   serializeSchema,
   type ImportSchemaDefinition,
 } from './bulk-import-registry';
+import type { ImportRowAction } from './import-schemas/types';
 
 // ─── Public constants ─────────────────────────────────────────────────
 
@@ -84,12 +86,39 @@ export interface ImportJobPreview {
     raw: Record<string, string>;
     valid: boolean;
     errors: Array<{ field: string; error: string }>;
+    action?: ImportRowAction;
+    notes?: string[];
+    /** Label -> display value for codes this row resolved (programme, branch). */
+    resolved?: Record<string, string>;
   }>;
   validCount: number;
   errorCount: number;
+  /** How many rows would create, update, or are blocked. */
+  actionCounts: { create: number; update: number; blocked: number };
+  /**
+   * Schema-defined counters summed over every row — not just the previewed
+   * ones. Empty for schemas without a validateRow hook.
+   */
+  sideEffectTotals: Record<string, number>;
 }
 
 // ─── CSV parser (RFC-4180-ish, no new dep) ────────────────────────────
+
+/**
+ * Normalize a CSV header cell to a schema `fieldKey`.
+ *
+ * Downloadable templates mark mandatory columns with a trailing `*`
+ * (`name*`). The row mapper matches headers to `fieldKey` by exact string,
+ * so without this a file downloaded from our own template would report every
+ * required field as empty and fail every row.
+ *
+ * Strips surrounding whitespace and at most ONE trailing asterisk, so a
+ * bare `fieldKey` — every CSV exported before templates gained the marker —
+ * passes through unchanged.
+ */
+export function normalizeImportHeader(header: string): string {
+  return header.trim().replace(/\s*\*$/, '').trim();
+}
 
 /**
  * Parse a CSV string into header[] + rows[][]. Handles quoted fields
@@ -218,6 +247,12 @@ export async function getImportJobSourceUrl(
   jobId: string,
 ): Promise<{ url: string; expiresAt: Date }> {
   const job = await getImportJob(collegeId, jobId);
+  if (!job.s3Key) {
+    throw new AppError(
+      503,
+      'No source file was archived for this job because storage (AWS_S3_BUCKET) was not configured at upload time.',
+    );
+  }
   return getPresignedUrl(job.s3Key, { expiresIn: 300 });
 }
 
@@ -248,18 +283,24 @@ export async function uploadAndValidate(
     throw new AppError(400, 'Empty file.');
   }
 
-  // ─ Generate the job _id up-front so we can name the S3 key with it.
+  // ─ Generate the job _id up-front so we can name the S3 key if the
+  //   archive is enabled.
   const jobOid = new Types.ObjectId();
-  const s3Key = s3KeyFor(collegeId, jobOid, fileName);
 
-  // ─ Upload source to S3 first; the DB row only exists if the file
-  //   landed. Same atomic-ish pattern as faculty-document-service.
-  await putObject({
-    key: s3Key,
-    body: fileBuffer,
-    contentType: declaredMime,
-    metadata: { entityType, fileName, collegeId },
-  });
+  // The source archive is an audit convenience, not a correctness
+  // requirement — an unconfigured bucket must not make imports impossible.
+  // Where S3 IS configured a failed upload still aborts, preserving the
+  // original guarantee for real deployments.
+  let s3Key: string | undefined;
+  if (isS3Configured()) {
+    s3Key = s3KeyFor(collegeId, jobOid, fileName);
+    await putObject({
+      key: s3Key,
+      body: fileBuffer,
+      contentType: declaredMime,
+      metadata: { entityType, fileName, collegeId },
+    });
+  }
 
   // ─ Parse.
   const text = fileBuffer.toString('utf-8');
@@ -293,6 +334,8 @@ export async function uploadAndValidate(
       previewRows: [],
       validCount: 0,
       errorCount: 0,
+      actionCounts: { create: 0, update: 0, blocked: 0 },
+      sideEffectTotals: {},
     };
   }
 
@@ -321,6 +364,8 @@ export async function uploadAndValidate(
       previewRows: [],
       validCount: 0,
       errorCount: 0,
+      actionCounts: { create: 0, update: 0, blocked: 0 },
+      sideEffectTotals: {},
     };
   }
 
@@ -337,14 +382,26 @@ export async function uploadAndValidate(
   const previewRows: ImportJobPreview['previewRows'] = [];
   const results: IImportJobRowResult[] = [];
   let errorCount = 0;
+  const actionCounts = { create: 0, update: 0, blocked: 0 };
+  const sideEffectTotals: Record<string, number> = {};
   const ctx = { collegeId, performedBy };
+  /**
+   * File-scoped claim ledger for `def.naturalKeys`: "<label>\0<value>" ->
+   * the 1-based row that claimed it first. Lives here rather than in a
+   * schema module because this loop is the only place with whole-file
+   * state — module-level state in a schema would leak between two imports
+   * running concurrently. Empty and never consulted for schemas that do not
+   * declare `naturalKeys`.
+   */
+  const claimedKeys = new Map<string, number>();
 
   for (let i = 0; i < parsed.rows.length; i += 1) {
     const rowIdx = i + 1; // 1-based, matches the spreadsheet's data-row count
     const cells = parsed.rows[i]!;
     const rawObj: Record<string, string> = {};
     parsed.headers.forEach((h, j) => {
-      rawObj[h] = cells[j] ?? '';
+      // Template headers carry a `*` on mandatory columns; map back to fieldKey.
+      rawObj[normalizeImportHeader(h)] = cells[j] ?? '';
     });
 
     // Run each schema field's validator. Coerced values get attached
@@ -361,16 +418,83 @@ export async function uploadAndValidate(
       }
     }
 
-    const valid = errors.length === 0;
-    if (!valid) errorCount += 1;
+    let valid = errors.length === 0;
+    let blocked = false;
+    let action: ImportRowAction | undefined;
+    let notes: string[] | undefined;
+    let resolved: Record<string, string> | undefined;
+
+    // Whole-file duplicate check, before the (DB-backed) validateRow hook so
+    // a duplicate row costs no queries. Only rows that passed field
+    // validation take part: a row that is already failing will never be
+    // written, so it must neither collide nor claim an identity.
+    if (valid && def.naturalKeys) {
+      const keys = def.naturalKeys(typedRow);
+      for (const k of keys) {
+        const claimedBy = claimedKeys.get(`${k.label}\u0000${k.value}`);
+        if (claimedBy !== undefined) {
+          errors.push({
+            field: '_row',
+            error: `duplicate ${k.label} "${k.value}" — also on row ${claimedBy}`,
+          });
+          valid = false;
+          break;
+        }
+      }
+      // Claim only if this row survived: an identity claimed by a failed row
+      // would produce a false collision for a later, legitimate row.
+      if (valid) {
+        for (const k of keys) claimedKeys.set(`${k.label}\u0000${k.value}`, rowIdx);
+      }
+    }
+
+    // Async row check — DB-backed validation the sync field validators
+    // cannot do. Skipped for rows that already failed, so a broken row does
+    // not cost a query.
+    if (valid && def.validateRow) {
+      // eslint-disable-next-line no-await-in-loop
+      const rowRes = await def.validateRow(typedRow, rawObj, ctx);
+      if (!rowRes.ok) {
+        valid = false;
+        errors.push({ field: '_row', error: rowRes.error });
+      } else {
+        action = rowRes.action;
+        notes = rowRes.notes;
+        resolved = rowRes.resolved;
+        actionCounts[rowRes.action] += 1;
+        for (const [key, n] of Object.entries(rowRes.sideEffects ?? {})) {
+          sideEffectTotals[key] = (sideEffectTotals[key] ?? 0) + n;
+        }
+        // A blocked row is not an error — it's a valid row the business
+        // rules refuse (sealed/exited/alumni). It must never reach commit
+        // (outcome below still becomes 'error' so commitImportJob skips
+        // it), but it must NOT inflate errorCount, which is reserved for
+        // genuine validation/reference failures. actionCounts.blocked is
+        // the figure the operator sees for this bucket instead.
+        if (rowRes.action === 'blocked') {
+          valid = false;
+          blocked = true;
+        }
+      }
+    }
+
+    if (!valid && !blocked) errorCount += 1;
 
     // The row entry — `raw` keeps the raw input for commit replay
     // AND error messages reference the raw value the user typed.
     results.push({
       row: rowIdx,
-      outcome: valid ? 'success' : 'error',
-      error: valid ? undefined : errors.map((e) => `${e.field}: ${e.error}`).join('; '),
+      // `blocked` is its own outcome, not an error. It used to persist as
+      // outcome:'error' with error:'' (empty, since a blocked row collects no
+      // field errors), which made commit count it as a failure — a job whose
+      // only anomaly was a sealed record reported "1 failed" for a row that
+      // was never eligible. The reason lives in `notes`.
+      outcome: blocked ? 'blocked' : valid ? 'success' : 'error',
+      error: valid || blocked ? undefined : errors.map((e) => `${e.field}: ${e.error}`).join('; '),
       raw: valid ? typedRow : rawObj,
+      action,
+      notes,
+      resolved,
     });
 
     // Preview slice. Always include error rows. Cap success rows.
@@ -378,7 +502,7 @@ export async function uploadAndValidate(
     const includeThisRow =
       !valid || successPreviewCount < PREVIEW_SUCCESS_LIMIT;
     if (includeThisRow) {
-      previewRows.push({ row: rowIdx, raw: rawObj, valid, errors });
+      previewRows.push({ row: rowIdx, raw: rawObj, valid, errors, action, notes, resolved });
     }
   }
 
@@ -399,6 +523,7 @@ export async function uploadAndValidate(
     totalRows: parsed.rows.length,
     successCount: 0,
     failureCount: errorCount,
+    blockedCount: actionCounts.blocked,
     results,
     errorSummary:
       errorCount > 0
@@ -410,8 +535,12 @@ export async function uploadAndValidate(
     job,
     headers: parsed.headers,
     previewRows,
-    validCount: parsed.rows.length - errorCount,
+    // Blocked rows are neither errors nor committable — exclude them from
+    // both buckets. actionCounts.blocked is the figure for that bucket.
+    validCount: parsed.rows.length - errorCount - actionCounts.blocked,
     errorCount,
+    actionCounts,
+    sideEffectTotals,
   };
 }
 
@@ -448,10 +577,17 @@ export async function commitImportJob(
 
   let successCount = 0;
   let failureCount = 0;
+  let blockedCount = 0;
   const ctx = { collegeId, performedBy };
 
   for (let i = 0; i < job.results.length; i += 1) {
     const r = job.results[i]!;
+    if (r.outcome === 'blocked') {
+      // Never attempted, and never a failure: the business rules refused it
+      // at preview and the operator was told so before confirming.
+      blockedCount += 1;
+      continue;
+    }
     if (r.outcome !== 'success') {
       // Already-failed validation row — skip, keep the failure entry.
       failureCount += 1;
@@ -474,15 +610,22 @@ export async function commitImportJob(
 
   job.successCount = successCount;
   job.failureCount = failureCount;
+  job.blockedCount = blockedCount;
   job.completedAt = new Date();
+  // Blocked rows are excluded from this ladder on purpose: a job whose only
+  // anomaly is a sealed record did not partially fail, it did exactly what
+  // preview said it would. The summary still names them so nothing is silent.
   job.status =
     failureCount === 0
       ? 'completed'
       : successCount === 0
         ? 'failed'
         : 'partial';
-  if (failureCount > 0) {
-    job.errorSummary = `Committed ${successCount} of ${job.totalRows} rows; ${failureCount} failed.`;
+  if (failureCount > 0 || blockedCount > 0) {
+    const parts = [`Committed ${successCount} of ${job.totalRows} rows`];
+    if (failureCount > 0) parts.push(`${failureCount} failed`);
+    if (blockedCount > 0) parts.push(`${blockedCount} blocked and not written`);
+    job.errorSummary = `${parts.join('; ')}.`;
   } else {
     job.errorSummary = undefined;
   }

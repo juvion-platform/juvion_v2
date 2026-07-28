@@ -14,7 +14,7 @@ npm install                          # installs all 3 workspaces (backend, admin
 npm run dev:backend                  # backend on :3003
 npm run dev:portal                   # admin portal on :5173
 npm run seed -w backend              # full dev seed (idempotent; uses shared/seed/policies for RBAC)
-npm run seed:e2e-users -w backend    # CI-minimal seed: 2 users + DEFAULT_POLICIES (what e2e uses)
+npm run seed:e2e-users -w backend    # CI-minimal seed: 3 users + DEFAULT_POLICIES (what e2e uses)
 npm run typecheck                    # check all workspaces
 npm run test -w e2e                  # Playwright suite (needs backend + portal running)
 ```
@@ -179,6 +179,18 @@ Students bind to a `FeeStructureInstance` via 4 wildcardable axes (single contra
 
 Use `POST /api/finance/students/:id/transfer-programme` instead — payload is `{ newProgrammeId, newBranchId?, newRegulationId?, effectiveYearOfStudy, academicYearId, reason }`. The FE wraps this in `admin-portal/src/components/people/ProgrammeTransferDialog.tsx`.
 
+**Student bulk import honours the same rule.** A re-imported row whose `programmeCode`, `branchCode`, `quota` or `category` differs from the matched student's current value resolves to **Blocked** at preview and is refused with a 409 at commit — those are all fee axes, and applying them directly would strand the pin. Import never calls the transfer service; the operator is sent to the transfer screen. See `backend/src/modules/people/student-import-service.ts`.
+
+### Student bulk import
+
+Two doors onto one engine. `/platform/bulk-imports` serves all five entity types and needs `platform:create` (admin/principal only). `/api/people/students/import/{template,preview,commit}` is a `people`-gated façade over the same `bulk-import-service`, so a Registrar (`ST-REG`) — who owns student records but holds no `platform` access — can actually use it. The FE entry point is the import drawer on `/people/students`.
+
+- Template headers are `fieldKey`, with a trailing `*` on mandatory columns. `normalizeImportHeader` (`bulk-import-service.ts`) strips it on upload. **Two-way contract** — change one side and template files stop importing.
+- Schemas live in `backend/src/modules/platform/import-schemas/`. Adding an entity type is one registry entry.
+- `ImportSchemaField.validate` is synchronous. Anything needing a DB lookup goes in the optional async `validateRow` hook, which is what lets preview label rows Create / Update / Blocked before anything is written.
+- A schema declaring `naturalKeys` gets intra-file duplicate detection; the other four declare none and are unaffected.
+- Commit uses compensating rollback, not transactions — the test harness is not a replica set.
+
 ## Frontend Conventions
 
 ### State Management
@@ -209,6 +221,11 @@ PAYMENT_WEBHOOK_SECRET=any-non-empty-string-in-production  # app.ts:55 startup g
 RBAC_ENFORCE=true   # 'false' = authorize() is a pass-through (dev mode default behavior)
 RBAC_NL_ENFORCE=true  # 'true' = NL endpoint uses authorize() instead of hard requireRole admin gate
 VITE_API_URL=http://localhost:3003/api  # baked into the production admin-portal build (vite preview doesn't proxy)
+AWS_S3_BUCKET=                  # backend/src/shared/s3/s3-client.ts; unset disables bulk-import source-file archiving (import still succeeds) but photo/faculty-document uploads still 503
+AWS_REGION=ap-south-1
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_S3_ENDPOINT=                # set for LocalStack/MinIO; forces path-style addressing
 ```
 
 > **Gotcha**: `MONGODB_URI` is what the backend actually reads. Earlier CI runs failed because only `MONGO_URI` was set. Set both for safety.
@@ -238,7 +255,7 @@ Gate guardrails:
 
 ## E2E Testing
 
-The `e2e/` workspace runs Playwright against a live backend + portal. CI workflow (`.github/workflows/e2e.yml`) seeds two test users (`e2e_super@juvion.test`, `e2e_principal@juvion.test`) plus all `DEFAULT_POLICIES` via `npm run seed:e2e-users -w backend` before launching the browser. Test fixtures share an `auth-fixture.ts` `loginAs(role)` helper. Render-only tests prefer accessible queries (`getByLabel`, `getByRole`, `getByTestId`) over class names — class churn shouldn't break the suite.
+The `e2e/` workspace runs Playwright against a live backend + portal. CI workflow (`.github/workflows/e2e.yml`) seeds three test users (`e2e_super@juvion.test`, `e2e_principal@juvion.test`, `e2e_registrar@juvion.test` — the last a `staff` / `ST-REG` persona, so `people`-gated surfaces are exercised by a persona that holds no `platform` access) plus all `DEFAULT_POLICIES` via `npm run seed:e2e-users -w backend` before launching the browser. Test fixtures share an `auth-fixture.ts` `loginAs(role)` helper. Render-only tests prefer accessible queries (`getByLabel`, `getByRole`, `getByTestId`) over class names — class churn shouldn't break the suite.
 
 Discipline notes (per the Phase A spec at `.captain/specs/playwright-e2e/spec.md`):
 - **Zero retries**. Flake-free is a hard acceptance criterion; retries hide drift.

@@ -524,6 +524,11 @@ function SummaryCard({ label, value, cls }: { label: string; value: number; cls:
 
 function JobDetailView({ job }: { job: ImportJobDoc }) {
   const errorRows = job.results.filter((r) => r.outcome === 'error');
+  // Blocked is a valid row the business rules refused (sealed/exited/alumni,
+  // or a change import may not make). It is not a failure and must not sit in
+  // the "Failed rows" table, but it must not vanish either — the reason lives
+  // in `notes`.
+  const blockedRows = job.results.filter((r) => r.outcome === 'blocked');
   return (
     <div className="space-y-4">
       <div className="bg-white rounded-xl border shadow-sm p-5">
@@ -538,10 +543,18 @@ function JobDetailView({ job }: { job: ImportJobDoc }) {
           </div>
           <StatusPill status={job.status} />
         </div>
-        <div className="grid grid-cols-3 gap-3 mt-4">
+        {/*
+          The blocked card only appears when there is something to report, so
+          entity types that cannot produce blocked rows (everything except
+          student) render exactly the three cards they always did.
+        */}
+        <div className={`grid gap-3 mt-4 ${blockedRows.length > 0 ? 'grid-cols-4' : 'grid-cols-3'}`}>
           <SummaryCard label="Total rows" value={job.totalRows} cls="bg-slate-50 border-slate-200 text-slate-800" />
           <SummaryCard label="Created" value={job.successCount} cls="bg-emerald-50 border-emerald-200 text-emerald-800" />
           <SummaryCard label="Failed" value={job.failureCount} cls="bg-red-50 border-red-200 text-red-800" />
+          {blockedRows.length > 0 && (
+            <SummaryCard label="Blocked" value={blockedRows.length} cls="bg-amber-50 border-amber-200 text-amber-900" />
+          )}
         </div>
         {job.errorSummary && (
           <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
@@ -577,6 +590,38 @@ function JobDetailView({ job }: { job: ImportJobDoc }) {
           {errorRows.length > 200 && (
             <div className="px-3 py-2 text-xs text-gray-500 italic">
               + {errorRows.length - 200} more failed rows not shown
+            </div>
+          )}
+        </div>
+      )}
+
+      {blockedRows.length > 0 && (
+        <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
+          <div className="px-5 py-3 border-b bg-amber-50/60">
+            <h3 className="text-sm font-semibold text-navy-dark">Blocked rows ({blockedRows.length})</h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Valid rows the business rules refused to write. Nothing was changed for these.
+            </p>
+          </div>
+          <table className="w-full text-xs">
+            <thead className="bg-gray-50 text-[10px] uppercase tracking-wide text-gray-500">
+              <tr>
+                <th className="px-3 py-1.5 text-left font-medium">Row</th>
+                <th className="px-3 py-1.5 text-left font-medium">Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              {blockedRows.slice(0, 200).map((r) => (
+                <tr key={r.row} className="border-t border-gray-100">
+                  <td className="px-3 py-1.5 text-gray-500">{r.row}</td>
+                  <td className="px-3 py-1.5 text-amber-800">{r.notes?.join(' ') ?? 'Blocked'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {blockedRows.length > 200 && (
+            <div className="px-3 py-2 text-xs text-gray-500 italic">
+              + {blockedRows.length - 200} more blocked rows not shown
             </div>
           )}
         </div>

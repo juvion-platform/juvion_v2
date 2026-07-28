@@ -35,10 +35,17 @@ export interface ImportEntityTypeDef {
 
 export interface ImportJobRowResult {
   row: number;
-  outcome: 'success' | 'error';
+  /**
+   * `blocked` is a valid row the business rules refused to write (sealed /
+   * exited / alumni, or a change import may not make). It is not an error:
+   * it never reaches commit and never counts toward `failureCount`. The
+   * reason lives in `notes`.
+   */
+  outcome: 'success' | 'error' | 'blocked';
   createdId?: string;
   error?: string;
   raw?: Record<string, unknown>;
+  notes?: string[];
 }
 
 export interface ImportJobDoc {
@@ -48,13 +55,16 @@ export interface ImportJobDoc {
   entityType: string;
   schemaSnapshot: ImportEntityFieldDef[];
   fileName: string;
-  s3Key: string;
+  /** Undefined when the source archive wasn't attempted (S3 not configured server-side). */
+  s3Key?: string;
   mimeType: string;
   sizeBytes: number;
   status: ImportJobStatus;
   totalRows: number;
   successCount: number;
   failureCount: number;
+  /** Rows the business rules refused to write. Never part of failureCount. */
+  blockedCount?: number;
   results: ImportJobRowResult[];
   errorSummary?: string;
   startedAt: string;

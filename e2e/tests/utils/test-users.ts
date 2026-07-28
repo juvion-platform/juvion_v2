@@ -10,7 +10,7 @@
  * the shared password.
  */
 
-export type E2ERole = 'super_admin' | 'principal';
+export type E2ERole = 'super_admin' | 'principal' | 'registrar';
 
 export interface E2EUser {
   /** Email used in the login form. */
@@ -37,6 +37,17 @@ export const TEST_USERS: Record<E2ERole, E2EUser> = {
     password: E2E_TEST_PASSWORD,
     // Per `admin-portal/src/pages/Login.tsx:48`, college-scoped users
     // land on `/` (the dashboard).
+    landingUrl: '/',
+  },
+  // NOTE: this row's DB role is `staff` with personaType `ST-REG`, which
+  // DEFAULT_POLICIES grants `people: *` and NOT `platform: *`. It exists so a
+  // test can prove a people-gated surface actually works for the persona it
+  // was built for. `super_admin` holds `*:*` and `principal` is DB role
+  // `admin`, which also holds `*:*` — neither can distinguish a working
+  // permission gate from an absent one.
+  registrar: {
+    email: 'e2e_registrar@juvion.test',
+    password: E2E_TEST_PASSWORD,
     landingUrl: '/',
   },
 };
