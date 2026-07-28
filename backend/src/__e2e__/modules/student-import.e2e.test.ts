@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import { Types } from 'mongoose';
 import { getTestApp, cleanupTestApp } from '../setup/test-app';
 import { seedBase, BaseFixtures } from '../setup/seed-base';
 import { createTestApi, TestApi } from '../helpers/request';
@@ -119,6 +120,61 @@ describe('POST /api/people/students/import/preview', () => {
     expect(students).toHaveLength(1);
     const person = await Person.findById(students[0]!.personId).lean();
     expect(person!.name).toBe('Dup Row One');
+  });
+});
+
+/**
+ * Final review, Important 1. `previewHandler` pins entityType to the
+ * constant; `commitHandler` did not. `commitImportJob` -> `getImportJob`
+ * scopes only by collegeId and archivedAt, then dispatches on
+ * `job.entityType` — so a caller holding people:create and nothing else
+ * could commit a pending faculty / staff / applicant / programme job that an
+ * admin left in preview_ready, writing through createFaculty or
+ * createProgramme on a route gated for people. That inverts the entire
+ * justification for the facade.
+ */
+describe('POST /api/people/students/import/commit — entity-type boundary', () => {
+  it('refuses a job that is not a student import', async () => {
+    // Stage a real faculty job through the PLATFORM door (admin holds
+    // platform:create), leaving it in preview_ready.
+    const facultyCsv = [
+      'name,phone,employeeCode,designation',
+      'Faculty Person,9876500201,FAC-E2E-1,Assistant Professor',
+    ].join('\n');
+    const facultyJob = await api.as(fx.admin.token)
+      .post('/api/platform/bulk-imports')
+      .field('entityType', 'faculty')
+      .attach('file', Buffer.from(facultyCsv), { filename: 'faculty.csv', contentType: 'text/csv' });
+    expect(facultyJob.status).toBe(201);
+    expect(facultyJob.body.job.entityType).toBe('faculty');
+    const facultyJobId = facultyJob.body.job._id;
+
+    const res = await api.as(fx.admin.token)
+      .post('/api/people/students/import/commit')
+      .send({ jobId: facultyJobId });
+    expect(res.status).toBe(404);
+
+    // And the job is untouched — still awaiting its own door.
+    const after = await api.as(fx.admin.token).get(`/api/platform/bulk-imports/${facultyJobId}`);
+    expect(after.body.status).toBe('preview_ready');
+    expect(after.body.successCount).toBe(0);
+  });
+
+  it('404s a job belonging to another college', async () => {
+    const csv = 'name*,phone*,programmeCode*,admissionYear*\nOther College,9876500202,BTECH,2025';
+    const previewRes = await api.as(fx.admin.token)
+      .post('/api/people/students/import/preview')
+      .attach('file', Buffer.from(csv), { filename: 'other.csv', contentType: 'text/csv' });
+    expect(previewRes.status).toBe(201);
+
+    const outsider = await createTestUser({
+      collegeId: String(new Types.ObjectId()), role: 'admin', personaType: 'L-PRIN',
+      name: 'Other College Admin', email: 'other-college-admin@test.com',
+    });
+    const res = await api.as(outsider.token)
+      .post('/api/people/students/import/commit')
+      .send({ jobId: previewRes.body.job._id });
+    expect(res.status).toBe(404);
   });
 });
 

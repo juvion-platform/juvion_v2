@@ -16,12 +16,18 @@ import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../../middleware/authenticate';
 import { AppError } from '../../middleware/errorHandler';
 import {
-  uploadAndValidate, commitImportJob,
+  uploadAndValidate, commitImportJob, getImportJob,
 } from '../platform/bulk-import-service';
 import { getImportSchema, serializeSchema } from '../platform/bulk-import-registry';
 import { importFileUpload, importMulterErrorHandler } from '../platform/bulk-import-controller';
 
 const ENTITY_TYPE = 'student';
+/**
+ * Cap on the per-row detail returned to the drawer. A 10,000-row import that
+ * fails wholesale must not put 10,000 messages on the wire; the counts are
+ * always exact and the job keeps the full record.
+ */
+const FAILED_ROW_LIMIT = 100;
 
 export const studentImportUpload = importFileUpload;
 export { importMulterErrorHandler as studentImportMulterErrorHandler };
@@ -57,7 +63,47 @@ export async function commitHandler(req: AuthRequest, res: Response, next: NextF
   try {
     const { jobId } = req.body as { jobId?: string };
     if (!jobId) throw new AppError(400, 'jobId is required.');
-    const job = await commitImportJob(req.collegeId!, jobId, req.user?.name ?? 'System');
-    res.json(job);
+
+    // previewHandler pins entityType to the constant; this handler must too.
+    // commitImportJob -> getImportJob scopes by collegeId and archivedAt and
+    // then dispatches on job.entityType, so without this a caller holding
+    // people:create and nothing else could commit a pending faculty / staff /
+    // applicant / programme job an admin left in preview_ready — writing
+    // through createFaculty or createProgramme on a route gated for people.
+    // That inverts the entire justification for this facade.
+    //
+    // getImportJob is also the college check: it 404s a job belonging to
+    // another tenant, so loading here rather than trusting the id is
+    // load-bearing twice over. 404 rather than 403 — a wrong-type job should
+    // not be confirmed to exist through this door.
+    const job = await getImportJob(req.collegeId!, jobId);
+    if (job.entityType !== ENTITY_TYPE) throw new AppError(404, 'Import job not found');
+
+    const committed = await commitImportJob(req.collegeId!, jobId, req.user?.name ?? 'System');
+
+    // A trimmed summary, not the whole IImportJob. The document carries every
+    // row's raw input and the full schema snapshot — megabytes on a large
+    // import — and the drawer only needs to tell the operator what happened.
+    // Per-row commit failures land on the job, and a Registrar cannot open
+    // /platform/bulk-imports to read it, so the failed rows have to travel
+    // with the response or they are invisible to the only persona that can
+    // reach this door.
+    res.json({
+      jobId: String(committed._id),
+      status: committed.status,
+      totalRows: committed.totalRows,
+      successCount: committed.successCount,
+      failureCount: committed.failureCount,
+      blockedCount: committed.blockedCount,
+      errorSummary: committed.errorSummary,
+      failedRows: committed.results
+        .filter((r) => r.outcome === 'error')
+        .slice(0, FAILED_ROW_LIMIT)
+        .map((r) => ({ row: r.row, error: r.error ?? 'commit failed' })),
+      blockedRows: committed.results
+        .filter((r) => r.outcome === 'blocked')
+        .slice(0, FAILED_ROW_LIMIT)
+        .map((r) => ({ row: r.row, reason: r.notes?.join(' ') ?? 'blocked' })),
+    });
   } catch (e) { next(e); }
 }
