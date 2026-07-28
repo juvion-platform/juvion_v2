@@ -36,7 +36,10 @@ describe('GET /api/people/students/import/template', () => {
     const res = await api.as(fx.admin.token).get('/api/people/students/import/template');
     expect(res.status).toBe(200);
     expect(res.body.entityType).toBe('student');
-    expect(res.body.fields.length).toBe(25);
+    expect(res.body.fields.length).toBe(24);
+    // onboardingStatus was removed from the importable set — completion is
+    // a lifecycle outcome the platform owns (assertStudentOnboardingRules).
+    expect(res.body.fields.map((f: any) => f.fieldKey)).not.toContain('onboardingStatus');
     const required = res.body.fields.filter((f: any) => f.required).map((f: any) => f.fieldKey);
     expect(required.sort()).toEqual(['admissionYear', 'name', 'phone', 'programmeCode']);
   });

@@ -7,12 +7,22 @@ import {
 } from './validators';
 
 /**
- * Student bulk-import schema — 25 operator-authored fields.
+ * Student bulk-import schema — 24 operator-authored fields.
  *
  * Deliberately excludes everything the payment and lifecycle pipelines own
  * (feeStatus, hasFinancialHold, feePins, isSealed, graduationDate, exitDate,
  * alumniId, finalCgpa). Letting a spreadsheet write those recreates the
  * corrupted-derived-field bug class fixed in the Jul-2026 audit pass.
+ *
+ * `onboardingStatus` belongs to that same excluded set even though it is
+ * operator-facing elsewhere. `assertStudentOnboardingRules`
+ * (people/service.ts) refuses `completed` unless a fee-responsible guardian
+ * is set and all five checklist items are true, and the service stamps
+ * `onboardingCompletedAt` alongside. An import column wrote the raw value
+ * and called none of that, producing a student marked complete with no
+ * guardian, an empty checklist and no completion timestamp. Onboarding is a
+ * lifecycle outcome the platform owns; imported students start at the model
+ * default (`not_started`) and progress through the onboarding workflow.
  *
  * `programmeCode` is required even though `programmeId` is optional on the
  * model: a student with no programme cannot be fee-pinned or placed, so
@@ -50,7 +60,6 @@ export const studentImportSchema: ImportSchemaDefinition = {
     { fieldKey: 'quota', label: 'Quota Code', type: 'string', required: false, validate: validString({ required: false, max: 50 }) },
     { fieldKey: 'category', label: 'Category Code', type: 'string', required: false, validate: validString({ required: false, max: 50 }) },
     { fieldKey: 'status', label: 'Status', type: 'enum', required: false, meta: { values: ['prospective', 'active'] }, validate: validEnum({ required: false, values: ['prospective', 'active'] }) },
-    { fieldKey: 'onboardingStatus', label: 'Onboarding Status', type: 'enum', required: false, meta: { values: ['not_started', 'in_progress', 'completed'] }, validate: validEnum({ required: false, values: ['not_started', 'in_progress', 'completed'] }) },
 
     // ── Guardians ──
     { fieldKey: 'primaryParentPhone', label: 'Primary Guardian Phone', type: 'string', required: false, validate: validPhone({ required: false }) },
@@ -63,7 +72,7 @@ export const studentImportSchema: ImportSchemaDefinition = {
     addressLine1: '12 MG Road', addressLine2: '', city: 'Hyderabad', state: 'Telangana', pincode: '500001',
     programmeCode: 'BTCSE', branchCode: 'CSE', batchCode: 'B2025', regulationCode: 'R20',
     admissionYear: '2025', studyYearAtAdmission: '1', rollNumber: '25B01A0501',
-    quota: 'convener', category: 'OC', status: 'active', onboardingStatus: 'not_started',
+    quota: 'convener', category: 'OC', status: 'active',
     primaryParentPhone: '9811111111', primaryParentName: 'Ramesh Sharma',
     feeResponsibleParentPhone: '9811111111',
   },

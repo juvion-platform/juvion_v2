@@ -18,7 +18,7 @@ A generic schema-driven import system already exists at `/platform/bulk-imports`
 2. **The template does not mark mandatory columns.** It emits bare `fieldKey`
    headers, so an operator cannot tell what is required without reading the
    schema panel.
-3. **The `student` schema covers 11 of the 25 operator-authored fields.** It cannot
+3. **The `student` schema covers 11 of the 24 operator-authored fields.** It cannot
    place a student in a programme, branch, batch or regulation, and cannot link
    a guardian — so an imported student still needs manual completion.
 
@@ -73,7 +73,16 @@ one place to fix bugs, and improvements reach both surfaces.
 
 ## Template schema
 
-The `student` registry entry grows from 11 to 25 fields.
+The `student` registry entry grows from 11 to 24 fields.
+
+> **Amendment (final review, 2026-07-28):** `onboardingStatus` was removed
+> from the importable set — it was the 25th column. Writing it directly
+> bypasses `assertStudentOnboardingRules` (`people/service.ts:127-150`) and
+> the `onboardingCompletedAt` stamp, so a spreadsheet could mark a student's
+> onboarding complete with no guardian and an empty checklist. Onboarding
+> completion is a lifecycle outcome the platform owns, the same reasoning
+> that already excludes `feeStatus`, `isSealed` and `graduationDate`.
+> Imported students take the model default (`not_started`).
 
 ### Identity → Person
 
@@ -105,7 +114,6 @@ The `student` registry entry grows from 11 to 25 fields.
 | `quota` | no | validated against active FeeQuota codes — see below |
 | `category` | no | validated against active FeeCategory codes — see below |
 | `status` | no | defaults to `active` — see below |
-| `onboardingStatus` | no | `not_started` \| `in_progress` \| `completed`, defaults to `not_started` (model default) |
 
 Two of these need stating precisely, because they differ from what the model or
 the current importer does:

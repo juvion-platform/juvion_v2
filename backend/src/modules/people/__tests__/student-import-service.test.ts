@@ -53,6 +53,23 @@ describe('commitStudentRow — create', () => {
       commitStudentRow({ ...baseRow(), programmeCode: 'NOPE' }, ctx()),
     ).rejects.toThrow(/unknown programme code "NOPE"/);
   });
+
+  // onboardingStatus is no longer an importable column. Writing it here
+  // bypassed assertStudentOnboardingRules (people/service.ts) — a
+  // spreadsheet could mark a student's onboarding complete with no
+  // fee-responsible guardian, an empty checklist and no
+  // onboardingCompletedAt. The allow-list in studentFieldsFromRow is the
+  // second line of defence: even a row that carries the key must not
+  // write it.
+  it('ignores an onboardingStatus value even if a row somehow carries one', async () => {
+    const { id } = await commitStudentRow(
+      { ...baseRow(), onboardingStatus: 'completed' },
+      ctx(),
+    );
+    const student = await Student.findById(id);
+    expect(student!.onboardingStatus).toBe('not_started');
+    expect(student!.onboardingCompletedAt).toBeUndefined();
+  });
 });
 
 describe('commitStudentRow — parents', () => {

@@ -7,13 +7,20 @@ const EXPECTED_KEYS = [
   'addressLine1', 'addressLine2', 'city', 'state', 'pincode',
   'programmeCode', 'branchCode', 'batchCode', 'regulationCode',
   'admissionYear', 'studyYearAtAdmission', 'rollNumber', 'quota',
-  'category', 'status', 'onboardingStatus',
+  'category', 'status',
   'primaryParentPhone', 'primaryParentName', 'feeResponsibleParentPhone',
 ];
 
 const FORBIDDEN = [
   'feeStatus', 'hasFinancialHold', 'feePins', 'isSealed',
   'graduationDate', 'exitDate', 'alumniId', 'finalCgpa',
+  // Onboarding completion is a lifecycle outcome the platform owns:
+  // `assertStudentOnboardingRules` (people/service.ts) refuses
+  // `completed` unless a fee-responsible guardian exists and all five
+  // checklist items are true, and stamps `onboardingCompletedAt`. A
+  // spreadsheet column bypassed all of that, so the column is gone and
+  // the model default (`not_started`) applies to every imported student.
+  'onboardingStatus',
 ];
 
 describe('student import schema', () => {
@@ -23,7 +30,8 @@ describe('student import schema', () => {
     expect(def).not.toBeNull();
   });
 
-  it('exposes exactly the 25 operator-authored fields', () => {
+  it('exposes exactly the 24 operator-authored fields', () => {
+    expect(def!.fields).toHaveLength(24);
     expect(def!.fields.map((f) => f.fieldKey).sort()).toEqual([...EXPECTED_KEYS].sort());
   });
 

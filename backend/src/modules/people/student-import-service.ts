@@ -326,7 +326,11 @@ function studentFieldsFromRow(
     out.status = statusRaw;
   }
 
-  const onboardingStatus = cell(row, 'onboardingStatus'); if (onboardingStatus) out.onboardingStatus = onboardingStatus;
+  // NOTE: `onboardingStatus` is deliberately absent and must stay absent.
+  // It is not in the importable field set (see import-schemas/student.ts)
+  // because writing it here bypasses assertStudentOnboardingRules and
+  // `onboardingCompletedAt`. This allow-list is the second line of defence:
+  // even a typedRow that somehow carried the key cannot write it.
   if (primaryParentId) out.primaryParentId = primaryParentId;
   if (feeResponsibleParentId) out.feeResponsibleParentId = feeResponsibleParentId;
 

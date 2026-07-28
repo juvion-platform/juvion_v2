@@ -7,7 +7,7 @@
  * so this pins the backend side of the contract against the SAME logic
  * buildTemplateCsv uses to emit a header cell (`fieldKey` + `*` iff
  * required), driven off the live registry rather than a hardcoded field
- * list. That means it exercises all 25 current student-import fields AND
+ * list. That means it exercises all 24 current student-import fields AND
  * automatically covers any field added later — no maintenance needed when
  * the schema grows.
  *
