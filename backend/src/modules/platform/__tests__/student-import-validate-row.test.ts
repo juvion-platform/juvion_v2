@@ -162,6 +162,35 @@ describe('studentImportSchema.validateRow — fee-axis changes block the row', (
     }
   });
 
+  /**
+   * A student the pre-import 11-field importer created can have no programme
+   * at all. Import still refuses to set one — programme is a fee axis — but
+   * the message must name the route that actually works. The Programme field
+   * on People → Students is read-only on edit, so telling a registrar to set
+   * it there is a dead end; transferProgramme() handles a student with no
+   * current programme and pins the year, so that is the only correct advice.
+   */
+  it('sends a programme-less student to Transfer programme, not to the read-only field', async () => {
+    const person = await Person.create({ collegeId, name: 'No Programme', phone: '9000000011' });
+    await Student.create({
+      collegeId, personId: person._id, admissionYear: 2025, status: 'active',
+      rollNumber: 'NOPROG-1',
+    });
+
+    const res = await callValidateRow({ ...baseRow(), rollNumber: 'NOPROG-1' });
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.action).toBe('blocked');
+      const note = res.notes?.join(' ') ?? '';
+      expect(note).toMatch(/no programme on file/i);
+      expect(note).toMatch(/transfer programme/i);
+      // The old wording sent operators to a field they cannot edit, and
+      // implied Transfer only applies once a fee pin exists. Neither is true.
+      expect(note).not.toMatch(/set it on the student's record/i);
+      expect(note).not.toMatch(/already hold a fee pin/i);
+    }
+  });
+
   it('blocks a quota change on a matched student', async () => {
     await existingStudent({ quota: 'convener' });
     await FeeQuota.create({ collegeId, code: 'management', name: 'Management', status: 'active' });

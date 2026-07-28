@@ -200,11 +200,18 @@ export function feeAxisConflicts(
           + 'different programme. Use the Programme Transfer screen, which rebinds the fee pin '
           + 'atomically, then re-run the import.'
         // Setting a programme where there was none is still a programme move
-        // that people/service.ts:437 refuses, so import refuses it too — but
-        // say what is actually on file rather than claim a different one.
+        // that people/service.ts:437 refuses, so import refuses it too.
+        //
+        // Programme Transfer is the ONLY route for this, whether or not the
+        // student already holds a fee pin: the Programme field on People →
+        // Students is read-only on edit precisely because the generic update
+        // rejects the change. transferProgramme() handles a student with no
+        // current programme — it sets the programme and then pins the year —
+        // so do not send the operator to a field they cannot edit.
         : 'programme change is not allowed on import — this student has no programme on file '
-          + "and programme is a fee axis. Set it on the student's record in People → Students "
-          + '(or use Programme Transfer if they already hold a fee pin), then re-run the import.',
+          + 'and programme is a fee axis. Open the student in People → Students and use '
+          + '"Transfer programme", which sets the programme and pins the year atomically, '
+          + 'then re-run the import.',
     );
   }
 

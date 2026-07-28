@@ -220,6 +220,53 @@ describe('commitStudentRow — guardian override (owner-approved: never self-gua
     expect(await Person.countDocuments({ collegeId })).toBe(2);
     expect(await Parent.countDocuments({ collegeId })).toBe(1);
   });
+
+  /**
+   * Several non-student, non-faculty Persons can legitimately share a phone
+   * (an uncle and a grandmother on the household landline). The guardian
+   * picked among them must be the same on every run — otherwise two
+   * identical imports attach different guardians, and the divergence only
+   * surfaces much later as a mismatched fee-responsible parent.
+   *
+   * HONEST CAVEAT: this is a guard, not a regression test. It was verified to
+   * pass with the `.sort({ _id: 1 })` removed, because mongodb-memory-server
+   * returns documents in insertion order anyway, so the unsorted read already
+   * yields the oldest Person. Real MongoDB makes no such guarantee — natural
+   * order can change after a document move or with a different plan — so the
+   * sort is load-bearing in production and untestable here. Do not delete the
+   * sort on the strength of this test still passing.
+   */
+  it('picks the same guardian every time when several eligible Persons share a phone', async () => {
+    const shared = '9333300001';
+    // Created oldest-first; _id is monotonic, so `oldest` must always win.
+    const oldest = await Person.create({ collegeId, name: 'Grandmother', phone: shared });
+    await Person.create({ collegeId, name: 'Uncle', phone: shared });
+    await Person.create({ collegeId, name: 'Aunt', phone: shared });
+
+    const picked: string[] = [];
+    for (const roll of ['DET-1', 'DET-2', 'DET-3']) {
+      // eslint-disable-next-line no-await-in-loop
+      const res = await commitStudentRow(
+        {
+          ...baseRow(),
+          rollNumber: roll,
+          phone: `98765${roll.slice(-1)}0000`,
+          primaryParentPhone: shared,
+        },
+        ctx(),
+      );
+      // eslint-disable-next-line no-await-in-loop
+      const student = await Student.findById(res.id);
+      // eslint-disable-next-line no-await-in-loop
+      const parent = await Parent.findOne({ collegeId, _id: student!.primaryParentId });
+      picked.push(String(parent!.personId));
+    }
+
+    expect(new Set(picked).size).toBe(1);
+    expect(picked[0]).toBe(String(oldest._id));
+    // One guardian Parent reused across all three, not three created.
+    expect(await Parent.countDocuments({ collegeId })).toBe(1);
+  });
 });
 
 describe('parentExistsByPhone', () => {

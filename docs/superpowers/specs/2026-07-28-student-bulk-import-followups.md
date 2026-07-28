@@ -8,19 +8,37 @@ These came out of the review passes and were deliberately left for later. They a
 recorded here because the review artifacts that produced them are scratch and do
 not survive.
 
-## 1. Legacy students with no programme have no route to get one
+## 1. ~~Legacy students with no programme have no route to get one~~ — RESOLVED, and the premise was wrong
 
-The pre-branch 11-field importer could create a student with no `programmeId`
-(verified at `a274e52`). After this work:
+**Closed 2026-07-28.** This entry claimed programme-less students were a dead end.
+They are not. Tracing it properly:
 
-- `PATCH /api/people/students/:id` still 403s any `programmeId` change
-  (`people/service.ts:437-445`).
-- Bulk import now treats an unset→set fee-axis change as **Blocked**, per the
-  owner's ruling, mirroring that same 403.
+- `PATCH /api/people/students/:id` does 403 an unset→set `programmeId`
+  (`people/service.ts:437-445` compares against `student.programmeId ?? ''`, so
+  any real programme differs from unset). The Programme field on
+  People → Students is read-only on edit for exactly this reason.
+- But `transferProgramme()` handles a student with **no** current programme
+  perfectly well: `snapshot.programmeId` is undefined, `isSameProgramme` is
+  false, so it sets the programme, saves, then `pinYear`s — and rolls back to
+  undefined if pinning fails.
+- The "Transfer programme" button on `StudentFormPage` is rendered for every
+  edit view, not gated on having a programme, and `ProgrammeTransferDialog`
+  handles an empty `currentProgrammeId` correctly (nothing is disabled, and the
+  "must differ from current" guard passes).
 
-So those students have no update path at all for programme. Harmless for fee pins
-— no programme means no pin to strand — but it is a dead end. A carve-out that
-permits unset→set specifically, or a one-off backfill, would close it.
+So the route existed all along, and it is the *right* route — it pins the year,
+which neither a loosened generic update nor the importer would do.
+
+The real defect was the import's own blocking message, which told registrars to
+"Set it on the student's record in People → Students" — a field they cannot edit
+— and implied Programme Transfer only applies once a fee pin exists. Both wrong.
+The message now names Transfer programme unconditionally, pinned by a test in
+`platform/__tests__/student-import-validate-row.test.ts` that asserts the old
+wording is gone.
+
+Lesson worth keeping: this entry was written from the review's summary rather
+than from reading `programme-transfer-service.ts`. A follow-up note that
+misdescribes the system is worse than no note.
 
 ## 2. An all-blocked job reports `status: 'completed'`
 
