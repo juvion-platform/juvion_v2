@@ -84,8 +84,13 @@ export interface IImportJob extends Document {
 
   /** Original filename uploaded by the operator. */
   fileName: string;
-  /** S3 location of the uploaded source file. */
-  s3Key: string;
+  /**
+   * S3 location of the uploaded source file. Undefined when the archive
+   * was never attempted because `AWS_S3_BUCKET` was not configured at
+   * upload time — the archive is an audit convenience, not a correctness
+   * requirement, so an unconfigured bucket must not block the import.
+   */
+  s3Key?: string;
   mimeType: string;
   sizeBytes: number;
 
@@ -155,7 +160,7 @@ const schema = new Schema<IImportJob>(
     schemaSnapshot: { type: [schemaFieldSchema], required: true },
 
     fileName: { type: String, required: true },
-    s3Key: { type: String, required: true },
+    s3Key: { type: String, required: false },
     mimeType: { type: String, required: true },
     sizeBytes: { type: Number, required: true },
 

@@ -8,6 +8,7 @@ import type { ImportSchemaDefinition } from '../import-schemas/types';
 // Mocked here (same pattern as photo-service.test.ts) so the test exercises
 // real CSV parsing + validation without a real bucket or network call.
 vi.mock('../../../shared/s3/s3-client', () => ({
+  isS3Configured: vi.fn().mockReturnValue(true),
   putObject: vi.fn().mockResolvedValue(undefined),
   getPresignedUrl: vi.fn().mockResolvedValue({ url: 'https://example.test/mock', expiresAt: new Date() }),
 }));

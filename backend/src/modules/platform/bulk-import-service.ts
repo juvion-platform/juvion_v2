@@ -43,6 +43,7 @@ import {
 import {
   putObject,
   getPresignedUrl,
+  isS3Configured,
 } from '../../shared/s3/s3-client';
 import {
   getImportSchema,
@@ -246,6 +247,12 @@ export async function getImportJobSourceUrl(
   jobId: string,
 ): Promise<{ url: string; expiresAt: Date }> {
   const job = await getImportJob(collegeId, jobId);
+  if (!job.s3Key) {
+    throw new AppError(
+      503,
+      'No source file was archived for this job because storage (AWS_S3_BUCKET) was not configured at upload time.',
+    );
+  }
   return getPresignedUrl(job.s3Key, { expiresIn: 300 });
 }
 
@@ -276,18 +283,24 @@ export async function uploadAndValidate(
     throw new AppError(400, 'Empty file.');
   }
 
-  // ─ Generate the job _id up-front so we can name the S3 key with it.
+  // ─ Generate the job _id up-front so we can name the S3 key if the
+  //   archive is enabled.
   const jobOid = new Types.ObjectId();
-  const s3Key = s3KeyFor(collegeId, jobOid, fileName);
 
-  // ─ Upload source to S3 first; the DB row only exists if the file
-  //   landed. Same atomic-ish pattern as faculty-document-service.
-  await putObject({
-    key: s3Key,
-    body: fileBuffer,
-    contentType: declaredMime,
-    metadata: { entityType, fileName, collegeId },
-  });
+  // The source archive is an audit convenience, not a correctness
+  // requirement — an unconfigured bucket must not make imports impossible.
+  // Where S3 IS configured a failed upload still aborts, preserving the
+  // original guarantee for real deployments.
+  let s3Key: string | undefined;
+  if (isS3Configured()) {
+    s3Key = s3KeyFor(collegeId, jobOid, fileName);
+    await putObject({
+      key: s3Key,
+      body: fileBuffer,
+      contentType: declaredMime,
+      metadata: { entityType, fileName, collegeId },
+    });
+  }
 
   // ─ Parse.
   const text = fileBuffer.toString('utf-8');

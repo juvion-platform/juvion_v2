@@ -105,6 +105,17 @@ export function getBucket(): string {
   return bucket;
 }
 
+/**
+ * Cheap, side-effect-free predicate over the same env var `getBucket()`
+ * reads — no client construction, no network. Callers that treat S3 as an
+ * optional convenience (e.g. the bulk-import source archive) use this to
+ * decide whether to attempt the upload at all, instead of calling
+ * `getBucket()` and having to catch its throw.
+ */
+export function isS3Configured(): boolean {
+  return Boolean(process.env.AWS_S3_BUCKET);
+}
+
 // ─── Key helpers ───────────────────────────────────────────────────
 
 /**

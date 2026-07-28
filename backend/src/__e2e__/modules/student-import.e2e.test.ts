@@ -14,6 +14,7 @@ import { Person } from '../../models/people/Person';
 // reaching the auth/validation logic this test exists to prove. Mocked
 // with the same shape used in bulk-import-row-hook.test.ts.
 vi.mock('../../shared/s3/s3-client', () => ({
+  isS3Configured: vi.fn().mockReturnValue(true),
   putObject: vi.fn().mockResolvedValue(undefined),
   getPresignedUrl: vi.fn().mockResolvedValue({ url: 'https://example.test/mock', expiresAt: new Date() }),
 }));

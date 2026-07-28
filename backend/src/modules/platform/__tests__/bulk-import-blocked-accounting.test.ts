@@ -18,6 +18,7 @@ import { uploadAndValidate, commitImportJob } from '../bulk-import-service';
 import type { ImportSchemaDefinition } from '../import-schemas/types';
 
 vi.mock('../../../shared/s3/s3-client', () => ({
+  isS3Configured: vi.fn().mockReturnValue(true),
   putObject: vi.fn().mockResolvedValue(undefined),
   getPresignedUrl: vi.fn().mockResolvedValue({ url: 'https://example.test/mock', expiresAt: new Date() }),
 }));
