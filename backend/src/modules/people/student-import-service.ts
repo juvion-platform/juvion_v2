@@ -167,7 +167,14 @@ async function linkOrCreateParent(
   compensations: Compensation[],
   performedBy: string,
 ): Promise<string> {
-  const persons = await Person.find({ collegeId, phone }).select('_id name').lean();
+  // Sorted by _id so a shared phone resolves to the SAME guardian on every
+  // run. ObjectIds are monotonic by creation time, so this means "prefer the
+  // person who has existed longest" — arbitrary but stable and explainable.
+  // Unsorted, two identical imports could attach to different Persons, and
+  // the divergence would only show up as a mismatched fee-responsible parent
+  // much later.
+  const persons = await Person.find({ collegeId, phone })
+    .select('_id name').sort({ _id: 1 }).lean();
   const ids = persons.map((p) => p._id);
 
   if (ids.length) {
@@ -183,9 +190,11 @@ async function linkOrCreateParent(
 
     if (eligible.length) {
       const eligibleIds = eligible.map((p) => p._id);
+      // Sorted for the same reason as the Person lookup above: several
+      // eligible Persons on one phone could each already be a Parent.
       const existingParent = await Parent.findOne({
         collegeId, personId: { $in: eligibleIds },
-      }).select('_id').lean();
+      }).select('_id').sort({ _id: 1 }).lean();
       if (existingParent) return String(existingParent._id);
 
       const target = eligible[0]!;
