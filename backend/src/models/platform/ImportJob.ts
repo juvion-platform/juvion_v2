@@ -42,7 +42,13 @@ export type ImportJobStatus = (typeof IMPORT_JOB_STATUSES)[number];
 export interface IImportJobRowResult {
   /** 1-based row number in the input CSV (1 = first data row, not header). */
   row: number;
-  outcome: 'success' | 'error';
+  /**
+   * `blocked` is a valid row the business rules refuse to write (a sealed /
+   * exited / alumni record, or a change import is not allowed to make). It
+   * is deliberately NOT an error: it never reaches commit and never counts
+   * toward failureCount. Only schemas with a validateRow hook can produce it.
+   */
+  outcome: 'success' | 'error' | 'blocked';
   /** Mongo _id of the row created on success — empty on error. */
   createdId?: string;
   /** Human-readable failure reason. */
@@ -90,6 +96,12 @@ export interface IImportJob extends Document {
   /** Set during commit. */
   successCount: number;
   failureCount: number;
+  /**
+   * Rows the business rules refused to write. Tallied at preview and carried
+   * through commit. Kept separate from failureCount so a job whose only
+   * anomaly is a sealed record does not report a failure that never happened.
+   */
+  blockedCount: number;
 
   /** Per-row outcomes — populated during validation + commit. */
   results: IImportJobRowResult[];
@@ -108,7 +120,7 @@ export interface IImportJob extends Document {
 const rowResultSchema = new Schema<IImportJobRowResult>(
   {
     row: { type: Number, required: true },
-    outcome: { type: String, enum: ['success', 'error'], required: true },
+    outcome: { type: String, enum: ['success', 'error', 'blocked'], required: true },
     createdId: { type: String },
     error: { type: String },
     raw: { type: Schema.Types.Mixed },
@@ -157,6 +169,7 @@ const schema = new Schema<IImportJob>(
     totalRows: { type: Number, required: true, default: 0 },
     successCount: { type: Number, required: true, default: 0 },
     failureCount: { type: Number, required: true, default: 0 },
+    blockedCount: { type: Number, required: true, default: 0 },
 
     results: { type: [rowResultSchema], default: [] },
 

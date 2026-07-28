@@ -471,8 +471,13 @@ export async function uploadAndValidate(
     // AND error messages reference the raw value the user typed.
     results.push({
       row: rowIdx,
-      outcome: valid ? 'success' : 'error',
-      error: valid ? undefined : errors.map((e) => `${e.field}: ${e.error}`).join('; '),
+      // `blocked` is its own outcome, not an error. It used to persist as
+      // outcome:'error' with error:'' (empty, since a blocked row collects no
+      // field errors), which made commit count it as a failure — a job whose
+      // only anomaly was a sealed record reported "1 failed" for a row that
+      // was never eligible. The reason lives in `notes`.
+      outcome: blocked ? 'blocked' : valid ? 'success' : 'error',
+      error: valid || blocked ? undefined : errors.map((e) => `${e.field}: ${e.error}`).join('; '),
       raw: valid ? typedRow : rawObj,
       action,
       notes,
@@ -505,6 +510,7 @@ export async function uploadAndValidate(
     totalRows: parsed.rows.length,
     successCount: 0,
     failureCount: errorCount,
+    blockedCount: actionCounts.blocked,
     results,
     errorSummary:
       errorCount > 0
@@ -558,10 +564,17 @@ export async function commitImportJob(
 
   let successCount = 0;
   let failureCount = 0;
+  let blockedCount = 0;
   const ctx = { collegeId, performedBy };
 
   for (let i = 0; i < job.results.length; i += 1) {
     const r = job.results[i]!;
+    if (r.outcome === 'blocked') {
+      // Never attempted, and never a failure: the business rules refused it
+      // at preview and the operator was told so before confirming.
+      blockedCount += 1;
+      continue;
+    }
     if (r.outcome !== 'success') {
       // Already-failed validation row — skip, keep the failure entry.
       failureCount += 1;
@@ -584,15 +597,22 @@ export async function commitImportJob(
 
   job.successCount = successCount;
   job.failureCount = failureCount;
+  job.blockedCount = blockedCount;
   job.completedAt = new Date();
+  // Blocked rows are excluded from this ladder on purpose: a job whose only
+  // anomaly is a sealed record did not partially fail, it did exactly what
+  // preview said it would. The summary still names them so nothing is silent.
   job.status =
     failureCount === 0
       ? 'completed'
       : successCount === 0
         ? 'failed'
         : 'partial';
-  if (failureCount > 0) {
-    job.errorSummary = `Committed ${successCount} of ${job.totalRows} rows; ${failureCount} failed.`;
+  if (failureCount > 0 || blockedCount > 0) {
+    const parts = [`Committed ${successCount} of ${job.totalRows} rows`];
+    if (failureCount > 0) parts.push(`${failureCount} failed`);
+    if (blockedCount > 0) parts.push(`${blockedCount} blocked and not written`);
+    job.errorSummary = `${parts.join('; ')}.`;
   } else {
     job.errorSummary = undefined;
   }
