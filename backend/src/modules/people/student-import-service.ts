@@ -20,6 +20,7 @@ import { Parent } from '../../models/people/Parent';
 import { Faculty } from '../../models/people/Faculty';
 import { AppError } from '../../middleware/errorHandler';
 import { createAuditLog } from '../../shared/audit';
+import { syncStudentParentLinks } from './service';
 import { resolveStudentRefs, validateCatalogCodes, ResolvedRefs } from './student-import-refs';
 import { matchExistingStudent, feeAxisConflicts } from './student-import-match';
 
@@ -40,7 +41,18 @@ type Compensation =
       id: unknown;
       set: Record<string, unknown>;
       unset: Record<string, ''>;
-    };
+    }
+  /**
+   * Reverse Parent -> Student links. Undone by re-running the same
+   * reconciliation with the two id sets swapped, which restores exactly the
+   * prior membership. Unlike the other two kinds this one is registered
+   * BEFORE its forward write: `syncStudentParentLinks` issues two updateMany
+   * calls (pull, then addToSet) and a failure between them would otherwise
+   * leave a half-applied change with no compensation. Registering early is
+   * safe precisely because the undo is a set reconciliation, not a delete —
+   * running it when the forward write never happened is a no-op.
+   */
+  | { kind: 'parentLinks'; studentId: string; previous: string[]; next: string[] };
 
 function cell(row: Record<string, unknown>, key: string): string {
   const v = row[key];
@@ -97,6 +109,8 @@ async function rollback(
         if (c.model === 'Person') await Person.deleteOne({ _id: c.id, collegeId });
         else if (c.model === 'Parent') await Parent.deleteOne({ _id: c.id, collegeId });
         else await Student.deleteOne({ _id: c.id, collegeId });
+      } else if (c.kind === 'parentLinks') {
+        await syncStudentParentLinks(collegeId, c.studentId, c.next, c.previous);
       } else {
         const update: Record<string, unknown> = {};
         if (Object.keys(c.set).length) update.$set = c.set;
@@ -116,8 +130,8 @@ async function rollback(
         {
           collegeId,
           kind: c.kind,
-          model: c.model,
-          id: String(c.id),
+          model: c.kind === 'parentLinks' ? 'Parent' : c.model,
+          id: c.kind === 'parentLinks' ? c.studentId : String(c.id),
           row: rowIdentity(row),
           error: rollbackErr instanceof Error ? rollbackErr.message : String(rollbackErr),
         },
@@ -413,6 +427,31 @@ export async function commitStudentRow(
         compensations.push({ kind: 'restore', model: 'Student', id: existingStudent._id, set, unset });
       }
 
+      // Keep Parent.linkedStudents in step, exactly as the manual update
+      // path does (people/service.ts:480). `existingStudent` was read before
+      // the write above, so it still holds the pre-update guardian ids; a
+      // guardian the row replaces is unlinked, not merely left behind.
+      const previousParentIds = [
+        existingStudent.primaryParentId, existingStudent.feeResponsibleParentId,
+      ].filter(Boolean).map(String);
+      const nextParentIds = [
+        primaryParentId ?? (existingStudent.primaryParentId
+          ? String(existingStudent.primaryParentId) : undefined),
+        feeResponsibleParentId ?? (existingStudent.feeResponsibleParentId
+          ? String(existingStudent.feeResponsibleParentId) : undefined),
+      ].filter((v): v is string => Boolean(v));
+      if (previousParentIds.length || nextParentIds.length) {
+        compensations.push({
+          kind: 'parentLinks',
+          studentId: String(existingStudent._id),
+          previous: previousParentIds,
+          next: nextParentIds,
+        });
+        await syncStudentParentLinks(
+          collegeId, String(existingStudent._id), previousParentIds, nextParentIds,
+        );
+      }
+
       await createAuditLog({
         collegeId, entityType: 'Student', entityId: String(existingStudent._id),
         entityName: (personSet.name as string | undefined) ?? existingPerson.name,
@@ -429,6 +468,18 @@ export async function commitStudentRow(
     );
     const student = await Student.create({ collegeId, ...studentFields, personId: person._id });
     compensations.push({ kind: 'create', model: 'Student', id: student._id });
+
+    // Same reverse link the manual create path maintains
+    // (people/service.ts:334). Without it every imported guardian reads as
+    // childless in parent search and scores 0 for "Linked students".
+    const newParentIds = [primaryParentId, feeResponsibleParentId]
+      .filter((v): v is string => Boolean(v));
+    if (newParentIds.length) {
+      compensations.push({
+        kind: 'parentLinks', studentId: String(student._id), previous: [], next: newParentIds,
+      });
+      await syncStudentParentLinks(collegeId, String(student._id), [], newParentIds);
+    }
 
     await createAuditLog({
       collegeId, entityType: 'Student', entityId: String(student._id),

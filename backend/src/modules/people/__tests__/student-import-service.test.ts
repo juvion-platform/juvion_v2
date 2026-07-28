@@ -9,6 +9,7 @@ import { Branch } from '../../../models/academic-structure/Branch';
 import { Regulation } from '../../../models/academic-structure/Regulation';
 import { FeeCategory } from '../../../models/finance/FeeCategory';
 import { FeeQuota } from '../../../models/finance/FeeQuota';
+import * as auditModule from '../../../shared/audit';
 import { commitStudentRow } from '../student-import-service';
 
 const oid = () => new mongoose.Types.ObjectId();
@@ -88,6 +89,101 @@ describe('commitStudentRow — parents', () => {
     await Parent.create({ collegeId, personId: parentPerson._id, relationship: 'guardian' });
     await commitStudentRow({ ...baseRow(), primaryParentPhone: '9111111111' }, ctx());
     expect(await Parent.countDocuments({ collegeId })).toBe(1);
+  });
+});
+
+/**
+ * Final review, Important 2. The manual path calls syncStudentParentLinks
+ * (people/service.ts:152, invoked at :334 on create and :480 on update) to
+ * $addToSet the student onto each parent. The import set
+ * Student.primaryParentId / feeResponsibleParentId and stopped, so
+ * Parent.linkedStudents stayed empty: people/search-service.ts:378 populates
+ * it to render a parent's children, and profileCompleteness.ts:120 scores
+ * "Linked students". Every guardian created by an import read as childless
+ * and incomplete.
+ */
+describe('commitStudentRow — Parent.linkedStudents', () => {
+  it('links the student onto a newly created guardian', async () => {
+    const { id } = await commitStudentRow(
+      { ...baseRow(), primaryParentPhone: '9111111111', primaryParentName: 'Ramesh Sharma' },
+      ctx(),
+    );
+    const parent = await Parent.findOne({ collegeId });
+    expect(parent!.linkedStudents.map(String)).toEqual([id]);
+  });
+
+  it('links the student onto an existing guardian that was merely matched', async () => {
+    const parentPerson = await Person.create({ collegeId, name: 'Ramesh', phone: '9111111111' });
+    await Parent.create({ collegeId, personId: parentPerson._id, relationship: 'guardian' });
+
+    const { id } = await commitStudentRow(
+      { ...baseRow(), primaryParentPhone: '9111111111' }, ctx(),
+    );
+    const parent = await Parent.findOne({ collegeId });
+    expect(parent!.linkedStudents.map(String)).toEqual([id]);
+  });
+
+  it('links both guardians once when the two phone columns differ', async () => {
+    const { id } = await commitStudentRow(
+      {
+        ...baseRow(),
+        primaryParentPhone: '9111111111',
+        feeResponsibleParentPhone: '9222222222',
+      },
+      ctx(),
+    );
+    const parents = await Parent.find({ collegeId }).sort({ createdAt: 1 });
+    expect(parents).toHaveLength(2);
+    for (const p of parents) expect(p.linkedStudents.map(String)).toEqual([id]);
+  });
+
+  it('moves the link when a re-import replaces the guardian', async () => {
+    const { id } = await commitStudentRow(
+      { ...baseRow(), rollNumber: 'R1', primaryParentPhone: '9111111111' }, ctx(),
+    );
+    const oldParent = await Parent.findOne({ collegeId });
+    expect(oldParent!.linkedStudents.map(String)).toEqual([id]);
+
+    await commitStudentRow(
+      { ...baseRow(), rollNumber: 'R1', primaryParentPhone: '9333333333' }, ctx(),
+    );
+
+    const oldAfter = await Parent.findById(oldParent!._id);
+    expect(oldAfter!.linkedStudents.map(String)).toEqual([]);
+    const newParent = await Parent.findOne({ collegeId, _id: { $ne: oldParent!._id } });
+    expect(newParent!.linkedStudents.map(String)).toEqual([id]);
+  });
+
+  it('does not double-link on an unchanged re-import', async () => {
+    const { id } = await commitStudentRow(
+      { ...baseRow(), rollNumber: 'R1', primaryParentPhone: '9111111111' }, ctx(),
+    );
+    await commitStudentRow(
+      { ...baseRow(), rollNumber: 'R1', primaryParentPhone: '9111111111', email: 'x@y.test' },
+      ctx(),
+    );
+    const parent = await Parent.findOne({ collegeId });
+    expect(parent!.linkedStudents.map(String)).toEqual([id]);
+  });
+
+  it('rolls the link back when a later write in the same row fails', async () => {
+    // A pre-existing guardian, so rollback cannot simply delete the Parent —
+    // the link itself has to be undone.
+    const parentPerson = await Person.create({ collegeId, name: 'Ramesh', phone: '9111111111' });
+    const parent = await Parent.create({
+      collegeId, personId: parentPerson._id, relationship: 'guardian',
+    });
+
+    // Fail the audit write, which happens AFTER the parent links are synced.
+    vi.spyOn(auditModule, 'createAuditLog').mockRejectedValueOnce(new Error('audit exploded'));
+
+    await expect(
+      commitStudentRow({ ...baseRow(), primaryParentPhone: '9111111111' }, ctx()),
+    ).rejects.toThrow(/audit exploded/);
+
+    const parentAfter = await Parent.findById(parent._id);
+    expect(parentAfter!.linkedStudents.map(String)).toEqual([]);
+    expect(await Student.countDocuments({ collegeId })).toBe(0);
   });
 });
 

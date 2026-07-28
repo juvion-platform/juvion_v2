@@ -149,7 +149,16 @@ function assertStudentOnboardingRules(input: {
   }
 }
 
-async function syncStudentParentLinks(collegeId: string, studentId: string, previousParentIds: string[], nextParentIds: string[]) {
+/**
+ * Keeps the reverse Parent -> Student link in step with a student's
+ * primaryParentId / feeResponsibleParentId.
+ *
+ * Exported because the bulk-import commit path must maintain the same link:
+ * people/search-service.ts populates `linkedStudents` to render a parent's
+ * children, and profileCompleteness.ts scores it, so an importer that skips
+ * this leaves every imported guardian reading as childless and incomplete.
+ */
+export async function syncStudentParentLinks(collegeId: string, studentId: string, previousParentIds: string[], nextParentIds: string[]) {
   const previous = new Set(previousParentIds.filter(Boolean));
   const next = new Set(nextParentIds.filter(Boolean));
   const toRemove = [...previous].filter(id => !next.has(id));
