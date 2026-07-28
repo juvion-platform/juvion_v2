@@ -65,6 +65,56 @@ describe('resolveStudentRefs', () => {
     expect(res.ok).toBe(false);
   });
 
+  // Branch and Batch are uniquely keyed on (collegeId, code) only, so a
+  // lookup by code alone is deterministic but UNCONSTRAINED: an MTECH
+  // programme paired with a BTech CSE branch resolved happily. `branchId`
+  // is a fee axis, so the mismatch produced a student who could never
+  // fee-pin — the same silent failure the quota/category validation was
+  // added to prevent, arrived at by a different route.
+  it('rejects a branch code belonging to a different programme', async () => {
+    await seed();
+    const otherProgrammeId = oid();
+    await Programme.create({
+      _id: otherProgrammeId, collegeId, code: 'MTECH', name: 'MTech CSE',
+      level: 'PG', durationYears: 2, regulationId,
+    });
+    const res = await resolveStudentRefs(collegeId, {
+      programmeCode: 'MTECH', branchCode: 'CSE',
+    });
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect(res.error).toBe(
+        'branch code "CSE" belongs to a different programme than "MTECH" — pick a branch of MTech CSE',
+      );
+    }
+  });
+
+  it('rejects a batch code belonging to a different programme', async () => {
+    await seed();
+    const otherProgrammeId = oid();
+    await Programme.create({
+      _id: otherProgrammeId, collegeId, code: 'MTECH', name: 'MTech CSE',
+      level: 'PG', durationYears: 2, regulationId,
+    });
+    const res = await resolveStudentRefs(collegeId, {
+      programmeCode: 'MTECH', batchCode: 'B2025',
+    });
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect(res.error).toBe(
+        'batch code "B2025" belongs to a different programme than "MTECH" — pick a batch of MTech CSE',
+      );
+    }
+  });
+
+  it('still accepts a branch and batch that do belong to the resolved programme', async () => {
+    await seed();
+    const res = await resolveStudentRefs(collegeId, {
+      programmeCode: 'BTCSE', branchCode: 'CSE', batchCode: 'B2025',
+    });
+    expect(res.ok).toBe(true);
+  });
+
   it('leaves optional refs undefined when their column is blank', async () => {
     await seed();
     const res = await resolveStudentRefs(collegeId, { programmeCode: 'BTCSE' });

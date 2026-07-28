@@ -45,18 +45,42 @@ export async function resolveStudentRefs(
 
   const out: ResolvedRefs = { programmeId: String(programme._id), programmeName: programme.name };
 
+  // Branch and Batch are uniquely keyed on (collegeId, code) alone, so a
+  // lookup by code is deterministic but says nothing about whether the row's
+  // programme and branch belong together. Both models carry a REQUIRED
+  // programmeId, and `branchId` is a fee axis (see the Fee-Pin Pipeline
+  // section of CLAUDE.md), so an MTECH programme paired with a BTech CSE
+  // branch produced a student who could never fee-pin — silently, since
+  // every individual code was valid. Resolve by code (so an unknown code
+  // still gets its own message), then assert the relationship.
   const branchCode = cell(row, 'branchCode');
   if (branchCode) {
-    const branch = await Branch.findOne({ collegeId, code: branchCode }).select('_id name').lean();
+    const branch = await Branch.findOne({ collegeId, code: branchCode })
+      .select('_id name programmeId').lean();
     if (!branch) return { ok: false, error: `unknown branch code "${branchCode}"` };
+    if (String(branch.programmeId) !== out.programmeId) {
+      return {
+        ok: false,
+        error: `branch code "${branchCode}" belongs to a different programme than `
+          + `"${programmeCode}" — pick a branch of ${programme.name}`,
+      };
+    }
     out.branchId = String(branch._id);
     out.branchName = branch.name;
   }
 
   const batchCode = cell(row, 'batchCode');
   if (batchCode) {
-    const batch = await Batch.findOne({ collegeId, code: batchCode }).select('_id').lean();
+    const batch = await Batch.findOne({ collegeId, code: batchCode })
+      .select('_id programmeId').lean();
     if (!batch) return { ok: false, error: `unknown batch code "${batchCode}"` };
+    if (String(batch.programmeId) !== out.programmeId) {
+      return {
+        ok: false,
+        error: `batch code "${batchCode}" belongs to a different programme than `
+          + `"${programmeCode}" — pick a batch of ${programme.name}`,
+      };
+    }
     out.batchId = String(batch._id);
   }
 
