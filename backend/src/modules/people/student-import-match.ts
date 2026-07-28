@@ -122,6 +122,42 @@ export async function matchExistingStudent(
 }
 
 /**
+ * The natural keys a row presents, for the engine's whole-file duplicate
+ * check (`ImportSchemaDefinition.naturalKeys`). Lives next to
+ * `matchExistingStudent` on purpose: the two must consult the same keys or
+ * the check misses exactly the collisions it exists to catch.
+ *
+ * EVERY key the row carries is emitted, not just the highest-precedence one,
+ * because `matchExistingStudent` FALLS THROUGH: a row whose rollNumber finds
+ * nothing is then tried on aadhaar, then on phone + admissionYear. So two
+ * rows with different roll numbers but the same family phone and admission
+ * year still collide at commit — row 2 lands on the student row 1 created
+ * and overwrites it.
+ *
+ * Order matches the matcher's precedence, so when a row collides on more
+ * than one key the operator is told about the strongest one.
+ */
+export function studentNaturalKeys(
+  row: Record<string, unknown>,
+): Array<{ label: string; value: string }> {
+  const keys: Array<{ label: string; value: string }> = [];
+
+  const rollNumber = cell(row, 'rollNumber');
+  if (rollNumber) keys.push({ label: 'rollNumber', value: rollNumber });
+
+  const aadhaar = cell(row, 'aadhaar');
+  if (aadhaar) keys.push({ label: 'aadhaar', value: aadhaar });
+
+  const phone = cell(row, 'phone');
+  const admissionYear = cell(row, 'admissionYear');
+  if (phone && admissionYear) {
+    keys.push({ label: 'phone + admissionYear', value: `${phone} / ${admissionYear}` });
+  }
+
+  return keys;
+}
+
+/**
  * Owner ruling A — import never moves a fee axis on an existing student.
  *
  * `Student.feePins[]` binds to a FeeStructureInstance selected on

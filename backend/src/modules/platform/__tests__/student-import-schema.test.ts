@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getImportSchema } from '../bulk-import-registry';
+import { getImportSchema, listImportEntityTypes } from '../bulk-import-registry';
 
 const REQUIRED = ['name', 'phone', 'programmeCode', 'admissionYear'];
 const EXPECTED_KEYS = [
@@ -48,6 +48,20 @@ describe('student import schema', () => {
   it('has a sample value for every field so the template row is complete', () => {
     for (const f of def!.fields) {
       expect(Object.keys(def!.sampleRow)).toContain(f.fieldKey);
+    }
+  });
+
+  // The whole-file duplicate check is opt-in precisely so the other four
+  // entity types keep the behaviour they had before this branch. Student is
+  // the only schema that upserts, so it is the only one where two rows
+  // claiming one identity destroys data rather than merely duplicating it.
+  it('is the only entity type that opts into whole-file duplicate detection', () => {
+    expect(def!.naturalKeys).toBeTypeOf('function');
+    const others = listImportEntityTypes().filter((d) => d.entityType !== 'student');
+    expect(others.map((d) => d.entityType).sort())
+      .toEqual(['applicant', 'faculty', 'programme', 'staff']);
+    for (const other of others) {
+      expect(other.naturalKeys, `${other.entityType} must not opt in`).toBeUndefined();
     }
   });
 

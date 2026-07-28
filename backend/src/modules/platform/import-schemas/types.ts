@@ -55,6 +55,36 @@ export interface ImportSchemaDefinition {
     ctx: ImportCommitContext,
   ) => Promise<{ id: string }>;
   /**
+   * OPTIONAL, opt-in. The natural keys this row would match an existing
+   * record on — the same keys, in the same precedence order, that the
+   * entity's own matcher consults.
+   *
+   * The engine tracks these across the WHOLE uploaded file and fails the
+   * second and subsequent row claiming a key an earlier row already claimed:
+   * `duplicate rollNumber "CS2025-014" — also on row 7`.
+   *
+   * Why this exists: preview classifies every row against the database as it
+   * stands BEFORE the batch, while commit processes rows sequentially, each
+   * seeing its predecessors' writes. For an upserting schema that means two
+   * rows sharing a key both preview as "Create", then at commit row 2 matches
+   * the record row 1 just created and overwrites it — row 2's record never
+   * exists, row 1's is destroyed, and the job reports two successes. Adopting
+   * upsert removed the unique-index safety net that used to hard-fail row 2.
+   *
+   * Emit EVERY key the row presents, not only the highest-precedence one:
+   * matchers fall through from one key to the next, so a row with a fresh
+   * rollNumber but a repeated phone can still land on the earlier row's
+   * record.
+   *
+   * Schemas that omit this (faculty, staff, applicant, programme) are not
+   * checked at all — the engine's behaviour for them is unchanged.
+   *
+   * Must be synchronous and side-effect free: it runs for every row.
+   */
+  naturalKeys?: (
+    typedRow: Record<string, unknown>,
+  ) => Array<{ label: string; value: string }>;
+  /**
    * Optional async per-row check, run after every field validator passes.
    *
    * `validate` is synchronous and therefore cannot hit the database, so

@@ -372,6 +372,15 @@ export async function uploadAndValidate(
   const actionCounts = { create: 0, update: 0, blocked: 0 };
   const sideEffectTotals: Record<string, number> = {};
   const ctx = { collegeId, performedBy };
+  /**
+   * File-scoped claim ledger for `def.naturalKeys`: "<label>\0<value>" ->
+   * the 1-based row that claimed it first. Lives here rather than in a
+   * schema module because this loop is the only place with whole-file
+   * state — module-level state in a schema would leak between two imports
+   * running concurrently. Empty and never consulted for schemas that do not
+   * declare `naturalKeys`.
+   */
+  const claimedKeys = new Map<string, number>();
 
   for (let i = 0; i < parsed.rows.length; i += 1) {
     const rowIdx = i + 1; // 1-based, matches the spreadsheet's data-row count
@@ -401,6 +410,30 @@ export async function uploadAndValidate(
     let action: ImportRowAction | undefined;
     let notes: string[] | undefined;
     let resolved: Record<string, string> | undefined;
+
+    // Whole-file duplicate check, before the (DB-backed) validateRow hook so
+    // a duplicate row costs no queries. Only rows that passed field
+    // validation take part: a row that is already failing will never be
+    // written, so it must neither collide nor claim an identity.
+    if (valid && def.naturalKeys) {
+      const keys = def.naturalKeys(typedRow);
+      for (const k of keys) {
+        const claimedBy = claimedKeys.get(`${k.label}\u0000${k.value}`);
+        if (claimedBy !== undefined) {
+          errors.push({
+            field: '_row',
+            error: `duplicate ${k.label} "${k.value}" — also on row ${claimedBy}`,
+          });
+          valid = false;
+          break;
+        }
+      }
+      // Claim only if this row survived: an identity claimed by a failed row
+      // would produce a false collision for a later, legitimate row.
+      if (valid) {
+        for (const k of keys) claimedKeys.set(`${k.label}\u0000${k.value}`, rowIdx);
+      }
+    }
 
     // Async row check — DB-backed validation the sync field validators
     // cannot do. Skipped for rows that already failed, so a broken row does

@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import { setupMongo, teardownMongo, clearCollections } from '../../../__tests__/helpers/mongoMemory';
 import { Person } from '../../../models/people/Person';
 import { Student } from '../../../models/people/Student';
-import { matchExistingStudent } from '../student-import-match';
+import { matchExistingStudent, studentNaturalKeys } from '../student-import-match';
 
 const oid = () => new mongoose.Types.ObjectId();
 let collegeId: string;
@@ -103,5 +103,60 @@ describe('matchExistingStudent', () => {
     await makeStudent({ rollNumber: 'R3', status: 'alumni' });
     const res = await matchExistingStudent(collegeId, { rollNumber: 'R3' });
     expect(res.action).toBe('blocked');
+  });
+
+  it('carries the matched student\'s fee axes so the caller need not re-read', async () => {
+    const programmeId = oid();
+    const branchId = oid();
+    const s = await makeStudent({
+      rollNumber: 'R4', programmeId, branchId, quota: 'convener', category: 'OC',
+    });
+    const res = await matchExistingStudent(collegeId, { rollNumber: 'R4' });
+    expect(res.action).toBe('update');
+    expect(res.studentId).toBe(String(s._id));
+    expect(res.existing).toEqual({
+      programmeId: String(programmeId),
+      branchId: String(branchId),
+      quota: 'convener',
+      category: 'OC',
+    });
+  });
+});
+
+/**
+ * The key set the engine uses to detect two rows in ONE uploaded file
+ * claiming the same identity (final review, Critical 2). It must stay in
+ * lockstep with matchExistingStudent above — which is why it lives here.
+ */
+describe('studentNaturalKeys', () => {
+  it('emits every key the row presents, in matcher precedence order', () => {
+    expect(studentNaturalKeys({
+      rollNumber: 'CS2025-014', aadhaar: '234567890101', phone: '9876543210', admissionYear: 2025,
+    })).toEqual([
+      { label: 'rollNumber', value: 'CS2025-014' },
+      { label: 'aadhaar', value: '234567890101' },
+      { label: 'phone + admissionYear', value: '9876543210 / 2025' },
+    ]);
+  });
+
+  it('emits nothing for a row carrying none of the keys', () => {
+    expect(studentNaturalKeys({ name: 'Aarav' })).toEqual([]);
+  });
+
+  it('needs BOTH halves of the weakest key', () => {
+    expect(studentNaturalKeys({ phone: '9876543210' })).toEqual([]);
+    expect(studentNaturalKeys({ admissionYear: 2025 })).toEqual([]);
+  });
+
+  it('emits the lower-precedence keys even when a rollNumber is present', () => {
+    // matchExistingStudent falls THROUGH: a row whose rollNumber does not
+    // match still gets tried on aadhaar and phone+admissionYear. So a second
+    // row with a fresh rollNumber but a repeated phone+admissionYear would
+    // still hit the first row's student at commit — it has to be a collision.
+    expect(studentNaturalKeys({ rollNumber: 'R1', phone: '9876543210', admissionYear: 2025 }))
+      .toEqual([
+        { label: 'rollNumber', value: 'R1' },
+        { label: 'phone + admissionYear', value: '9876543210 / 2025' },
+      ]);
   });
 });

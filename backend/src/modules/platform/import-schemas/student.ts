@@ -1,6 +1,8 @@
 import { commitStudentRow, parentExistsByPhone } from '../../people/student-import-service';
 import { resolveStudentRefs, validateCatalogCodes } from '../../people/student-import-refs';
-import { matchExistingStudent, feeAxisConflicts } from '../../people/student-import-match';
+import {
+  matchExistingStudent, feeAxisConflicts, studentNaturalKeys,
+} from '../../people/student-import-match';
 import type { ImportSchemaDefinition } from './types';
 import {
   validString, validNumber, validEnum, validDate, validPhone, validAadhaar, validEmail,
@@ -76,6 +78,12 @@ export const studentImportSchema: ImportSchemaDefinition = {
     primaryParentPhone: '9811111111', primaryParentName: 'Ramesh Sharma',
     feeResponsibleParentPhone: '9811111111',
   },
+  /**
+   * Opt into the engine's whole-file duplicate check. Student is the only
+   * schema that upserts, so it is the only one where two rows claiming one
+   * identity destroys data instead of merely duplicating it.
+   */
+  naturalKeys: studentNaturalKeys,
   /**
    * Runs at preview. Field validators are synchronous, so every DB-backed
    * check lives here: resolve the codes, validate the catalogs, and decide

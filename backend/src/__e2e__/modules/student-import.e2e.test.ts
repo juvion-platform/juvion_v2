@@ -3,6 +3,8 @@ import { getTestApp, cleanupTestApp } from '../setup/test-app';
 import { seedBase, BaseFixtures } from '../setup/seed-base';
 import { createTestApi, TestApi } from '../helpers/request';
 import { createTestUser } from '../factories/user.factory';
+import { Student } from '../../models/people/Student';
+import { Person } from '../../models/people/Person';
 
 // uploadAndValidate() (called by previewHandler) writes the source CSV to
 // S3 before validating rows. The e2e harness boots app.ts directly (not
@@ -74,6 +76,49 @@ describe('POST /api/people/students/import/preview', () => {
   it('401 without auth', async () => {
     const res = await api.post('/api/people/students/import/preview').send({});
     expect(res.status).toBe(401);
+  });
+
+  /**
+   * Final review, Critical 2 — through the real door, with the real schema.
+   *
+   * Before the whole-file duplicate check, both rows previewed as "Create".
+   * At commit row 1 created a student and row 2 MATCHED it on rollNumber,
+   * overwriting row 1's Person and Student with row 2's data: row 2's
+   * student never existed, row 1's was destroyed, and the job reported two
+   * successes.
+   */
+  it('fails the second row of a duplicated rollNumber instead of overwriting the first', async () => {
+    const roll = `DUP-${Date.now()}`;
+    const csv = [
+      'name*,phone*,programmeCode*,admissionYear*,rollNumber',
+      `Dup Row One,9876500101,BTECH,2025,${roll}`,
+      `Dup Row Two,9876500102,BTECH,2025,${roll}`,
+    ].join('\n');
+
+    const previewRes = await api.as(fx.admin.token)
+      .post('/api/people/students/import/preview')
+      .attach('file', Buffer.from(csv), { filename: 'dup.csv', contentType: 'text/csv' });
+
+    expect(previewRes.status).toBe(201);
+    expect(previewRes.body.previewRows[0].valid).toBe(true);
+    expect(previewRes.body.previewRows[1].valid).toBe(false);
+    expect(previewRes.body.previewRows[1].errors[0].error)
+      .toBe(`duplicate rollNumber "${roll}" — also on row 1`);
+    expect(previewRes.body.validCount).toBe(1);
+    expect(previewRes.body.errorCount).toBe(1);
+
+    const commitRes = await api.as(fx.admin.token)
+      .post('/api/people/students/import/commit')
+      .send({ jobId: previewRes.body.job._id });
+    expect(commitRes.status).toBe(200);
+    expect(commitRes.body.successCount).toBe(1);
+
+    // Exactly one student carries the roll number, and it is row 1's — the
+    // row the operator was told would be created.
+    const students = await Student.find({ collegeId: fx.collegeId, rollNumber: roll }).lean();
+    expect(students).toHaveLength(1);
+    const person = await Person.findById(students[0]!.personId).lean();
+    expect(person!.name).toBe('Dup Row One');
   });
 });
 
