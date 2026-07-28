@@ -221,6 +221,11 @@ PAYMENT_WEBHOOK_SECRET=any-non-empty-string-in-production  # app.ts:55 startup g
 RBAC_ENFORCE=true   # 'false' = authorize() is a pass-through (dev mode default behavior)
 RBAC_NL_ENFORCE=true  # 'true' = NL endpoint uses authorize() instead of hard requireRole admin gate
 VITE_API_URL=http://localhost:3003/api  # baked into the production admin-portal build (vite preview doesn't proxy)
+AWS_S3_BUCKET=                  # backend/src/shared/s3/s3-client.ts; unset disables bulk-import source-file archiving (import still succeeds) but photo/faculty-document uploads still 503
+AWS_REGION=ap-south-1
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_S3_ENDPOINT=                # set for LocalStack/MinIO; forces path-style addressing
 ```
 
 > **Gotcha**: `MONGODB_URI` is what the backend actually reads. Earlier CI runs failed because only `MONGO_URI` was set. Set both for safety.
