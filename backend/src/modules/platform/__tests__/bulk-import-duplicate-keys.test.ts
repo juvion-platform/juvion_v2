@@ -26,6 +26,13 @@ vi.mock('../../../shared/s3/s3-client', () => ({
   getPresignedUrl: vi.fn().mockResolvedValue({ url: 'https://example.test/mock', expiresAt: new Date() }),
 }));
 
+// These files each stand up their own mongodb-memory-server. Under the full
+// parallel suite that contention pushes the FIRST test in the file past the
+// 5s default (~7s observed); in isolation the whole file runs in well under a
+// second. Raising the per-test budget removes a harness timing sensitivity,
+// not a product slowness.
+vi.setConfig({ testTimeout: 20_000 });
+
 const COLLEGE = '000000000000000000000001';
 
 function fakeSchema(
