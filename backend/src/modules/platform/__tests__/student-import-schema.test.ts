@@ -94,4 +94,48 @@ describe('student import schema', () => {
     expect(res.ok).toBe(true);
     if (res.ok) expect(res.value).toBe('234567890101');
   });
+
+  /**
+   * Phone is a natural key: matchExistingStudent falls through to
+   * Person.find({ collegeId, phone }) + admissionYear, and linkOrCreateParent
+   * resolves guardians by phone. Operators paste from WhatsApp, contact cards
+   * and spreadsheets, and the manual student form accepts those formats
+   * verbatim (z.string().min(10) behind a plain text input) — so the importer
+   * refusing them was stricter than the platform's own UI, and storing a
+   * spaced value would break the key comparison. Same lesson as Aadhaar.
+   */
+  describe.each([
+    ['plain 10-digit', '9876543210'],
+    ['spaced', '98765 43210'],
+    ['hyphenated', '98765-43210'],
+    ['+91 prefixed', '+91 9876543210'],
+    ['91 prefixed, no plus', '919876543210'],
+    ['leading trunk 0', '09876543210'],
+    ['parenthesised STD-style', '(98765) 43210'],
+    ['dotted', '98765.43210'],
+  ])('phone accepts %s and stores it compact', (_label, raw) => {
+    for (const key of ['phone', 'primaryParentPhone', 'feeResponsibleParentPhone']) {
+      it(`on ${key}`, () => {
+        const f = def!.fields.find((x) => x.fieldKey === key)!;
+        const res = f.validate(raw, {}, { collegeId: 'c', performedBy: 'p' });
+        expect(res.ok).toBe(true);
+        if (res.ok) expect(res.value).toBe('9876543210');
+      });
+    }
+  });
+
+  it('still rejects a phone that is not 10 digits once separators are stripped', () => {
+    const p = def!.fields.find((f) => f.fieldKey === 'phone')!;
+    for (const bad of ['12345', '98765 4321', 'abcdefghij', '9876543210123']) {
+      const res = p.validate(bad, {}, { collegeId: 'c', performedBy: 'p' });
+      expect(res.ok, `expected ${bad} to be rejected`).toBe(false);
+    }
+  });
+
+  it('leaves an optional guardian phone empty rather than failing the row', () => {
+    const g = def!.fields.find((f) => f.fieldKey === 'primaryParentPhone')!;
+    const res = g.validate('   ', {}, { collegeId: 'c', performedBy: 'p' });
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.value).toBe('');
+  });
 });

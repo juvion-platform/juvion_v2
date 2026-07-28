@@ -60,18 +60,35 @@ export function validEnum(opts: { required: boolean; values: ReadonlyArray<strin
 }
 
 /**
- * Deliberately strict: 10 bare digits, no `+91`, spaces, or hyphens tolerated.
- * This matches the inline validator it replaced exactly (no widening), and
- * `phone` is used as an exact-equality natural key in several places —
- * `Person.find({ collegeId, phone })` in student-import-service.ts
- * (linkOrCreateParent / parentExistsByPhone) and the phone+admissionYear
- * fallback in matchExistingStudent. Accepting punctuated input would require
- * normalizing to a single canonical stored form everywhere that key is
- * compared, which is a separate, deliberate decision this fix does not make.
+ * Accepts the formats operators actually paste, and stores a single canonical
+ * 10-digit form.
+ *
+ * Separators (spaces, hyphens, parens, dots) are stripped, then an optional
+ * Indian country code (`+91` / `91`) or trunk prefix (`0`) is removed — but
+ * only when exactly 10 digits remain after it, so `919876543210` normalizes
+ * while a genuine 12-digit number is still rejected rather than silently
+ * truncated. The 10-digit rule itself is unchanged.
+ *
+ * Why this matters beyond convenience: `phone` is an exact-equality natural
+ * key in three places — `Person.find({ collegeId, phone })` in
+ * student-import-service.ts (linkOrCreateParent / parentExistsByPhone) and
+ * the phone+admissionYear fallback in matchExistingStudent. Storing a spaced
+ * value would break every one of those comparisons, so normalizing on input
+ * is what makes the key reliable, not a cosmetic nicety. Same reasoning as
+ * `validAadhaar` below.
+ *
+ * Scope note: this fixes the IMPORT door only. The manual student form is
+ * `z.string().min(10)` behind a plain text input, so it still accepts and
+ * stores punctuated values — meaning a phone written by that path may not
+ * match an imported one. Tightening that is a platform-wide change plus a
+ * backfill, tracked separately in the import follow-ups doc.
  */
 export function validPhone(opts: { required: boolean }) {
   return (raw: string): Res<string> => {
-    const v = raw.trim();
+    const v = raw
+      .trim()
+      .replace(/[\s\-().]/g, '')
+      .replace(/^(?:\+?91|0)(?=\d{10}$)/, '');
     if (!v) return opts.required ? { ok: false, error: 'required' } : { ok: true, value: '' };
     if (!/^[0-9]{10}$/.test(v)) return { ok: false, error: 'must be a 10-digit phone number' };
     return { ok: true, value: v };
