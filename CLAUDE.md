@@ -14,7 +14,7 @@ npm install                          # installs all 3 workspaces (backend, admin
 npm run dev:backend                  # backend on :3003
 npm run dev:portal                   # admin portal on :5173
 npm run seed -w backend              # full dev seed (idempotent; uses shared/seed/policies for RBAC)
-npm run seed:e2e-users -w backend    # CI-minimal seed: 2 users + DEFAULT_POLICIES (what e2e uses)
+npm run seed:e2e-users -w backend    # CI-minimal seed: 3 users + DEFAULT_POLICIES (what e2e uses)
 npm run typecheck                    # check all workspaces
 npm run test -w e2e                  # Playwright suite (needs backend + portal running)
 ```
