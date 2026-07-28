@@ -55,7 +55,8 @@ export interface ImportJobDoc {
   entityType: string;
   schemaSnapshot: ImportEntityFieldDef[];
   fileName: string;
-  s3Key: string;
+  /** Undefined when the source archive wasn't attempted (S3 not configured server-side). */
+  s3Key?: string;
   mimeType: string;
   sizeBytes: number;
   status: ImportJobStatus;
