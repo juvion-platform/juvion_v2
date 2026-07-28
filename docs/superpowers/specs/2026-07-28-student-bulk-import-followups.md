@@ -13,14 +13,15 @@ not survive.
 |---|------|-------|
 | 1 | Programme-less students have no route | Closed — premise was wrong; misleading message fixed |
 | 2 | All-blocked job reports `completed` | Closed — working as intended |
-| 3 | `validPhone` does no separator stripping | **Open**, deliberately deferred |
+| 3 | `validPhone` does no separator stripping | Fixed for import; **manual form still open** |
 | 4 | Audit `changes: []` on update | **Open**, house convention |
 | 5 | Non-deterministic guardian pick | Fixed |
 | 6 | No job-read endpoint for a Registrar | **Open**, needs a new endpoint |
 
-Items 3, 4 and 6 are the ones still worth doing. 3 is a scoped key-normalisation
-change; 4 is a codebase-wide convention question rather than a bug in this
-feature; 6 is a small new endpoint plus a UI affordance.
+Still worth doing: **3's second half** (normalise phone on the manual form +
+admissions, and backfill — needs its own spec, see below), **4** (a
+codebase-wide convention question rather than a bug in this feature), and **6**
+(a small new endpoint plus a UI affordance).
 
 ## 1. ~~Legacy students with no programme have no route to get one~~ — RESOLVED, and the premise was wrong
 
@@ -67,13 +68,32 @@ Adding a `blocked` value to the status enum would ripple into the platform UI's
 status badges and filters for no information gain over the summary already
 persisted. Left alone.
 
-## 3. `validPhone` does no separator stripping
+## 3. ~~`validPhone` does no separator stripping~~ — FIXED for the import door
 
-`platform/import-schemas/validators.ts`. `validAadhaar` strips whitespace so a
-card-format number (`2345 6789 0101`) matches a stored compact one; `validPhone`
-does bare `.trim()`. Phone is a natural key for matching, so the same paste-format
-bug class is one text message away. Deferred deliberately: normalising a key
-requires auditing every comparison site, which is its own scoped change.
+**Closed 2026-07-28, import side only.** `validPhone` now strips separators
+(spaces, hyphens, parens, dots) and an optional `+91` / `91` / leading `0`, then
+holds the same 10-digit rule and stores the canonical form — matching
+`validAadhaar`'s contract. Eight paste formats now reduce to one stored value.
+
+The audit the original note called for was done, and the comparison sites are:
+`matchExistingStudent`'s phone+admissionYear fallback, and `linkOrCreateParent` /
+`parentExistsByPhone`. All three read the *typed* row, so they get the canonical
+form automatically — no query-side change was needed.
+
+Proven end-to-end rather than at the validator: re-importing a student as
+`+91 98765-43210` after `9876543210` previews as **update**, not create, and two
+siblings naming the same guardian in different formats share one `Parent`.
+6 of the 7 round-trip tests fail against the un-normalised validator.
+
+**Still open — the other door.** The manual student form is
+`z.string().min(10)` behind a plain text input (only a "10-digit mobile"
+placeholder, no `pattern`), so it still accepts and stores punctuated values. A
+phone written that way may not match an imported one. Closing that means
+tightening the Zod schema, normalising on the manual create/update path, checking
+`admissions/workflow.handlers.ts` (which does its own exact-equality phone
+duplicate detection), and backfilling existing `Person.phone` values. That is a
+platform-wide change with a data migration and wants its own spec — the owner
+scoped this fix to the import door deliberately.
 
 ## 4. Audit `changes: []` on student update
 
