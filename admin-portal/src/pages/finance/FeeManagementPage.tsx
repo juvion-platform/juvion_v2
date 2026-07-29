@@ -12,7 +12,7 @@ import FinanceTabShell, {
   type FinanceTabDef,
 } from '../../components/finance/FinanceTabShell';
 
-import FeeStructuresPage from './FeeStructuresPage';
+import FeeStructureInstancesPage from './FeeStructureInstancesPage';
 import FeeComponentTemplatePage from './FeeComponentTemplatePage';
 import FeeCategoriesPage from './FeeCategoriesPage';
 import FeeQuotasPage from './FeeQuotasPage';
@@ -47,7 +47,10 @@ export default function FeeManagementPage() {
     >
       <Routes>
         <Route index element={<Navigate to="fee-structures" replace />} />
-        <Route path="fee-structures" element={<FeeStructuresPage />} />
+        {/* The legacy FeeStructuresPage (writing the retired FeeStructure
+            model) is retained on disk + under test, but no longer routed —
+            this URL now serves the FeeStructureInstance authoring page. */}
+        <Route path="fee-structures" element={<FeeStructureInstancesPage />} />
         <Route path="component-template" element={<FeeComponentTemplatePage />} />
         <Route path="fee-categories" element={<FeeCategoriesPage />} />
         <Route path="fee-quotas" element={<FeeQuotasPage />} />

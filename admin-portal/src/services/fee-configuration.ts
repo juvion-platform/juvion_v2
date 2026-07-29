@@ -34,9 +34,10 @@ export interface PopulatedFeeStructureInstance {
   status?: string;
   totalAmount?: number;
   approvedAt?: string;
+  yearOfStudy?: number;
   programmeId?: string | { _id: string; name?: string };
   branchId?: string | { _id: string; name?: string };
-  academicYearId?: string | { _id: string; name?: string };
+  academicYearId?: string | { _id: string; name?: string; label?: string; code?: string };
   quota?: string;
   category?: string;
 }
@@ -202,3 +203,87 @@ export const listFeeComponents = (
 
 export const getComponentTemplate = () =>
   api.get(`${FINANCE}/component-template`).then((r) => r.data);
+
+// ─── FSI authoring (Fix 1: create / edit / lifecycle) ────────────────
+
+export interface CreateFeeStructureInstanceInput {
+  academicYearId: string;
+  programmeId: string;
+  branchId?: string;
+  category?: string;
+  quota?: string;
+  /** Optional year-of-study (1–8). Omit for "any year" (wildcard). */
+  yearOfStudy?: number;
+  totalAmount?: number;
+}
+
+/** PATCH edit of a draft/revision_required FSI. Nullable axes clear to wildcard. */
+export interface UpdateFeeStructureInstanceInput {
+  academicYearId?: string;
+  programmeId?: string;
+  branchId?: string | null;
+  category?: string | null;
+  quota?: string | null;
+  yearOfStudy?: number | null;
+  totalAmount?: number;
+}
+
+export const getFeeStructureInstance = (id: string): Promise<PopulatedFeeStructureInstance> =>
+  api.get(`${FINANCE}/fee-structure-instances/${id}`).then((r) => r.data);
+
+export const createFeeStructureInstance = (
+  data: CreateFeeStructureInstanceInput,
+): Promise<PopulatedFeeStructureInstance> =>
+  api.post(`${FINANCE}/fee-structure-instances`, data).then((r) => r.data);
+
+export const updateFeeStructureInstance = (
+  id: string,
+  data: UpdateFeeStructureInstanceInput,
+): Promise<PopulatedFeeStructureInstance> =>
+  api.patch(`${FINANCE}/fee-structure-instances/${id}`, data).then((r) => r.data);
+
+export const deleteFeeStructureInstance = (id: string): Promise<{ deleted: boolean }> =>
+  api.delete(`${FINANCE}/fee-structure-instances/${id}`).then((r) => r.data);
+
+// Lifecycle transitions. All require finance:update on the backend.
+export const submitFeeStructureInstance = (id: string): Promise<PopulatedFeeStructureInstance> =>
+  api.post(`${FINANCE}/fee-structure-instances/${id}/submit`).then((r) => r.data);
+
+export const approveFeeStructureInstance = (id: string): Promise<PopulatedFeeStructureInstance> =>
+  api.post(`${FINANCE}/fee-structure-instances/${id}/approve`).then((r) => r.data);
+
+export const activateFeeStructureInstance = (id: string): Promise<PopulatedFeeStructureInstance> =>
+  api.post(`${FINANCE}/fee-structure-instances/${id}/activate`).then((r) => r.data);
+
+export const rejectFeeStructureInstance = (
+  id: string,
+  comments: string,
+): Promise<PopulatedFeeStructureInstance> =>
+  api.post(`${FINANCE}/fee-structure-instances/${id}/reject`, { comments }).then((r) => r.data);
+
+export const archiveFeeStructureInstance = (id: string): Promise<PopulatedFeeStructureInstance> =>
+  api.post(`${FINANCE}/fee-structure-instances/${id}/archive`).then((r) => r.data);
+
+// ─── Fee Component authoring ─────────────────────────────────────────
+
+export interface CreateFeeComponentInput {
+  feeStructureInstanceId: string;
+  name: string;
+  amount: number;
+  componentType: FeeComponentType;
+  isRefundable?: boolean;
+  isConditional?: boolean;
+  displayOrder?: number;
+}
+
+export const createFeeComponent = (data: CreateFeeComponentInput): Promise<IFeeComponent> =>
+  api.post(`${FINANCE}/fee-components`, data).then((r) => r.data);
+
+export const updateFeeComponent = (
+  id: string,
+  data: Partial<Omit<CreateFeeComponentInput, 'feeStructureInstanceId'>>,
+): Promise<IFeeComponent> =>
+  api.put(`${FINANCE}/fee-components/${id}`, data).then((r) => r.data);
+
+export const deleteFeeComponent = (id: string): Promise<{ message?: string } | IFeeComponent> =>
+  api.delete(`${FINANCE}/fee-components/${id}`).then((r) => r.data);

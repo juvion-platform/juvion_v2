@@ -248,6 +248,25 @@ export const createFeeStructureInstanceSchema = z.object({
   category: z.string().optional(),
   // Admin-managed via FeeQuota CRUD — see createFeeStructureSchema.
   quota: z.string().optional(),
+  // Optional year-of-study axis (1–8). Absent = wildcard across years.
+  // The model + matcher already support it; it was previously unreachable
+  // because this schema stripped it before it reached the service.
+  yearOfStudy: z.number().int().min(1).max(8).optional(),
+  totalAmount: z.number().min(0).optional(),
+});
+
+// Edit a DRAFT (or revision_required) FSI. All fields optional. The
+// wildcardable axes accept null to explicitly clear them back to
+// "any". academicYearId/programmeId are required refs so they may be
+// changed but not cleared. Enforcement of the draft-only rule lives in
+// the service.
+export const updateFeeStructureInstanceSchema = z.object({
+  academicYearId: z.string().min(1).optional(),
+  programmeId: z.string().min(1).optional(),
+  branchId: z.string().nullable().optional(),
+  category: z.string().nullable().optional(),
+  quota: z.string().nullable().optional(),
+  yearOfStudy: z.number().int().min(1).max(8).nullable().optional(),
   totalAmount: z.number().min(0).optional(),
 });
 
