@@ -1,0 +1,143 @@
+/**
+ * Fee-pinning for the student bulk import (006-import-fee-pin §3).
+ *
+ * Kept out of `student-import-service.ts`, which owns a different concern
+ * (Person / Parent / Student writes plus their compensating rollback).
+ *
+ * `pinImportedStudent` NEVER throws. That is the whole point of the module,
+ * not a defensive habit: `commitImportJob` turns any throw out of `commitOne`
+ * into `outcome:'error'` for that row, which inflates `failureCount` and
+ * degrades the job to `partial`/`failed`. A college that simply has not
+ * published next year's fee structures yet would turn a perfectly clean
+ * 500-student import red. Every failure mode is therefore a return value, so
+ * a pin outcome can never change a row's outcome (plan §2 invariant).
+ *
+ * No `createAuditLog` here — `pinYear` → `commitPin` already writes one per
+ * pin, and logging again would double-count every imported student in the
+ * fee-pin audit trail.
+ */
+import { Student } from '../../models/people/Student';
+import * as feePinService from '../finance/fee-pin-service';
+
+/**
+ * Stable actor string. Must stay a literal: `backfill-fee-pins.ts`'s
+ * `--rollback-pins-created-by=` matches `pin.pinnedBy` by exact equality, so
+ * folding the job id in here would make import-created pins un-rollbackable.
+ * Provenance lives in `remarks` instead.
+ */
+export const IMPORT_PIN_ACTOR = 'system:import';
+
+/** Mirrors the `feePins.yearOfStudy` schema bound on Student. */
+const MAX_YEAR_OF_STUDY = 8;
+
+export type PinOutcome =
+  | { kind: 'pinned'; pinId: string; fsiId: string; totalAmount: number }
+  | { kind: 'already-pinned'; fsiId: string }
+  | { kind: 'no-match'; message: string }
+  | { kind: 'skipped'; reason: 'no-academic-year' | 'no-programme' }
+  | { kind: 'error'; message: string };
+
+export interface PinImportContext {
+  collegeId: string;
+  performedBy: string;
+  /**
+   * Resolved once per job and frozen on the ImportJob (§4.3), never per row —
+   * a long import must not straddle an academic-year rollover and split a
+   * cohort. Absent means the job could not resolve one at all.
+   */
+  academicYearId?: string;
+  jobId: string;
+}
+
+export type YearOfStudyResolution =
+  | { ok: true; yearOfStudy: number }
+  | { ok: false; error: string };
+
+/**
+ * Resolve the year a row should pin at.
+ *
+ * `studyYearAtAdmission` is an optional column, so a blank cell legitimately
+ * means "direct admission, Year 1". Anything else present must be a whole
+ * year in range: the field validator (`validNumber({min:1,max:8})`) lets
+ * `2.5` through, and `2.5` matches no fee structure at all — it would surface
+ * as a baffling "no matching fee structure" rather than the typo it is.
+ *
+ * Shared with the preview hook so the year shown to the operator is provably
+ * the year the commit will pin at (E21).
+ */
+export function resolvePinYearOfStudy(raw: unknown): YearOfStudyResolution {
+  const cell = typeof raw === 'string' ? raw.trim() : raw == null ? '' : String(raw).trim();
+  if (!cell) return { ok: true, yearOfStudy: 1 };
+
+  const parsed = Number(cell);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > MAX_YEAR_OF_STUDY) {
+    return {
+      ok: false,
+      error:
+        `studyYearAtAdmission must be a whole number between 1 and ${MAX_YEAR_OF_STUDY} `
+        + `— got "${cell}"`,
+    };
+  }
+  return { ok: true, yearOfStudy: parsed };
+}
+
+export async function pinImportedStudent(
+  studentId: string,
+  typedRow: Record<string, unknown>,
+  ctx: PinImportContext,
+): Promise<PinOutcome> {
+  try {
+    if (!ctx.academicYearId) return { kind: 'skipped', reason: 'no-academic-year' };
+
+    const year = resolvePinYearOfStudy(typedRow.studyYearAtAdmission);
+    if (!year.ok) return { kind: 'error', message: year.error };
+
+    const student = await Student.findOne({ _id: studentId, collegeId: ctx.collegeId })
+      .select('feePins programmeId')
+      .lean();
+    if (!student) return { kind: 'error', message: 'Student not found' };
+    if (!student.programmeId) return { kind: 'skipped', reason: 'no-programme' };
+
+    // Guard before pinning: `commitPin` archives whatever active pin exists
+    // for the year and pushes a replacement even when the structure is
+    // identical, so an unguarded re-import would churn every pin and fill the
+    // audit trail with no-op replacements.
+    //
+    // Deliberately not "re-pin when the structure differs" — that means
+    // either an axis moved (which import refuses outright) or Finance
+    // superseded the structure, and the second is a Finance decision that
+    // belongs on the Re-pin screen with a reason attached, not a side effect
+    // of a spreadsheet upload.
+    const active = (student.feePins ?? []).find(
+      (pin) => pin.yearOfStudy === year.yearOfStudy && !pin.archivedAt,
+    );
+    if (active) return { kind: 'already-pinned', fsiId: String(active.feeStructureInstanceId) };
+
+    const pinned = await feePinService.pinYear(studentId, year.yearOfStudy, {
+      pinnedBy: IMPORT_PIN_ACTOR,
+      reason: 'initial',
+      academicYearId: ctx.academicYearId,
+      // Sheet generation is an explicit bulk action. A 500-row intake must
+      // not be able to fail on a Redis blip.
+      enqueueCommitmentSheet: false,
+      remarks: `import job=${ctx.jobId} by=${ctx.performedBy}`,
+    });
+
+    return {
+      kind: 'pinned',
+      pinId: String(pinned._id),
+      fsiId: String(pinned.feeStructureInstanceId),
+      totalAmount: pinned.snapshotTotalAmount ?? 0,
+    };
+  } catch (err) {
+    if ((err as { name?: string }).name === 'FeeStructureNotFoundError') {
+      return { kind: 'no-match', message: (err as Error).message };
+    }
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[import-pin] student=${studentId} job=${ctx.jobId} pin failed:`,
+      (err as Error).message ?? err,
+    );
+    return { kind: 'error', message: (err as Error).message ?? 'pin failed' };
+  }
+}
