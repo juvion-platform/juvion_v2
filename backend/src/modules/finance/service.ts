@@ -901,14 +901,32 @@ export async function activateFeeStructure(collegeId: string, instanceId: string
   if (!instance) throw new AppError(404, 'Fee structure instance not found');
   if (instance.status !== 'approved') throw new AppError(400, 'Can only activate approved structures');
 
+  // Supersede only the FSI occupying the SAME slot. The slot is the full
+  // axis tuple, INCLUDING academicYearId and yearOfStudy. Omitting those
+  // two (the pre-fix bug) meant activating a Year-2/2026 structure wrongly
+  // superseded the still-needed Year-1/2025 one for the same
+  // programme/branch/quota/category — silently unpinning a whole cohort.
+  //
+  // Wildcardable axes are normalised to null so a wildcard FSI (field
+  // absent) is matched as the same slot — Mongo treats `{ field: null }`
+  // as "null OR missing".
+  //
+  // NOTE: the codebase intentionally tolerates more than one active FSI
+  // per slot and resolves the ambiguity at read time by most-recent
+  // `approvedAt` (see resolveMatchingFeeStructureInstance's tie-break).
+  // We therefore do NOT enforce a DB-level "one active per slot" unique
+  // index — this supersede step is the intent, the scorer is the backstop.
   await FeeStructureInstance.updateMany(
     {
       collegeId,
+      academicYearId: instance.academicYearId,
       programmeId: instance.programmeId,
-      branchId: instance.branchId,
-      quota: instance.quota,
-      category: instance.category,
+      branchId: instance.branchId ?? null,
+      category: instance.category ?? null,
+      quota: instance.quota ?? null,
+      yearOfStudy: instance.yearOfStudy ?? null,
       status: 'active',
+      _id: { $ne: instance._id },
     },
     { status: 'superseded' },
   );
