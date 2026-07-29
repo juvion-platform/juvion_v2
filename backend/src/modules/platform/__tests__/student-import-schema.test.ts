@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { getImportSchema, listImportEntityTypes } from '../bulk-import-registry';
+import type { ImportCommitContext } from '../import-schemas/types';
+
+/** Field validators are synchronous and touch no DB, so any well-formed context does. */
+const CTX: ImportCommitContext = { collegeId: 'c', performedBy: 'p', jobId: 'j' };
 
 const REQUIRED = ['name', 'phone', 'programmeCode', 'admissionYear'];
 const EXPECTED_KEYS = [
@@ -67,20 +71,20 @@ describe('student import schema', () => {
 
   it('rejects a blank required field', () => {
     const nameField = def!.fields.find((f) => f.fieldKey === 'name')!;
-    const res = nameField.validate('', {}, { collegeId: 'c', performedBy: 'p' });
+    const res = nameField.validate('', {}, CTX);
     expect(res.ok).toBe(false);
   });
 
   it('accepts a valid gender and rejects an invalid one', () => {
     const g = def!.fields.find((f) => f.fieldKey === 'gender')!;
-    expect(g.validate('male', {}, { collegeId: 'c', performedBy: 'p' }).ok).toBe(true);
-    expect(g.validate('helicopter', {}, { collegeId: 'c', performedBy: 'p' }).ok).toBe(false);
+    expect(g.validate('male', {}, CTX).ok).toBe(true);
+    expect(g.validate('helicopter', {}, CTX).ok).toBe(false);
   });
 
   it('bounds studyYearAtAdmission to 1-8', () => {
     const y = def!.fields.find((f) => f.fieldKey === 'studyYearAtAdmission')!;
-    expect(y.validate('1', {}, { collegeId: 'c', performedBy: 'p' }).ok).toBe(true);
-    expect(y.validate('9', {}, { collegeId: 'c', performedBy: 'p' }).ok).toBe(false);
+    expect(y.validate('1', {}, CTX).ok).toBe(true);
+    expect(y.validate('9', {}, CTX).ok).toBe(false);
   });
 
   // Regression test: Aadhaar is printed on the physical card grouped as
@@ -90,7 +94,7 @@ describe('student import schema', () => {
   // matchExistingStudent (Person.find({ collegeId, aadhaar })).
   it('accepts a grouped-format Aadhaar and normalizes it to 12 digits', () => {
     const a = def!.fields.find((f) => f.fieldKey === 'aadhaar')!;
-    const res = a.validate('2345 6789 0101', {}, { collegeId: 'c', performedBy: 'p' });
+    const res = a.validate('2345 6789 0101', {}, CTX);
     expect(res.ok).toBe(true);
     if (res.ok) expect(res.value).toBe('234567890101');
   });
@@ -117,7 +121,7 @@ describe('student import schema', () => {
     for (const key of ['phone', 'primaryParentPhone', 'feeResponsibleParentPhone']) {
       it(`on ${key}`, () => {
         const f = def!.fields.find((x) => x.fieldKey === key)!;
-        const res = f.validate(raw, {}, { collegeId: 'c', performedBy: 'p' });
+        const res = f.validate(raw, {}, CTX);
         expect(res.ok).toBe(true);
         if (res.ok) expect(res.value).toBe('9876543210');
       });
@@ -127,14 +131,14 @@ describe('student import schema', () => {
   it('still rejects a phone that is not 10 digits once separators are stripped', () => {
     const p = def!.fields.find((f) => f.fieldKey === 'phone')!;
     for (const bad of ['12345', '98765 4321', 'abcdefghij', '9876543210123']) {
-      const res = p.validate(bad, {}, { collegeId: 'c', performedBy: 'p' });
+      const res = p.validate(bad, {}, CTX);
       expect(res.ok, `expected ${bad} to be rejected`).toBe(false);
     }
   });
 
   it('leaves an optional guardian phone empty rather than failing the row', () => {
     const g = def!.fields.find((f) => f.fieldKey === 'primaryParentPhone')!;
-    const res = g.validate('   ', {}, { collegeId: 'c', performedBy: 'p' });
+    const res = g.validate('   ', {}, CTX);
     expect(res.ok).toBe(true);
     if (res.ok) expect(res.value).toBe('');
   });

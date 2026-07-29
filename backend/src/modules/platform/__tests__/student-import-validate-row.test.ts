@@ -23,7 +23,7 @@ const oid = () => new mongoose.Types.ObjectId();
 let collegeId: string;
 
 function ctx(overrides: Partial<ImportCommitContext> = {}): ImportCommitContext {
-  return { collegeId, performedBy: 'tester', ...overrides };
+  return { collegeId, performedBy: 'tester', jobId: 'test-job', ...overrides };
 }
 
 /** Guards against a future edit silently dropping the hook — fails loudly rather than crashing on a bare `!`. */

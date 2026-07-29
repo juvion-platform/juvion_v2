@@ -384,7 +384,7 @@ export async function uploadAndValidate(
   let errorCount = 0;
   const actionCounts = { create: 0, update: 0, blocked: 0 };
   const sideEffectTotals: Record<string, number> = {};
-  const ctx = { collegeId, performedBy };
+  const ctx = { collegeId, performedBy, jobId: String(jobOid) };
   /**
    * File-scoped claim ledger for `def.naturalKeys`: "<label>\0<value>" ->
    * the 1-based row that claimed it first. Lives here rather than in a
@@ -578,7 +578,7 @@ export async function commitImportJob(
   let successCount = 0;
   let failureCount = 0;
   let blockedCount = 0;
-  const ctx = { collegeId, performedBy };
+  const ctx = { collegeId, performedBy, jobId: String(job._id) };
 
   for (let i = 0; i < job.results.length; i += 1) {
     const r = job.results[i]!;
