@@ -726,6 +726,64 @@ export async function createFeeStructureInstance(collegeId: string, data: any, w
   return doc;
 }
 
+// Edit a draft (or revision_required) FSI. Only axes/year/total are
+// mutable, and only before the structure enters the approval workflow —
+// editing an active/approved FSI's axes would silently desync every
+// student already pinned to it, so that is refused. A rejected
+// (revision_required) structure returns to draft on edit so it can be
+// resubmitted (the submit path only accepts draft).
+export async function updateFeeStructureInstance(collegeId: string, id: string, data: any, who: string) {
+  const doc = await FeeStructureInstance.findOne({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Fee structure instance not found');
+  if (!['draft', 'revision_required'].includes(doc.status)) {
+    throw new AppError(400, 'Only draft or revision-required fee structures can be edited; submitted or later structures are locked');
+  }
+
+  const editable = ['academicYearId', 'programmeId', 'branchId', 'category', 'quota', 'yearOfStudy', 'totalAmount'] as const;
+  for (const key of editable) {
+    if (key in data) (doc as any)[key] = data[key];
+  }
+  if (doc.status === 'revision_required') {
+    doc.status = 'draft';
+    doc.rejectionComments = undefined;
+  }
+  await doc.save();
+
+  // Components are the source of truth for totalAmount once any exist; a
+  // client-supplied total is only honoured for a component-less FSI.
+  const componentCount = await FeeComponent.countDocuments({ feeStructureInstanceId: id, collegeId });
+  if (componentCount > 0) {
+    await recalcInstanceTotalAmount(collegeId, id);
+  }
+
+  await createAuditLog({ collegeId, entityType: 'FeeStructureInstance', entityId: id, entityName: `Fee Structure Instance`, action: 'update', changes: [], performedBy: who });
+  return FeeStructureInstance.findOne({ _id: id, collegeId });
+}
+
+// Hard-delete a draft FSI and cascade its components + rules. Only
+// drafts may be deleted; submitted/approved/active/superseded structures
+// carry workflow or billing history and must be archived, not removed.
+// This also cleans up an orphan draft left by a partial create (FSI
+// saved but a component POST failed).
+export async function deleteFeeStructureInstance(collegeId: string, id: string, who: string) {
+  const doc = await FeeStructureInstance.findOne({ _id: id, collegeId });
+  if (!doc) throw new AppError(404, 'Fee structure instance not found');
+  if (doc.status !== 'draft') {
+    throw new AppError(400, 'Only draft fee structures can be deleted; submitted or later structures must be archived');
+  }
+
+  const comps = await FeeComponent.find({ feeStructureInstanceId: id, collegeId }).select('_id').lean();
+  const compIds = comps.map((c) => String(c._id));
+  if (compIds.length > 0) {
+    await FeeComponentRule.deleteMany({ feeComponentId: { $in: compIds }, collegeId });
+  }
+  await FeeComponent.deleteMany({ feeStructureInstanceId: id, collegeId });
+  await FeeStructureInstance.deleteOne({ _id: id, collegeId });
+
+  await createAuditLog({ collegeId, entityType: 'FeeStructureInstance', entityId: id, entityName: `Fee Structure Instance`, action: 'delete', changes: [], performedBy: who });
+  return { deleted: true };
+}
+
 export async function cloneFeeStructure(collegeId: string, sourceInstanceId: string, newAcademicYearId: string, who: string) {
   const source = await FeeStructureInstance.findOne({ _id: sourceInstanceId, collegeId });
   if (!source) throw new AppError(404, 'Source fee structure instance not found');
@@ -823,7 +881,14 @@ export async function approveFeeStructure(collegeId: string, instanceId: string,
   if (instance.status !== 'submitted') throw new AppError(400, 'Can only approve submitted structures');
 
   instance.status = 'approved';
-  instance.approvedBy = who as any;
+  // `who` is the approver's display name (req.user.name / 'System' in dev),
+  // NOT a Person id — but approvedBy is an ObjectId ref, so assigning the
+  // name directly makes Mongoose throw a CastError on save (a 500 the moment
+  // Approve became reachable from the UI). Only set it when we actually have
+  // a valid ObjectId; the audit log below records the approver by name.
+  if (/^[a-fA-F0-9]{24}$/.test(who)) {
+    instance.approvedBy = who as any;
+  }
   instance.approvedAt = new Date();
   await instance.save();
 

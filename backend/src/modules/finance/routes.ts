@@ -30,6 +30,7 @@ import {
   createFeeReminderSchema, updateFeeReminderSchema,
   createFinancialReportSchema,
   createFeeStructureInstanceSchema,
+  updateFeeStructureInstanceSchema,
   cloneFeeStructureSchema,
   rejectFeeStructureSchema,
   createFeeComponentSchema,
@@ -365,6 +366,8 @@ router.get('/fee-structure-instances', authorize('finance', 'read'), ctrl.listFe
 router.get('/fee-structure-instances/preview-match', authorize('finance', 'read'), feePinCtrl.previewMatchingFeeStructure);
 router.get('/fee-structure-instances/:id', authorize('finance', 'read'), ctrl.getFeeStructureInstance);
 router.post('/fee-structure-instances', authorize('finance', 'create'), validate(createFeeStructureInstanceSchema), ctrl.createFeeStructureInstance);
+router.patch('/fee-structure-instances/:id', authorize('finance', 'update'), validate(updateFeeStructureInstanceSchema), ctrl.updateFeeStructureInstance);
+router.delete('/fee-structure-instances/:id', authorize('finance', 'delete'), ctrl.deleteFeeStructureInstance);
 router.post('/fee-structures/clone', authorize('finance', 'create'), validate(cloneFeeStructureSchema), ctrl.cloneFeeStructure);
 router.post('/fee-structure-instances/:id/submit', authorize('finance', 'update'), ctrl.submitFeeStructure);
 router.post('/fee-structure-instances/:id/approve', authorize('finance', 'update'), ctrl.approveFeeStructure);

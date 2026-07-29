@@ -323,6 +323,14 @@ export async function createFeeStructureInstance(req: AuthRequest, res: Response
   try { res.status(201).json(await service.createFeeStructureInstance(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
 }
 
+export async function updateFeeStructureInstance(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.updateFeeStructureInstance(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+
+export async function deleteFeeStructureInstance(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.deleteFeeStructureInstance(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
 export async function cloneFeeStructure(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { sourceInstanceId, newAcademicYearId } = req.body;
