@@ -47,6 +47,9 @@ export async function templateHandler(_req: AuthRequest, res: Response, next: Ne
 export async function previewHandler(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     if (!req.file) throw new AppError(400, 'No file uploaded. Attach a .csv as "file".');
+    // Optional multipart field. Supplying it is how a cohort is loaded ahead
+    // of the year it belongs to; omitted means the college's current year.
+    const { academicYearId } = req.body as { academicYearId?: string };
     const preview = await uploadAndValidate({
       collegeId: req.collegeId!,
       performedBy: req.user?.name ?? 'System',
@@ -54,6 +57,7 @@ export async function previewHandler(req: AuthRequest, res: Response, next: Next
       fileBuffer: req.file.buffer,
       fileName: req.file.originalname,
       declaredMime: req.file.mimetype,
+      ...(academicYearId ? { academicYearId } : {}),
     });
     res.status(201).json(preview);
   } catch (e) { next(e); }
@@ -104,6 +108,22 @@ export async function commitHandler(req: AuthRequest, res: Response, next: NextF
         .filter((r) => r.outcome === 'blocked')
         .slice(0, FAILED_ROW_LIMIT)
         .map((r) => ({ row: r.row, reason: r.notes?.join(' ') ?? 'blocked' })),
+      // Travels with the response for the same reason the failed rows do: a
+      // Registrar holds no platform:read and cannot open the job afterwards,
+      // so a student left unpinned is invisible to them unless it is here.
+      pinSummary: committed.pinSummary
+        ? {
+          ...committed.pinSummary,
+          unpinnedRows: committed.results
+            .filter((r) => r.pinOutcome && r.pinOutcome.kind !== 'pinned'
+              && r.pinOutcome.kind !== 'already-pinned')
+            .slice(0, FAILED_ROW_LIMIT)
+            .map((r) => ({
+              row: r.row,
+              reason: r.pinOutcome?.message ?? r.pinOutcome?.kind ?? 'not pinned',
+            })),
+        }
+        : undefined,
     });
   } catch (e) { next(e); }
 }

@@ -37,6 +37,7 @@ import {
   ImportJob,
   IImportJob,
   IImportJobRowResult,
+  IImportJobPinSummary,
   ImportJobStatus,
   IImportJobSchemaField,
 } from '../../models/platform/ImportJob';
@@ -50,7 +51,13 @@ import {
   serializeSchema,
   type ImportSchemaDefinition,
 } from './bulk-import-registry';
-import type { ImportRowAction } from './import-schemas/types';
+import type { ImportRowAction, ImportCommitContext } from './import-schemas/types';
+import { AcademicYear } from '../../models/academic-structure/AcademicYear';
+import {
+  resolveImportPinAcademicYear,
+  IMPORT_AUTO_PIN_MAX_ROWS,
+  type PinBudget,
+} from '../people/student-import-pin';
 
 // ─── Public constants ─────────────────────────────────────────────────
 
@@ -74,6 +81,20 @@ export interface UploadAndValidateOpts {
   fileBuffer: Buffer;
   fileName: string;
   declaredMime: string;
+  /**
+   * Academic year to pin imported students against. Omitted means "the
+   * college's current one"; supplying it is how a cohort is loaded ahead of
+   * the year it belongs to.
+   */
+  academicYearId?: string;
+}
+
+/** What the whole file will pin against, decided once and echoed to the operator. */
+export interface ImportPinContext {
+  academicYearId: string | null;
+  academicYearLabel?: string;
+  /** Present when pinning is off for the entire job. */
+  warning?: string;
 }
 
 export interface ImportJobPreview {
@@ -100,6 +121,8 @@ export interface ImportJobPreview {
    * ones. Empty for schemas without a validateRow hook.
    */
   sideEffectTotals: Record<string, number>;
+  /** Absent for entity types that do not fee-pin. */
+  pinContext?: ImportPinContext;
 }
 
 // ─── CSV parser (RFC-4180-ish, no new dep) ────────────────────────────
@@ -201,6 +224,39 @@ function isAllowedMime(mime: string): boolean {
 function s3KeyFor(collegeId: string, jobOid: Types.ObjectId, fileName: string): string {
   const safe = fileName.replace(/[^A-Za-z0-9._-]/g, '_');
   return `colleges/${collegeId}/bulk-imports/${String(jobOid)}/${safe}`;
+}
+
+/**
+ * Settle the academic year the job's fee pins resolve against.
+ *
+ * An explicitly chosen year is validated against the college rather than
+ * trusted — it arrives from a form field, and a year belonging to another
+ * tenant must not become a pin axis.
+ */
+async function resolvePinContext(
+  collegeId: string,
+  explicitAcademicYearId?: string,
+): Promise<ImportPinContext> {
+  if (explicitAcademicYearId) {
+    if (!Types.ObjectId.isValid(explicitAcademicYearId)) {
+      throw new AppError(400, 'academicYearId is not a valid id.');
+    }
+    const chosen = await AcademicYear.findOne({
+      _id: explicitAcademicYearId,
+      collegeId,
+    })
+      .select('_id label code')
+      .lean();
+    if (!chosen) throw new AppError(400, 'Academic year not found for this college.');
+    return {
+      academicYearId: String(chosen._id),
+      academicYearLabel: chosen.label ?? chosen.code ?? '',
+    };
+  }
+
+  const resolved = await resolveImportPinAcademicYear(collegeId);
+  if (!resolved.ok) return { academicYearId: null, warning: resolved.message };
+  return { academicYearId: resolved.academicYearId, academicYearLabel: resolved.label };
 }
 
 function snapshotSchema(def: ImportSchemaDefinition): IImportJobSchemaField[] {
@@ -384,7 +440,24 @@ export async function uploadAndValidate(
   let errorCount = 0;
   const actionCounts = { create: 0, update: 0, blocked: 0 };
   const sideEffectTotals: Record<string, number> = {};
-  const ctx = { collegeId, performedBy, jobId: String(jobOid) };
+
+  // Decided once for the whole file. Doing it per row would let a long import
+  // straddle an academic-year rollover and split one cohort across two years.
+  let pinContext: ImportPinContext | undefined;
+  if (def.requiresPinAcademicYear) {
+    pinContext = await resolvePinContext(collegeId, opts.academicYearId);
+  }
+
+  const ctx: ImportCommitContext = {
+    collegeId,
+    performedBy,
+    jobId: String(jobOid),
+    ...(pinContext?.academicYearId ? { academicYearId: pinContext.academicYearId } : {}),
+    // Preview-only, and it must stay that way: reusing a cached match to
+    // WRITE a pin would persist a structure that was superseded between
+    // preview and commit. Commit builds its own context without one.
+    previewCache: new Map<string, unknown>(),
+  };
   /**
    * File-scoped claim ledger for `def.naturalKeys`: "<label>\0<value>" ->
    * the 1-based row that claimed it first. Lives here rather than in a
@@ -529,6 +602,10 @@ export async function uploadAndValidate(
       errorCount > 0
         ? `${errorCount} of ${parsed.rows.length} rows have validation errors.`
         : undefined,
+    pinAcademicYearId: pinContext?.academicYearId
+      ? new Types.ObjectId(pinContext.academicYearId)
+      : undefined,
+    pinContextWarning: pinContext?.warning,
   });
 
   return {
@@ -541,6 +618,7 @@ export async function uploadAndValidate(
     errorCount,
     actionCounts,
     sideEffectTotals,
+    ...(pinContext ? { pinContext } : {}),
   };
 }
 
@@ -578,7 +656,23 @@ export async function commitImportJob(
   let successCount = 0;
   let failureCount = 0;
   let blockedCount = 0;
-  const ctx = { collegeId, performedBy, jobId: String(job._id) };
+
+  // No previewCache here on purpose — see ImportCommitContext. Commit always
+  // re-resolves against live data so a structure superseded since preview is
+  // never persisted as a pin.
+  const pinBudget: PinBudget | undefined = def.requiresPinAcademicYear
+    ? { remaining: IMPORT_AUTO_PIN_MAX_ROWS }
+    : undefined;
+  const ctx: ImportCommitContext = {
+    collegeId,
+    performedBy,
+    jobId: String(job._id),
+    ...(job.pinAcademicYearId ? { academicYearId: String(job.pinAcademicYearId) } : {}),
+    ...(pinBudget ? { pinBudget } : {}),
+  };
+  const pinSummary: IImportJobPinSummary = {
+    pinned: 0, alreadyPinned: 0, noMatch: 0, skipped: 0, errors: 0, totalPinnedAmount: 0,
+  };
 
   for (let i = 0; i < job.results.length; i += 1) {
     const r = job.results[i]!;
@@ -595,18 +689,46 @@ export async function commitImportJob(
     }
     try {
       // eslint-disable-next-line no-await-in-loop
-      const { id } = await def.commitOne(r.raw as Record<string, unknown>, ctx);
+      const { id, pinOutcome } = await def.commitOne(r.raw as Record<string, unknown>, ctx);
       r.createdId = id;
       // Keep outcome='success'; clear `raw` to save space — the
       // create succeeded, the row is now identifiable by createdId.
       r.raw = undefined;
       successCount += 1;
+      // Tallied on its own axis. A pin that did not land leaves the row a
+      // success: the student was imported, which is what the row claimed.
+      if (pinOutcome) {
+        r.pinOutcome = {
+          kind: pinOutcome.kind,
+          ...('message' in pinOutcome ? { message: pinOutcome.message } : {}),
+          ...('reason' in pinOutcome ? { message: pinOutcome.reason } : {}),
+          ...('fsiId' in pinOutcome ? { fsiId: pinOutcome.fsiId } : {}),
+          ...(pinOutcome.kind === 'pinned' ? { totalAmount: pinOutcome.totalAmount } : {}),
+        };
+        if (pinOutcome.kind === 'pinned') {
+          pinSummary.pinned += 1;
+          pinSummary.totalPinnedAmount += pinOutcome.totalAmount;
+        } else if (pinOutcome.kind === 'already-pinned') pinSummary.alreadyPinned += 1;
+        else if (pinOutcome.kind === 'no-match') pinSummary.noMatch += 1;
+        else if (pinOutcome.kind === 'skipped') pinSummary.skipped += 1;
+        else pinSummary.errors += 1;
+      }
     } catch (err) {
       r.outcome = 'error';
       r.error = (err as Error).message ?? 'commit failed';
       failureCount += 1;
     }
   }
+
+  if (pinBudget && pinBudget.remaining <= 0) {
+    // Never let truncation read as full coverage.
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[bulk-import] job=${String(job._id)} hit the ${IMPORT_AUTO_PIN_MAX_ROWS}-row auto-pin cap; `
+      + `${pinSummary.skipped} row(s) imported unpinned and need a bulk pin.`,
+    );
+  }
+  if (def.requiresPinAcademicYear) job.pinSummary = pinSummary;
 
   job.successCount = successCount;
   job.failureCount = failureCount;

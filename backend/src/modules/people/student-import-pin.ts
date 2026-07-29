@@ -17,6 +17,7 @@
  * fee-pin audit trail.
  */
 import { Student } from '../../models/people/Student';
+import { AcademicYear } from '../../models/academic-structure/AcademicYear';
 import * as feePinService from '../finance/fee-pin-service';
 
 /**
@@ -30,12 +31,81 @@ export const IMPORT_PIN_ACTOR = 'system:import';
 /** Mirrors the `feePins.yearOfStudy` schema bound on Student. */
 const MAX_YEAR_OF_STUDY = 8;
 
+/**
+ * Ceiling on how many rows one import will auto-pin. Beyond it the students
+ * still import, unpinned, and the remainder is a Finance bulk-pin job.
+ *
+ * Commit is a synchronous HTTP request that already does several writes per
+ * row; pinning adds ~5 round trips on top of each one. A 10,000-row file
+ * would hit a gateway timeout long before it hit a correctness problem. The
+ * truncation is always logged and reported — silent truncation would read as
+ * full coverage, which is worse than not pinning at all.
+ */
+export const IMPORT_AUTO_PIN_MAX_ROWS = 2000;
+
 export type PinOutcome =
   | { kind: 'pinned'; pinId: string; fsiId: string; totalAmount: number }
   | { kind: 'already-pinned'; fsiId: string }
   | { kind: 'no-match'; message: string }
-  | { kind: 'skipped'; reason: 'no-academic-year' | 'no-programme' }
+  | { kind: 'skipped'; reason: 'no-academic-year' | 'no-programme' | 'row-cap' }
   | { kind: 'error'; message: string };
+
+/**
+ * Mutable per-job allowance, decremented by each row that actually attempts a
+ * pin. Lives on the commit context because the row handler is stateless and
+ * the engine is the only thing that spans rows.
+ */
+export interface PinBudget {
+  remaining: number;
+}
+
+export type ImportPinAcademicYear =
+  | { ok: true; academicYearId: string; label: string }
+  | { ok: false; reason: 'none-current' | 'ambiguous-current'; message: string };
+
+/**
+ * Decide, once per job, which academic year the whole file pins against.
+ *
+ * Resolved once rather than per row on purpose: a long import that straddled
+ * an academic-year rollover would otherwise split one cohort across two
+ * years, and nothing downstream would show that it had happened.
+ *
+ * An ambiguous `isCurrent` (two years flagged — a data bug, but a real one)
+ * is refused rather than guessed. `findOne` would pick an arbitrary year and
+ * bind the entire cohort to it silently; making the operator name the year
+ * turns an invisible wrong answer into a visible question.
+ */
+export async function resolveImportPinAcademicYear(
+  collegeId: string,
+): Promise<ImportPinAcademicYear> {
+  const current = await AcademicYear.find({ collegeId, isCurrent: true })
+    .select('_id label code')
+    .lean();
+
+  if (current.length === 0) {
+    return {
+      ok: false,
+      reason: 'none-current',
+      message:
+        'No current academic year is set for this college, so imported students '
+        + 'cannot be pinned to a fee structure. Set one, or choose an academic '
+        + 'year for this import.',
+    };
+  }
+  if (current.length > 1) {
+    return {
+      ok: false,
+      reason: 'ambiguous-current',
+      message:
+        `${current.length} academic years are flagged as current, so the fee `
+        + 'structure to pin against is ambiguous. Choose an academic year for '
+        + 'this import, or fix the flags.',
+    };
+  }
+
+  const only = current[0]!;
+  return { ok: true, academicYearId: String(only._id), label: only.label ?? only.code ?? '' };
+}
 
 export interface PinImportContext {
   collegeId: string;
@@ -47,6 +117,8 @@ export interface PinImportContext {
    */
   academicYearId?: string;
   jobId: string;
+  /** Absent outside commit — preview attempts no pins, so it needs no budget. */
+  pinBudget?: PinBudget;
 }
 
 export type YearOfStudyResolution =
@@ -112,6 +184,14 @@ export async function pinImportedStudent(
       (pin) => pin.yearOfStudy === year.yearOfStudy && !pin.archivedAt,
     );
     if (active) return { kind: 'already-pinned', fsiId: String(active.feeStructureInstanceId) };
+
+    // Checked after the guard so an already-pinned row costs no budget — a
+    // re-import of a 3,000-row file should not exhaust the allowance on
+    // students that need no work.
+    if (ctx.pinBudget) {
+      if (ctx.pinBudget.remaining <= 0) return { kind: 'skipped', reason: 'row-cap' };
+      ctx.pinBudget.remaining -= 1;
+    }
 
     const pinned = await feePinService.pinYear(studentId, year.yearOfStudy, {
       pinnedBy: IMPORT_PIN_ACTOR,

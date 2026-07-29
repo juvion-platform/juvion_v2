@@ -23,8 +23,16 @@ import { createAuditLog } from '../../shared/audit';
 import { syncStudentParentLinks } from './service';
 import { resolveStudentRefs, validateCatalogCodes, ResolvedRefs } from './student-import-refs';
 import { matchExistingStudent, feeAxisConflicts } from './student-import-match';
+import { pinImportedStudent, type PinOutcome, type PinBudget } from './student-import-pin';
+import * as feePinService from '../finance/fee-pin-service';
 
-interface Ctx { collegeId: string; performedBy: string; }
+interface Ctx {
+  collegeId: string;
+  performedBy: string;
+  jobId: string;
+  academicYearId?: string;
+  pinBudget?: PinBudget;
+}
 
 /**
  * One undo step for a single row's commit. `create` steps are undone with a
@@ -52,7 +60,14 @@ type Compensation =
    * safe precisely because the undo is a set reconciliation, not a delete —
    * running it when the forward write never happened is a no-op.
    */
-  | { kind: 'parentLinks'; studentId: string; previous: string[]; next: string[] };
+  | { kind: 'parentLinks'; studentId: string; previous: string[]; next: string[] }
+  /**
+   * Undone by archiving, not deleting: a pin is an auditable financial event
+   * and `commitPin` has already written an audit entry referencing it.
+   * Registered AFTER its write, unlike `parentLinks`, because the undo needs
+   * a real pin id.
+   */
+  | { kind: 'pin'; studentId: string; pinId: string };
 
 function cell(row: Record<string, unknown>, key: string): string {
   const v = row[key];
@@ -111,6 +126,8 @@ async function rollback(
         else await Student.deleteOne({ _id: c.id, collegeId });
       } else if (c.kind === 'parentLinks') {
         await syncStudentParentLinks(collegeId, c.studentId, c.next, c.previous);
+      } else if (c.kind === 'pin') {
+        await feePinService.archivePin(c.studentId, c.pinId, 'import-rollback');
       } else {
         const update: Record<string, unknown> = {};
         if (Object.keys(c.set).length) update.$set = c.set;
@@ -130,8 +147,8 @@ async function rollback(
         {
           collegeId,
           kind: c.kind,
-          model: c.kind === 'parentLinks' ? 'Parent' : c.model,
-          id: c.kind === 'parentLinks' ? c.studentId : String(c.id),
+          model: c.kind === 'parentLinks' ? 'Parent' : c.kind === 'pin' ? 'FeePin' : c.model,
+          id: c.kind === 'parentLinks' || c.kind === 'pin' ? c.studentId : String(c.id),
           row: rowIdentity(row),
           error: rollbackErr instanceof Error ? rollbackErr.message : String(rollbackErr),
         },
@@ -363,7 +380,7 @@ function studentFieldsFromRow(
 export async function commitStudentRow(
   typedRow: Record<string, unknown>,
   ctx: Ctx,
-): Promise<{ id: string }> {
+): Promise<{ id: string; pinOutcome?: PinOutcome }> {
   const { collegeId, performedBy } = ctx;
 
   const catalog = await validateCatalogCodes(collegeId, typedRow);
@@ -466,7 +483,18 @@ export async function commitStudentRow(
         entityName: (personSet.name as string | undefined) ?? existingPerson.name,
         action: 'update', changes: [], performedBy,
       });
-      return { id: String(existingStudent._id) };
+
+      // An update row's fee axes cannot have moved — feeAxisConflicts blocks
+      // any row that would move one — so a student who already holds a pin is
+      // left alone. One who does not gets pinned, which is what makes
+      // re-importing the recovery path once Finance publishes the structure.
+      const updatePin = await pinImportedStudent(String(existingStudent._id), typedRow, ctx);
+      if (updatePin.kind === 'pinned') {
+        compensations.push({
+          kind: 'pin', studentId: String(existingStudent._id), pinId: updatePin.pinId,
+        });
+      }
+      return { id: String(existingStudent._id), pinOutcome: updatePin };
     }
 
     const person = await Person.create({ collegeId, ...personCreateFields(typedRow) });
@@ -495,7 +523,12 @@ export async function commitStudentRow(
       entityName: person.name, action: 'create', changes: [], performedBy,
     });
 
-    return { id: String(student._id) };
+    const createPin = await pinImportedStudent(String(student._id), typedRow, ctx);
+    if (createPin.kind === 'pinned') {
+      compensations.push({ kind: 'pin', studentId: String(student._id), pinId: createPin.pinId });
+    }
+
+    return { id: String(student._id), pinOutcome: createPin };
   } catch (err) {
     await rollback(compensations, collegeId, typedRow);
     throw err;

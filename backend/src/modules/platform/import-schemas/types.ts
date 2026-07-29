@@ -28,6 +28,15 @@ export interface ImportCommitContext {
    * between the two calls. Undefined when the job could not resolve one.
    */
   academicYearId?: string;
+  /**
+   * Per-job memo store handed to `validateRow`, so a schema can avoid
+   * re-querying reference data that is identical across rows.
+   *
+   * Present ONLY during preview. Commit deliberately gets none: reusing a
+   * cached match to write a pin would persist a fee structure that was
+   * superseded between the two calls.
+   */
+  previewCache?: Map<string, unknown>;
 }
 
 export interface ImportSchemaField extends IImportJobSchemaField {
@@ -58,6 +67,12 @@ export interface ImportSchemaDefinition {
   fields: ImportSchemaField[];
   /** Sample row for the downloadable CSV template. Keys must be `fieldKey`. */
   sampleRow: Record<string, string>;
+  /**
+   * Opt in to having the engine resolve and freeze an academic year for the
+   * job, and to per-row pin accounting. Only the student schema pins; the
+   * other four never touch fee structures and must not pay for the lookup.
+   */
+  requiresPinAcademicYear?: boolean;
   /**
    * Given a fully-validated typed row, perform the create + return
    * the _id. Throw `Error` on failure — the orchestrator catches and
