@@ -76,6 +76,13 @@ router.post(
   studentImportCtrl.previewHandler,
 );
 router.post('/students/import/commit', authorize('people', 'create'), studentImportCtrl.commitHandler);
+// Read-only history: 'people','read' rather than 'create' — looking at what a
+// past import did is not a write. Both are pinned to student jobs inside the
+// controller, so this door never exposes the other four entity types.
+// `/jobs` before `/jobs/:id`, and both before `/students/:id`, for the same
+// static-vs-param reason as the paths above.
+router.get('/students/import/jobs', authorize('people', 'read'), studentImportCtrl.jobListHandler);
+router.get('/students/import/jobs/:id', authorize('people', 'read'), studentImportCtrl.jobDetailHandler);
 
 router.get('/students/:id', authorize('people', 'read'), ctrl.getStudent);
 router.post('/students', authorize('people', 'create'), validate(createStudentSchema), ctrl.createStudent);

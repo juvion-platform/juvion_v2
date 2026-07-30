@@ -16,8 +16,9 @@ import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../../middleware/authenticate';
 import { AppError } from '../../middleware/errorHandler';
 import {
-  uploadAndValidate, commitImportJob, getImportJob,
+  uploadAndValidate, commitImportJob, getImportJob, listImportJobs,
 } from '../platform/bulk-import-service';
+import type { IImportJob } from '../../models/platform/ImportJob';
 import { getImportSchema, serializeSchema } from '../platform/bulk-import-registry';
 import { importFileUpload, importMulterErrorHandler } from '../platform/bulk-import-controller';
 
@@ -28,6 +29,47 @@ const ENTITY_TYPE = 'student';
  * always exact and the job keeps the full record.
  */
 const FAILED_ROW_LIMIT = 100;
+/** Default page size for the drawer's "recent imports" list. */
+const JOB_LIST_LIMIT = 10;
+
+/**
+ * The wire shape for one finished job, shared by `commitHandler` and
+ * `jobDetailHandler`.
+ *
+ * Extracted so the two cannot drift: the drawer renders the commit response
+ * and a re-opened job through the same code, so a field added to one and not
+ * the other would silently render blank on whichever path the operator took.
+ *
+ * Deliberately NOT the raw `IImportJob`. That document carries every row's raw
+ * input plus the full schema snapshot — megabytes on a large import — and the
+ * per-row detail is capped, since a 10,000-row wholesale failure must not put
+ * 10,000 messages on the wire. Counts are always exact; `truncated` tells the
+ * reader when the row lists are partial rather than leaving them to infer it
+ * from a suspiciously round number.
+ */
+function jobSummary(job: IImportJob) {
+  const failed = job.results.filter((r) => r.outcome === 'error');
+  const blocked = job.results.filter((r) => r.outcome === 'blocked');
+  return {
+    jobId: String(job._id),
+    fileName: job.fileName,
+    status: job.status,
+    totalRows: job.totalRows,
+    successCount: job.successCount,
+    failureCount: job.failureCount,
+    blockedCount: job.blockedCount,
+    errorSummary: job.errorSummary,
+    createdAt: job.createdAt,
+    completedAt: job.completedAt,
+    failedRows: failed
+      .slice(0, FAILED_ROW_LIMIT)
+      .map((r) => ({ row: r.row, error: r.error ?? 'commit failed' })),
+    blockedRows: blocked
+      .slice(0, FAILED_ROW_LIMIT)
+      .map((r) => ({ row: r.row, reason: r.notes?.join(' ') ?? 'blocked' })),
+    truncated: failed.length > FAILED_ROW_LIMIT || blocked.length > FAILED_ROW_LIMIT,
+  };
+}
 
 export const studentImportUpload = importFileUpload;
 export { importMulterErrorHandler as studentImportMulterErrorHandler };
@@ -88,22 +130,63 @@ export async function commitHandler(req: AuthRequest, res: Response, next: NextF
     // /platform/bulk-imports to read it, so the failed rows have to travel
     // with the response or they are invisible to the only persona that can
     // reach this door.
-    res.json({
-      jobId: String(committed._id),
-      status: committed.status,
-      totalRows: committed.totalRows,
-      successCount: committed.successCount,
-      failureCount: committed.failureCount,
-      blockedCount: committed.blockedCount,
-      errorSummary: committed.errorSummary,
-      failedRows: committed.results
-        .filter((r) => r.outcome === 'error')
-        .slice(0, FAILED_ROW_LIMIT)
-        .map((r) => ({ row: r.row, error: r.error ?? 'commit failed' })),
-      blockedRows: committed.results
-        .filter((r) => r.outcome === 'blocked')
-        .slice(0, FAILED_ROW_LIMIT)
-        .map((r) => ({ row: r.row, reason: r.notes?.join(' ') ?? 'blocked' })),
+    res.json(jobSummary(committed));
+  } catch (e) { next(e); }
+}
+
+/**
+ * The drawer's "recent imports" list.
+ *
+ * Summary fields only — no per-row detail. `IImportJob.results[]` holds up to
+ * IMPORT_MAX_ROWS entries, so returning whole documents for ten jobs could be
+ * tens of megabytes; the row lists live on the detail endpoint, one job at a
+ * time.
+ *
+ * Pinned to student jobs, so this door never lists the faculty / staff /
+ * applicant / programme imports an admin ran through /platform/bulk-imports.
+ */
+export async function jobListHandler(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { limit } = req.query as { limit?: string };
+    const parsed = Number(limit);
+    const jobs = await listImportJobs(req.collegeId!, {
+      entityType: ENTITY_TYPE,
+      limit: Number.isFinite(parsed) && parsed > 0 ? parsed : JOB_LIST_LIMIT,
     });
+    res.json({
+      items: jobs.map((job) => ({
+        jobId: String(job._id),
+        fileName: job.fileName,
+        status: job.status,
+        totalRows: job.totalRows,
+        successCount: job.successCount,
+        failureCount: job.failureCount,
+        blockedCount: job.blockedCount,
+        errorSummary: job.errorSummary,
+        createdAt: job.createdAt,
+        completedAt: job.completedAt,
+      })),
+    });
+  } catch (e) { next(e); }
+}
+
+/**
+ * One job's detail, so an operator who closed the drawer can get the failed
+ * rows back. Before this existed there was no route at all: the façade had no
+ * job endpoint and a Registrar holds no `platform:read`, so the per-row commit
+ * errors were visible exactly once and then unreachable.
+ *
+ * The entityType check is the same load-bearing one `commitHandler` carries:
+ * `getImportJob` scopes by collegeId, but nothing stops a caller holding only
+ * `people:read` from passing the id of a faculty or applicant job. 404 rather
+ * than 403 — a wrong-type job must not be confirmed to exist through this door.
+ */
+export async function jobDetailHandler(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { id } = req.params as { id?: string };
+    if (!id) throw new AppError(400, 'Job id is required.');
+    const job = await getImportJob(req.collegeId!, id);
+    if (job.entityType !== ENTITY_TYPE) throw new AppError(404, 'Import job not found');
+    res.json(jobSummary(job));
   } catch (e) { next(e); }
 }

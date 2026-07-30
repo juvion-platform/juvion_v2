@@ -16,13 +16,23 @@ not survive.
 | 3 | `validPhone` does no separator stripping | Fixed for import; **manual form still open** |
 | 4 | Audit `changes: []` on update | Fixed for import; **837 other sites open** |
 | 5 | Non-deterministic guardian pick | Fixed |
-| 6 | No job-read endpoint for a Registrar | **Open**, needs a new endpoint |
+| 6 | No job-read endpoint for a Registrar | Fixed |
 
-Still worth doing: **6** (a small new endpoint plus a UI affordance), **3's
-second half** (normalise phone on the manual form + admissions, plus a
-`Person.phone` backfill — needs its own spec), and **4's wider question**
-(whether the other 837 `changes: []` sites should be populated — a call for
-whoever owns the audit trail, not a defect in this feature).
+All six original items are now closed. Two were closed because the note itself
+was wrong or the behaviour was intended (1, 2); four produced real fixes (3, 4,
+5, 6). What remains is deliberately **out of this feature's scope**:
+
+- **3's second half** — normalise phone on the manual student form and in
+  `admissions/workflow.handlers.ts`, plus a `Person.phone` backfill. A
+  platform-wide change with a data migration; wants its own spec.
+- **4's wider question** — whether the other 837 `changes: []` call sites should
+  be populated. A call for whoever owns the audit trail.
+
+A note on this list's own reliability: **two of the six entries misdescribed the
+system** (1 claimed a dead end that did not exist; 4 framed a purpose-built
+schema field as a convention debate). Both were written from a review summary
+rather than from reading the code. Where an entry here disagrees with the source,
+trust the source.
 
 ## 1. ~~Legacy students with no programme have no route to get one~~ — RESOLVED, and the premise was wrong
 
@@ -145,9 +155,39 @@ Real MongoDB guarantees no natural order, so the sort matters in production and
 cannot be proven here. The test comment says as much, so nobody deletes the sort
 because "the test still passes without it."
 
-## 6. Commit returns a trimmed summary, but there is still no job-read endpoint
+## 6. ~~No job-read endpoint~~ — FIXED
 
-A Registrar cannot fetch a finished job — no façade endpoint, and they lack
-`platform:read`. The drawer now surfaces counts and failed rows inline from the
-commit response, which covers the immediate need, but a registrar who closes the
-drawer cannot get the detail back.
+**Closed 2026-07-30.** Two read-only routes on the façade, both
+`authorize('people', 'read')` — reading what a past import did is not a write:
+
+- `GET /students/import/jobs` — recent student imports, summary fields only.
+  `results[]` can hold `IMPORT_MAX_ROWS` entries, so returning whole documents
+  ten jobs deep could be tens of megabytes.
+- `GET /students/import/jobs/:id` — one job, in **the same shape the commit
+  response uses**. That is deliberate: the drawer renders a fresh commit and a
+  re-opened job through one component, so a second shape would render blank on
+  whichever path the operator took. `jobSummary()` is extracted for exactly this
+  reason.
+
+Both pinned to `entityType: 'student'`, carrying the same 404 that
+`commitHandler` already enforced — `getImportJob` scopes by college, but nothing
+otherwise stops a `people:read` holder passing a faculty or applicant job id.
+404 rather than 403, so a wrong-type job is not confirmed to exist through this
+door.
+
+**UI:** the drawer's choose-file step now lists recent imports; clicking one
+reopens its detail. This exposed a latent bug — the result view hardcoded an
+amber "Import finished with problems" banner, correct for a fresh commit (which
+only lands there on failure) but wrong for a clean past job, which would have
+read "0 failed" under a warning. Now conditional.
+
+**Also fixed in passing:** `e2e/tests/utils/confirm-dialog.ts` located the
+dialog with `getByRole('dialog')`. `ConfirmDialog` mounts at app root and stacks
+on top of whatever opened it, so when the caller is itself a `Modal` — the
+import drawer — that matched two elements and failed Playwright's strict mode
+before any button was clicked. It now targets a `data-testid="confirm-dialog"`,
+which cannot grab the wrong dialog however deeply nested the caller is. Any
+future confirm-inside-a-modal would have hit the same wall.
+
+Verified against a live stack: **Playwright 31/31**, including the
+`admissions.spec.ts` cases that share the helper.

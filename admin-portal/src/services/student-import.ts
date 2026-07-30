@@ -106,10 +106,46 @@ export interface ImportCommitSummary {
   errorSummary?: string;
   failedRows: Array<{ row: number; error: string }>;
   blockedRows: Array<{ row: number; reason: string }>;
+  fileName?: string;
+  createdAt?: string;
+  completedAt?: string;
+  /** True when `failedRows` / `blockedRows` were capped. Counts stay exact. */
+  truncated?: boolean;
 }
 
 export const commitStudentImport = (jobId: string): Promise<ImportCommitSummary> =>
   api.post(`${BASE}/commit`, { jobId }).then((r) => r.data);
+
+/** One row of the drawer's "recent imports" list — no per-row detail. */
+export interface ImportJobListEntry {
+  jobId: string;
+  fileName: string;
+  status: string;
+  totalRows: number;
+  successCount: number;
+  failureCount: number;
+  blockedCount: number;
+  errorSummary?: string;
+  createdAt?: string;
+  completedAt?: string;
+}
+
+/**
+ * Recent student imports for this college.
+ *
+ * Summary fields only — the server deliberately withholds per-row detail here,
+ * because a job's `results[]` can hold up to 10,000 entries and this list is
+ * ten jobs deep. Fetch one job's detail when the operator opens it.
+ */
+export const listStudentImportJobs = (limit?: number): Promise<{ items: ImportJobListEntry[] }> =>
+  api.get(`${BASE}/jobs`, { params: limit ? { limit } : undefined }).then((r) => r.data);
+
+/**
+ * One past job, in the same shape as the commit response — which is what lets
+ * the drawer render a fresh commit and a re-opened job through one component.
+ */
+export const getStudentImportJob = (jobId: string): Promise<ImportCommitSummary> =>
+  api.get(`${BASE}/jobs/${jobId}`).then((r) => r.data);
 
 function csvCell(value: string): string {
   return /[,"\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;

@@ -179,6 +179,166 @@ describe('POST /api/people/students/import/commit — entity-type boundary', () 
   });
 });
 
+/**
+ * Job history — the reason it exists.
+ *
+ * Per-row commit failures land on the ImportJob. Until these routes existed
+ * there was no way for a Registrar to read them back: the facade had no job
+ * endpoint, and a Registrar holds no `platform:read`, so /platform/bulk-imports
+ * was a 403. The failures were visible in the commit response exactly once and
+ * then unreachable — close the drawer and the detail was gone.
+ *
+ * Every student below carries a distinct rollNumber on purpose. The unique
+ * index is `{ collegeId: 1, rollNumber: 1 }` sparse, but because collegeId is
+ * always present Mongo does not treat a missing rollNumber as absent — it
+ * indexes `null` — so a second rollNumber-less student in the same college
+ * fails to commit. Omitting them here silently consumed that one slot and
+ * broke the RBAC test further down this file.
+ */
+describe('GET /api/people/students/import/jobs — history', () => {
+  async function commitOne(csv: string, filename: string) {
+    const preview = await api.as(fx.admin.token)
+      .post('/api/people/students/import/preview')
+      .attach('file', Buffer.from(csv), { filename, contentType: 'text/csv' });
+    expect(preview.status).toBe(201);
+    const commit = await api.as(fx.admin.token)
+      .post('/api/people/students/import/commit')
+      .send({ jobId: preview.body.job._id });
+    expect(commit.status).toBe(200);
+    return commit.body.jobId as string;
+  }
+
+  it('lists this college\'s student imports, newest first, without per-row payloads', async () => {
+    await commitOne('name*,phone*,programmeCode*,admissionYear*,rollNumber\nHist One,9876500301,BTECH,2025,HIST-1', 'first.csv');
+    const secondId = await commitOne(
+      'name*,phone*,programmeCode*,admissionYear*,rollNumber\nHist Two,9876500302,BTECH,2025,HIST-2', 'second.csv',
+    );
+
+    const res = await api.as(fx.admin.token).get('/api/people/students/import/jobs');
+    expect(res.status).toBe(200);
+    expect(res.body.items.length).toBeGreaterThanOrEqual(2);
+    // Newest first.
+    expect(res.body.items[0].jobId).toBe(secondId);
+    expect(res.body.items[0].fileName).toBe('second.csv');
+    expect(res.body.items[0].successCount).toBe(1);
+    // The list must stay small: results[] can hold IMPORT_MAX_ROWS entries.
+    expect(res.body.items[0].failedRows).toBeUndefined();
+    expect(res.body.items[0].results).toBeUndefined();
+  });
+
+  it('honours ?limit and ignores a nonsense one rather than erroring', async () => {
+    await commitOne('name*,phone*,programmeCode*,admissionYear*,rollNumber\nHist Lim,9876500303,BTECH,2025,HIST-3', 'lim.csv');
+
+    const limited = await api.as(fx.admin.token).get('/api/people/students/import/jobs?limit=1');
+    expect(limited.status).toBe(200);
+    expect(limited.body.items).toHaveLength(1);
+
+    const nonsense = await api.as(fx.admin.token).get('/api/people/students/import/jobs?limit=abc');
+    expect(nonsense.status).toBe(200);
+    expect(Array.isArray(nonsense.body.items)).toBe(true);
+  });
+
+  it('never lists jobs from the other four entity types', async () => {
+    const facultyCsv = [
+      'name,phone,employeeCode,designation',
+      'Faculty Hist,9876500304,FAC-HIST-1,Assistant Professor',
+    ].join('\n');
+    const facultyJob = await api.as(fx.admin.token)
+      .post('/api/platform/bulk-imports')
+      .field('entityType', 'faculty')
+      .attach('file', Buffer.from(facultyCsv), { filename: 'faculty-hist.csv', contentType: 'text/csv' });
+    expect(facultyJob.status).toBe(201);
+
+    const res = await api.as(fx.admin.token).get('/api/people/students/import/jobs');
+    expect(res.status).toBe(200);
+    expect(res.body.items.map((j: { jobId: string }) => j.jobId))
+      .not.toContain(facultyJob.body.job._id);
+  });
+
+  it('401 without auth', async () => {
+    expect((await api.get('/api/people/students/import/jobs')).status).toBe(401);
+  });
+});
+
+describe('GET /api/people/students/import/jobs/:id — detail', () => {
+  it('returns the failed rows a closed drawer would otherwise have lost', async () => {
+    // Two rows sharing a rollNumber: the engine fails the second rather than
+    // letting it overwrite the first, so the job carries a real failure.
+    const csv = [
+      'name*,phone*,programmeCode*,admissionYear*,rollNumber',
+      'Dup A,9876500311,BTECH,2025,DUP-HIST-1',
+      'Dup B,9876500312,BTECH,2025,DUP-HIST-1',
+    ].join('\n');
+    const preview = await api.as(fx.admin.token)
+      .post('/api/people/students/import/preview')
+      .attach('file', Buffer.from(csv), { filename: 'dup.csv', contentType: 'text/csv' });
+    expect(preview.status).toBe(201);
+    const commit = await api.as(fx.admin.token)
+      .post('/api/people/students/import/commit')
+      .send({ jobId: preview.body.job._id });
+    expect(commit.status).toBe(200);
+
+    // Re-read it the way a Registrar returning later would.
+    const res = await api.as(fx.admin.token)
+      .get(`/api/people/students/import/jobs/${commit.body.jobId}`);
+    expect(res.status).toBe(200);
+    expect(res.body.jobId).toBe(commit.body.jobId);
+    expect(res.body.fileName).toBe('dup.csv');
+    // Same shape the commit response used — the drawer renders both paths
+    // through one component, so a drift here renders blank on one of them.
+    expect(res.body).toMatchObject({
+      totalRows: commit.body.totalRows,
+      successCount: commit.body.successCount,
+      failureCount: commit.body.failureCount,
+      blockedCount: commit.body.blockedCount,
+    });
+    expect(res.body.failedRows).toEqual(commit.body.failedRows);
+    expect(res.body.truncated).toBe(false);
+  });
+
+  it('404s a faculty job — the same boundary commit enforces', async () => {
+    const facultyCsv = [
+      'name,phone,employeeCode,designation',
+      'Faculty Detail,9876500313,FAC-DET-1,Assistant Professor',
+    ].join('\n');
+    const facultyJob = await api.as(fx.admin.token)
+      .post('/api/platform/bulk-imports')
+      .field('entityType', 'faculty')
+      .attach('file', Buffer.from(facultyCsv), { filename: 'faculty-det.csv', contentType: 'text/csv' });
+    expect(facultyJob.status).toBe(201);
+
+    const res = await api.as(fx.admin.token)
+      .get(`/api/people/students/import/jobs/${facultyJob.body.job._id}`);
+    expect(res.status).toBe(404);
+  });
+
+  it('404s a job from another college', async () => {
+    const csv = 'name*,phone*,programmeCode*,admissionYear*,rollNumber\nCross Tenant,9876500314,BTECH,2025,HIST-4';
+    const preview = await api.as(fx.admin.token)
+      .post('/api/people/students/import/preview')
+      .attach('file', Buffer.from(csv), { filename: 'cross.csv', contentType: 'text/csv' });
+    expect(preview.status).toBe(201);
+
+    const outsider = await createTestUser({
+      collegeId: String(new Types.ObjectId()), role: 'admin', personaType: 'L-PRIN',
+      name: 'Cross Tenant Admin', email: 'cross-tenant-history@test.com',
+    });
+    const res = await api.as(outsider.token)
+      .get(`/api/people/students/import/jobs/${preview.body.job._id}`);
+    expect(res.status).toBe(404);
+  });
+
+  it('404s a malformed id rather than throwing', async () => {
+    const res = await api.as(fx.admin.token).get('/api/people/students/import/jobs/not-an-objectid');
+    expect(res.status).toBe(404);
+  });
+
+  it('401 without auth', async () => {
+    const res = await api.get(`/api/people/students/import/jobs/${new Types.ObjectId()}`);
+    expect(res.status).toBe(401);
+  });
+});
+
 // The e2e harness sets RBAC_ENFORCE='false' globally (see
 // setup/test-app.ts), which makes authorize() a pass-through for ANY
 // authenticated user regardless of module/action — so `expect(res.status)
@@ -221,6 +381,22 @@ describe('RBAC enforcement — the gate is on people, not platform', () => {
       .send({ jobId });
     expect(commitRes.status).toBe(200);
     expect(commitRes.body.status).toBe('completed');
+  });
+
+  it('a Registrar can read import history — history is people:read, not people:create', async () => {
+    // The write routes need people:create; reading what a past import did does
+    // not. Under real enforcement the Registrar must reach both history routes.
+    const list = await api.as(registrar.token).get('/api/people/students/import/jobs');
+    expect(list.status).toBe(200);
+
+    const csv = 'name*,phone*,programmeCode*,admissionYear*,rollNumber\nHist Rbac,9876500321,BTECH,2025,HIST-5';
+    const preview = await api.as(registrar.token)
+      .post('/api/people/students/import/preview')
+      .attach('file', Buffer.from(csv), { filename: 'hist-rbac.csv', contentType: 'text/csv' });
+    expect(preview.status).toBe(201);
+    const detail = await api.as(registrar.token)
+      .get(`/api/people/students/import/jobs/${preview.body.job._id}`);
+    expect(detail.status).toBe(200);
   });
 
   it('a Principal (platform:*, only people:read — no people:create) is rejected on preview — proves the gate checks people:create, not platform', async () => {
