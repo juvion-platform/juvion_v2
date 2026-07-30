@@ -33,14 +33,18 @@ describe('resolvePermissions', () => {
 
     const result = await resolvePermissions('college1', 'super_admin', 'SA');
 
-    // 13 modules x 4 actions = 52 permissions
-    expect(result).toHaveLength(52);
+    // 13 modules x 5 actions = 65 permissions. `approve` joined the CRUD
+    // four so the frontend can detect grants on routes that gate on it —
+    // re-pin and bulk-pin both do, and while it was unemitted those buttons
+    // had to fall back to role checks that disagreed with the backend.
+    expect(result).toHaveLength(65);
     expect(result).toContain('admissions:read');
     expect(result).toContain('admissions:create');
     expect(result).toContain('admissions:update');
     expect(result).toContain('admissions:delete');
     expect(result).toContain('juvi:read');
     expect(result).toContain('platform:delete');
+    expect(result).toContain('finance:approve');
     expect(mockedLoadPolicies).toHaveBeenCalledTimes(1);
     expect(mockedLoadPolicies).toHaveBeenCalledWith('college1', 'super_admin');
   });
@@ -98,8 +102,8 @@ describe('resolvePermissions', () => {
 
     const result = await resolvePermissions('college1', 'admin', 'ADM');
 
-    // 52 total minus 1 denied = 51
-    expect(result).toHaveLength(51);
+    // 65 total minus 1 denied = 64
+    expect(result).toHaveLength(64);
     expect(result).toContain('governance:read');
     expect(result).toContain('governance:create');
     expect(result).toContain('governance:update');

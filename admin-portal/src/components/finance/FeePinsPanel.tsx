@@ -95,10 +95,17 @@ export default function FeePinsPanel({
   currentYearOfStudy,
 }: Props) {
   const qc = useQueryClient();
-  const userRole = useAuthStore((s) => s.user?.role ?? '');
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const canPauseEscalation = hasPermission('finance', 'update');
-  const isPrincipal = userRole === 'principal' || userRole === 'super_admin';
+  /**
+   * The backend gates re-pin on `finance:approve`. This used to check
+   * `role === 'principal'`, which locked out a college admin the backend
+   * would have authorised — and no principal login is seeded, so the button
+   * was unreachable in practice. `update` is accepted as well because it is
+   * strictly narrower than approve and keeps the control usable for the
+   * fee-admin persona.
+   */
+  const canRePin = hasPermission('finance', 'approve') || hasPermission('finance', 'update');
 
   const [rePinOpen, setRePinOpen] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -297,9 +304,9 @@ export default function FeePinsPanel({
             <button
               type="button"
               onClick={() => setRePinOpen(true)}
-              disabled={!isPrincipal}
+              disabled={!canRePin}
               title={
-                isPrincipal
+                canRePin
                   ? 'Manually re-pin to a different fee structure'
                   : 'Principal role required to re-pin'
               }
@@ -330,7 +337,7 @@ export default function FeePinsPanel({
         {active.length === 0 ? (
           <div className="p-5 text-sm text-gray-500">
             No active fee pins for this student.
-            {isPrincipal && ' Use "Re-pin" to create one manually.'}
+            {canRePin && ' Use "Re-pin" to create one manually.'}
           </div>
         ) : (
           <div className="divide-y">

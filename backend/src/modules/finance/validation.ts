@@ -818,6 +818,18 @@ export const feePinRePinSchema = z.object({
   remarks: z.string().optional(),
 });
 
+export const bulkPinSchema = z.object({
+  studentIds: z.array(z.string().min(1)).optional(),
+  filter: z.object({
+    programmeId: z.string().min(1).optional(),
+    branchId: z.string().min(1).optional(),
+    quota: z.string().min(1).optional(),
+    category: z.string().min(1).optional(),
+  }).optional(),
+  academicYearId: z.string().min(1).optional(),
+  dryRun: z.boolean().optional(),
+});
+
 export const commitmentSheetRegenerateSchema = z.object({
   pinId: z.string().min(1).optional(),
 });

@@ -519,7 +519,21 @@ export async function updateStudent(collegeId: string, id: string, data: any, pe
     reason?: string;
   } = { feeAxisChanged, autoRebound: false, pinMarkedStale: false };
 
-  if (feeAxisChanged) {
+  // Option (b) of the spec's §5.5: also pin when the student holds no active
+  // pin at all. The edit form's preview strip promises "saving will switch to
+  // this", and before this it was a lie for exactly the students who most
+  // needed it — an imported cohort whose axes were already correct, so
+  // nothing "changed" and nothing was pinned.
+  //
+  // Adds only. It runs when there is NO active pin, so it can never archive
+  // or replace one; a student who is already pinned is untouched.
+  let needsInitialPin = false;
+  if (!feeAxisChanged) {
+    const current = await Student.findOne({ _id: id, collegeId }).select('feePins').lean();
+    needsInitialPin = !(current?.feePins ?? []).some((pin) => !pin.archivedAt);
+  }
+
+  if (feeAxisChanged || needsInitialPin) {
     try {
       const yearOfStudy = await resolveYearOfStudyForStalePinCheck(id);
       if (yearOfStudy !== null) {
@@ -535,7 +549,7 @@ export async function updateStudent(collegeId: string, id: string, data: any, pe
           // just-committed branch/category/quota values.
           const newPin = await feePinService.pinYear(id, yearOfStudy, {
             pinnedBy: performedBy,
-            reason: 'data_correction',
+            reason: feeAxisChanged ? 'data_correction' : 'initial',
             academicYearId: currentAY?._id,
             // Skip BullMQ enqueue to keep this path synchronous and
             // avoid a Redis failure killing the student save.

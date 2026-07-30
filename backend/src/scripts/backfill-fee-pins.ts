@@ -34,7 +34,8 @@ import mongoose from 'mongoose';
 
 import { Student, IStudent } from '../models/people/Student';
 import { College } from '../models/College';
-import { resolveStudentYearOfStudy } from '../modules/finance/resolve-year-of-study';
+import { resolvePinYearForExistingStudent } from '../modules/people/student-import-pin';
+import { AcademicYear } from '../models/academic-structure/AcademicYear';
 import {
   resolveMatchingFeeStructureInstance,
   pinYear,
@@ -387,25 +388,39 @@ async function processStudent(
   const programmeIdStr = student.programmeId ? String(student.programmeId) : '';
 
   // 1. Resolve yearOfStudy.
-  let yearOfStudy: number;
-  let academicYearId: string;
-  try {
-    const resolved = await resolveStudentYearOfStudy(String(student._id));
-    yearOfStudy = resolved.yearOfStudy;
-    academicYearId = resolved.academicYearId;
-  } catch (e) {
-    totals.unresolvable += 1;
-    csv.write(
-      csvRow([
-        String(student._id),
-        rollNumber,
-        programmeIdStr,
-        '',
-        'unresolvable',
-        (e as Error).message ?? 'year-of-study unresolvable',
-      ]),
-    );
-    return;
+  //
+  // The canonical resolver hard-fails without a Batch, and batch-less
+  // students are exactly the ones bulk import produces (a stock catalogue has
+  // no batch for MTECH/MBA). Writing them off as unresolvable made this
+  // script skip precisely the population it exists to serve, so it falls back
+  // to their admission year — the same rule bulk-pin uses. `unresolvable` now
+  // means what it says: no academic year to pin against at all.
+  const resolvedYear = await resolvePinYearForExistingStudent(
+    String(student._id),
+    student.studyYearAtAdmission,
+  );
+  const yearOfStudy = resolvedYear.yearOfStudy;
+  let academicYearId = resolvedYear.academicYearId;
+  if (!academicYearId) {
+    const currentAy = await AcademicYear.findOne({
+      collegeId: student.collegeId,
+      isCurrent: true,
+    }).select({ _id: 1 }).lean<{ _id: mongoose.Types.ObjectId } | null>();
+    if (!currentAy) {
+      totals.unresolvable += 1;
+      csv.write(
+        csvRow([
+          String(student._id),
+          rollNumber,
+          programmeIdStr,
+          '',
+          'unresolvable',
+          'no current academic year for this college',
+        ]),
+      );
+      return;
+    }
+    academicYearId = String(currentAy._id);
   }
 
   // 2. Already pinned for that year?

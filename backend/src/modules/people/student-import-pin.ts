@@ -19,6 +19,7 @@
 import { Student } from '../../models/people/Student';
 import { AcademicYear } from '../../models/academic-structure/AcademicYear';
 import * as feePinService from '../finance/fee-pin-service';
+import { resolveStudentYearOfStudy } from '../finance/resolve-year-of-study';
 
 /**
  * Stable actor string. Must stay a literal: `backfill-fee-pins.ts`'s
@@ -153,16 +154,35 @@ export function resolvePinYearOfStudy(raw: unknown): YearOfStudyResolution {
   return { ok: true, yearOfStudy: parsed };
 }
 
-export async function pinImportedStudent(
+/** Actor recorded on pins written by the Finance bulk-pin action. */
+export const BULK_PIN_ACTOR = 'system:bulk-pin';
+
+export interface PinAttemptContext {
+  collegeId: string;
+  /** Absent means the caller could not settle one; every attempt is skipped. */
+  academicYearId?: string;
+  /** Stable literal — `--rollback-pins-created-by` matches it exactly. */
+  pinnedBy: string;
+  remarks: string;
+  pinBudget?: PinBudget;
+  /** Identifies the caller in the warning log when a pin fails unexpectedly. */
+  logLabel: string;
+}
+
+/**
+ * Pin one student for one year, or explain why not. Never throws.
+ *
+ * Shared by the import commit and the Finance bulk-pin action so the two can
+ * never drift on what "already pinned" means — the guard below is the only
+ * definition of it.
+ */
+export async function pinStudentForYear(
   studentId: string,
-  typedRow: Record<string, unknown>,
-  ctx: PinImportContext,
+  yearOfStudy: number,
+  ctx: PinAttemptContext,
 ): Promise<PinOutcome> {
   try {
     if (!ctx.academicYearId) return { kind: 'skipped', reason: 'no-academic-year' };
-
-    const year = resolvePinYearOfStudy(typedRow.studyYearAtAdmission);
-    if (!year.ok) return { kind: 'error', message: year.error };
 
     const student = await Student.findOne({ _id: studentId, collegeId: ctx.collegeId })
       .select('feePins programmeId')
@@ -170,37 +190,36 @@ export async function pinImportedStudent(
     if (!student) return { kind: 'error', message: 'Student not found' };
     if (!student.programmeId) return { kind: 'skipped', reason: 'no-programme' };
 
-    // Guard before pinning: `commitPin` archives whatever active pin exists
-    // for the year and pushes a replacement even when the structure is
-    // identical, so an unguarded re-import would churn every pin and fill the
-    // audit trail with no-op replacements.
+    // `commitPin` archives whatever active pin exists for the year and pushes
+    // a replacement even when the structure is identical, so an unguarded
+    // re-run would churn every pin and fill the audit trail with no-op
+    // replacements.
     //
     // Deliberately not "re-pin when the structure differs" — that means
     // either an axis moved (which import refuses outright) or Finance
     // superseded the structure, and the second is a Finance decision that
-    // belongs on the Re-pin screen with a reason attached, not a side effect
-    // of a spreadsheet upload.
+    // belongs on the Re-pin screen with a reason attached.
     const active = (student.feePins ?? []).find(
-      (pin) => pin.yearOfStudy === year.yearOfStudy && !pin.archivedAt,
+      (pin) => pin.yearOfStudy === yearOfStudy && !pin.archivedAt,
     );
     if (active) return { kind: 'already-pinned', fsiId: String(active.feeStructureInstanceId) };
 
-    // Checked after the guard so an already-pinned row costs no budget — a
-    // re-import of a 3,000-row file should not exhaust the allowance on
-    // students that need no work.
+    // Checked after the guard so a student needing no work costs no budget —
+    // a re-run over 3,000 students should not exhaust the allowance on the
+    // ones already pinned.
     if (ctx.pinBudget) {
       if (ctx.pinBudget.remaining <= 0) return { kind: 'skipped', reason: 'row-cap' };
       ctx.pinBudget.remaining -= 1;
     }
 
-    const pinned = await feePinService.pinYear(studentId, year.yearOfStudy, {
-      pinnedBy: IMPORT_PIN_ACTOR,
+    const pinned = await feePinService.pinYear(studentId, yearOfStudy, {
+      pinnedBy: ctx.pinnedBy,
       reason: 'initial',
       academicYearId: ctx.academicYearId,
-      // Sheet generation is an explicit bulk action. A 500-row intake must
-      // not be able to fail on a Redis blip.
+      // Sheet generation is an explicit bulk action of its own. A 500-student
+      // run must not be able to fail on a Redis blip.
       enqueueCommitmentSheet: false,
-      remarks: `import job=${ctx.jobId} by=${ctx.performedBy}`,
+      remarks: ctx.remarks,
     });
 
     return {
@@ -215,9 +234,126 @@ export async function pinImportedStudent(
     }
     // eslint-disable-next-line no-console
     console.warn(
-      `[import-pin] student=${studentId} job=${ctx.jobId} pin failed:`,
+      `[${ctx.logLabel}] student=${studentId} pin failed:`,
       (err as Error).message ?? err,
     );
     return { kind: 'error', message: (err as Error).message ?? 'pin failed' };
+  }
+}
+
+export async function pinImportedStudent(
+  studentId: string,
+  typedRow: Record<string, unknown>,
+  ctx: PinImportContext,
+): Promise<PinOutcome> {
+  const year = resolvePinYearOfStudy(typedRow.studyYearAtAdmission);
+  if (!year.ok) return { kind: 'error', message: year.error };
+
+  return pinStudentForYear(studentId, year.yearOfStudy, {
+    collegeId: ctx.collegeId,
+    ...(ctx.academicYearId ? { academicYearId: ctx.academicYearId } : {}),
+    pinnedBy: IMPORT_PIN_ACTOR,
+    remarks: `import job=${ctx.jobId} by=${ctx.performedBy}`,
+    ...(ctx.pinBudget ? { pinBudget: ctx.pinBudget } : {}),
+    logLabel: 'import-pin',
+  });
+}
+
+export interface ExistingStudentPinYear {
+  yearOfStudy: number;
+  /**
+   * `calendar` came from the batch + academic-year maths, which is the real
+   * current year. `admission` is the fallback for a student with no batch —
+   * correct for one just imported, a guess for one who has been enrolled for
+   * years. Callers surface it so the assumption is never invisible.
+   */
+  derivedFrom: 'calendar' | 'admission';
+  academicYearId?: string;
+}
+
+/**
+ * Year to pin an EXISTING student at.
+ *
+ * `resolveStudentYearOfStudy` is the canonical answer but hard-fails without a
+ * Batch, and batch-less students are exactly the ones bulk import produces
+ * (no batch exists for MTECH/MBA in a stock catalogue). Refusing them would
+ * make the bulk remedy skip precisely the population it exists to serve, so
+ * this falls back to their admission year and reports that it did.
+ */
+export async function resolvePinYearForExistingStudent(
+  studentId: string,
+  studyYearAtAdmission?: number,
+): Promise<ExistingStudentPinYear> {
+  try {
+    const resolved = await resolveStudentYearOfStudy(studentId);
+    return {
+      yearOfStudy: resolved.yearOfStudy,
+      derivedFrom: 'calendar',
+      academicYearId: resolved.academicYearId,
+    };
+  } catch {
+    return {
+      yearOfStudy: studyYearAtAdmission && studyYearAtAdmission >= 1
+        ? studyYearAtAdmission
+        : 1,
+      derivedFrom: 'admission',
+    };
+  }
+}
+
+/**
+ * What `pinStudentForYear` WOULD return, without writing anything.
+ *
+ * Same shape minus `pinId`, which only exists once a pin has been created.
+ * `kind: 'pinned'` therefore reads as "would pin" — unambiguous because the
+ * only caller is the dry-run branch of bulk-pin, which labels its whole
+ * result `dryRun: true`.
+ */
+export type PinFeasibility =
+  | { kind: 'pinned'; fsiId: string; totalAmount: number }
+  | Exclude<PinOutcome, { kind: 'pinned' }>;
+
+/**
+ * Mirrors `pinStudentForYear`'s decision tree exactly, in the same order, so
+ * a dry run cannot promise an outcome the real run would not produce.
+ */
+export async function previewPinYearAvailability(
+  studentId: string,
+  yearOfStudy: number,
+  ctx: { collegeId: string; academicYearId?: string },
+): Promise<PinFeasibility> {
+  try {
+    if (!ctx.academicYearId) return { kind: 'skipped', reason: 'no-academic-year' };
+
+    const student = await Student.findOne({ _id: studentId, collegeId: ctx.collegeId })
+      .select('feePins programmeId branchId quota category')
+      .lean();
+    if (!student) return { kind: 'error', message: 'Student not found' };
+    if (!student.programmeId) return { kind: 'skipped', reason: 'no-programme' };
+
+    const active = (student.feePins ?? []).find(
+      (pin) => pin.yearOfStudy === yearOfStudy && !pin.archivedAt,
+    );
+    if (active) return { kind: 'already-pinned', fsiId: String(active.feeStructureInstanceId) };
+
+    const match = await feePinService.previewMatchingFeeStructureInstance({
+      collegeId: ctx.collegeId,
+      programmeId: String(student.programmeId),
+      ...(student.branchId ? { branchId: String(student.branchId) } : {}),
+      ...(student.quota ? { quota: student.quota } : {}),
+      ...(student.category ? { category: student.category } : {}),
+      yearOfStudy,
+      academicYearId: ctx.academicYearId,
+    });
+    if (!match.matched || !match.fsi) {
+      return { kind: 'no-match', message: 'no matching fee structure' };
+    }
+    return {
+      kind: 'pinned',
+      fsiId: String(match.fsi._id),
+      totalAmount: match.fsi.totalAmount ?? 0,
+    };
+  } catch (err) {
+    return { kind: 'error', message: (err as Error).message ?? 'lookup failed' };
   }
 }

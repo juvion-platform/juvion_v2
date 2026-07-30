@@ -16,7 +16,7 @@ import { AppError } from '../../middleware/errorHandler';
 import * as auditService from './fee-pin-audit-service';
 
 /**
- * GET /pin-audit/coverage?collegeId=<id>
+ * GET /pin-audit/coverage?collegeId=<id>&page=&limit=&reason=
  *
  * `collegeId` query override is only honored for super_admin; every
  * other caller is scoped to their own college via JWT.
@@ -28,7 +28,14 @@ export async function getCoverage(
 ) {
   try {
     const collegeId = resolveAuditCollegeId(req);
-    const report = await auditService.getCoverage(collegeId);
+    const { page, limit, reason } = req.query as {
+      page?: string; limit?: string; reason?: string;
+    };
+    const report = await auditService.getCoverage(collegeId, {
+      ...(page ? { page: Number(page) } : {}),
+      ...(limit ? { limit: Number(limit) } : {}),
+      ...(reason ? { reason: reason as auditService.CoverageReason } : {}),
+    });
     res.json(report);
   } catch (err) {
     next(err);

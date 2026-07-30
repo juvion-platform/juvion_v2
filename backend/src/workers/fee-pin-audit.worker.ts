@@ -172,7 +172,13 @@ export async function feePinAuditWorker(
 
   for (const collegeId of collegeIds) {
     try {
-      const coverage = await feePinAuditService.getCoverage(collegeId);
+      // Only the reasons that mean "no usable pin" — the coverage report also
+      // flags students who ARE pinned but have no fee-responsible guardian,
+      // and this snapshot field is specifically about missing pins.
+      const coverage = await feePinAuditService.getCoverage(collegeId, {
+        limit: 50,
+        reason: feePinAuditService.PIN_MISSING_REASONS,
+      });
       const invariants = await feePinAuditService.getInvariants(collegeId);
       const { deferredPinsCount, commitmentSheetFailureCount } =
         await computeAdditionalCounts(collegeId);
@@ -185,11 +191,13 @@ export async function feePinAuditWorker(
           studentsWithActivePinForCurrentYear:
             coverage.studentsWithActivePinForCurrentYear,
           coveragePercent: coverage.coveragePercent,
-          missingSample: coverage.studentsMissingPin.slice(0, 50).map((m) => ({
+          // Sliced here as well as limited in the query: 50 is what this
+          // snapshot field promises, whatever the service is asked for.
+          missingSample: coverage.students.slice(0, 50).map((m) => ({
             studentId: m.studentId,
             rollNumber: m.rollNumber ?? '',
             programmeId: m.programmeId,
-            currentYearOfStudy: m.currentYearOfStudy,
+            currentYearOfStudy: m.yearOfStudy,
           })),
         },
         invariants: {

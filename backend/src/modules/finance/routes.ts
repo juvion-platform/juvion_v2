@@ -143,6 +143,7 @@ import {
   confirmVendorPaymentSchema,
   generateRevenueReportSchema,
   feePinRePinSchema,
+  bulkPinSchema,
   commitmentSheetRegenerateSchema,
   programmeTransferSchema,
   feeComponentCreateSchema,
@@ -647,6 +648,15 @@ router.post(
   feeConfigRateLimit,
   validate(feePinRePinSchema),
   feePinCtrl.rePinStudent,
+);
+// Bulk pin — same `finance:approve` gate as re-pin: both bind students to a
+// fee structure, which is a money commitment, not a data edit.
+router.post(
+  '/students/bulk-pin',
+  authorize('finance', 'approve'),
+  feeConfigRateLimit,
+  validate(bulkPinSchema),
+  feePinCtrl.bulkPin,
 );
 router.post(
   '/students/:id/commitment-sheet/regenerate',

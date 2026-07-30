@@ -76,9 +76,13 @@ const AY_LABEL = `${AY_START_YEAR}-${String(AY_END_YEAR).slice(2)}`;
 
 /**
  * Seed 100 students for a college:
- *   - 80 resolve to a matching FSI (pinnable)
- *   - 15 have valid yearOfStudy but NO matching FSI (unpinnable)
- *   - 5 reference a non-existent Batch (unresolvable yearOfStudy)
+ *   - 80 resolve to a matching FSI via the batch calendar (pinnable)
+ *   - 15 have a valid yearOfStudy but NO matching FSI (unpinnable)
+ *   - 5 reference a non-existent Batch, so the calendar derivation fails and
+ *     they fall back to their admission year — they still pin (F13). Before
+ *     that fix they were written off as `unresolvable`, which meant the
+ *     documented bulk remedy skipped exactly the students bulk import
+ *     produces: a stock catalogue has no batch for MTECH/MBA.
  *
  * Returns the seed plan so assertions can pick through the results.
  */
@@ -88,7 +92,7 @@ async function seedMixedData(): Promise<SeedPlan> {
   const branchId = oid();
   const academicYearId = oid();
   const batchId = oid();
-  const missingBatchIdRef = oid(); // never inserted → unresolvable
+  const missingBatchIdRef = oid(); // never inserted → calendar derivation fails
   const validBatchId = oid();
   const unpinnableProgrammeId = oid();
 
@@ -197,7 +201,7 @@ async function seedMixedData(): Promise<SeedPlan> {
     });
   }
 
-  // 5 unresolvable — reference a missing Batch → resolveStudentYearOfStudy throws
+  // 5 with a dangling Batch reference → year falls back to admission (F13)
   for (let i = 0; i < 5; i += 1) {
     await Student.create({
       collegeId,
@@ -296,9 +300,12 @@ describe('backfill-fee-pins (T16)', () => {
 
     expect(result.exitCode).toBe(0);
     expect(result.totals.total).toBe(100);
-    expect(result.totals.wouldPin).toBe(80);
+    // 80 by calendar + the 5 batch-less ones now reached via the admission
+    // fallback. `unresolvable` is reserved for a genuine no-academic-year
+    // college, which this fixture is not.
+    expect(result.totals.wouldPin).toBe(85);
     expect(result.totals.unpinnable).toBe(15);
-    expect(result.totals.unresolvable).toBe(5);
+    expect(result.totals.unresolvable).toBe(0);
     expect(result.totals.pinned).toBe(0);
 
     const body = fs.readFileSync(csvPath, 'utf-8');
@@ -311,11 +318,10 @@ describe('backfill-fee-pins (T16)', () => {
     expect(lines.length).toBe(102);
     expect(body).toContain('would-pin');
     expect(body).toContain('unpinnable');
-    expect(body).toContain('unresolvable');
   }, 30_000);
 
   // ── 2. --commit with same data ─────────────────────────────────────
-  it('scenario 2: --commit creates 80 pins; 20 non-pinnable in CSV', async () => {
+  it('scenario 2: --commit creates 85 pins; 15 unpinnable in CSV', async () => {
     const plan = await seedMixedData();
     const csvPath = path.join(tmpDir, 'commit.csv');
 
@@ -325,12 +331,12 @@ describe('backfill-fee-pins (T16)', () => {
       csvPath,
     });
     expect(result.exitCode).toBe(0);
-    expect(result.totals.pinned).toBe(80);
+    expect(result.totals.pinned).toBe(85);
     expect(result.totals.unpinnable).toBe(15);
-    expect(result.totals.unresolvable).toBe(5);
+    expect(result.totals.unresolvable).toBe(0);
 
     const pinsAfter = await countActivePins(plan.collegeId);
-    expect(pinsAfter).toBe(80);
+    expect(pinsAfter).toBe(85);
 
     const body = fs.readFileSync(csvPath, 'utf-8');
     expect(body).toContain('pinned');
@@ -348,7 +354,7 @@ describe('backfill-fee-pins (T16)', () => {
       csvPath: csvPath1,
     });
     const pinsAfterFirst = await countActivePins(plan.collegeId);
-    expect(pinsAfterFirst).toBe(80);
+    expect(pinsAfterFirst).toBe(85);
 
     const result2 = await runBackfill({
       mode: 'commit',
@@ -356,10 +362,10 @@ describe('backfill-fee-pins (T16)', () => {
       csvPath: csvPath2,
     });
     expect(result2.totals.pinned).toBe(0);
-    expect(result2.totals.alreadyPinned).toBe(80);
+    expect(result2.totals.alreadyPinned).toBe(85);
 
     const pinsAfterSecond = await countActivePins(plan.collegeId);
-    expect(pinsAfterSecond).toBe(80);
+    expect(pinsAfterSecond).toBe(85);
 
     const body2 = fs.readFileSync(csvPath2, 'utf-8');
     expect(body2).toContain('already-pinned');
@@ -375,9 +381,9 @@ describe('backfill-fee-pins (T16)', () => {
       collegeId: String(plan.collegeId),
       csvPath: path.join(tmpDir, 'rollback-commit.csv'),
     });
-    expect(await countActivePins(plan.collegeId)).toBe(80);
+    expect(await countActivePins(plan.collegeId)).toBe(85);
 
-    // Inject a non-backfill pin onto one of the 80 pinned students to
+    // Inject a non-backfill pin onto one of the 85 pinned students to
     // assert the rollback does NOT touch it.
     const victim = await Student.findOne({ collegeId: plan.collegeId, rollNumber: 'PIN-0' });
     expect(victim).toBeTruthy();
@@ -403,7 +409,7 @@ describe('backfill-fee-pins (T16)', () => {
     });
 
     expect(result.exitCode).toBe(0);
-    expect(result.totals.archived).toBe(80);
+    expect(result.totals.archived).toBe(85);
 
     const activePinsAfter = await countActivePins(plan.collegeId);
     // All backfill pins archived; the admission-label pin on PIN-0 survives.
