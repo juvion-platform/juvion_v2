@@ -48,7 +48,13 @@ export default function ConfirmDialog() {
 
   return (
     <Modal open onClose={cancel} title={title} widthClass="max-w-md">
-      <form onSubmit={submit} className="space-y-4">
+      {/*
+        Tagged so tests can target THIS dialog specifically. It mounts at app
+        root and stacks on top of whatever opened it, so when the caller is
+        itself a Modal (the student-import drawer, for one) a bare
+        getByRole('dialog') matches two elements and fails strict mode.
+      */}
+      <form onSubmit={submit} className="space-y-4" data-testid="confirm-dialog">
         <div className="flex items-start gap-3">
           <span className={`mt-0.5 shrink-0 rounded-full p-2 ${danger ? 'bg-red-50 text-red-600' : 'bg-primary-50 text-primary-600'}`}>
             {danger ? <AlertTriangle size={18} /> : <HelpCircle size={18} />}

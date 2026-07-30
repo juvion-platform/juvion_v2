@@ -20,6 +20,7 @@ import { Parent } from '../../models/people/Parent';
 import { Faculty } from '../../models/people/Faculty';
 import { AppError } from '../../middleware/errorHandler';
 import { createAuditLog } from '../../shared/audit';
+import type { FieldChange } from '../../shared/types';
 import { syncStudentParentLinks } from './service';
 import { resolveStudentRefs, validateCatalogCodes, ResolvedRefs } from './student-import-refs';
 import { matchExistingStudent, feeAxisConflicts } from './student-import-match';
@@ -110,6 +111,58 @@ function snapshotFor(
     else set[key] = prev;
   }
   return { set, unset };
+}
+
+/** `address.line1` -> `Address Line 1`; `rollNumber` -> `Roll Number`. */
+function humaniseFieldPath(path: string): string {
+  return path
+    .split('.')
+    .map((part) => part
+      .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+      .replace(/^./, (c) => c.toUpperCase()))
+    .join(' ');
+}
+
+/**
+ * Turn a `$set` payload plus the rollback snapshot of its prior values into
+ * audit `changes[]`.
+ *
+ * The snapshot already exists — `snapshotFor()` computes it so a failed row can
+ * be reverted — so the before/after pairs are free; nothing extra is read.
+ *
+ * Every entry is tagged `source: 'import'`. `FieldChange.source` has documented
+ * that value as "value came from a bulk import" since the AI-assisted-config
+ * work, but no production code emitted it until now; bulk import is its
+ * intended consumer. This matters more here than on a hand edit: one operator
+ * action rewrites hundreds of records, so "what changed" cannot be
+ * reconstructed from context afterwards. `changes: []` is why the address-wipe
+ * and status-flip defects found in review were invisible in the audit trail.
+ *
+ * Fields the row supplied but did not move are omitted — a byte-identical
+ * re-import should not manufacture an audit entry per column.
+ */
+function importFieldChanges(
+  prior: { set: Record<string, unknown>; unset: Record<string, ''> },
+  next: Record<string, unknown>,
+): FieldChange[] {
+  const changes: FieldChange[] = [];
+  for (const [field, newValue] of Object.entries(next)) {
+    const existedBefore = !(field in prior.unset);
+    const oldValue = existedBefore ? prior.set[field] : undefined;
+    // Compare stringified: handles ObjectId vs string and Date vs Date without
+    // reporting a change where the stored value is equivalent.
+    if (existedBefore && String(oldValue ?? '') === String(newValue ?? '')) continue;
+    changes.push({
+      field,
+      displayName: humaniseFieldPath(field),
+      // null, not undefined — Mongoose drops undefined, which would leave the
+      // reader unable to tell "was absent" from "not recorded".
+      oldValue: oldValue ?? null,
+      newValue,
+      source: 'import',
+    });
+  }
+  return changes;
 }
 
 async function rollback(
@@ -434,12 +487,17 @@ export async function commitStudentRow(
       if (!existingPerson) throw new AppError(404, 'Matched student has no person record');
 
       const personSet = personUpdateFields(typedRow);
+      // Accumulated across both writes so one audit entry describes the whole
+      // row, the way the operator experienced it.
+      const auditChanges: FieldChange[] = [];
+
       if (Object.keys(personSet).length) {
         const { set, unset } = snapshotFor(
           existingPerson.toObject() as unknown as Record<string, unknown>, personSet,
         );
         await Person.updateOne({ _id: existingPerson._id, collegeId }, { $set: personSet });
         compensations.push({ kind: 'restore', model: 'Person', id: existingPerson._id, set, unset });
+        auditChanges.push(...importFieldChanges({ set, unset }, personSet));
       }
 
       const studentSet = studentFieldsFromRow(
@@ -451,6 +509,7 @@ export async function commitStudentRow(
         );
         await Student.updateOne({ _id: existingStudent._id, collegeId }, { $set: studentSet });
         compensations.push({ kind: 'restore', model: 'Student', id: existingStudent._id, set, unset });
+        auditChanges.push(...importFieldChanges({ set, unset }, studentSet));
       }
 
       // Keep Parent.linkedStudents in step, exactly as the manual update
@@ -481,7 +540,7 @@ export async function commitStudentRow(
       await createAuditLog({
         collegeId, entityType: 'Student', entityId: String(existingStudent._id),
         entityName: (personSet.name as string | undefined) ?? existingPerson.name,
-        action: 'update', changes: [], performedBy,
+        action: 'update', changes: auditChanges, performedBy,
       });
 
       // An update row's fee axes cannot have moved — feeAxisConflicts blocks

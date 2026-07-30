@@ -10,6 +10,7 @@ import { Regulation } from '../../../models/academic-structure/Regulation';
 import { FeeCategory } from '../../../models/finance/FeeCategory';
 import { FeeQuota } from '../../../models/finance/FeeQuota';
 import * as auditModule from '../../../shared/audit';
+import { AuditLog } from '../../../shared/audit';
 import { commitStudentRow } from '../student-import-service';
 
 const oid = () => new mongoose.Types.ObjectId();
@@ -610,5 +611,79 @@ describe('commitStudentRow — compensating rollback', () => {
     // Rollback must only undo what THIS row created.
     expect(await Parent.countDocuments({ collegeId })).toBe(1);
     expect(await Person.countDocuments({ collegeId })).toBe(1);
+  });
+});
+
+/**
+ * Audit `changes[]` on the update path.
+ *
+ * The import wrote `changes: []`, recording THAT a student changed but never
+ * WHAT — which is precisely why the address-wipe and status-flip defects found
+ * in review were invisible after the fact and only caught by reading the diff.
+ * The house convention is an empty array (837 call sites), so this is not a
+ * codebase-wide change; it is this feature using a mechanism the audit schema
+ * already defines for it. `FieldChange.source` documents `'import'` as
+ * "value came from a bulk import", and until now nothing in production emitted
+ * it — bulk import is its intended and only consumer.
+ *
+ * A bulk import is exactly where this matters: one operator action rewrites
+ * hundreds of records, so "what changed" cannot be reconstructed from context.
+ */
+describe('commitStudentRow — the update audit records what actually changed', () => {
+  async function auditFor(studentId: string, action: 'create' | 'update') {
+    return AuditLog.findOne({ collegeId, entityType: 'Student', entityId: studentId, action }).lean();
+  }
+
+  it('names each changed field with its old and new value, tagged as an import', async () => {
+    const first = await commitStudentRow(
+      { ...baseRow(), rollNumber: 'AUD-1', city: 'Hyderabad' },
+      ctx(),
+    );
+
+    await commitStudentRow(
+      { ...baseRow(), rollNumber: 'AUD-1', city: 'Warangal', email: 'aarav@example.com' },
+      ctx(),
+    );
+
+    const log = await auditFor(first.id, 'update');
+    expect(log).not.toBeNull();
+    const byField = new Map(log!.changes.map((c) => [c.field, c]));
+
+    // The city moved: both ends recorded.
+    expect(byField.get('address.city')).toMatchObject({
+      oldValue: 'Hyderabad', newValue: 'Warangal', source: 'import',
+    });
+    // Email was absent before, so oldValue is null rather than missing.
+    expect(byField.get('email')).toMatchObject({
+      oldValue: null, newValue: 'aarav@example.com', source: 'import',
+    });
+    // Every entry carries a human-readable label for the audit UI.
+    for (const c of log!.changes) {
+      expect(c.displayName, `displayName for ${c.field}`).toBeTruthy();
+    }
+  });
+
+  it('omits fields the row supplied but did not actually change', async () => {
+    const first = await commitStudentRow(
+      { ...baseRow(), rollNumber: 'AUD-2', city: 'Hyderabad' },
+      ctx(),
+    );
+    // Byte-identical re-import: nothing moved, so there is nothing to record.
+    await commitStudentRow(
+      { ...baseRow(), rollNumber: 'AUD-2', city: 'Hyderabad' },
+      ctx(),
+    );
+
+    const log = await auditFor(first.id, 'update');
+    expect(log).not.toBeNull();
+    expect(log!.changes.map((c) => c.field)).not.toContain('address.city');
+    expect(log!.changes.map((c) => c.field)).not.toContain('name');
+  });
+
+  it('leaves the create audit as an empty array, per the house convention', async () => {
+    const res = await commitStudentRow({ ...baseRow(), rollNumber: 'AUD-3' }, ctx());
+    const log = await auditFor(res.id, 'create');
+    expect(log).not.toBeNull();
+    expect(log!.changes).toEqual([]);
   });
 });

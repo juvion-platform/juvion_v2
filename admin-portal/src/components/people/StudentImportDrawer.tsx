@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Upload, Download, Loader2, CheckCircle2, XCircle } from 'lucide-react';
+import { Upload, Download, Loader2, CheckCircle2, XCircle, History } from 'lucide-react';
 import Modal from '../ui/Modal';
 import Badge from '../ui/Badge';
 import { confirmAction } from '../../stores/confirmStore';
 import { toast } from '../../stores/toastStore';
 import {
   getStudentImportTemplate, previewStudentImport, commitStudentImport, buildTemplateCsv,
+  listStudentImportJobs, getStudentImportJob,
   type ImportPreview, type ImportPreviewRow, type ImportCommitSummary,
+  type ImportJobListEntry,
 } from '../../services/student-import';
 
 const inr = (n: number) => `₹${n.toLocaleString('en-IN')}`;
@@ -33,6 +35,25 @@ export default function StudentImportDrawer({ open, onClose }: Props) {
     enabled: open,
   });
 
+  // Recent imports, so an operator who closed the drawer can get the failed
+  // rows back. Before the /jobs endpoints existed there was no route to them
+  // at all: a Registrar holds no platform:read, so /platform/bulk-imports 403s.
+  const { data: history } = useQuery({
+    queryKey: ['student-import-jobs'],
+    queryFn: () => listStudentImportJobs(),
+    // Only needed on the first step — once a preview or result is on screen
+    // the list is hidden, so do not refetch behind it.
+    enabled: open && !preview && !result,
+  });
+
+  const openPastJob = useMutation({
+    mutationFn: (jobId: string) => getStudentImportJob(jobId),
+    meta: { silentError: true },
+    // Reuses the same result view a fresh commit renders — the detail endpoint
+    // returns the same shape for exactly this reason.
+    onSuccess: setResult,
+  });
+
   const previewMut = useMutation({
     mutationFn: () => previewStudentImport(file!),
     // Preview failures are shown in the drawer itself; the global toast
@@ -53,6 +74,7 @@ export default function StudentImportDrawer({ open, onClose }: Props) {
     onSuccess: (summary) => {
       qc.invalidateQueries({ queryKey: ['students'] });
       qc.invalidateQueries({ queryKey: ['people-stats'] });
+      qc.invalidateQueries({ queryKey: ['student-import-jobs'] });
 
       const unpinned = unpinnedCount(summary);
       const rowsFailed = summary.failureCount > 0 || summary.blockedCount > 0;
@@ -159,26 +181,78 @@ export default function StudentImportDrawer({ open, onClose }: Props) {
 
         {result && (
           <div className="space-y-3" data-testid="import-result">
-            <div className="rounded-lg border border-amber-300 bg-amber-50 p-3">
-              <p className="text-sm font-semibold text-amber-900">
-                {result.failureCount > 0 || result.blockedCount > 0
-                  ? 'Import finished with problems'
-                  : 'Imported, but some students have no fee structure'}
+            {/*
+              A fresh commit reaches this view when something needs review —
+              a failed/blocked row, OR a student imported without a fee
+              structure. Opening a PAST job from history can also land here
+              with nothing wrong, so the banner distinguishes three states:
+              problems, imported-but-unpinned, and cleanly-done.
+            */}
+            {(() => {
+              const unpinned = result.pinSummary
+                ? result.pinSummary.noMatch + result.pinSummary.skipped + result.pinSummary.errors
+                : 0;
+              const pinnedNote = result.pinSummary
+                ? ` ${result.pinSummary.pinned} pinned to a fee structure.` : '';
+              if (result.failureCount + result.blockedCount > 0) {
+                return (
+                  <div className="rounded-lg border border-amber-300 bg-amber-50 p-3">
+                    <p className="text-sm font-semibold text-amber-900">
+                      Import finished with problems
+                    </p>
+                    <p className="mt-1 text-sm text-amber-900">
+                      {result.successCount} imported · {result.failureCount} failed
+                      {result.blockedCount > 0 ? ` · ${result.blockedCount} blocked` : ''} of{' '}
+                      {result.totalRows} row{result.totalRows === 1 ? '' : 's'}.{pinnedNote}
+                    </p>
+                    <p className="mt-1 text-xs text-amber-800">
+                      Rows listed below were not written. Fix them in the source file and upload it
+                      again — re-importing is safe, matched rows are updated rather than duplicated.
+                    </p>
+                  </div>
+                );
+              }
+              if (unpinned > 0) {
+                return (
+                  <div className="rounded-lg border border-amber-300 bg-amber-50 p-3">
+                    <p className="text-sm font-semibold text-amber-900">
+                      Imported, but some students have no fee structure
+                    </p>
+                    <p className="mt-1 text-sm text-amber-900">
+                      {result.successCount} imported · {result.pinSummary?.pinned ?? 0} pinned ·{' '}
+                      {unpinned} without a fee structure of{' '}
+                      {result.totalRows} row{result.totalRows === 1 ? '' : 's'}.
+                    </p>
+                    <p className="mt-1 text-xs text-amber-800">
+                      You can pin them later from Finance → Fee Management → Pin Coverage.
+                    </p>
+                  </div>
+                );
+              }
+              return (
+                <div className="rounded-lg border border-teal-300 bg-teal-50 p-3">
+                  <p className="flex items-center gap-1.5 text-sm font-semibold text-teal-900">
+                    <CheckCircle2 size={14} /> Imported cleanly
+                  </p>
+                  <p className="mt-1 text-sm text-teal-900">
+                    All {result.totalRows} row{result.totalRows === 1 ? '' : 's'} written.{pinnedNote} Nothing to review.
+                  </p>
+                </div>
+              );
+            })()}
+
+            {(result.fileName || result.completedAt) && (
+              <p className="text-xs text-gray-500">
+                {result.fileName}
+                {result.completedAt ? ` · ${new Date(result.completedAt).toLocaleString()}` : ''}
               </p>
-              <p className="mt-1 text-sm text-amber-900">
-                {result.successCount} imported · {result.failureCount} failed
-                {result.blockedCount > 0 ? ` · ${result.blockedCount} blocked` : ''} of{' '}
-                {result.totalRows} row{result.totalRows === 1 ? '' : 's'}.
-                {result.pinSummary
-                  ? ` ${result.pinSummary.pinned} pinned to a fee structure.` : ''}
+            )}
+
+            {result.truncated && (
+              <p className="text-xs text-gray-600">
+                Only the first rows are listed — the counts above are exact.
               </p>
-              {(result.failureCount > 0 || result.blockedCount > 0) && (
-                <p className="mt-1 text-xs text-amber-800">
-                  Rows listed below were not written. Fix them in the source file and upload it
-                  again — re-importing is safe, matched rows are updated rather than duplicated.
-                </p>
-              )}
-            </div>
+            )}
 
             {result.pinSummary && result.pinSummary.unpinnedRows.length > 0 && (
               <div data-testid="unpinned-rows">
@@ -295,6 +369,49 @@ export default function StudentImportDrawer({ open, onClose }: Props) {
                   ?? 'Could not read that file.'}
               </p>
             )}
+
+            {history?.items?.length ? (
+              <div className="mt-6 border-t pt-4" data-testid="import-history">
+                <h3 className="mb-2 flex items-center gap-1.5 text-sm font-medium text-gray-700">
+                  <History size={14} /> Recent imports
+                </h3>
+                <ul className="divide-y rounded-lg border">
+                  {history.items.map((job: ImportJobListEntry) => {
+                    const problems = job.failureCount + job.blockedCount;
+                    return (
+                      <li key={job.jobId}>
+                        <button
+                          type="button"
+                          onClick={() => openPastJob.mutate(job.jobId)}
+                          disabled={openPastJob.isPending}
+                          className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm transition hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate font-medium text-gray-800">{job.fileName}</span>
+                            <span className="block text-xs text-gray-500">
+                              {job.completedAt ? new Date(job.completedAt).toLocaleString() : 'in progress'}
+                            </span>
+                          </span>
+                          <span className="flex shrink-0 items-center gap-2">
+                            <span className="text-xs text-gray-600">
+                              {job.successCount}/{job.totalRows} imported
+                            </span>
+                            {problems > 0 && (
+                              <Badge variant="warning">{problems} to review</Badge>
+                            )}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {openPastJob.isError && (
+                  <p className="mt-2 text-sm text-red-600" role="alert">
+                    Could not load that import.
+                  </p>
+                )}
+              </div>
+            ) : null}
           </div>
         )}
 

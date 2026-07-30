@@ -19,6 +19,7 @@
  */
 import { request as apiRequest } from '@playwright/test';
 import { test, expect } from './fixtures/auth-fixture';
+import { confirmDialog } from './utils/confirm-dialog';
 import { TEST_USERS } from './utils/test-users';
 
 const BACKEND_URL = process.env.E2E_BACKEND_URL || 'http://localhost:3003';
@@ -130,5 +131,56 @@ test.describe('People — Student bulk import', () => {
     // proves the programme was found rather than skipped.
     await expect(page.getByRole('dialog')).toContainText(`Programme: ${PROGRAMME_NAME}`);
     await expect(page.getByRole('button', { name: /^import 1$/i })).toBeEnabled();
+  });
+
+  /**
+   * Import history — the drawer's first step lists past student imports so an
+   * operator who closed it can get the failed rows back. Before the /jobs
+   * endpoints existed there was no route to that detail at all: a Registrar
+   * holds no platform:read, so /platform/bulk-imports answers 403.
+   *
+   * This commits a row so there is guaranteed history to find, rather than
+   * depending on what earlier runs happened to leave behind.
+   */
+  test('a Registrar can reopen a past import from history and see its detail', async ({ page, loginAs }) => {
+    await loginAs('registrar');
+    await page.goto('/people/students');
+
+    const stamp = Date.now();
+    const phone = `98${Math.floor(10_000_000 + Math.random() * 89_999_999)}`;
+    const fileName = `history-${stamp}.csv`;
+    // A distinct rollNumber per run: two students in one college that both
+    // omit it collide on the unique { collegeId, rollNumber } index, because
+    // collegeId is always present so Mongo indexes rollNumber as null.
+    const csv = 'name*,phone*,programmeCode*,admissionYear*,rollNumber\n'
+      + `E2E History Student,${phone},${PROGRAMME_CODE},2025,E2E-HIST-${stamp}`;
+
+    await page.getByRole('button', { name: /^import$/i }).click();
+    await page.setInputFiles('#student-import-file', {
+      name: fileName, mimeType: 'text/csv', buffer: Buffer.from(csv),
+    });
+    await page.getByRole('button', { name: /^preview$/i }).click();
+    await expect(page.getByTestId('import-summary')).toContainText('1 new', { timeout: 10_000 });
+
+    await page.getByRole('button', { name: /^import 1$/i }).click();
+    await confirmDialog(page);
+
+    // A clean import closes the drawer, so reopen it — which is exactly the
+    // "I closed it and lost the detail" situation this feature addresses.
+    await expect(page.getByRole('dialog')).toBeHidden({ timeout: 15_000 });
+    await page.getByRole('button', { name: /^import$/i }).click();
+
+    const history = page.getByTestId('import-history');
+    await expect(history).toBeVisible({ timeout: 10_000 });
+    await expect(history).toContainText(fileName);
+
+    // Opening it renders the same result view a fresh commit uses, and this
+    // job had nothing to review — so the banner must say so rather than
+    // claiming problems.
+    await history.getByRole('button', { name: new RegExp(fileName) }).click();
+    const result = page.getByTestId('import-result');
+    await expect(result).toBeVisible({ timeout: 10_000 });
+    await expect(result).toContainText(/imported cleanly/i);
+    await expect(result).toContainText(fileName);
   });
 });

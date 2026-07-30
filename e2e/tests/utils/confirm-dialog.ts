@@ -12,6 +12,12 @@ import { Page, expect } from '@playwright/test';
  * Usage:
  *   await row.getByTitle('Delete').click();
  *   await confirmDialog(page);
+ *
+ * Targets the confirm dialog by its own testid rather than by role. It mounts
+ * at app root and stacks on top of whatever opened it, so when the caller is
+ * itself a Modal — the student-import drawer, for one — a bare
+ * getByRole('dialog') matches two elements and fails Playwright's strict mode
+ * before any button is clicked.
  */
 export async function confirmDialog(
   page: Page,
@@ -19,7 +25,7 @@ export async function confirmDialog(
 ): Promise<void> {
   const { action = 'confirm', reason } = opts;
 
-  const dialog = page.getByRole('dialog');
+  const dialog = page.getByTestId('confirm-dialog');
   await expect(dialog).toBeVisible({ timeout: 10_000 });
 
   if (action === 'cancel') {
