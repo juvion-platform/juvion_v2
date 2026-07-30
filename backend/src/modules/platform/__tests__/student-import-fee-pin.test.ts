@@ -126,6 +126,31 @@ describe('import fee-pin — preview', () => {
     expect(p.previewRows[0]?.notes?.join(' ')).toContain('will pin Year 1');
   });
 
+  // The drawer renders a per-row Fee structure column from this rather than
+  // parsing the note string.
+  it('carries a structured pinPreview on each row', async () => {
+    await makeFsi({ academicYearId: currentAyId, totalAmount: 125000 });
+    const p = await preview([
+      'Aarav,9876500001,BTCSE,2025,R1,2',
+      'Priya,9876500002,BTCSE,2025,R2,3',
+    ]);
+
+    expect(p.previewRows[0]?.pinPreview).toEqual({
+      yearOfStudy: 2, willPin: true, totalAmount: 125000,
+    });
+    // Year 3 has no structure of its own but the wildcard-year one matches.
+    expect(p.previewRows[1]?.pinPreview?.yearOfStudy).toBe(3);
+  });
+
+  it('reports why a row will not pin', async () => {
+    await makeFsi({ academicYearId: currentAyId, yearOfStudy: 3 });
+    const p = await preview(['Aarav,9876500001,BTCSE,2025,R1,1']);
+
+    expect(p.previewRows[0]?.pinPreview).toMatchObject({
+      yearOfStudy: 1, willPin: false, reason: 'no matching fee structure',
+    });
+  });
+
   it('counts rows that will import unpinned', async () => {
     await makeFsi({ academicYearId: currentAyId, yearOfStudy: 3 });
     const p = await preview(['Aarav,9876500001,BTCSE,2025,R1,1']);

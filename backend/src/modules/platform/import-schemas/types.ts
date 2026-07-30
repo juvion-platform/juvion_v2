@@ -60,6 +60,21 @@ export interface ImportSchemaField extends IImportJobSchemaField {
  */
 export type ImportRowAction = 'create' | 'update' | 'blocked';
 
+/**
+ * What committing a row would do to its fee pin, computed at preview.
+ *
+ * `yearOfStudy` is carried even when the row will pin cleanly: the column it
+ * derives from is optional, so a blank one silently means Year 1, and the
+ * operator has to be able to see that before confirming.
+ */
+export interface ImportRowPinPreview {
+  yearOfStudy: number;
+  willPin: boolean;
+  totalAmount?: number;
+  /** Why not, when `willPin` is false. */
+  reason?: string;
+}
+
 export interface ImportSchemaDefinition {
   entityType: string;
   label: string;
@@ -149,6 +164,7 @@ export interface ImportSchemaDefinition {
         notes?: string[];
         resolved?: Record<string, string>;
         sideEffects?: Record<string, number>;
+        pinPreview?: ImportRowPinPreview;
       }
     | { ok: false; error: string }
   >;

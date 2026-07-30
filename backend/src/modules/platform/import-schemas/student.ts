@@ -9,7 +9,7 @@ import {
   type PreviewMatchResult,
 } from '../../finance/fee-pin-service';
 import { Student } from '../../../models/people/Student';
-import type { ImportSchemaDefinition } from './types';
+import type { ImportSchemaDefinition, ImportRowPinPreview } from './types';
 import {
   validString, validNumber, validEnum, validDate, validPhone, validAadhaar, validEmail,
 } from './validators';
@@ -176,6 +176,7 @@ export const studentImportSchema: ImportSchemaDefinition = {
 
     const notes: string[] = [];
     const sideEffects: Record<string, number> = {};
+    let pinPreview: ImportRowPinPreview | undefined;
 
     // Which fee structure this row would bind the student to, and at which
     // year. The year is echoed because `studyYearAtAdmission` is optional: a
@@ -187,10 +188,16 @@ export const studentImportSchema: ImportSchemaDefinition = {
       sideEffects.pinError = 1;
     } else if (!ctx.academicYearId) {
       sideEffects.pinNoAcademicYear = 1;
+      pinPreview = {
+        yearOfStudy: pinYear.yearOfStudy, willPin: false, reason: 'no academic year',
+      };
     } else if (match.action === 'update' && match.studentId
       && await hasActivePinForYear(ctx.collegeId, match.studentId, pinYear.yearOfStudy)) {
       // Silent on purpose — nothing is changing for this student.
       sideEffects.pinAlreadyPinned = 1;
+      pinPreview = {
+        yearOfStudy: pinYear.yearOfStudy, willPin: false, reason: 'already pinned',
+      };
     } else {
       const quotaCell = String(typedRow.quota ?? '').trim();
       const categoryCell = String(typedRow.category ?? '').trim();
@@ -211,12 +218,18 @@ export const studentImportSchema: ImportSchemaDefinition = {
         notes.push(`will pin Year ${pinYear.yearOfStudy} → ${inr(amount)}`);
         sideEffects.pinWillPin = 1;
         sideEffects.pinAmount = amount;
+        pinPreview = {
+          yearOfStudy: pinYear.yearOfStudy, willPin: true, totalAmount: amount,
+        };
       } else {
         notes.push(
           `no matching fee structure for Year ${pinYear.yearOfStudy} `
           + '— will import unpinned',
         );
         sideEffects.pinNoMatch = 1;
+        pinPreview = {
+          yearOfStudy: pinYear.yearOfStudy, willPin: false, reason: 'no matching fee structure',
+        };
       }
     }
 
@@ -244,6 +257,7 @@ export const studentImportSchema: ImportSchemaDefinition = {
       notes: notes.length ? notes : undefined,
       resolved,
       sideEffects: Object.keys(sideEffects).length ? sideEffects : undefined,
+      pinPreview,
     };
   },
   commitOne: (typedRow, ctx) => commitStudentRow(typedRow, ctx),

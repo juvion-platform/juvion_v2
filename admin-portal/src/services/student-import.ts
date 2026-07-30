@@ -27,6 +27,14 @@ export interface ImportTemplate {
 /** What committing a row would do, as computed during preview. */
 export type ImportRowAction = 'create' | 'update' | 'blocked';
 
+/** What committing a row would do to its fee pin, computed at preview. */
+export interface ImportRowPinPreview {
+  yearOfStudy: number;
+  willPin: boolean;
+  totalAmount?: number;
+  reason?: string;
+}
+
 export interface ImportPreviewRow {
   row: number;
   raw: Record<string, string>;
@@ -37,6 +45,15 @@ export interface ImportPreviewRow {
   notes?: string[];
   /** Label -> display value for the codes this row resolved. */
   resolved?: Record<string, string>;
+  pinPreview?: ImportRowPinPreview;
+}
+
+/** The academic year the whole file pins against, decided once server-side. */
+export interface ImportPinContext {
+  academicYearId: string | null;
+  academicYearLabel?: string;
+  /** Present when pinning is off for the entire job. */
+  warning?: string;
 }
 
 export interface ImportPreview {
@@ -51,6 +68,8 @@ export interface ImportPreview {
    * so these cannot be recomputed in the browser.
    */
   sideEffectTotals: Record<string, number>;
+  /** Absent for entity types that do not fee-pin. */
+  pinContext?: ImportPinContext;
 }
 
 export const getStudentImportTemplate = (): Promise<ImportTemplate> =>
@@ -106,6 +125,20 @@ export interface ImportCommitSummary {
   errorSummary?: string;
   failedRows: Array<{ row: number; error: string }>;
   blockedRows: Array<{ row: number; reason: string }>;
+  /**
+   * Fee-pin roll-up. Travels with the response for the same reason the failed
+   * rows do: a Registrar holds no `platform:read` and cannot open the job
+   * afterwards, so a student left unpinned would otherwise be invisible.
+   */
+  pinSummary?: {
+    pinned: number;
+    alreadyPinned: number;
+    noMatch: number;
+    skipped: number;
+    errors: number;
+    totalPinnedAmount: number;
+    unpinnedRows: Array<{ row: number; reason: string }>;
+  };
 }
 
 export const commitStudentImport = (jobId: string): Promise<ImportCommitSummary> =>

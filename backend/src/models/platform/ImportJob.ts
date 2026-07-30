@@ -61,6 +61,13 @@ export interface IImportJobRowResult {
   notes?: string[];
   /** Label -> display value for codes this row resolved (programme, branch). */
   resolved?: Record<string, string>;
+  /** Fee structure this row would pin to, as computed at preview. */
+  pinPreview?: {
+    yearOfStudy: number;
+    willPin: boolean;
+    totalAmount?: number;
+    reason?: string;
+  };
   /**
    * Fee-pin result for this row, when the schema attempted one. Recorded
    * separately from `outcome` because a pin never changes whether the row
@@ -167,6 +174,7 @@ const rowResultSchema = new Schema<IImportJobRowResult>(
     action: { type: String, enum: ['create', 'update', 'blocked'], required: false },
     notes: { type: [String], required: false },
     resolved: { type: Schema.Types.Mixed, required: false },
+    pinPreview: { type: Schema.Types.Mixed, required: false },
     pinOutcome: { type: Schema.Types.Mixed, required: false },
   },
   { _id: false },

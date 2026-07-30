@@ -51,7 +51,9 @@ import {
   serializeSchema,
   type ImportSchemaDefinition,
 } from './bulk-import-registry';
-import type { ImportRowAction, ImportCommitContext } from './import-schemas/types';
+import type {
+  ImportRowAction, ImportCommitContext, ImportRowPinPreview,
+} from './import-schemas/types';
 import { AcademicYear } from '../../models/academic-structure/AcademicYear';
 import {
   resolveImportPinAcademicYear,
@@ -111,6 +113,7 @@ export interface ImportJobPreview {
     notes?: string[];
     /** Label -> display value for codes this row resolved (programme, branch). */
     resolved?: Record<string, string>;
+    pinPreview?: ImportRowPinPreview;
   }>;
   validCount: number;
   errorCount: number;
@@ -496,6 +499,7 @@ export async function uploadAndValidate(
     let action: ImportRowAction | undefined;
     let notes: string[] | undefined;
     let resolved: Record<string, string> | undefined;
+    let pinPreview: ImportRowPinPreview | undefined;
 
     // Whole-file duplicate check, before the (DB-backed) validateRow hook so
     // a duplicate row costs no queries. Only rows that passed field
@@ -534,6 +538,7 @@ export async function uploadAndValidate(
         action = rowRes.action;
         notes = rowRes.notes;
         resolved = rowRes.resolved;
+        pinPreview = rowRes.pinPreview;
         actionCounts[rowRes.action] += 1;
         for (const [key, n] of Object.entries(rowRes.sideEffects ?? {})) {
           sideEffectTotals[key] = (sideEffectTotals[key] ?? 0) + n;
@@ -568,6 +573,7 @@ export async function uploadAndValidate(
       action,
       notes,
       resolved,
+      pinPreview,
     });
 
     // Preview slice. Always include error rows. Cap success rows.
@@ -575,7 +581,9 @@ export async function uploadAndValidate(
     const includeThisRow =
       !valid || successPreviewCount < PREVIEW_SUCCESS_LIMIT;
     if (includeThisRow) {
-      previewRows.push({ row: rowIdx, raw: rawObj, valid, errors, action, notes, resolved });
+      previewRows.push({
+        row: rowIdx, raw: rawObj, valid, errors, action, notes, resolved, pinPreview,
+      });
     }
   }
 

@@ -10,6 +10,15 @@ import {
   type ImportPreview, type ImportPreviewRow, type ImportCommitSummary,
 } from '../../services/student-import';
 
+const inr = (n: number) => `₹${n.toLocaleString('en-IN')}`;
+
+/** Rows that were imported but hold no fee structure. */
+function unpinnedCount(s: ImportCommitSummary): number {
+  const p = s.pinSummary;
+  if (!p) return 0;
+  return p.noMatch + p.skipped + p.errors;
+}
+
 interface Props { open: boolean; onClose: () => void; }
 
 export default function StudentImportDrawer({ open, onClose }: Props) {
@@ -45,8 +54,9 @@ export default function StudentImportDrawer({ open, onClose }: Props) {
       qc.invalidateQueries({ queryKey: ['students'] });
       qc.invalidateQueries({ queryKey: ['people-stats'] });
 
-      const clean = summary.failureCount === 0 && summary.blockedCount === 0;
-      if (clean) {
+      const unpinned = unpinnedCount(summary);
+      const rowsFailed = summary.failureCount > 0 || summary.blockedCount > 0;
+      if (!rowsFailed && unpinned === 0) {
         toast.success(
           `Imported ${summary.successCount} student${summary.successCount === 1 ? '' : 's'}`,
         );
@@ -56,12 +66,23 @@ export default function StudentImportDrawer({ open, onClose }: Props) {
       }
       // Something did not land. Stay open, stay factual, and show which rows
       // so the operator can fix the file rather than guess.
-      toast.warning(
-        'Import finished with problems',
-        summary.errorSummary
-          ?? `${summary.successCount} imported, ${summary.failureCount} failed, `
-            + `${summary.blockedCount} blocked.`,
-      );
+      //
+      // An unpinned student counts as "needs attention" even when every row
+      // committed: the import worked, but those students carry no fee
+      // structure and nothing else will tell this operator that.
+      if (rowsFailed) {
+        toast.warning(
+          'Import finished with problems',
+          summary.errorSummary
+            ?? `${summary.successCount} imported, ${summary.failureCount} failed, `
+              + `${summary.blockedCount} blocked.`,
+        );
+      } else {
+        toast.warning(
+          `Imported ${summary.successCount} student${summary.successCount === 1 ? '' : 's'}`,
+          `${unpinned} of them have no fee structure yet.`,
+        );
+      }
       setResult(summary);
     },
   });
@@ -84,6 +105,9 @@ export default function StudentImportDrawer({ open, onClose }: Props) {
   async function handleCommit() {
     if (!preview?.job?._id) return;
     const guardianTotal = preview.sideEffectTotals.guardians ?? 0;
+    const willPin = preview.sideEffectTotals.pinWillPin ?? 0;
+    const noMatch = preview.sideEffectTotals.pinNoMatch ?? 0;
+    const pinAmount = preview.sideEffectTotals.pinAmount ?? 0;
     const ok = await confirmAction({
       title: `Import ${preview.validCount} student${preview.validCount === 1 ? '' : 's'}?`,
       message: [
@@ -93,6 +117,15 @@ export default function StudentImportDrawer({ open, onClose }: Props) {
         preview.errorCount > 0 ? `${preview.errorCount} row(s) with errors will be skipped.` : '',
         guardianTotal > 0
           ? `Up to ${guardianTotal} guardian record(s) will also be created.` : '',
+        // Consequence, not an approval — the import approves nothing, Finance
+        // already approved these structures. Counts lead; the money is
+        // secondary and labelled estimated because the amount is read at
+        // preview and frozen again at commit.
+        willPin > 0
+          ? `${willPin} student(s) will be bound to an estimated ${inr(pinAmount)} in fees.` : '',
+        noMatch > 0
+          ? `${noMatch} will import without a fee structure and can be pinned later `
+            + 'from Finance → Fee Management → Pin Coverage.' : '',
       ].filter(Boolean).join(' '),
       confirmLabel: 'Import',
     });
@@ -128,18 +161,55 @@ export default function StudentImportDrawer({ open, onClose }: Props) {
           <div className="space-y-3" data-testid="import-result">
             <div className="rounded-lg border border-amber-300 bg-amber-50 p-3">
               <p className="text-sm font-semibold text-amber-900">
-                Import finished with problems
+                {result.failureCount > 0 || result.blockedCount > 0
+                  ? 'Import finished with problems'
+                  : 'Imported, but some students have no fee structure'}
               </p>
               <p className="mt-1 text-sm text-amber-900">
                 {result.successCount} imported · {result.failureCount} failed
                 {result.blockedCount > 0 ? ` · ${result.blockedCount} blocked` : ''} of{' '}
                 {result.totalRows} row{result.totalRows === 1 ? '' : 's'}.
+                {result.pinSummary
+                  ? ` ${result.pinSummary.pinned} pinned to a fee structure.` : ''}
               </p>
-              <p className="mt-1 text-xs text-amber-800">
-                Rows listed below were not written. Fix them in the source file and upload it
-                again — re-importing is safe, matched rows are updated rather than duplicated.
-              </p>
+              {(result.failureCount > 0 || result.blockedCount > 0) && (
+                <p className="mt-1 text-xs text-amber-800">
+                  Rows listed below were not written. Fix them in the source file and upload it
+                  again — re-importing is safe, matched rows are updated rather than duplicated.
+                </p>
+              )}
             </div>
+
+            {result.pinSummary && result.pinSummary.unpinnedRows.length > 0 && (
+              <div data-testid="unpinned-rows">
+                <p className="mb-1 text-xs text-gray-600">
+                  These students were imported but hold no fee structure. Publish the missing
+                  structure, then pin them from{' '}
+                  <span className="font-medium">Finance → Fee Management → Pin Coverage</span>
+                  {' '}— or re-upload this file, which will pin them and change nothing else.
+                </p>
+                <div className="max-h-56 overflow-auto rounded-lg border">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-medium text-gray-600">Row</th>
+                        <th className="px-3 py-2 text-left font-medium text-gray-600">
+                          Not pinned because
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {result.pinSummary.unpinnedRows.map((r) => (
+                        <tr key={`u-${r.row}`}>
+                          <td className="px-3 py-2 text-gray-500">{r.row}</td>
+                          <td className="px-3 py-2 text-xs text-amber-800">{r.reason}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
 
             {result.failedRows.length > 0 && (
               <div className="max-h-56 overflow-auto rounded-lg border">
@@ -255,6 +325,42 @@ export default function StudentImportDrawer({ open, onClose }: Props) {
               )}
             </div>
 
+            {preview.pinContext?.warning ? (
+              <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                {preview.pinContext.warning}
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-3 text-sm" data-testid="pin-summary">
+                <span className="font-medium text-slate-700">
+                  {preview.sideEffectTotals.pinWillPin ?? 0} will pin
+                </span>
+                {(preview.sideEffectTotals.pinNoMatch ?? 0) > 0 && (
+                  <span className="text-amber-700">
+                    {preview.sideEffectTotals.pinNoMatch} no matching fee structure
+                  </span>
+                )}
+                {(preview.sideEffectTotals.pinAlreadyPinned ?? 0) > 0 && (
+                  <span className="text-gray-600">
+                    {preview.sideEffectTotals.pinAlreadyPinned} already pinned
+                  </span>
+                )}
+                {/* Secondary and muted on purpose: the import approves no
+                    money, it binds students to structures Finance already
+                    approved. A 10x-expected total is still the one number
+                    worth stopping on. */}
+                {(preview.sideEffectTotals.pinWillPin ?? 0) > 0 && (
+                  <span className="text-xs text-gray-500">
+                    estimated {inr(preview.sideEffectTotals.pinAmount ?? 0)} in fees
+                  </span>
+                )}
+                {preview.pinContext?.academicYearLabel && (
+                  <span className="text-xs text-gray-500">
+                    · academic year {preview.pinContext.academicYearLabel}
+                  </span>
+                )}
+              </div>
+            )}
+
             <div className="max-h-72 overflow-auto rounded-lg border">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50">
@@ -262,6 +368,7 @@ export default function StudentImportDrawer({ open, onClose }: Props) {
                     <th className="px-3 py-2 text-left font-medium text-gray-600">Row</th>
                     <th className="px-3 py-2 text-left font-medium text-gray-600">Name</th>
                     <th className="px-3 py-2 text-left font-medium text-gray-600">Resolves to</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-600">Fee structure</th>
                     <th className="px-3 py-2 text-left font-medium text-gray-600">Status</th>
                     <th className="px-3 py-2 text-left font-medium text-gray-600">Issues</th>
                   </tr>
@@ -275,6 +382,18 @@ export default function StudentImportDrawer({ open, onClose }: Props) {
                         {r.resolved
                           ? Object.entries(r.resolved).map(([k, v]) => `${k}: ${v}`).join(' · ')
                           : '—'}
+                      </td>
+                      <td className="px-3 py-2 text-xs">
+                        {r.pinPreview?.willPin ? (
+                          <span className="text-slate-700">
+                            {inr(r.pinPreview.totalAmount ?? 0)}
+                            <span className="text-gray-500"> · Year {r.pinPreview.yearOfStudy}</span>
+                          </span>
+                        ) : (
+                          <span className="text-gray-500">
+                            {r.pinPreview ? `— ${r.pinPreview.reason}` : '—'}
+                          </span>
+                        )}
                       </td>
                       <td className="px-3 py-2">
                         <Badge
