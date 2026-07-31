@@ -68,11 +68,23 @@ export const createPaymentSchema = z.object({
     lineItemId: z.string().min(1),
     amount: z.number().min(0),
   })).optional(),
-  status: z.enum(['success', 'pending', 'failed', 'reversed']).optional(),
+  // 007 — the invoice this payment settles. When present, createPayment applies the
+  // amount to that invoice and decrements StudentFeeAccount.balance.
+  invoiceId: z.string().min(1).optional(),
   collectedBy: z.string().optional(),
   remarks: z.string().optional(),
+  // NOTE (007): `status` is deliberately NOT accepted. Counter/manual capture is always
+  // money-in-hand → the model default 'success' is the only reachable value. Allowing a
+  // client to set status (esp. via PUT) would desync AR with no reversal. See T7/§4.3a.
 });
-export const updatePaymentSchema = createPaymentSchema.partial();
+// 007 — standalone .strict() schema, NOT createPaymentSchema.partial(). A partial would
+// still accept amount/invoiceId/status on PUT, and updatePayment does a raw
+// findOneAndUpdate with no recompute → AR desync. Only non-financial fields are editable;
+// corrections go through delete-and-reenter (deletePayment reverses the balance).
+export const updatePaymentSchema = z.object({
+  remarks: z.string().optional(),
+  transactionRef: z.string().optional(),
+}).strict();
 
 // ═══ Scholarships ═════════════════════════════════════════
 

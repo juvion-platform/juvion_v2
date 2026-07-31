@@ -308,6 +308,27 @@ export async function updatePayment(collegeId: string, id: string, data: any, wh
 export async function deletePayment(collegeId: string, id: string, who: string) {
   const doc = await Payment.findOneAndDelete({ _id: id, collegeId });
   if (!doc) throw new AppError(404, 'Payment not found');
+  // 007 — delete is the correction path for a mis-keyed counter payment, so it must
+  // REVERSE the balance effect (removing the UI status controls left delete as the only
+  // way to undo one). A settled, invoice-linked payment credited the account and moved
+  // the invoice status; undo both. A bare payment (no invoiceId) had no such effect.
+  if (doc.status === 'success' && doc.invoiceId) {
+    await StudentFeeAccount.findOneAndUpdate(
+      { collegeId, studentId: doc.studentId },
+      { $inc: { totalPaid: -doc.amount, balance: doc.amount } },
+    );
+    const invoice = await Invoice.findOne({ _id: doc.invoiceId, collegeId });
+    if (invoice) {
+      const [agg] = await Payment.aggregate([
+        { $match: { collegeId: new mongoose.Types.ObjectId(collegeId), invoiceId: invoice._id, status: 'success' } },
+        { $group: { _id: null, paid: { $sum: '$amount' } } },
+      ]);
+      const paid: number = agg?.paid ?? 0;
+      const net = invoice.netPayable ?? invoice.totalAmount;
+      invoice.status = paid <= 0 ? 'generated' : paid >= net ? 'paid' : 'partially_paid';
+      await invoice.save();
+    }
+  }
   await createAuditLog({ collegeId, entityType: 'Payment', entityId: id, entityName: doc.receiptNumber, action: 'delete', changes: [], performedBy: who });
   return doc;
 }
