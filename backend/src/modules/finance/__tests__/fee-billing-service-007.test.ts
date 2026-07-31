@@ -27,7 +27,10 @@ import { FeeStructureInstance } from '../../../models/finance/FeeStructureInstan
 import { Invoice } from '../../../models/finance/Invoice';
 import { InvoiceLineItem } from '../../../models/finance/InvoiceLineItem';
 import { StudentFeeAccount } from '../../../models/finance/StudentFeeAccount';
-import { generateSemesterInstallmentForStudent } from '../fee-billing-service';
+import {
+  generateSemesterInstallmentForStudent,
+  generateSemesterInstallmentsForPinned,
+} from '../fee-billing-service';
 
 const COLLEGE = new Types.ObjectId();
 const AY = new Types.ObjectId();
@@ -199,5 +202,54 @@ describe('007 T3 — generateSemesterInstallmentForStudent', () => {
     expect(await Invoice.countDocuments({ studentId, isSemesterInstallment: true })).toBe(0); // compensated
     expect(await StudentFeeAccount.countDocuments({ studentId })).toBe(0);
     spy.mockRestore();
+  });
+});
+
+describe('007 T4 — generateSemesterInstallmentsForPinned (batch)', () => {
+  it('bills every active pinned student and aggregates the outcomes', async () => {
+    const fsiId = await makeFsi();
+    const willPin = await makePinnedStudent({ fsiId, snapshotTotalAmount: 90000 });
+    const noPin = await makePinnedStudent({ fsiId, pins: false });
+    const semesterId = await makeSemester(1);
+
+    const r = await generateSemesterInstallmentsForPinned(String(COLLEGE), { semesterId }, 'admin');
+    // Candidate set is "active students with a non-archived pin", so the no-pin
+    // student is not even a candidate — it isn't counted.
+    expect(r.generated).toBe(1);
+    expect(r.errors).toHaveLength(0);
+    expect(await Invoice.countDocuments({ studentId: willPin, isSemesterInstallment: true })).toBe(1);
+    expect(await Invoice.countDocuments({ studentId: noPin })).toBe(0);
+  });
+
+  it('honours an explicit studentIds set', async () => {
+    const fsiId = await makeFsi();
+    const a = await makePinnedStudent({ fsiId, snapshotTotalAmount: 90000 });
+    const b = await makePinnedStudent({ fsiId, snapshotTotalAmount: 90000 });
+    const semesterId = await makeSemester(1);
+
+    const r = await generateSemesterInstallmentsForPinned(String(COLLEGE), { semesterId, studentIds: [a] }, 'admin');
+    expect(r.generated).toBe(1);
+    expect(await Invoice.countDocuments({ studentId: a, isSemesterInstallment: true })).toBe(1);
+    expect(await Invoice.countDocuments({ studentId: b, isSemesterInstallment: true })).toBe(0);
+  });
+
+  it('dry-run reports counts and writes nothing', async () => {
+    const fsiId = await makeFsi();
+    await makePinnedStudent({ fsiId, snapshotTotalAmount: 90000 });
+    const semesterId = await makeSemester(1);
+
+    const r = await generateSemesterInstallmentsForPinned(String(COLLEGE), { semesterId, dryRun: true }, 'admin');
+    expect(r.dryRun).toBe(true);
+    expect(r.generated).toBe(1);
+    expect(await Invoice.countDocuments({ isSemesterInstallment: true })).toBe(0);
+  });
+
+  it('yearOfStudy filter skips students not in that year', async () => {
+    const fsiId = await makeFsi();
+    await makePinnedStudent({ fsiId, snapshotTotalAmount: 90000 }); // resolves to year 1 (admission fallback)
+    const semesterId = await makeSemester(1);
+
+    const r = await generateSemesterInstallmentsForPinned(String(COLLEGE), { semesterId, yearOfStudy: 3 }, 'admin');
+    expect(r.generated).toBe(0); // nobody is in year 3
   });
 });

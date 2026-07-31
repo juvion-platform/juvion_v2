@@ -216,3 +216,85 @@ export async function generateSemesterInstallmentForStudent(
 
   return { kind: 'generated', studentId, invoiceId: String(invoice._id), amount: installment, yearAssumed: yearOfStudy, derivedFrom };
 }
+
+export interface BatchBillInput {
+  semesterId: string;
+  /** Explicit students (individual / selected-rows path). Omit to bill everyone pinned. */
+  studentIds?: string[];
+  /** Optional narrowing: only bill students whose resolved year equals this. */
+  yearOfStudy?: number;
+  dryRun?: boolean;
+}
+
+export interface BatchBillResult {
+  dryRun: boolean;
+  generated: number;
+  alreadyBilled: number;
+  noPin: number;
+  pinnedToDifferentAy: number;
+  noAmount: number;
+  unsupportedSemesterNumber: number;
+  errors: Array<{ studentId: string; error: string }>;
+}
+
+/**
+ * Generate (or dry-run) semester-installment invoices for a cohort of pinned
+ * students. Candidate set = the explicit `studentIds`, else every active student
+ * holding a non-archived pin (mirrors the coverage query). Each student runs through
+ * `generateSemesterInstallmentForStudent`; a throw on one drops to `errors` and the
+ * batch continues. Sequential — demo scale is small, and it keeps the compensating
+ * rollback per-student simple.
+ */
+export async function generateSemesterInstallmentsForPinned(
+  collegeId: string,
+  input: BatchBillInput,
+  performedBy: string,
+): Promise<BatchBillResult> {
+  const result: BatchBillResult = {
+    dryRun: Boolean(input.dryRun),
+    generated: 0, alreadyBilled: 0, noPin: 0,
+    pinnedToDifferentAy: 0, noAmount: 0, unsupportedSemesterNumber: 0,
+    errors: [],
+  };
+
+  let candidates: string[];
+  if (input.studentIds && input.studentIds.length > 0) {
+    candidates = input.studentIds;
+  } else {
+    const rows = await Student.find({
+      collegeId,
+      status: 'active',
+      feePins: { $elemMatch: { archivedAt: null } },
+    }).select('_id').lean();
+    candidates = rows.map((r) => String(r._id));
+  }
+
+  for (const studentId of candidates) {
+    try {
+      if (input.yearOfStudy !== undefined) {
+        const s = await Student.findOne({ _id: studentId, collegeId }).select('studyYearAtAdmission').lean();
+        if (!s) { result.errors.push({ studentId, error: 'Student not found' }); continue; }
+        const { yearOfStudy } = await resolvePinYearForExistingStudent(studentId, s.studyYearAtAdmission);
+        if (yearOfStudy !== input.yearOfStudy) continue;
+      }
+      const outcome = await generateSemesterInstallmentForStudent(
+        collegeId, { studentId, semesterId: input.semesterId }, performedBy, { dryRun: input.dryRun },
+      );
+      switch (outcome.kind) {
+        case 'generated': result.generated += 1; break;
+        case 'already-billed': result.alreadyBilled += 1; break;
+        case 'no-active-pin': result.noPin += 1; break;
+        case 'pinned-to-different-ay': result.pinnedToDifferentAy += 1; break;
+        case 'skipped':
+          if (outcome.reason === 'no-amount') result.noAmount += 1;
+          else result.unsupportedSemesterNumber += 1;
+          break;
+        case 'error': result.errors.push({ studentId, error: outcome.error }); break;
+      }
+    } catch (e) {
+      result.errors.push({ studentId, error: e instanceof Error ? e.message : String(e) });
+    }
+  }
+
+  return result;
+}
