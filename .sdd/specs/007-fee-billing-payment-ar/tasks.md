@@ -1,5 +1,14 @@
 # Tasks — 007-fee-billing-payment-ar
 
+## STATUS (branch `feat/fee-billing-payment-ar`)
+T1–T13 ✅ DONE — committed, each test-first + typecheck-clean. Full finance suite green (288).
+T14 (manual UI QA + optional e2e) ⏳ pending — the flow to walk: bulk-import a student →
+auto-pin → Generate Bills (finance:create as admin) → record a partial payment against the
+invoice → dashboard "Collected" rises + "Outstanding (AR)" falls.
+**Deploy scripts to run on existing DBs:** `fix-invoice-semester-installment-index.ts` (T2)
+and `verify-fee-balance-invariant.ts` (T10, check). Leave FINANCE_ENFORCE_FEE_GUARDIAN unset.
+
+
 TDD-ordered, each commit-shaped. Derived from `plan.md` §8, incorporating the GATE-2
 resolutions (`gate2-resolution.md`). Each task: **RED** (failing test) → **GREEN**
 (minimal impl) → **REFACTOR** → typecheck → commit.
