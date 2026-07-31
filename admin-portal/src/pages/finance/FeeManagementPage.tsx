@@ -18,6 +18,7 @@ import FeeCategoriesPage from './FeeCategoriesPage';
 import FeeQuotasPage from './FeeQuotasPage';
 import StudentFeeAccountsPage from './StudentFeeAccountsPage';
 import FeeLineItemsPage from './FeeLineItemsPage';
+import GenerateBillsPage from './GenerateBillsPage';
 import PaymentsPage from './PaymentsPage';
 import InvoicesPage from './InvoicesPage';
 import FeeRemindersPage from './FeeRemindersPage';
@@ -32,6 +33,7 @@ const TABS: FinanceTabDef[] = [
   { to: '/finance/fee-management/fee-quotas', label: 'Fee Quotas' },
   { to: '/finance/fee-management/fee-accounts', label: 'Fee Accounts' },
   { to: '/finance/fee-management/fee-line-items', label: 'Fee Line Items' },
+  { to: '/finance/fee-management/generate-bills', label: 'Generate Bills' },
   { to: '/finance/fee-management/payments', label: 'Payments' },
   { to: '/finance/fee-management/invoices', label: 'Invoices' },
   { to: '/finance/fee-management/reminders', label: 'Fee Reminders' },
@@ -58,6 +60,7 @@ export default function FeeManagementPage() {
         <Route path="fee-quotas" element={<FeeQuotasPage />} />
         <Route path="fee-accounts" element={<StudentFeeAccountsPage />} />
         <Route path="fee-line-items" element={<FeeLineItemsPage />} />
+        <Route path="generate-bills" element={<GenerateBillsPage />} />
         <Route path="payments" element={<PaymentsPage />} />
         <Route path="invoices" element={<InvoicesPage />} />
         <Route path="reminders" element={<FeeRemindersPage />} />
