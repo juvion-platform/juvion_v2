@@ -51,10 +51,18 @@ const STUDENT_POPULATE = { path: 'studentId', populate: { path: 'personId' } };
 async function assertStudentFeeGuardianReady(collegeId: string, studentId?: string) {
   if (!studentId) return;
 
+  // Existence + college-match ALWAYS runs — even with guardian enforcement off — or a
+  // college-A caller could write finance records referencing a college-B studentId
+  // (orphan rows, cross-tenant AR noise). G2-M1.
   const student = await Student.findOne({ _id: studentId, collegeId }).lean();
   if (!student) {
     throw new AppError(404, 'Student not found');
   }
+  // DEMO CHOICE (2026-07): the fee-guardian REQUIREMENT is flag-gated OFF, so
+  // bulk-imported students can be billed/paid without a linked guardian. The guard
+  // exists because production finance needs a payer-of-record (receipts, dunning,
+  // refunds). RE-ENABLE for real-college onboarding: FINANCE_ENFORCE_FEE_GUARDIAN=true.
+  if (process.env.FINANCE_ENFORCE_FEE_GUARDIAN !== 'true') return;
   if (!student.feeResponsibleParentId) {
     throw new AppError(400, 'Fee responsible guardian is required before creating finance records for this student');
   }

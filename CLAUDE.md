@@ -220,6 +220,7 @@ DEV_COLLEGE_ID=000000000000000000000001
 PAYMENT_WEBHOOK_SECRET=any-non-empty-string-in-production  # app.ts:55 startup guard
 RBAC_ENFORCE=true   # 'false' = authorize() is a pass-through (dev mode default behavior)
 RBAC_NL_ENFORCE=true  # 'true' = NL endpoint uses authorize() instead of hard requireRole admin gate
+FINANCE_ENFORCE_FEE_GUARDIAN=false  # 'true' requires a fee-responsible guardian before any finance record (payment/invoice/account). OFF for demo; ON for real colleges. Existence/college check always runs regardless.
 VITE_API_URL=http://localhost:3003/api  # baked into the production admin-portal build (vite preview doesn't proxy)
 AWS_S3_BUCKET=                  # backend/src/shared/s3/s3-client.ts; unset disables bulk-import source-file archiving (import still succeeds) but photo/faculty-document uploads still 503
 AWS_REGION=ap-south-1
