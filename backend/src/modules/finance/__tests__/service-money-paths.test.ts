@@ -255,17 +255,24 @@ describe('finance.createPayment — money paths', () => {
   });
 
   describe('student fee-guardian gate', () => {
-    it('rejects 400 when student has no feeResponsibleParentId', async () => {
-      const cid = String(oid());
-      const student = await seedStudent(cid, { withGuardian: false });
+    // 007 T8 — the guardian REQUIREMENT is now flag-gated (off for the demo). Pin it ON
+    // to exercise the guard; flag-off behaviour is covered by guardian-flag-007.test.ts.
+    it('rejects 400 when enforcement is ON and student has no feeResponsibleParentId', async () => {
+      process.env.FINANCE_ENFORCE_FEE_GUARDIAN = 'true';
+      try {
+        const cid = String(oid());
+        const student = await seedStudent(cid, { withGuardian: false });
 
-      await expect(
-        service.createPayment(cid, {
-          studentId: String(student._id),
-          amount: 1000,
-          paymentMode: 'cash',
-        }, 'u'),
-      ).rejects.toMatchObject({ statusCode: 400 });
+        await expect(
+          service.createPayment(cid, {
+            studentId: String(student._id),
+            amount: 1000,
+            paymentMode: 'cash',
+          }, 'u'),
+        ).rejects.toMatchObject({ statusCode: 400 });
+      } finally {
+        delete process.env.FINANCE_ENFORCE_FEE_GUARDIAN;
+      }
     });
 
     it('rejects 404 when studentId does not exist', async () => {
