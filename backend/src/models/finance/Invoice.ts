@@ -11,6 +11,13 @@ export interface IInvoice extends Document {
   concessionApplied?: number;
   paymentPlanId?: Schema.Types.ObjectId;
   batchId?: string;
+  /**
+   * 007 — POSITIVE discriminator marking a semester-tuition-installment invoice.
+   * Exam-fee invoices are ALSO type:'fee' with a semesterId, so idempotency and
+   * the partial unique index key on THIS flag, never on type:'fee' (G2-C1). Only
+   * `fee-billing-service` sets it; every other invoice creator leaves it undefined.
+   */
+  isSemesterInstallment?: boolean;
   metadata?: Record<string, unknown>;
 }
 
@@ -32,6 +39,7 @@ const schema = new Schema<IInvoice>({
   concessionApplied: { type: Number, default: 0 },
   paymentPlanId: { type: Schema.Types.ObjectId, ref: 'PaymentPlan' },
   batchId: { type: String },
+  isSemesterInstallment: { type: Boolean },
   metadata: { type: Schema.Types.Mixed, default: {} },
 }, { timestamps: true });
 
