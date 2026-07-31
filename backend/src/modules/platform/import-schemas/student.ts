@@ -3,7 +3,13 @@ import { resolveStudentRefs, validateCatalogCodes } from '../../people/student-i
 import {
   matchExistingStudent, feeAxisConflicts, studentNaturalKeys,
 } from '../../people/student-import-match';
-import type { ImportSchemaDefinition } from './types';
+import { resolvePinYearOfStudy } from '../../people/student-import-pin';
+import {
+  previewMatchingFeeStructureInstance,
+  type PreviewMatchResult,
+} from '../../finance/fee-pin-service';
+import { Student } from '../../../models/people/Student';
+import type { ImportSchemaDefinition, ImportRowPinPreview } from './types';
 import {
   validString, validNumber, validEnum, validDate, validPhone, validAadhaar, validEmail,
 } from './validators';
@@ -30,9 +36,60 @@ import {
  * model: a student with no programme cannot be fee-pinned or placed, so
  * importing one creates downstream work rather than saving it.
  */
+function inr(amount: number): string {
+  return `₹${amount.toLocaleString('en-IN')}`;
+}
+
+/** Mirrors the commit-side guard so preview and commit agree on "already pinned". */
+async function hasActivePinForYear(
+  collegeId: string,
+  studentId: string,
+  yearOfStudy: number,
+): Promise<boolean> {
+  const found = await Student.findOne({
+    _id: studentId,
+    collegeId,
+    feePins: { $elemMatch: { yearOfStudy, archivedAt: null } },
+  }).select('_id').lean();
+  return Boolean(found);
+}
+
+/**
+ * Resolve the fee structure a row would pin to, reusing the job's memo store.
+ *
+ * A cohort import repeats the same axis tuple across hundreds of rows, so
+ * without this the preview would issue one `FeeStructureInstance` query per
+ * row. Keyed on the full tuple because that is exactly what the matcher
+ * scores on.
+ *
+ * Preview only — `previewCache` is absent at commit by design, so a structure
+ * superseded between the two calls can never be written as a pin.
+ */
+async function previewPinMatch(
+  collegeId: string,
+  academicYearId: string,
+  axes: { programmeId: string; branchId?: string; quota?: string; category?: string },
+  yearOfStudy: number,
+  cache: Map<string, unknown> | undefined,
+): Promise<PreviewMatchResult> {
+  const key = [
+    'fsi', academicYearId, axes.programmeId, axes.branchId ?? '',
+    axes.quota ?? '', axes.category ?? '', yearOfStudy,
+  ].join('|');
+  const memo = cache?.get(key);
+  if (memo) return memo as PreviewMatchResult;
+
+  const result = await previewMatchingFeeStructureInstance({
+    collegeId, academicYearId, yearOfStudy, ...axes,
+  });
+  cache?.set(key, result);
+  return result;
+}
+
 export const studentImportSchema: ImportSchemaDefinition = {
   entityType: 'student',
   label: 'Students',
+  requiresPinAcademicYear: true,
   description:
     'Bulk-create or update students. Identity, academic placement and guardians. '
     + 'Mandatory columns are marked with * in the template. Re-uploading a corrected '
@@ -117,10 +174,68 @@ export const studentImportSchema: ImportSchemaDefinition = {
       if (conflicts.length) return { ok: true, action: 'blocked', notes: conflicts, resolved };
     }
 
+    const notes: string[] = [];
+    const sideEffects: Record<string, number> = {};
+    let pinPreview: ImportRowPinPreview | undefined;
+
+    // Which fee structure this row would bind the student to, and at which
+    // year. The year is echoed because `studyYearAtAdmission` is optional: a
+    // blank column silently means Year 1, and a mid-lifecycle intake loaded
+    // with it blank would pin an entire cohort of third-years to Year 1.
+    const pinYear = resolvePinYearOfStudy(typedRow.studyYearAtAdmission);
+    if (!pinYear.ok) {
+      notes.push(pinYear.error);
+      sideEffects.pinError = 1;
+    } else if (!ctx.academicYearId) {
+      sideEffects.pinNoAcademicYear = 1;
+      pinPreview = {
+        yearOfStudy: pinYear.yearOfStudy, willPin: false, reason: 'no academic year',
+      };
+    } else if (match.action === 'update' && match.studentId
+      && await hasActivePinForYear(ctx.collegeId, match.studentId, pinYear.yearOfStudy)) {
+      // Silent on purpose — nothing is changing for this student.
+      sideEffects.pinAlreadyPinned = 1;
+      pinPreview = {
+        yearOfStudy: pinYear.yearOfStudy, willPin: false, reason: 'already pinned',
+      };
+    } else {
+      const quotaCell = String(typedRow.quota ?? '').trim();
+      const categoryCell = String(typedRow.category ?? '').trim();
+      const fsiMatch = await previewPinMatch(
+        ctx.collegeId,
+        ctx.academicYearId,
+        {
+          programmeId: refs.value.programmeId,
+          ...(refs.value.branchId ? { branchId: refs.value.branchId } : {}),
+          ...(quotaCell ? { quota: quotaCell } : {}),
+          ...(categoryCell ? { category: categoryCell } : {}),
+        },
+        pinYear.yearOfStudy,
+        ctx.previewCache,
+      );
+      if (fsiMatch.matched && fsiMatch.fsi) {
+        const amount = fsiMatch.fsi.totalAmount ?? 0;
+        notes.push(`will pin Year ${pinYear.yearOfStudy} → ${inr(amount)}`);
+        sideEffects.pinWillPin = 1;
+        sideEffects.pinAmount = amount;
+        pinPreview = {
+          yearOfStudy: pinYear.yearOfStudy, willPin: true, totalAmount: amount,
+        };
+      } else {
+        notes.push(
+          `no matching fee structure for Year ${pinYear.yearOfStudy} `
+          + '— will import unpinned',
+        );
+        sideEffects.pinNoMatch = 1;
+        pinPreview = {
+          yearOfStudy: pinYear.yearOfStudy, willPin: false, reason: 'no matching fee structure',
+        };
+      }
+    }
+
     // Report guardian side effects before they happen. Both columns can name
     // the same person, so dedupe within the row — across rows the total is an
     // upper bound, which is why the UI says "up to".
-    const notes: string[] = [];
     const phones = new Set(
       ['primaryParentPhone', 'feeResponsibleParentPhone']
         .map((k) => String(typedRow[k] ?? '').trim())
@@ -134,12 +249,15 @@ export const studentImportSchema: ImportSchemaDefinition = {
       }
     }
 
+    if (guardiansToCreate) sideEffects.guardians = guardiansToCreate;
+
     return {
       ok: true,
       action: match.action,
       notes: notes.length ? notes : undefined,
       resolved,
-      sideEffects: guardiansToCreate ? { guardians: guardiansToCreate } : undefined,
+      sideEffects: Object.keys(sideEffects).length ? sideEffects : undefined,
+      pinPreview,
     };
   },
   commitOne: (typedRow, ctx) => commitStudentRow(typedRow, ctx),

@@ -11,10 +11,32 @@
  */
 
 import { IImportJobSchemaField } from '../../../models/platform/ImportJob';
+import type { PinOutcome } from '../../people/student-import-pin';
 
 export interface ImportCommitContext {
   collegeId: string;
   performedBy: string;
+  /**
+   * The ImportJob these rows belong to. Always available — the job id is
+   * minted before parsing — and it is what makes a side effect traceable
+   * back to the upload that caused it (fee pins record it in `remarks`).
+   */
+  jobId: string;
+  /**
+   * Academic year that fee-pin resolution runs against, resolved once and
+   * frozen on the job at preview so commit cannot drift if `isCurrent` flips
+   * between the two calls. Undefined when the job could not resolve one.
+   */
+  academicYearId?: string;
+  /**
+   * Per-job memo store handed to `validateRow`, so a schema can avoid
+   * re-querying reference data that is identical across rows.
+   *
+   * Present ONLY during preview. Commit deliberately gets none: reusing a
+   * cached match to write a pin would persist a fee structure that was
+   * superseded between the two calls.
+   */
+  previewCache?: Map<string, unknown>;
 }
 
 export interface ImportSchemaField extends IImportJobSchemaField {
@@ -38,6 +60,21 @@ export interface ImportSchemaField extends IImportJobSchemaField {
  */
 export type ImportRowAction = 'create' | 'update' | 'blocked';
 
+/**
+ * What committing a row would do to its fee pin, computed at preview.
+ *
+ * `yearOfStudy` is carried even when the row will pin cleanly: the column it
+ * derives from is optional, so a blank one silently means Year 1, and the
+ * operator has to be able to see that before confirming.
+ */
+export interface ImportRowPinPreview {
+  yearOfStudy: number;
+  willPin: boolean;
+  totalAmount?: number;
+  /** Why not, when `willPin` is false. */
+  reason?: string;
+}
+
 export interface ImportSchemaDefinition {
   entityType: string;
   label: string;
@@ -46,14 +83,26 @@ export interface ImportSchemaDefinition {
   /** Sample row for the downloadable CSV template. Keys must be `fieldKey`. */
   sampleRow: Record<string, string>;
   /**
+   * Opt in to having the engine resolve and freeze an academic year for the
+   * job, and to per-row pin accounting. Only the student schema pins; the
+   * other four never touch fee structures and must not pay for the lookup.
+   */
+  requiresPinAcademicYear?: boolean;
+  /**
    * Given a fully-validated typed row, perform the create + return
    * the _id. Throw `Error` on failure — the orchestrator catches and
    * records the per-row error.
+   *
+   * `pinOutcome` reports a fee pin the commit attempted alongside the row.
+   * It is deliberately a return value and never a throw: the orchestrator
+   * turns any throw into `outcome:'error'`, so a college that has not yet
+   * published its fee structures would otherwise turn a clean import red.
+   * Only the student schema sets it.
    */
   commitOne: (
     typedRow: Record<string, unknown>,
     ctx: ImportCommitContext,
-  ) => Promise<{ id: string }>;
+  ) => Promise<{ id: string; pinOutcome?: PinOutcome }>;
   /**
    * OPTIONAL, opt-in. The natural keys this row would match an existing
    * record on — the same keys, in the same precedence order, that the
@@ -115,6 +164,7 @@ export interface ImportSchemaDefinition {
         notes?: string[];
         resolved?: Record<string, string>;
         sideEffects?: Record<string, number>;
+        pinPreview?: ImportRowPinPreview;
       }
     | { ok: false; error: string }
   >;

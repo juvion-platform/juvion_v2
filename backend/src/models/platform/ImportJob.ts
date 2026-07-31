@@ -61,6 +61,35 @@ export interface IImportJobRowResult {
   notes?: string[];
   /** Label -> display value for codes this row resolved (programme, branch). */
   resolved?: Record<string, string>;
+  /** Fee structure this row would pin to, as computed at preview. */
+  pinPreview?: {
+    yearOfStudy: number;
+    willPin: boolean;
+    totalAmount?: number;
+    reason?: string;
+  };
+  /**
+   * Fee-pin result for this row, when the schema attempted one. Recorded
+   * separately from `outcome` because a pin never changes whether the row
+   * itself succeeded — a student with no matching fee structure is imported,
+   * not failed.
+   */
+  pinOutcome?: {
+    kind: string;
+    message?: string;
+    fsiId?: string;
+    totalAmount?: number;
+  };
+}
+
+/** Roll-up of the per-row `pinOutcome`s, computed once at commit. */
+export interface IImportJobPinSummary {
+  pinned: number;
+  alreadyPinned: number;
+  noMatch: number;
+  skipped: number;
+  errors: number;
+  totalPinnedAmount: number;
 }
 
 export interface IImportJobSchemaField {
@@ -114,6 +143,19 @@ export interface IImportJob extends Document {
   /** Short summary surfaced on list views. */
   errorSummary?: string;
 
+  /**
+   * Academic year the fee-pin resolution runs against, frozen at preview.
+   * Commit reads it back rather than re-deriving, so a college that flips
+   * `isCurrent` between the two calls cannot split one cohort across two
+   * years. Undefined when the job could not resolve one — see
+   * `pinContextWarning`.
+   */
+  pinAcademicYearId?: Types.ObjectId;
+  /** Why pinning is off for this whole job, if it is. Shown before the operator commits. */
+  pinContextWarning?: string;
+  /** Populated at commit for schemas that pin. */
+  pinSummary?: IImportJobPinSummary;
+
   startedAt: Date;
   completedAt?: Date;
   archivedAt?: Date | null;
@@ -132,6 +174,8 @@ const rowResultSchema = new Schema<IImportJobRowResult>(
     action: { type: String, enum: ['create', 'update', 'blocked'], required: false },
     notes: { type: [String], required: false },
     resolved: { type: Schema.Types.Mixed, required: false },
+    pinPreview: { type: Schema.Types.Mixed, required: false },
+    pinOutcome: { type: Schema.Types.Mixed, required: false },
   },
   { _id: false },
 );
@@ -177,6 +221,10 @@ const schema = new Schema<IImportJob>(
     blockedCount: { type: Number, required: true, default: 0 },
 
     results: { type: [rowResultSchema], default: [] },
+
+    pinAcademicYearId: { type: Schema.Types.ObjectId, required: false },
+    pinContextWarning: { type: String, required: false },
+    pinSummary: { type: Schema.Types.Mixed, required: false },
 
     errorSummary: { type: String },
 

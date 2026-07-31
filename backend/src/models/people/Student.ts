@@ -203,7 +203,24 @@ const schema = new Schema<IStudent>({
   feePins: { type: [feePinSchema], default: [] },
 }, { timestamps: true });
 
-schema.index({ collegeId: 1, rollNumber: 1 }, { unique: true, sparse: true });
+/**
+ * Roll numbers are unique per college, but only among students that HAVE one
+ * — `rollNumber` is optional (admissions allocates it later, and bulk import
+ * does not require the column).
+ *
+ * `sparse` cannot express that on a compound index: it omits a document only
+ * when EVERY indexed field is absent, and `collegeId` is always present. So
+ * every roll-number-less student was indexed under the key
+ * `{ collegeId, null }`, and a college could hold exactly one of them — the
+ * second import of a student without a roll number died on E11000.
+ *
+ * `partialFilterExpression` is the construct that actually means "index only
+ * the documents that have one".
+ */
+schema.index(
+  { collegeId: 1, rollNumber: 1 },
+  { unique: true, partialFilterExpression: { rollNumber: { $type: 'string' } } },
+);
 // Sparse index to accelerate nightly audit + pin-coverage queries that
 // join students ↔ FeeStructureInstance on the pinned id (plan §2.1).
 schema.index({ 'feePins.feeStructureInstanceId': 1 }, { sparse: true });

@@ -15,7 +15,9 @@ import { commitStudentRow } from '../student-import-service';
 
 const oid = () => new mongoose.Types.ObjectId();
 let collegeId: string;
-const ctx = () => ({ collegeId, performedBy: 'tester' });
+// No academicYearId: these cover the Person/Parent/Student writes, and
+// without one every row skips pinning, so the pre-pin behaviour is unchanged.
+const ctx = () => ({ collegeId, performedBy: 'tester', jobId: 'test-job' });
 
 beforeAll(async () => { await setupMongo(); }, 60_000);
 afterAll(async () => { await teardownMongo(); });

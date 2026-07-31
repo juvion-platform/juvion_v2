@@ -34,11 +34,44 @@ import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
 import { User } from '../models/User';
+import { AcademicYear } from '../models/academic-structure/AcademicYear';
 import { seedPolicies } from '../shared/seed/policies';
 
 dotenv.config();
 
 export const E2E_TEST_PASSWORD = 'E2ETestPassword!';
+
+const E2E_COLLEGE_ID = process.env.DEV_COLLEGE_ID || '000000000000000000000001';
+const E2E_ACADEMIC_YEAR_CODE = 'E2E-AY';
+
+/**
+ * The e2e college needs exactly ONE current academic year, or student import
+ * cannot fee-pin anyone: the matcher requires an `academicYearId`, and the
+ * import resolver refuses a college with zero or ambiguous `isCurrent` years.
+ * Idempotent — normalises any other current year off first, then upserts ours.
+ */
+export async function seedE2EAcademicYear(): Promise<void> {
+  const collegeId = new mongoose.Types.ObjectId(E2E_COLLEGE_ID);
+  await AcademicYear.updateMany(
+    { collegeId, isCurrent: true, code: { $ne: E2E_ACADEMIC_YEAR_CODE } },
+    { $set: { isCurrent: false } },
+  );
+  await AcademicYear.updateOne(
+    { collegeId, code: E2E_ACADEMIC_YEAR_CODE },
+    {
+      $set: {
+        collegeId,
+        code: E2E_ACADEMIC_YEAR_CODE,
+        label: 'E2E Academic Year',
+        startDate: new Date('2025-06-01'),
+        endDate: new Date('2026-05-31'),
+        isCurrent: true,
+        status: 'active',
+      },
+    },
+    { upsert: true },
+  );
+}
 
 export interface E2EUserDefinition {
   email: string;
@@ -141,6 +174,11 @@ export async function seedE2EUsers(): Promise<SeedResult> {
     if (existing) updated += 1;
     else created += 1;
   }
+
+  // Fee-pinning on student import needs one current academic year for the
+  // e2e college; seed it alongside the users so both the CLI and the
+  // Playwright global-setup (which import this function) get it.
+  await seedE2EAcademicYear();
 
   return { created, updated, total: created + updated };
 }

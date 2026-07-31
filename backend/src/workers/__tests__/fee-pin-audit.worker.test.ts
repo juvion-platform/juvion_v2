@@ -34,6 +34,9 @@ vi.mock('../../shared/queue/QueueManager', async (importOriginal) => {
 vi.mock('../../modules/finance/fee-pin-audit-service', () => ({
   getCoverage: vi.fn(),
   getInvariants: vi.fn(),
+  // Real value, not a stub: the worker passes it straight through as a query
+  // argument, and a mock would not catch it asking for the wrong reasons.
+  PIN_MISSING_REASONS: ['no-matching-structure', 'never-pinned', 'year-unresolvable'],
 }));
 
 import * as feePinAuditService from '../../modules/finance/fee-pin-audit-service';
@@ -72,13 +75,25 @@ async function seedCollege(name: string, code: string) {
   });
 }
 
+const NO_COUNTS = {
+  'no-matching-structure': 0,
+  'never-pinned': 0,
+  'year-unresolvable': 0,
+  'no-fee-responsible-guardian': 0,
+} as const;
+
 function defaultCoverage(collegeId: string) {
   return {
     collegeId,
     totalActiveStudents: 10,
     studentsWithActivePinForCurrentYear: 10,
     coveragePercent: 100,
-    studentsMissingPin: [],
+    counts: { ...NO_COUNTS },
+    groups: [],
+    students: [],
+    page: 1,
+    limit: 50,
+    total: 0,
   };
 }
 
@@ -171,12 +186,19 @@ describe('feePinAuditWorker', () => {
       totalActiveStudents: 25,
       studentsWithActivePinForCurrentYear: 20,
       coveragePercent: 80,
-      studentsMissingPin: Array.from({ length: 75 }).map((_, i) => ({
+      counts: { ...NO_COUNTS, 'never-pinned': 75 },
+      groups: [],
+      students: Array.from({ length: 75 }).map((_, i) => ({
         studentId: String(studentId),
-        rollNumber: `R${i}`,
+        name: `Student ${i}`,
         programmeId: null,
-        currentYearOfStudy: 2,
+        rollNumber: `R${i}`,
+        yearOfStudy: 2,
+        reason: 'never-pinned' as const,
       })),
+      page: 1,
+      limit: 200,
+      total: 75,
     });
     vi.mocked(feePinAuditService.getInvariants).mockResolvedValueOnce({
       collegeId: String(a._id),
@@ -408,7 +430,12 @@ describe('feePinAuditWorker', () => {
       totalActiveStudents: 10,
       studentsWithActivePinForCurrentYear: 7,
       coveragePercent: 70,
-      studentsMissingPin: [],
+      counts: { ...NO_COUNTS },
+      groups: [],
+      students: [],
+      page: 1,
+      limit: 50,
+      total: 0,
     });
 
     await feePinAuditWorker(buildJob({ collegeId: String(a._id) }));
@@ -434,7 +461,12 @@ describe('feePinAuditWorker', () => {
       totalActiveStudents: 10,
       studentsWithActivePinForCurrentYear: 1,
       coveragePercent: 10,
-      studentsMissingPin: [],
+      counts: { ...NO_COUNTS },
+      groups: [],
+      students: [],
+      page: 1,
+      limit: 50,
+      total: 0,
     });
     vi.mocked(addJob).mockRejectedValueOnce(new Error('EMAIL queue down'));
 

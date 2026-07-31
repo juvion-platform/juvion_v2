@@ -16,7 +16,13 @@ export const ALL_MODULES = [
   'juvi',
 ] as const;
 
-export const ALL_ACTIONS = ['read', 'create', 'update', 'delete'] as const;
+/**
+ * `approve` is emitted alongside the CRUD four because several routes gate on
+ * it — re-pin and bulk-pin both bind students to a fee structure — and while
+ * it was missing the frontend could never detect the grant, forcing those
+ * buttons onto hardcoded role checks that disagreed with the backend.
+ */
+export const ALL_ACTIONS = ['read', 'create', 'update', 'delete', 'approve'] as const;
 
 /**
  * Resolve the flat list of "module:action" permission strings for a given role and personaType.

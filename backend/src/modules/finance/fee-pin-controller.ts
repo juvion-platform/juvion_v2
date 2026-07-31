@@ -16,6 +16,7 @@ import { Response, NextFunction } from 'express';
 
 import { AuthRequest } from '../../middleware/authenticate';
 import { AppError } from '../../middleware/errorHandler';
+import { bulkPinStudents, type BulkPinInput } from './bulk-pin-service';
 import { Student } from '../../models/people/Student';
 import * as feePinService from './fee-pin-service';
 import * as commitmentSheetService from './fee-commitment-sheet-service';
@@ -243,6 +244,30 @@ export async function previewMatchingFeeStructure(
       academicYearId: academicYearId || undefined,
     });
 
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * POST /students/bulk-pin
+ *
+ * Clears the unpinned tail from the Pin Coverage screen. Gated on
+ * `finance:approve` — it binds students to fee structures, which is the same
+ * commitment the re-pin route guards.
+ */
+export async function bulkPin(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const result = await bulkPinStudents(
+      req.collegeId!,
+      req.body as BulkPinInput,
+      req.user?.name ?? 'System',
+    );
     res.json(result);
   } catch (err) {
     next(err);

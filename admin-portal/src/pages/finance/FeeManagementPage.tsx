@@ -22,6 +22,7 @@ import PaymentsPage from './PaymentsPage';
 import InvoicesPage from './InvoicesPage';
 import FeeRemindersPage from './FeeRemindersPage';
 import FinePenaltiesPage from './FinePenaltiesPage';
+import PinCoveragePage from './PinCoveragePage';
 import FinancialHoldsPage from './FinancialHoldsPage';
 
 const TABS: FinanceTabDef[] = [
@@ -36,6 +37,7 @@ const TABS: FinanceTabDef[] = [
   { to: '/finance/fee-management/reminders', label: 'Fee Reminders' },
   { to: '/finance/fee-management/fines', label: 'Fines & Penalties' },
   { to: '/finance/fee-management/holds', label: 'Financial Holds' },
+  { to: '/finance/fee-management/pin-coverage', label: 'Pin Coverage' },
 ];
 
 export default function FeeManagementPage() {
@@ -61,6 +63,7 @@ export default function FeeManagementPage() {
         <Route path="reminders" element={<FeeRemindersPage />} />
         <Route path="fines" element={<FinePenaltiesPage />} />
         <Route path="holds" element={<FinancialHoldsPage />} />
+        <Route path="pin-coverage" element={<PinCoveragePage />} />
       </Routes>
     </FinanceTabShell>
   );

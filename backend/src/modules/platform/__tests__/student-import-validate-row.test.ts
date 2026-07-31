@@ -23,7 +23,7 @@ const oid = () => new mongoose.Types.ObjectId();
 let collegeId: string;
 
 function ctx(overrides: Partial<ImportCommitContext> = {}): ImportCommitContext {
-  return { collegeId, performedBy: 'tester', ...overrides };
+  return { collegeId, performedBy: 'tester', jobId: 'test-job', ...overrides };
 }
 
 /** Guards against a future edit silently dropping the hook — fails loudly rather than crashing on a bare `!`. */
@@ -211,6 +211,10 @@ describe('studentImportSchema.validateRow — fee-axis changes block the row', (
   });
 });
 
+/**
+ * Asserted on the `guardians` key rather than the whole `sideEffects` object:
+ * the hook also emits fee-pin counters, and these tests are about guardians.
+ */
 describe('studentImportSchema.validateRow — guardian side effects', () => {
   it('dedupes two parent-phone columns carrying the same new number into one guardian', async () => {
     const res = await callValidateRow({
@@ -219,7 +223,7 @@ describe('studentImportSchema.validateRow — guardian side effects', () => {
     expect(res.ok).toBe(true);
     if (res.ok) {
       expect(res.notes).toEqual(['will create a guardian for 9111111111']);
-      expect(res.sideEffects).toEqual({ guardians: 1 });
+      expect(res.sideEffects?.guardians).toBe(1);
     }
   });
 
@@ -230,7 +234,7 @@ describe('studentImportSchema.validateRow — guardian side effects', () => {
     expect(res.ok).toBe(true);
     if (res.ok) {
       expect(res.notes).toHaveLength(2);
-      expect(res.sideEffects).toEqual({ guardians: 2 });
+      expect(res.sideEffects?.guardians).toBe(2);
     }
   });
 
@@ -242,7 +246,7 @@ describe('studentImportSchema.validateRow — guardian side effects', () => {
     expect(res.ok).toBe(true);
     if (res.ok) {
       expect(res.notes).toBeUndefined();
-      expect(res.sideEffects).toBeUndefined();
+      expect(res.sideEffects?.guardians).toBeUndefined();
     }
   });
 
@@ -260,7 +264,7 @@ describe('studentImportSchema.validateRow — guardian side effects', () => {
     expect(res.ok).toBe(true);
     if (res.ok) {
       expect(res.notes).toEqual(['will create a guardian for 9444444444']);
-      expect(res.sideEffects).toEqual({ guardians: 1 });
+      expect(res.sideEffects?.guardians).toBe(1);
     }
   });
 });
