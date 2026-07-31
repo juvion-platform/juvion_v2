@@ -8,6 +8,7 @@ import {
 } from '../../../__tests__/helpers/mongoMemory';
 
 import { Invoice } from '../../../models/finance/Invoice';
+import { StudentFeeAccount } from '../../../models/finance/StudentFeeAccount';
 import { Payment } from '../../../models/finance/Payment';
 import { DefaulterRecord } from '../../../models/finance/DefaulterRecord';
 import { Student } from '../../../models/people/Student';
@@ -186,6 +187,11 @@ describe('fee-analytics-service', () => {
         },
       ]);
 
+      // 007 — AR is now net StudentFeeAccount.balance; owes 30000, paid 14000 → 16000.
+      await StudentFeeAccount.create({
+        collegeId, studentId: student._id, totalDue: 30000, totalPaid: 14000, balance: 16000,
+      });
+
       const from = new Date(now.getTime() - 90 * day);
       const to = now;
       const result = await svc.getDashboard(
@@ -230,6 +236,27 @@ describe('fee-analytics-service', () => {
       for (const m of result.dueVsCollectedByMonth) {
         expect(m.month).toMatch(/^\d{4}-\d{2}$/);
       }
+    });
+
+    it('007: totalOutstanding is the NET sum of StudentFeeAccount.balance (partial reflected)', async () => {
+      const collegeId = oid();
+      const programme = await seedProgramme(collegeId, 'NET');
+      const s1 = await seedStudent({ collegeId, programmeId: programme._id as mongoose.Types.ObjectId, rollNumber: 'N1', name: 'P1' });
+      const s2 = await seedStudent({ collegeId, programmeId: programme._id as mongoose.Types.ObjectId, rollNumber: 'N2', name: 'P2' });
+      await StudentFeeAccount.create([
+        { collegeId, studentId: s1._id, totalDue: 45000, totalPaid: 20000, balance: 25000 }, // partially paid
+        { collegeId, studentId: s2._id, totalDue: 45000, totalPaid: 45000, balance: 0 },      // fully paid
+      ]);
+      const now = new Date();
+      const r = await svc.getDashboard(
+        String(collegeId),
+        { from: new Date(now.getTime() - 30 * 86_400_000), to: now },
+        { role: 'admin', collegeId: String(collegeId) },
+      );
+      // Net, not gross: the partial payment is reflected (25000), not the full 45000 due.
+      expect(r.totalOutstanding).toBe(25000);
+      const net = r.dueByProgramme.find((p) => p.programmeName === 'NET');
+      expect(net?.due).toBe(25000);
     });
 
     it('HOD scope: HOD of CSE does not see ECE funnel counts', async () => {
@@ -486,6 +513,10 @@ describe('fee-analytics-service', () => {
         issuedDate: new Date(now.getTime() - 20 * 86_400_000),
         items: [],
       });
+
+      // 007 — give the orphan a net balance so the programme-join filter is genuinely
+      // exercised (its balance feeds totalOutstanding but must NOT reach dueByProgramme).
+      await StudentFeeAccount.create({ collegeId, studentId: orphan._id, totalDue: 5000, balance: 5000 });
 
       const r = await svc.getDashboard(
         String(collegeId),
@@ -812,6 +843,13 @@ describe('fee-analytics-service', () => {
         createdAt: new Date(now.getTime() - (i % 45 + 1) * day),
       }));
       await Payment.insertMany(payments);
+
+      // 007 — AR reads StudentFeeAccount.balance; give every student a net balance so
+      // totalOutstanding > 0 (first 500 paid 2000 of 10000, rest owe the full 10000).
+      await StudentFeeAccount.insertMany(students.map((s, i) => ({
+        collegeId, studentId: s._id, totalDue: 10000,
+        totalPaid: i < 500 ? 2000 : 0, balance: i < 500 ? 8000 : 10000,
+      })));
 
       const defaulters = students.slice(0, 300).map((s, i) => ({
         collegeId,
