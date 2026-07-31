@@ -117,6 +117,26 @@ export const updateInvoice = (id: string, data: any) =>
 export const deleteInvoice = (id: string) =>
   api.delete(`${BASE}/invoices/${id}`).then(r => r.data);
 
+// 007 — pin-driven semester-installment billing. Omit studentIds to bill every active
+// pinned student; dryRun previews the outcome counts without writing.
+export interface GenerateFeeBillsResult {
+  dryRun: boolean;
+  generated: number;
+  alreadyBilled: number;
+  noPin: number;
+  pinnedToDifferentAy: number;
+  noAmount: number;
+  unsupportedSemesterNumber: number;
+  errors: Array<{ studentId: string; error: string }>;
+}
+export const generateFeeBills = (body: {
+  semesterId: string;
+  studentIds?: string[];
+  yearOfStudy?: number;
+  dryRun?: boolean;
+}): Promise<GenerateFeeBillsResult> =>
+  api.post(`${BASE}/invoices/generate-from-pins`, body).then(r => r.data);
+
 // ─── Budget ───────────────────────────────────────────────
 export const listBudgets = (page = 1, limit = 20, academicYearId?: string, search?: string) =>
   api.get(`${BASE}/budgets`, { params: { page, limit, academicYearId, ...(search ? { search } : {}) } }).then(r => r.data);
