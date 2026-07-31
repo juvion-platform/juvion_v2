@@ -46,5 +46,21 @@ const schema = new Schema<IInvoice>({
 schema.index({ collegeId: 1, invoiceNumber: 1 }, { unique: true });
 // Cron primary scan query — plan §2.4
 schema.index({ collegeId: 1, status: 1, dueDate: 1 });
+// 007 — one tuition-installment invoice per (student, semester). Keyed on the
+// POSITIVE discriminator `isSemesterInstallment:true`, NOT `type:'fee'` (exam-fee
+// invoices share type:'fee'+semesterId — see IInvoice.isSemesterInstallment / G2-C1).
+// The $type:'objectId' guards on both ids keep any flag-set row lacking them out of
+// the index, so it can never collapse to {collegeId,null,null} (the rollNumber trap).
+schema.index(
+  { collegeId: 1, studentId: 1, semesterId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      isSemesterInstallment: true,
+      studentId: { $type: 'objectId' },
+      semesterId: { $type: 'objectId' },
+    },
+  },
+);
 
 export const Invoice = model<IInvoice>('Invoice', schema);
