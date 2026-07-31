@@ -110,16 +110,19 @@ async function ensureFeeStructure(
     const items = ((await res.json()) as { items?: Array<{ status: string }> }).items ?? [];
     if (items.some((i) => i.status === 'active')) return;
   }
+  // The create endpoint only mints a DRAFT — `status` is owned by the
+  // approval lifecycle, not the request body (Zod strips it). Walk it to
+  // active so the matcher will actually pin against it.
   const created = await api.post('/api/finance/fee-structure-instances', {
     headers,
-    data: {
-      programmeId,
-      academicYearId,
-      totalAmount: FEE_TOTAL,
-      status: 'active',
-    },
+    data: { programmeId, academicYearId, totalAmount: FEE_TOTAL },
   });
   expect(created.ok(), `create fee structure: ${await created.text()}`).toBeTruthy();
+  const fsiId = ((await created.json()) as { _id: string })._id;
+  for (const step of ['submit', 'approve', 'activate'] as const) {
+    const r = await api.post(`/api/finance/fee-structure-instances/${fsiId}/${step}`, { headers });
+    expect(r.ok(), `${step} fee structure: ${await r.text()}`).toBeTruthy();
+  }
 }
 
 const HEADER = 'name*,phone*,programmeCode*,admissionYear*,rollNumber';
