@@ -11,7 +11,7 @@ import { ScholarshipAllocation } from '../../models/finance/ScholarshipAllocatio
 import { Concession } from '../../models/finance/Concession';
 import { Refund } from '../../models/finance/Refund';
 import { FinePenalty } from '../../models/finance/FinePenalty';
-import { Invoice } from '../../models/finance/Invoice';
+import { Invoice, IInvoice } from '../../models/finance/Invoice';
 import { Budget } from '../../models/finance/Budget';
 import { Expense } from '../../models/finance/Expense';
 import { FinancialLedger } from '../../models/finance/FinancialLedger';
@@ -273,13 +273,48 @@ export async function createPayment(collegeId: string, data: any, who: string) {
     ? data.receiptNumber.trim()
     : await generateReceiptNumber(collegeId, paymentDate);
 
+  // 007 — when the payment targets an invoice, apply it against that invoice and the
+  // student's balance so recording a payment reduces Accounts Receivable live.
+  let targetInvoice: IInvoice | null = null;
+  if (data.invoiceId) {
+    targetInvoice = await Invoice.findOne({ _id: data.invoiceId, collegeId, studentId: data.studentId });
+    if (!targetInvoice) throw new AppError(400, 'Invoice not found for this student');
+    // Overpayment guard, BEFORE writing the Payment. Sum prior successful payments.
+    const [agg] = await Payment.aggregate([
+      { $match: { collegeId: new mongoose.Types.ObjectId(collegeId), invoiceId: targetInvoice._id, status: 'success' } },
+      { $group: { _id: null, paid: { $sum: '$amount' } } },
+    ]);
+    const paidSoFar: number = agg?.paid ?? 0;
+    const net = targetInvoice.netPayable ?? targetInvoice.totalAmount;
+    if (data.amount > net - paidSoFar) {
+      throw new AppError(400, "Payment exceeds the invoice's remaining balance");
+    }
+  }
+
   const doc = await Payment.create({
     ...data,
     collegeId,
     receiptNumber,
     paymentDate,
   });
-  // Update allocated line items
+
+  // 007 — apply to the invoice + student account (status is always 'success' now).
+  if (targetInvoice && doc.status === 'success') {
+    const paidNow = await Payment.aggregate([
+      { $match: { collegeId: new mongoose.Types.ObjectId(collegeId), invoiceId: targetInvoice._id, status: 'success' } },
+      { $group: { _id: null, paid: { $sum: '$amount' } } },
+    ]).then(([r]) => (r?.paid ?? 0) as number);
+    const net = targetInvoice.netPayable ?? targetInvoice.totalAmount;
+    targetInvoice.status = paidNow >= net ? 'paid' : 'partially_paid';
+    await targetInvoice.save();
+    await StudentFeeAccount.findOneAndUpdate(
+      { collegeId, studentId: data.studentId },
+      { $inc: { totalPaid: doc.amount, balance: -doc.amount }, $set: { lastPaymentDate: paymentDate } },
+      { upsert: true },
+    );
+  }
+
+  // Update allocated line items (legacy FeeLineItem path — unused by 007, kept for compat)
   if (data.allocations?.length) {
     for (const alloc of data.allocations) {
       await FeeLineItem.findByIdAndUpdate(alloc.lineItemId, {
