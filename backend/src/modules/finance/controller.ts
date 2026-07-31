@@ -1200,6 +1200,23 @@ export async function triggerReminderSequence(req: AuthRequest, res: Response, n
   } catch (e) { next(e); }
 }
 
+// ═══ 007 Fee Billing — semester-installment generation from pins ═══
+
+import * as feeBillingService from './fee-billing-service';
+
+/**
+ * POST /invoices/generate-from-pins — bill pinned students for a semester.
+ * `finance:create` gated (see routes). Body validated by generateFeeBillsSchema:
+ * { semesterId, studentIds?, yearOfStudy?, dryRun? }. Returns the per-outcome roll-up.
+ */
+export async function generateFeeBillsCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    res.status(201).json(
+      await feeBillingService.generateSemesterInstallmentsForPinned(req.collegeId!, req.body, who(req)),
+    );
+  } catch (e) { next(e); }
+}
+
 // ═══ W03 Fee Lifecycle & Revenue Assurance ══════════════════
 
 import * as feeLifecycleService from './fee-lifecycle-service';

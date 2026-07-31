@@ -342,6 +342,15 @@ export const generateSemesterInvoiceBatchSchema = z.object({
   academicYearId: z.string().min(1),
 });
 
+// 007 — pin-driven semester-installment billing. `studentIds` omitted = bill every
+// active pinned student; `yearOfStudy` narrows; `dryRun` previews without writing.
+export const generateFeeBillsSchema = z.object({
+  semesterId: z.string().min(1),
+  studentIds: z.array(z.string().min(1)).optional(),
+  yearOfStudy: z.number().int().min(1).max(8).optional(),
+  dryRun: z.boolean().optional(),
+});
+
 export const generateEnrolmentInvoiceSchema = z.object({
   studentId: z.string().min(1),
   feeStructureInstanceId: z.string().min(1),
