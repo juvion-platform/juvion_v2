@@ -37,7 +37,7 @@ describe('<GenerateBillsPage />', () => {
   it('previews (dry-run) then generates on confirm', async () => {
     renderWithProviders(<GenerateBillsPage />);
     await screen.findByRole('option', { name: /Semester 1/ });
-    fireEvent.change(screen.getAllByRole('combobox')[0], { target: { value: 'sem1' } });
+    fireEvent.change(screen.getAllByRole('combobox')[0]!, { target: { value: 'sem1' } });
     fireEvent.click(screen.getByRole('button', { name: /Preview & Generate/i }));
 
     await waitFor(() => expect(generateFeeBills as Mock).toHaveBeenCalledWith({ semesterId: 'sem1', dryRun: true }));
@@ -48,7 +48,7 @@ describe('<GenerateBillsPage />', () => {
     confirmMock.confirmed = false;
     renderWithProviders(<GenerateBillsPage />);
     await screen.findByRole('option', { name: /Semester 1/ });
-    fireEvent.change(screen.getAllByRole('combobox')[0], { target: { value: 'sem1' } });
+    fireEvent.change(screen.getAllByRole('combobox')[0]!, { target: { value: 'sem1' } });
     fireEvent.click(screen.getByRole('button', { name: /Preview & Generate/i }));
 
     await waitFor(() => expect(generateFeeBills as Mock).toHaveBeenCalledWith({ semesterId: 'sem1', dryRun: true }));

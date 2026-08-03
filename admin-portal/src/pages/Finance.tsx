@@ -35,7 +35,7 @@ function FinanceHome() {
           </div>
           <div className="bg-gradient-to-br from-red-50 to-rose-50 border border-red-200 rounded-xl p-4">
             <span className="text-xs font-medium text-red-600 uppercase">Overdue Items</span>
-            <div className="text-2xl font-bold text-red-700 mt-1">{stats.overdueLineItems || 0}</div>
+            <div className="text-2xl font-bold text-red-700 mt-1">{stats.overdueInvoices || 0}</div>
           </div>
           <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
             <span className="text-xs font-medium text-blue-600 uppercase">Total Payments</span>

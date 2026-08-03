@@ -73,7 +73,7 @@ export async function getStats(collegeId: string) {
   const [
     feeStructures, studentFeeAccounts, feeLineItems, payments,
     scholarships, concessions, refunds, budgets, expenses, invoices,
-    fines, pendingLineItems, overdueLineItems,
+    fines, pendingLineItems, overdueLineItems, overdueInvoices,
   ] = await Promise.all([
     FeeStructure.countDocuments({ collegeId }),
     StudentFeeAccount.countDocuments({ collegeId }),
@@ -88,6 +88,13 @@ export async function getStats(collegeId: string) {
     FinePenalty.countDocuments({ collegeId }),
     FeeLineItem.countDocuments({ collegeId, status: 'pending' }),
     FeeLineItem.countDocuments({ collegeId, status: 'overdue' }),
+    // Overdue on the pin→invoice billing path: issued, past due, not settled.
+    // `draft` is excluded because nothing was ever presented to the payer.
+    Invoice.countDocuments({
+      collegeId,
+      dueDate: { $lt: new Date() },
+      status: { $nin: ['paid', 'cancelled', 'written_off', 'draft'] },
+    }),
   ]);
 
   // Aggregate totals.
@@ -101,15 +108,22 @@ export async function getStats(collegeId: string) {
     { $match: { collegeId: cidObj, status: 'success' } },
     { $group: { _id: null, total: { $sum: '$amount' } } },
   ]);
-  const [pendingAgg] = await FeeLineItem.aggregate([
-    { $match: { collegeId: cidObj, status: { $in: ['pending', 'partial', 'overdue'] } } },
-    { $group: { _id: null, total: { $sum: { $subtract: ['$amount', '$paidAmount'] } } } },
+  // NET Accounts Receivable = Σ StudentFeeAccount.balance — the same source the
+  // analytics dashboard uses (fee-analytics-service.ts:253). This previously summed
+  // FeeLineItem, a collection the pin→invoice billing path never writes, so the hub
+  // reported a frozen number that contradicted the dashboard. Reading the maintained
+  // balance is also what makes a PARTIAL payment move the figure.
+  const [pendingAgg] = await StudentFeeAccount.aggregate([
+    { $match: { collegeId: cidObj } },
+    { $group: { _id: null, total: { $sum: '$balance' } } },
   ]);
 
   return {
     feeStructures, studentFeeAccounts, feeLineItems, payments,
     scholarships, concessions, refunds, budgets, expenses, invoices, fines,
-    pendingLineItems, overdueLineItems,
+    // `pendingLineItems`/`overdueLineItems` still describe the manual FeeLineItem
+    // ledger, which has its own page. `overdueInvoices` is the billing-path figure.
+    pendingLineItems, overdueLineItems, overdueInvoices,
     totalCollected: collectionAgg?.total || 0,
     totalPending: pendingAgg?.total || 0,
   };
@@ -188,8 +202,9 @@ export async function deleteFeeStructure(collegeId: string, id: string, who: str
 
 // ═══ Student Fee Account ══════════════════════════════════
 
-export async function listStudentFeeAccounts(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+export async function listStudentFeeAccounts(collegeId: string, page = 1, limit = 20, studentId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
+  if (studentId) filter.studentId = studentId;
   if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
   return paginate(StudentFeeAccount, filter, page, limit, { createdAt: -1 }, [STUDENT_POPULATE] as any);
 }

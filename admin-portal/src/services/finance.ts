@@ -18,8 +18,8 @@ export const deleteFeeStructure = (id: string) =>
   api.delete(`${BASE}/fee-structures/${id}`).then(r => r.data);
 
 // ─── Student Fee Accounts ─────────────────────────────────
-export const listStudentFeeAccounts = (page = 1, limit = 20, search?: string) =>
-  api.get(`${BASE}/student-fee-accounts`, { params: { page, limit, ...(search ? { search } : {}) } }).then(r => r.data);
+export const listStudentFeeAccounts = (page = 1, limit = 20, search?: string, studentId?: string) =>
+  api.get(`${BASE}/student-fee-accounts`, { params: { page, limit, ...(search ? { search } : {}), ...(studentId ? { studentId } : {}) } }).then(r => r.data);
 export const getStudentFeeAccount = (id: string) =>
   api.get(`${BASE}/student-fee-accounts/${id}`).then(r => r.data);
 export const createStudentFeeAccount = (data: any) =>

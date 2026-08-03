@@ -33,7 +33,7 @@ export async function deleteFeeStructure(req: AuthRequest, res: Response, next: 
 // ═══ Student Fee Account ══════════════════════════════════
 
 export async function listStudentFeeAccounts(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listStudentFeeAccounts(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
+  try { res.json(await service.listStudentFeeAccounts(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.query.studentId as string | undefined, req.authScope)); } catch (err) { next(err); }
 }
 export async function getStudentFeeAccount(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getStudentFeeAccount(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
