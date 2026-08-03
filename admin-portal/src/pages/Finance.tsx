@@ -107,7 +107,7 @@ function FinanceHome() {
           const hasStat = Boolean(card.statKey);
           const count = hasStat && stats ? ((stats as any)[card.statKey!] ?? 0) : null;
           return (
-            <button key={card.to} onClick={() => navigate(card.to)} className={`bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all ${card.border}`}>
+            <button key={card.to} onClick={() => navigate(`/finance/${card.to}`)} className={`bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all ${card.border}`}>
               <div className={`inline-flex p-2.5 rounded-lg mb-3 ${card.iconBg}`}><Icon size={22} /></div>
               {hasStat && (count === null
                 ? <div className="h-7 w-12 mb-1 animate-pulse rounded bg-slate-100" aria-hidden="true" />
@@ -132,7 +132,7 @@ function FinanceHome() {
           const hasStat = Boolean(card.statKey);
           const count = hasStat && stats ? ((stats as any)[card.statKey!] ?? 0) : null;
           return (
-            <button key={card.to} onClick={() => navigate(card.to)} className={`bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all ${card.border}`}>
+            <button key={card.to} onClick={() => navigate(`/finance/${card.to}`)} className={`bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all ${card.border}`}>
               <div className={`inline-flex p-2.5 rounded-lg mb-3 ${card.iconBg}`}><Icon size={22} /></div>
               {hasStat && (count === null
                 ? <div className="h-7 w-12 mb-1 animate-pulse rounded bg-slate-100" aria-hidden="true" />
@@ -156,7 +156,7 @@ function FinanceHome() {
           const hasStat = Boolean(card.statKey);
           const count = hasStat && stats ? ((stats as any)[card.statKey!] ?? 0) : null;
           return (
-            <button key={card.to} onClick={() => navigate(card.to)} className={`bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all ${card.border}`}>
+            <button key={card.to} onClick={() => navigate(`/finance/${card.to}`)} className={`bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all ${card.border}`}>
               <div className={`inline-flex p-2.5 rounded-lg mb-3 ${card.iconBg}`}><Icon size={22} /></div>
               {hasStat && (count === null
                 ? <div className="h-7 w-12 mb-1 animate-pulse rounded bg-slate-100" aria-hidden="true" />
