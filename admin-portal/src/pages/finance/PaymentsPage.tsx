@@ -25,7 +25,8 @@ const lbl = "block text-sm font-medium text-gray-700 mb-1";
 const manageLink = "inline-flex items-center gap-0.5 text-xs text-primary-500 hover:text-primary-700 font-medium ml-1";
 
 // 007 — no `status` field: counter/manual capture is always 'success' (the API strips it).
-const emptyForm = { studentId: '', receiptNumber: '', amount: '', paymentMode: 'cash', transactionRef: '', paymentDate: '', invoiceId: '', remarks: '' };
+// paymentDate defaults to today (en-CA => YYYY-MM-DD in local time, not UTC); operator can still change it.
+const newForm = () => ({ studentId: '', receiptNumber: '', amount: '', paymentMode: 'cash', transactionRef: '', paymentDate: new Date().toLocaleDateString('en-CA'), invoiceId: '', remarks: '' });
 
 export default function PaymentsPage() {
   const qc = useQueryClient();
@@ -33,7 +34,7 @@ export default function PaymentsPage() {
   const { page, setPage, limit, setLimit, search, setSearch } = useListControls();
   const [studentFilter, setStudentFilter] = useState(searchParams.get('studentId') || '');
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState(newForm);
 
   const vem = useViewEditMode<any>({
     onOpenEntity: (row) => setForm({
@@ -46,8 +47,8 @@ export default function PaymentsPage() {
       invoiceId: row.invoiceId || '',
       remarks: row.remarks || '',
     }),
-    onOpenCreate: () => setForm(emptyForm),
-    onClose: () => setForm(emptyForm),
+    onOpenCreate: () => setForm(newForm()),
+    onClose: () => setForm(newForm()),
   });
 
   const { data, isLoading } = useQuery({

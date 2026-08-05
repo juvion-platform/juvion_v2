@@ -1,0 +1,6 @@
+name,phone,email,gender,dob,aadhaar,addressLine1,addressLine2,city,state,pincode,programmeCode,branchCode,batchCode,regulationCode,admissionYear,studyYearAtAdmission,rollNumber,quota,category,status,primaryParentPhone,primaryParentName,feeResponsibleParentPhone
+Aditya Nair,9900000001,aditya.nair@demo.edu,male,2007-04-12,500000000101,14 Road No 5,Jubilee Hills,Hyderabad,Telangana,500033,BTECH,CSE,,R22,2025,1,25B01A0511,convener,OC,active,9900001001,Suresh Nair,9900001001
+Kavya Menon,9900000002,kavya.menon@demo.edu,female,2007-08-03,500000000102,88 Banjara Hills,,Hyderabad,Telangana,500034,BTECH,CSE,,R22,2025,1,25B01A0512,convener,SC,active,9900001002,Lalitha Menon,9900001002
+Rohit Verma,9900000003,rohit.verma@demo.edu,male,2007-01-25,500000000103,21 Kukatpally,Phase 2,Hyderabad,Telangana,500072,BTECH,CSE,,R22,2025,1,25B01A0513,convener,BC-A,active,9900001003,Manoj Verma,9900001003
+Ananya Iyer,9900000004,ananya.iyer@demo.edu,female,2007-11-17,500000000104,7 Gachibowli,,Hyderabad,Telangana,500032,BTECH,CSE,,R22,2025,1,25B01A0514,convener,OC,active,9900001004,Shankar Iyer,9900001004
+Siddharth Rao,9900000005,siddharth.rao@demo.edu,male,2007-06-09,500000000105,45 Madhapur,Near Hitec City,Hyderabad,Telangana,500081,BTECH,CSE,,R22,2025,1,25B01A0515,convener,OC,active,9900001005,Prakash Rao,9900001005
