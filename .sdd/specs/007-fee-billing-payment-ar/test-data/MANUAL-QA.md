@@ -144,20 +144,51 @@ Spot-check one: **People → Students → Aditya Nair** → fee pin shows Year 1
 
 - Semester: **Semester 1 — 2024** (this is the AY2024-25 one — see fact #1)
 - Year of study: **Year 1**
-- Click **Preview & Generate**
+- Click **Preview**
 
-The confirm dialog reports the projected counts; confirm.
+**✅ Expected — the table, not a dialog:** five rows, each naming a student —
+`Aditya Nair · 25B01A0511 · BTECH / CSE · 1 · ₹60,000 · Billable`. All five
+ticked. Sticky footer reads **`5 of 5 selected · ₹3,00,000`** (half the
+₹1,20,000 annual, each).
 
-**✅ Expected:** `Generated 5`. The "Last run" card shows Generated 5, everything
-else 0.
+Now click **Generate bills** and confirm.
 
-Total billed this run = 5 × ₹60,000 = **₹3,00,000** (half the ₹1,20,000 annual).
-
-> The screen shows counts only, never names or amounts — that is the gap written
-> up in `../generate-bills-ux-suggestions.md`.
+**✅ Expected:** the same rows come back badged **Generated**, and the toast
+reads `Generated 5 bills · ₹3,00,000`.
 
 **Cross-check — Finance → Fee Management → Invoices:** five new invoices, each
 `₹60,000`, status `generated`, `INV-…` numbers.
+
+### Step 4b — the console's own behaviour
+
+Worth ten minutes; none of it is covered by the automated suite.
+
+| Do this | Expect |
+|---|---|
+| Preview, untick two rows | Footer drops to `3 of 5 selected · ₹1,80,000` |
+| Generate with three ticked | Exactly 3 invoices. The two unticked students stay unbilled — check Invoices |
+| Change any filter after previewing | Table and selection clear. It must NOT keep showing the old cohort |
+| Untick everything | **Generate is disabled.** (Left enabled, an empty list used to mean *bill the whole college*) |
+| Set **Due date** to `2026-09-15` before generating | The new invoices carry that due date, not today + 30 |
+| Leave Due date blank | Due date lands on today + 30 days |
+| Set Programme = BTECH, Branch = ECE | Only ECE students appear |
+| Type a name in the search box | Table narrows; the footer total does **not** change (search filters the view, not the selection) |
+| Preview once cohort B exists but is unpinned | Those students appear as greyed **No pin** rows with a `Fix →` link, not as a bare count |
+
+### Step 4c — billing history
+
+Scroll below the console to **Previously generated**.
+
+**✅ Expected:** one row per semester billed — `Semester 1 — 2024 · 5 of 5 ·
+Complete · ₹3,00,000`. After cohort B is imported but before it is billed the
+same row should read **`5 of 10 · 5 left`** — that is the coverage figure doing
+its job.
+
+Click **View invoices →**.
+
+**✅ Expected:** the Invoices page, filtered to that semester, showing a chip
+that says so plus a **Show all invoices** link. Without the chip a filtered list
+is indistinguishable from the full one.
 
 ---
 
@@ -203,9 +234,11 @@ Repeat **Steps 2 → 6** with `cohort-b-ece-management.csv`, unchanged except:
 - Step 2 preview should read **`will pin Year 1 → ₹2,40,000`** (FSI-B, the
   management structure — *if it says ₹1,20,000 the matcher picked the wrong
   structure, which is a bug worth reporting*).
-- Step 4: keep **Semester 1 — 2024**. Expect **`Generated 5`** *and*
-  **`Already billed 5`** — cohort A is correctly skipped. That is the
-  idempotency guard, and re-running is meant to be safe.
+- Step 4: keep **Semester 1 — 2024**. The preview should now show **ten rows**:
+  cohort B billable at ₹1,20,000 each, cohort A greyed as **Already billed**
+  with disabled checkboxes. Footer reads `5 of 10 selected · ₹6,00,000`. That
+  is the idempotency guard, and re-running is meant to be safe — but now you
+  can see *which* five are being skipped instead of reading the number 5.
 - Step 6: outstanding rises by 5 × ₹1,20,000 = **₹6,00,000**.
 
 ---
@@ -227,6 +260,7 @@ Two invoices per student now sum to exactly the annual fee: 60000 + 60000 =
 | What you'll see | Why |
 |---|---|
 | Import rejects every row with `unknown quota code` | `src/seed.ts` never calls the quota/category seeders — see Step 0 |
-| Generate Bills shows counts, no student names or ₹ | Known gap, written up in `../generate-bills-ux-suggestions.md` |
+| Preview is gated `finance:create`, so a principal cannot even look | Deliberately deferred — splitting it into a `GET` means touching a money path guarded by 14 tests to open a gate that blocks nobody today. See `../plan-generate-bills-console.md` §10 |
+| Preview on a large cohort takes a few seconds | ~7 queries per student, unchanged by the console (enrichment adds 4 queries total, not per row). Deferred until measured — §11 of the same doc |
 | Payments student dropdown lists all students in one `<select>` | Pre-existing pattern across finance pages; needs a searchable picker at 500+ students |
 | Approved-but-not-Activated structure silently fails to pin | Pins require `status: 'active'`; the UI does not warn |
