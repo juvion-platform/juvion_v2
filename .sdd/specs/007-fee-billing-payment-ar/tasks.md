@@ -1,10 +1,20 @@
 # Tasks — 007-fee-billing-payment-ar
 
 ## STATUS (branch `feat/fee-billing-payment-ar`)
-T1–T13 ✅ DONE — committed, each test-first + typecheck-clean. Full finance suite green (288).
-T14 (manual UI QA + optional e2e) ⏳ pending — the flow to walk: bulk-import a student →
-auto-pin → Generate Bills (finance:create as admin) → record a partial payment against the
-invoice → dashboard "Collected" rises + "Outstanding (AR)" falls.
+T1–T13 ✅ DONE — committed, each test-first + typecheck-clean.
+**Generate Bills console (C1–C3) ✅ DONE** — a follow-on plan written after T13, not part of
+the original T1–T14 sequence. See `plan-generate-bills-console.md`; rationale in
+`generate-bills-ux-suggestions.md`.
+Full finance suite green (**317** backend, 154 portal).
+
+T14 (manual UI QA + optional e2e) ⏳ **still pending — nothing below has been walked in a
+browser.** The script is `test-data/MANUAL-QA.md` (two cohorts differing on branch AND quota,
+so a pass proves the fee-pin axis matcher is selecting rather than returning the only
+structure present). The chain: bulk-import → auto-pin → Generate Bills (finance:create as
+admin) → partial payment against the invoice → dashboard "Collected" rises + "Outstanding
+(AR)" falls. Doc steps 4b/4c cover the console and history surfaces, which have no
+automated coverage at all.
+
 **Deploy scripts to run on existing DBs:** `fix-invoice-semester-installment-index.ts` (T2)
 and `verify-fee-balance-invariant.ts` (T10, check). Leave FINANCE_ENFORCE_FEE_GUARDIAN unset.
 
@@ -100,6 +110,51 @@ Branch: `feat/fee-billing-payment-ar`. Test runner: `vitest run` (backend), scop
 ## T14 — Manual QA + optional e2e
 - Full flow: import → pin → generate bills → record payment → AR drops. Optional single e2e happy-path.
 - Commit (if e2e added): `test(e2e): billing→payment→AR happy path (007 T14)`
+
+---
+
+# Generate Bills console — C1–C3 ✅ DONE
+
+Not in the original plan. T13 shipped a screen that reported *how many* bills a run
+would raise and never *who*, so an operator could not verify, intervene in, or audit
+it. Scoped in `plan-generate-bills-console.md` after T13 landed; the nine problems it
+closes are itemised in `generate-bills-ux-suggestions.md`.
+
+Guiding constraint, held: **no refactoring of tested money code.** All 14 cases in
+`fee-billing-service-007.test.ts` pass unedited — that was the safety net, and needing
+to touch one would have meant the change went too far.
+
+## C1 — Backend: return the rows the loop already computes ✅
+**Files:** `fee-billing-service.ts`, `validation.ts`, new `__tests__/fee-billing-console-007.test.ts`
+- `BatchBillResult` gains `rows: BillRow[]` + `totalAmount`; enrichment is 4 queries total, not per student.
+- Counters become a **tally of `rows`**, not a parallel `+= 1` — the summary line and the table cannot drift.
+- Never-pinned students appear as `no-active-pin` rows via one complement query (step 3b); widening the candidate set would have walked every active student at ~7 queries each.
+- `programmeId` / `branchId` / `dueDate` on the input; `studentIds: []` rejected at validation (it used to fall through to billing the whole college).
+- Commit: `4e99291 feat(finance): return per-student rows from the bill batch (007 console 1/3)`
+
+## C2 — Frontend: the console ✅
+**Files:** `GenerateBillsPage.tsx` (rewrite), `services/finance.ts`, its `__tests__`, `vitest.config.ts`
+- One row per student, non-billable rows kept visible with the reason as the badge and a `Fix →` into Pin Coverage.
+- Per-row checkbox, sticky footer summing the **selected** rows client-side; Generate disabled on an empty selection.
+- Any filter change clears table + selection. Generate posts `studentIds` and nothing else — the backend re-applies `yearOfStudy` on top of an explicit list and would silently drop ticked rows.
+- Confirm dialog kept as the write guard, but the numbers now live in the table.
+- `vitest` moved to the `vmThreads` pool: on /mnt/c the default forks pool exceeds vitest's hardcoded 60s worker-start timeout and the suite dies before running.
+- Commit: `15ec4a0 feat(portal): the Generate Bills console (007 console 2/3)`
+
+## C3 — Billing history ✅
+**Files:** `fee-billing-service.ts`, `routes.ts`, `controller.ts`, `service.ts`, `GenerateBillsPage.tsx`, `InvoicesPage.tsx`
+- `GET /finance/invoices/billing-history` — one aggregation over existing invoices, so it works retroactively. No `BillingRun` model.
+- `pinnedStudents` alongside `invoiceCount` turns "12" into "12 of 15 · 3 left"; the population mirrors the writer's academic-year guard.
+- `cancelled` excluded, `written_off` / `disputed` counted. Deleted semester falls back to the raw id — billed money must not vanish because a lookup failed.
+- Registered **above** `/invoices/:id` (a source-order test pins it) and gated `finance:create`, matching its only caller.
+- `View invoices →` deep-links Invoices filtered by semester, with a chip, since a silently filtered list looks like the whole list.
+- Commit: `f451ceb feat(finance): billing history per semester (007 console 3/3)`
+
+**Deliberately not built:** `GET /bill-preview` split (opens a gate that blocks nobody
+today, at the cost of touching a money path guarded by 14 tests) · pure `decideBill()`
+extraction · the ~7-queries-per-student preview cost (unchanged by this work; revisit
+only if measured) · `BillingRun` model · CSV export · progress bars. Rationale per item
+in the suggestions doc.
 
 ---
 **Deploy checklist:** run `fix-invoice-semester-installment-index.ts` (T2) on existing DBs;
