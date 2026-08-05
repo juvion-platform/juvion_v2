@@ -38,11 +38,32 @@ describe('007 T5 — generateFeeBillsSchema', () => {
   it('rejects an out-of-range yearOfStudy', () => {
     expect(generateFeeBillsSchema.safeParse({ semesterId: 'sem1', yearOfStudy: 9 }).success).toBe(false);
   });
+
+  // An empty array previously passed validation, then failed the `length > 0`
+  // check in the service and fell through to billing EVERY pinned student in
+  // the college. The console disables Generate on an empty selection too, so
+  // the mass-bill path is closed at both ends.
+  it('rejects an empty studentIds array — never reads as "everyone"', () => {
+    expect(generateFeeBillsSchema.safeParse({ semesterId: 'sem1', studentIds: [] }).success).toBe(false);
+  });
+
+  it('accepts the axis filters and coerces dueDate to a Date', () => {
+    const parsed = generateFeeBillsSchema.safeParse({
+      semesterId: 'sem1', programmeId: 'prog1', branchId: 'br1', dueDate: '2026-09-15',
+    });
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && parsed.data.dueDate).toBeInstanceOf(Date);
+  });
+
+  // Colleges legitimately raise a bill whose deadline has already passed.
+  it('accepts a dueDate in the past', () => {
+    expect(generateFeeBillsSchema.safeParse({ semesterId: 'sem1', dueDate: '2020-01-01' }).success).toBe(true);
+  });
 });
 
 describe('007 T5 — generateFeeBillsCtrl', () => {
   it('forwards (collegeId, body, who) to the batch service and returns 201', async () => {
-    const result = { dryRun: false, generated: 3, alreadyBilled: 0, noPin: 1, pinnedToDifferentAy: 0, noAmount: 0, unsupportedSemesterNumber: 0, errors: [] };
+    const result = { dryRun: false, generated: 3, alreadyBilled: 0, noPin: 1, pinnedToDifferentAy: 0, noAmount: 0, unsupportedSemesterNumber: 0, errors: [], rows: [], totalAmount: 180000 };
     vi.mocked(feeBillingService.generateSemesterInstallmentsForPinned).mockResolvedValue(result);
 
     const json = vi.fn();

@@ -358,8 +358,22 @@ export const generateSemesterInvoiceBatchSchema = z.object({
 // active pinned student; `yearOfStudy` narrows; `dryRun` previews without writing.
 export const generateFeeBillsSchema = z.object({
   semesterId: z.string().min(1),
-  studentIds: z.array(z.string().min(1)).optional(),
+  /**
+   * `.min(1)` on the ARRAY is a correctness guard, not tidying: an empty array
+   * would pass validation, then fail the `length > 0` check in
+   * fee-billing-service and fall through to billing EVERY pinned student in the
+   * college. Untick everything, press Generate, mass-bill. Reject it here.
+   */
+  studentIds: z.array(z.string().min(1)).min(1).optional(),
   yearOfStudy: z.number().int().min(1).max(8).optional(),
+  programmeId: z.string().min(1).optional(),
+  branchId: z.string().min(1).optional(),
+  /**
+   * Announced deadline; omit for the standing +30 days. Deliberately NOT
+   * constrained to the future — a late-entered installment is genuinely overdue
+   * on arrival, which is a true statement rather than an input error.
+   */
+  dueDate: z.coerce.date().optional(),
   dryRun: z.boolean().optional(),
 });
 

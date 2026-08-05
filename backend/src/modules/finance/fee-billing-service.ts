@@ -24,6 +24,9 @@ import { Types } from 'mongoose';
 import crypto from 'crypto';
 
 import { Student } from '../../models/people/Student';
+import { Person } from '../../models/people/Person';
+import { Programme } from '../../models/academic-structure/Programme';
+import { Branch } from '../../models/academic-structure/Branch';
 import { Semester } from '../../models/academic-structure/Semester';
 import { FeeStructureInstance } from '../../models/finance/FeeStructureInstance';
 import { Invoice } from '../../models/finance/Invoice';
@@ -41,13 +44,42 @@ export const SEMESTER_INSTALLMENTS_PER_YEAR = 2;
 
 const DUE_DAYS = 30;
 
+/**
+ * `yearOfStudy` is carried by every variant reachable AFTER the pin year is
+ * resolved (`:117`), so the console can show a year on every row an operator can
+ * act on. It is absent only on `unsupported-semester-number`, which returns
+ * before resolution, and on an `error` raised by the batch's own catch.
+ */
 export type BillOutcome =
   | { kind: 'generated'; studentId: string; invoiceId: string; amount: number; yearAssumed: number; derivedFrom: 'calendar' | 'admission' }
-  | { kind: 'already-billed'; studentId: string; invoiceId: string }
-  | { kind: 'no-active-pin'; studentId: string }
-  | { kind: 'pinned-to-different-ay'; studentId: string }
-  | { kind: 'skipped'; studentId: string; reason: 'no-amount' | 'unsupported-semester-number' }
-  | { kind: 'error'; studentId: string; error: string };
+  | { kind: 'already-billed'; studentId: string; invoiceId: string; yearOfStudy: number }
+  | { kind: 'no-active-pin'; studentId: string; yearOfStudy: number }
+  | { kind: 'pinned-to-different-ay'; studentId: string; yearOfStudy: number }
+  | { kind: 'skipped'; studentId: string; reason: 'no-amount' | 'unsupported-semester-number'; yearOfStudy?: number }
+  | { kind: 'error'; studentId: string; error: string; yearOfStudy?: number };
+
+/** Flattened `BillOutcome['kind']`, splitting `skipped` into its two reasons. */
+export type BillRowOutcome =
+  | 'generated' | 'already-billed' | 'no-active-pin' | 'pinned-to-different-ay'
+  | 'no-amount' | 'unsupported-semester-number' | 'error';
+
+/**
+ * One student, as the billing console renders them. Deliberately the same
+ * vocabulary as the writer — no parallel naming to keep in sync.
+ */
+export interface BillRow {
+  studentId: string;
+  name: string;
+  rollNumber?: string;
+  programmeCode?: string;
+  branchCode?: string;
+  /** 0 when it could not be derived — rendered as an em dash, never guessed. */
+  yearOfStudy: number;
+  /** The installment this run would raise. 0 on every non-billable row. */
+  amount: number;
+  outcome: BillRowOutcome;
+  error?: string;
+}
 
 interface ScaledLine {
   feeComponentId?: Types.ObjectId;
@@ -98,7 +130,7 @@ export async function generateSemesterInstallmentForStudent(
   collegeId: string,
   data: { studentId: string; semesterId: string },
   performedBy: string,
-  opts: { dryRun?: boolean } = {},
+  opts: { dryRun?: boolean; dueDate?: Date } = {},
 ): Promise<BillOutcome> {
   const { studentId, semesterId } = data;
 
@@ -119,7 +151,7 @@ export async function generateSemesterInstallmentForStudent(
     student.studyYearAtAdmission,
   );
   const pin = await resolveActivePin(studentId, yearOfStudy);
-  if (!pin) return { kind: 'no-active-pin', studentId };
+  if (!pin) return { kind: 'no-active-pin', studentId, yearOfStudy };
 
   // ── (b) guard: the pin's FSI must belong to the semester's academic year.
   const fsi = await FeeStructureInstance.findOne({
@@ -127,10 +159,10 @@ export async function generateSemesterInstallmentForStudent(
     collegeId,
   }).lean();
   if (!fsi) {
-    return { kind: 'error', studentId, error: `Pin references missing FeeStructureInstance ${String(pin.feeStructureInstanceId)}` };
+    return { kind: 'error', studentId, yearOfStudy, error: `Pin references missing FeeStructureInstance ${String(pin.feeStructureInstanceId)}` };
   }
   if (String(fsi.academicYearId) !== semesterAcademicYearId) {
-    return { kind: 'pinned-to-different-ay', studentId };
+    return { kind: 'pinned-to-different-ay', studentId, yearOfStudy };
   }
 
   // ── Idempotency — keyed on the discriminator, NOT type:'fee' (G2-C1).
@@ -140,11 +172,11 @@ export async function generateSemesterInstallmentForStudent(
     semesterId,
     isSemesterInstallment: true,
   }).select('_id').lean();
-  if (existing) return { kind: 'already-billed', studentId, invoiceId: String(existing._id) };
+  if (existing) return { kind: 'already-billed', studentId, invoiceId: String(existing._id), yearOfStudy };
 
   // ── Amount — frozen snapshot preferred; FSI total as fallback; never bill 0.
   const annual = pin.snapshotTotalAmount ?? fsi.totalAmount ?? 0;
-  if (!annual || annual <= 0) return { kind: 'skipped', studentId, reason: 'no-amount' };
+  if (!annual || annual <= 0) return { kind: 'skipped', studentId, reason: 'no-amount', yearOfStudy };
 
   const first = Math.floor(annual / SEMESTER_INSTALLMENTS_PER_YEAR);
   const installment = semester.number === 1 ? first : annual - first;
@@ -169,7 +201,10 @@ export async function generateSemesterInstallmentForStudent(
     items: lines.map((l) => ({ description: l.description, amount: l.netAmount })),
     totalAmount: installment,
     netPayable: installment,
-    dueDate: new Date(Date.now() + DUE_DAYS * 24 * 60 * 60 * 1000),
+    // Operator-supplied deadline when the college has announced one; otherwise
+    // the standing +30 days. A past date is legal — a late-entered installment
+    // is genuinely overdue on arrival.
+    dueDate: opts.dueDate ?? new Date(Date.now() + DUE_DAYS * 24 * 60 * 60 * 1000),
     status: 'generated',
     semesterId,
   });
@@ -223,6 +258,11 @@ export interface BatchBillInput {
   studentIds?: string[];
   /** Optional narrowing: only bill students whose resolved year equals this. */
   yearOfStudy?: number;
+  /** Fee axes — narrow the cohort without naming every student. */
+  programmeId?: string;
+  branchId?: string;
+  /** Announced deadline. Omit for the standing +30 days. */
+  dueDate?: Date;
   dryRun?: boolean;
 }
 
@@ -235,6 +275,69 @@ export interface BatchBillResult {
   noAmount: number;
   unsupportedSemesterNumber: number;
   errors: Array<{ studentId: string; error: string }>;
+  /** One entry per student considered — the console renders these directly. */
+  rows: BillRow[];
+  /**
+   * Σ amount over `generated` rows. The console does NOT render this: its
+   * footer sums the SELECTED rows client-side, and this figure is only correct
+   * while everything is still ticked. Kept for API consumers and the post-run
+   * summary.
+   */
+  totalAmount: number;
+}
+
+/**
+ * Attach names and axis codes to rows in bulk — four queries for the whole
+ * batch, never one per student. Same shape as `getCoverage`
+ * (`fee-pin-audit-service.ts:163-175`).
+ */
+async function enrichRows(collegeId: string, rows: BillRow[]): Promise<void> {
+  if (rows.length === 0) return;
+
+  const students = await Student.find({
+    collegeId,
+    _id: { $in: rows.map((r) => r.studentId) },
+  }).select({ _id: 1, personId: 1, rollNumber: 1, programmeId: 1, branchId: 1 }).lean();
+
+  const [persons, programmes, branches] = await Promise.all([
+    Person.find({
+      collegeId,
+      _id: { $in: students.map((s) => s.personId).filter(Boolean) },
+    }).select({ _id: 1, name: 1 }).lean(),
+    Programme.find({ collegeId }).select({ _id: 1, code: 1 }).lean(),
+    Branch.find({ collegeId }).select({ _id: 1, code: 1 }).lean(),
+  ]);
+
+  const nameById = new Map(persons.map((p) => [String(p._id), p.name]));
+  const codeOf = (list: Array<{ _id: unknown; code?: string }>, id: unknown) =>
+    (id ? list.find((x) => String(x._id) === String(id))?.code : undefined);
+  const byId = new Map(students.map((s) => [String(s._id), s]));
+
+  for (const row of rows) {
+    const s = byId.get(row.studentId);
+    if (!s) continue;
+    // A student with no linked Person keeps name '' — the console falls back
+    // to the roll number rather than inventing a placeholder.
+    row.name = nameById.get(String(s.personId)) ?? '';
+    if (s.rollNumber) row.rollNumber = s.rollNumber;
+    row.programmeCode = codeOf(programmes, s.programmeId);
+    row.branchCode = codeOf(branches, s.branchId);
+  }
+}
+
+/** Flatten one outcome into the row the console renders. */
+function rowFromOutcome(o: BillOutcome): BillRow {
+  const base = { studentId: o.studentId, name: '', yearOfStudy: 0, amount: 0 };
+  switch (o.kind) {
+    case 'generated':
+      return { ...base, yearOfStudy: o.yearAssumed, amount: o.amount, outcome: 'generated' };
+    case 'skipped':
+      return { ...base, yearOfStudy: o.yearOfStudy ?? 0, outcome: o.reason };
+    case 'error':
+      return { ...base, yearOfStudy: o.yearOfStudy ?? 0, outcome: 'error', error: o.error };
+    default:
+      return { ...base, yearOfStudy: o.yearOfStudy, outcome: o.kind };
+  }
 }
 
 /**
@@ -250,51 +353,99 @@ export async function generateSemesterInstallmentsForPinned(
   input: BatchBillInput,
   performedBy: string,
 ): Promise<BatchBillResult> {
-  const result: BatchBillResult = {
-    dryRun: Boolean(input.dryRun),
-    generated: 0, alreadyBilled: 0, noPin: 0,
-    pinnedToDifferentAy: 0, noAmount: 0, unsupportedSemesterNumber: 0,
-    errors: [],
+  const rows: BillRow[] = [];
+  const errors: Array<{ studentId: string; error: string }> = [];
+
+  const explicit = Boolean(input.studentIds && input.studentIds.length > 0);
+  const axisFilter = {
+    ...(input.programmeId ? { programmeId: input.programmeId } : {}),
+    ...(input.branchId ? { branchId: input.branchId } : {}),
   };
 
   let candidates: string[];
-  if (input.studentIds && input.studentIds.length > 0) {
-    candidates = input.studentIds;
+  if (explicit) {
+    // Dedupe: on a dry run nothing is written, so the idempotency guard cannot
+    // catch a repeat — the same student would report `generated` twice and
+    // double-count into totalAmount.
+    candidates = [...new Set(input.studentIds)];
   } else {
-    const rows = await Student.find({
+    const pinned = await Student.find({
       collegeId,
       status: 'active',
+      ...axisFilter,
       feePins: { $elemMatch: { archivedAt: null } },
     }).select('_id').lean();
-    candidates = rows.map((r) => String(r._id));
+    candidates = pinned.map((r) => String(r._id));
+  }
+
+  // ── Never-pinned students, as rows rather than candidates.
+  //
+  // The candidate query above requires a non-archived pin, so a student with
+  // `feePins: []` would otherwise produce no row at all and the console could
+  // never name them. Selecting them separately keeps this O(1) in queries —
+  // widening the candidate set instead would push every active student through
+  // the ~4-7 query walk in `generateSemesterInstallmentForStudent` only for it
+  // to return `no-active-pin`, which is minutes of work on a large college.
+  //
+  // Skipped when the caller named the students (they chose the set; a
+  // never-pinned id still flows through the loop) and when a year filter is
+  // active (their year is deliberately unresolved, so we cannot honestly claim
+  // they belong to the requested one).
+  if (!explicit && input.yearOfStudy === undefined) {
+    const unpinned = await Student.find({
+      collegeId,
+      status: 'active',
+      ...axisFilter,
+      feePins: { $not: { $elemMatch: { archivedAt: null } } },
+    }).select('_id').lean();
+    for (const u of unpinned) {
+      rows.push({
+        studentId: String(u._id), name: '', yearOfStudy: 0, amount: 0,
+        outcome: 'no-active-pin',
+      });
+    }
   }
 
   for (const studentId of candidates) {
     try {
       if (input.yearOfStudy !== undefined) {
         const s = await Student.findOne({ _id: studentId, collegeId }).select('studyYearAtAdmission').lean();
-        if (!s) { result.errors.push({ studentId, error: 'Student not found' }); continue; }
+        if (!s) { errors.push({ studentId, error: 'Student not found' }); rows.push({ studentId, name: '', yearOfStudy: 0, amount: 0, outcome: 'error', error: 'Student not found' }); continue; }
         const { yearOfStudy } = await resolvePinYearForExistingStudent(studentId, s.studyYearAtAdmission);
+        // Filtered out is not the same as skipped — emit no row at all.
         if (yearOfStudy !== input.yearOfStudy) continue;
       }
       const outcome = await generateSemesterInstallmentForStudent(
-        collegeId, { studentId, semesterId: input.semesterId }, performedBy, { dryRun: input.dryRun },
+        collegeId,
+        { studentId, semesterId: input.semesterId },
+        performedBy,
+        { dryRun: input.dryRun, ...(input.dueDate ? { dueDate: input.dueDate } : {}) },
       );
-      switch (outcome.kind) {
-        case 'generated': result.generated += 1; break;
-        case 'already-billed': result.alreadyBilled += 1; break;
-        case 'no-active-pin': result.noPin += 1; break;
-        case 'pinned-to-different-ay': result.pinnedToDifferentAy += 1; break;
-        case 'skipped':
-          if (outcome.reason === 'no-amount') result.noAmount += 1;
-          else result.unsupportedSemesterNumber += 1;
-          break;
-        case 'error': result.errors.push({ studentId, error: outcome.error }); break;
-      }
+      if (outcome.kind === 'error') errors.push({ studentId, error: outcome.error });
+      rows.push(rowFromOutcome(outcome));
     } catch (e) {
-      result.errors.push({ studentId, error: e instanceof Error ? e.message : String(e) });
+      const error = e instanceof Error ? e.message : String(e);
+      errors.push({ studentId, error });
+      rows.push({ studentId, name: '', yearOfStudy: 0, amount: 0, outcome: 'error', error });
     }
   }
 
-  return result;
+  await enrichRows(collegeId, rows);
+
+  // Counters are a PROJECTION of rows, never a parallel tally — one source of
+  // truth, so the summary line and the table cannot drift apart.
+  const count = (o: BillRowOutcome) => rows.filter((r) => r.outcome === o).length;
+
+  return {
+    dryRun: Boolean(input.dryRun),
+    generated: count('generated'),
+    alreadyBilled: count('already-billed'),
+    noPin: count('no-active-pin'),
+    pinnedToDifferentAy: count('pinned-to-different-ay'),
+    noAmount: count('no-amount'),
+    unsupportedSemesterNumber: count('unsupported-semester-number'),
+    errors,
+    rows,
+    totalAmount: rows.reduce((s, r) => (r.outcome === 'generated' ? s + r.amount : s), 0),
+  };
 }
