@@ -7,6 +7,8 @@
  * The `finance:create` gate is applied declaratively on the route (routes.ts) and is
  * exercised centrally by the RBAC suite + e2e, per finance-module convention.
  */
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { describe, it, expect, vi } from 'vitest';
 
 // The controller import graph reaches fee-pin-service → the commitment worker; mock it
@@ -89,5 +91,34 @@ describe('007 T5 — generateFeeBillsCtrl', () => {
     const next = vi.fn();
     await generateFeeBillsCtrl(req, res, next);
     expect(next).toHaveBeenCalledWith(err);
+  });
+});
+
+/**
+ * Source-order guard, in the spirit of aggregate-collegeid-pattern.test.ts.
+ *
+ * Express matches routes in declaration order. `GET /invoices/billing-history`
+ * registered AFTER `GET /invoices/:id` would be swallowed as an :id and handed
+ * to getInvoice, failing as an ObjectId cast error that looks nothing like a
+ * routing bug. Only ordering prevents it, so only ordering can be asserted.
+ */
+describe('billing-history route registration', () => {
+  it('is declared before /invoices/:id', () => {
+    const src = readFileSync(
+      join(__dirname, '..', 'routes.ts'),
+      'utf8',
+    );
+    const history = src.indexOf("router.get('/invoices/billing-history'");
+    const byId = src.indexOf("router.get('/invoices/:id'");
+
+    expect(history).toBeGreaterThan(-1);
+    expect(byId).toBeGreaterThan(-1);
+    expect(history).toBeLessThan(byId);
+  });
+
+  it('is gated finance:create, matching the console that is its only caller', () => {
+    const src = readFileSync(join(__dirname, '..', 'routes.ts'), 'utf8');
+    const line = src.split('\n').find((l) => l.includes("'/invoices/billing-history'"));
+    expect(line).toContain("authorize('finance', 'create')");
   });
 });

@@ -323,6 +323,16 @@ router.post('/invoices/ad-hoc', authorize('finance', 'create'), validate(generat
 
 // Invoices
 router.get('/invoices', authorize('finance', 'read'), ctrl.listInvoices);
+// 007 — what has been billed per semester, for the Generate Bills console.
+//
+// MUST stay above `/invoices/:id`: Express matches in declaration order, so
+// registering it after would resolve 'billing-history' as an :id and hand it to
+// getInvoice, which fails as a cast error that looks nothing like a routing bug.
+//
+// finance:create, not read — this is billing-run history on a screen already
+// gated finance:create. A read gate would advertise access the only caller never
+// grants.
+router.get('/invoices/billing-history', authorize('finance', 'create'), ctrl.billingHistoryCtrl);
 router.get('/invoices/:id', authorize('finance', 'read'), ctrl.getInvoice);
 router.post('/invoices', authorize('finance', 'create'), validate(createInvoiceSchema), ctrl.createInvoice);
 router.put('/invoices/:id', authorize('finance', 'update'), validate(updateInvoiceSchema), ctrl.updateInvoice);

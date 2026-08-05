@@ -27,18 +27,22 @@ vi.mock('../../../stores/authStore', () => ({
 vi.mock('../../../services/academics', () => ({
   listSemesters: vi.fn(), listProgrammes: vi.fn(), listBranches: vi.fn(),
 }));
-vi.mock('../../../services/finance', () => ({ generateFeeBills: vi.fn() }));
+vi.mock('../../../services/finance', () => ({ generateFeeBills: vi.fn(), getBillingHistory: vi.fn() }));
 vi.mock('../../../stores/confirmStore', () => ({ confirmAction: vi.fn(() => Promise.resolve(confirmMock)) }));
 vi.mock('../../../stores/toastStore', () => ({ toast: { success: vi.fn(), warning: vi.fn(), error: vi.fn() } }));
 
 import { listSemesters, listProgrammes, listBranches } from '../../../services/academics';
-import { generateFeeBills } from '../../../services/finance';
+import { generateFeeBills, getBillingHistory } from '../../../services/finance';
 
 const ROWS = [
   { studentId: 's1', name: 'Aditya Nair', rollNumber: '25B01A0511', programmeCode: 'BTECH', branchCode: 'CSE', yearOfStudy: 1, amount: 60000, outcome: 'generated' },
   { studentId: 's2', name: 'Kavya Menon', rollNumber: '25B01A0512', programmeCode: 'BTECH', branchCode: 'CSE', yearOfStudy: 1, amount: 60000, outcome: 'generated' },
   { studentId: 's3', name: 'Rohit Verma', rollNumber: '25B01A0513', programmeCode: 'BTECH', branchCode: 'CSE', yearOfStudy: 1, amount: 0, outcome: 'already-billed' },
   { studentId: 's4', name: 'Meera Krishnan', rollNumber: '25B01A0411', programmeCode: 'BTECH', branchCode: 'ECE', yearOfStudy: 0, amount: 0, outcome: 'no-active-pin' },
+];
+
+const HISTORY = [
+  { semesterId: 'sem1', semesterLabel: 'Semester 1 — 2025', invoiceCount: 12, totalBilled: 720000, firstGeneratedAt: '2026-08-03T10:00:00.000Z', lastGeneratedAt: '2026-08-03T10:00:00.000Z', pinnedStudents: 15 },
 ];
 
 const PREVIEW = {
@@ -62,6 +66,7 @@ beforeEach(() => {
   (listProgrammes as Mock).mockResolvedValue({ items: [{ _id: 'p1', code: 'BTECH', name: 'B.Tech' }] });
   (listBranches as Mock).mockResolvedValue({ items: [{ _id: 'b1', code: 'CSE' }] });
   (generateFeeBills as Mock).mockResolvedValue(PREVIEW);
+  (getBillingHistory as Mock).mockResolvedValue(HISTORY);
 });
 
 describe('<GenerateBillsPage /> — preview table', () => {
@@ -196,5 +201,56 @@ describe('<GenerateBillsPage /> — staleness and gating', () => {
     perm.can = false;
     renderWithProviders(<GenerateBillsPage />);
     expect(await screen.findByText(/need the finance/i)).toBeInTheDocument();
+  });
+});
+
+describe('<GenerateBillsPage /> — billing history', () => {
+  it('lists what was billed per semester, and links into Invoices', async () => {
+    renderWithProviders(<GenerateBillsPage />);
+
+    expect(await screen.findByText('Semester 1 — 2025')).toBeInTheDocument();
+    expect(screen.getByText('₹7,20,000')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /View invoices/ }))
+      .toHaveAttribute('href', '/finance/fee-management/invoices?semesterId=sem1');
+  });
+
+  it('shows history without needing a preview first', async () => {
+    renderWithProviders(<GenerateBillsPage />);
+
+    await screen.findByText('Semester 1 — 2025');
+    // It reads existing invoices, so it stands alone from the preview flow.
+    expect(generateFeeBills as Mock).not.toHaveBeenCalled();
+  });
+
+  it('reports nothing billed rather than an empty table', async () => {
+    (getBillingHistory as Mock).mockResolvedValue([]);
+    renderWithProviders(<GenerateBillsPage />);
+
+    expect(await screen.findByText(/No bills have been generated yet/)).toBeInTheDocument();
+  });
+});
+
+describe('<GenerateBillsPage /> — history coverage', () => {
+  it('shows how many of the billable population were billed, and what is left', async () => {
+    renderWithProviders(<GenerateBillsPage />);
+
+    expect(await screen.findByText('12 of 15')).toBeInTheDocument();
+    expect(screen.getByText('3 left')).toBeInTheDocument();
+  });
+
+  it('marks a semester Complete once everyone billable has been billed', async () => {
+    (getBillingHistory as Mock).mockResolvedValue([{ ...HISTORY[0], invoiceCount: 15, pinnedStudents: 15 }]);
+    renderWithProviders(<GenerateBillsPage />);
+
+    expect(await screen.findByText('Complete')).toBeInTheDocument();
+  });
+
+  it('falls back to a bare count when the billable population is unknown', async () => {
+    (getBillingHistory as Mock).mockResolvedValue([{ ...HISTORY[0], pinnedStudents: 0 }]);
+    renderWithProviders(<GenerateBillsPage />);
+
+    await screen.findByText('Semester 1 — 2025');
+    expect(screen.queryByText(/left$/)).toBeNull();
+    expect(screen.queryByText('Complete')).toBeNull();
   });
 });

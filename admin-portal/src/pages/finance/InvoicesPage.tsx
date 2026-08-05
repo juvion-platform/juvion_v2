@@ -28,6 +28,10 @@ export default function InvoicesPage() {
   const { page, setPage, limit, setLimit, search, setSearch } = useListControls();
   const [studentFilter, setStudentFilter] = useState(searchParams.get('studentId') || '');
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
+  // Arrives from the Generate Bills history table's "View invoices" link. Read
+  // straight from the URL rather than held in state: it is a deep-link, not a
+  // control on this page, so clearing it means going back rather than editing it.
+  const semesterFilter = searchParams.get('semesterId') || '';
   const [form, setForm] = useState(emptyForm);
 
   const vem = useViewEditMode<any>({
@@ -45,8 +49,8 @@ export default function InvoicesPage() {
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ['invoices', page, statusFilter, studentFilter, limit, search],
-    queryFn: () => listInvoices(page, limit, statusFilter || undefined, studentFilter || undefined, search),
+    queryKey: ['invoices', page, statusFilter, studentFilter, limit, search, semesterFilter],
+    queryFn: () => listInvoices(page, limit, statusFilter || undefined, studentFilter || undefined, search, semesterFilter || undefined),
   });
   const { data: studentsData } = useQuery({ queryKey: ['students-list'], queryFn: () => listStudents(1, 100) });
   const { data: selectedStudent, isFetching: studentReadinessLoading } = useQuery({
@@ -63,7 +67,20 @@ export default function InvoicesPage() {
     const params = new URLSearchParams();
     if (next.studentId) params.set('studentId', next.studentId);
     if (next.status) params.set('status', next.status);
+    // Carried through explicitly: this rebuilds the query string from scratch,
+    // so an incoming semesterId deep-link would otherwise be wiped the moment
+    // someone touched either dropdown.
+    const semester = searchParams.get('semesterId');
+    if (semester) params.set('semesterId', semester);
     setSearchParams(params, { replace: true });
+  }
+
+  /** Drop the semester deep-link, keeping whatever else is applied. */
+  function clearSemesterFilter() {
+    const params = new URLSearchParams(searchParams);
+    params.delete('semesterId');
+    setSearchParams(params, { replace: true });
+    setPage(1);
   }
 
   const createMut = useMutation({ mutationFn: createInvoice, onSuccess: () => { qc.invalidateQueries({ queryKey: ['invoices'] }); vem.close(); } });
@@ -142,6 +159,20 @@ export default function InvoicesPage() {
         </button>
       </div>
       </div>
+
+      {semesterFilter && (
+        // Without this the page silently shows a subset and looks like the whole
+        // list — the same "looks like it worked" failure as dropping the filter.
+        <div
+          className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-sm text-primary-800"
+          data-testid="semester-filter-chip"
+        >
+          <span>Showing invoices for one semester only.</span>
+          <button onClick={clearSemesterFilter} className="text-xs font-medium underline hover:no-underline">
+            Show all invoices
+          </button>
+        </div>
+      )}
 
       <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
         <select value={studentFilter} onChange={(e) => {

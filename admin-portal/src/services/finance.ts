@@ -154,6 +154,20 @@ export interface GenerateFeeBillsResult {
    */
   totalAmount: number;
 }
+/** One semester's billing run, derived from the invoices it produced. */
+export interface BillingHistoryRow {
+  semesterId: string;
+  semesterLabel: string;
+  invoiceCount: number;
+  totalBilled: number;
+  firstGeneratedAt: string;
+  lastGeneratedAt: string;
+  /** Students who COULD be billed for this semester — the coverage denominator. */
+  pinnedStudents: number;
+}
+export const getBillingHistory = (): Promise<BillingHistoryRow[]> =>
+  api.get(`${BASE}/invoices/billing-history`).then(r => r.data);
+
 export const generateFeeBills = (body: {
   semesterId: string;
   studentIds?: string[];

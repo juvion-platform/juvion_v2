@@ -21,7 +21,7 @@
  * finance:create gated (admin / ST-ACC — NOT principal, which holds only approve+read).
  */
 import { useMemo, useState } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Receipt, Loader2, Search } from 'lucide-react';
 
@@ -30,9 +30,11 @@ import Badge from '../../components/ui/Badge';
 import { listSemesters, listProgrammes, listBranches } from '../../services/academics';
 import {
   generateFeeBills,
+  getBillingHistory,
   type GenerateFeeBillsResult,
   type BillRow,
   type BillRowOutcome,
+  type BillingHistoryRow,
 } from '../../services/finance';
 import { useAuthStore } from '../../stores/authStore';
 import { confirmAction } from '../../stores/confirmStore';
@@ -68,9 +70,94 @@ const EMPTY_FILTERS: Filters = {
   semesterId: '', programmeId: '', branchId: '', yearOfStudy: '', dueDate: '',
 };
 
+/**
+ * What has been billed already, per semester. Reads invoices that exist rather
+ * than a run log, so it covers every bill ever generated — including those
+ * raised before this screen did.
+ *
+ * Reports only what was BILLED. Collections and outstanding live on the finance
+ * dashboard, off StudentFeeAccount; repeating them here is how two screens start
+ * disagreeing about money.
+ */
+function BillingHistory() {
+  const { data, isLoading } = useQuery({
+    queryKey: ['billing-history'],
+    queryFn: getBillingHistory,
+    staleTime: 60_000,
+  });
+
+  const columns = [
+    { key: 'semesterLabel', label: 'Semester' },
+    {
+      key: 'invoiceCount',
+      label: 'Billed',
+      sortValue: (r: BillingHistoryRow) => r.invoiceCount,
+      // "12" alone cannot say whether a semester is finished. Against the
+      // billable population it can.
+      render: (r: BillingHistoryRow) => {
+        if (r.pinnedStudents === 0) return <span className="font-mono">{r.invoiceCount}</span>;
+        const done = r.invoiceCount >= r.pinnedStudents;
+        return (
+          <span className="inline-flex items-center gap-2">
+            <span className="font-mono">{r.invoiceCount} of {r.pinnedStudents}</span>
+            <Badge variant={done ? 'success' : 'warning'}>
+              {done ? 'Complete' : `${r.pinnedStudents - r.invoiceCount} left`}
+            </Badge>
+          </span>
+        );
+      },
+    },
+    {
+      key: 'totalBilled',
+      label: 'Total billed',
+      sortValue: (r: BillingHistoryRow) => r.totalBilled,
+      render: (r: BillingHistoryRow) => <span className="font-mono">{inr(r.totalBilled)}</span>,
+    },
+    {
+      key: 'lastGeneratedAt',
+      label: 'Generated',
+      render: (r: BillingHistoryRow) => {
+        const first = new Date(r.firstGeneratedAt).toLocaleDateString('en-IN');
+        const last = new Date(r.lastGeneratedAt).toLocaleDateString('en-IN');
+        // A spread means bills were topped up after the original run.
+        return first === last ? first : `${first} – ${last}`;
+      },
+    },
+    {
+      key: 'actions',
+      label: '',
+      sortable: false,
+      render: (r: BillingHistoryRow) => (
+        // Links into the Invoices page rather than rebuilding a list inside this
+        // table — that page already exists and already does this well.
+        <Link
+          to={`/finance/fee-management/invoices?semesterId=${r.semesterId}`}
+          className="text-xs text-primary-600 hover:underline"
+        >
+          View invoices →
+        </Link>
+      ),
+    },
+  ];
+
+  return (
+    <div className="mt-10" data-testid="billing-history">
+      <h3 className="mb-2 text-sm font-semibold text-navy">Previously generated</h3>
+      <DataTable
+        columns={columns as never}
+        data={data ?? []}
+        loading={isLoading}
+        rowKey={(r: BillingHistoryRow) => r.semesterId}
+        emptyMessage="No bills have been generated yet."
+      />
+    </div>
+  );
+}
+
 export default function GenerateBillsPage() {
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const canGenerate = hasPermission('finance', 'create');
+  const queryClient = useQueryClient();
 
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [preview, setPreview] = useState<GenerateFeeBillsResult | null>(null);
@@ -128,6 +215,8 @@ export default function GenerateBillsPage() {
     onSuccess: (res) => {
       setPreview(res);
       setSelected(new Set());
+      // The run just changed what history reports.
+      queryClient.invalidateQueries({ queryKey: ['billing-history'] });
       if (res.generated > 0 && res.errors.length === 0) {
         toast.success(`Generated ${res.generated} bill${res.generated === 1 ? '' : 's'} · ${inr(res.totalAmount)}`);
       } else {
@@ -344,6 +433,8 @@ export default function GenerateBillsPage() {
           />
         </div>
       )}
+
+      <BillingHistory />
 
       {preview && rows.length > 0 && (
         <div className="fixed bottom-0 left-0 right-0 border-t border-gray-200 bg-white/95 px-6 py-3 backdrop-blur">

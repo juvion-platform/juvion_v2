@@ -252,6 +252,130 @@ export async function generateSemesterInstallmentForStudent(
   return { kind: 'generated', studentId, invoiceId: String(invoice._id), amount: installment, yearAssumed: yearOfStudy, derivedFrom };
 }
 
+/** One semester's billing run, as the console's history table renders it. */
+export interface BillingHistoryRow {
+  semesterId: string;
+  semesterLabel: string;
+  invoiceCount: number;
+  totalBilled: number;
+  firstGeneratedAt: Date;
+  /** Later than `first` when bills were topped up after the original run. */
+  lastGeneratedAt: Date;
+  /**
+   * How many students COULD be billed for this semester — active students whose
+   * non-archived pin belongs to the semester's academic year. Against
+   * `invoiceCount` this answers "is this semester finished?", which counts alone
+   * never could.
+   *
+   * The academic-year condition is not arbitrary: it mirrors the guard the
+   * writer applies (`fsi.academicYearId !== semester.academicYearId` →
+   * `pinned-to-different-ay`), so this counts exactly the students a run would
+   * actually bill. 0 when the semester document is gone.
+   */
+  pinnedStudents: number;
+}
+
+/**
+ * What has been billed, per semester — the answer to "did we bill Sem 1, and
+ * for how much".
+ *
+ * Derived entirely from invoices that already exist, so it works retroactively
+ * over every bill ever generated. There is deliberately no `BillingRun` model:
+ * one would only describe runs made after it shipped, leaving today's invoices
+ * invisible, and would add a write to a money path to answer a question the
+ * invoices already answer.
+ *
+ * Deliberately reports only what was BILLED. Collections and outstanding come
+ * from `StudentFeeAccount` on the finance dashboard; computing them a second
+ * time here is how two screens start disagreeing about money.
+ */
+export async function getBillingHistory(collegeId: string): Promise<BillingHistoryRow[]> {
+  const groups = await Invoice.aggregate<{
+    _id: Types.ObjectId;
+    invoiceCount: number;
+    totalBilled: number;
+    firstGeneratedAt: Date;
+    lastGeneratedAt: Date;
+  }>([
+    {
+      $match: {
+        // Cast is load-bearing: aggregate() does not auto-cast the string, and a
+        // raw one silently matches nothing (G2-M5).
+        collegeId: new Types.ObjectId(collegeId),
+        isSemesterInstallment: true,
+        // Excludes rows the partial index tolerates but that would otherwise
+        // collapse into a meaningless `null` bucket.
+        semesterId: { $type: 'objectId' },
+        // `cancelled` means the bill should not have existed. `written_off` and
+        // `disputed` ARE counted — those were genuinely raised, and hiding them
+        // would understate what the college billed.
+        status: { $ne: 'cancelled' },
+      },
+    },
+    {
+      $group: {
+        _id: '$semesterId',
+        invoiceCount: { $sum: 1 },
+        totalBilled: { $sum: { $ifNull: ['$netPayable', '$totalAmount'] } },
+        firstGeneratedAt: { $min: '$createdAt' },
+        lastGeneratedAt: { $max: '$createdAt' },
+      },
+    },
+    { $sort: { lastGeneratedAt: -1 } },
+  ]);
+
+  if (groups.length === 0) return [];
+
+  const semesters = await Semester.find({
+    collegeId,
+    _id: { $in: groups.map((g) => g._id) },
+  }).select({ _id: 1, number: 1, year: 1, academicYearId: 1 }).lean();
+  const byId = new Map(semesters.map((s) => [String(s._id), s]));
+
+  // ── Billable population per academic year, for the coverage figure.
+  //
+  // Counted per DISTINCT academic year rather than per row: a college bills two
+  // semesters from the same year, so this is one or two counts for the whole
+  // table, not one per semester.
+  const ayIds = [...new Set(semesters.map((s) => String(s.academicYearId)))];
+  const fsis = await FeeStructureInstance.find({
+    collegeId,
+    academicYearId: { $in: ayIds },
+  }).select({ _id: 1, academicYearId: 1 }).lean();
+
+  const fsiByAy = new Map<string, Types.ObjectId[]>();
+  for (const f of fsis) {
+    const key = String(f.academicYearId);
+    if (!fsiByAy.has(key)) fsiByAy.set(key, []);
+    fsiByAy.get(key)!.push(f._id as Types.ObjectId);
+  }
+
+  const pinnedByAy = new Map<string, number>();
+  for (const ay of ayIds) {
+    const ids = fsiByAy.get(ay) ?? [];
+    pinnedByAy.set(ay, ids.length === 0 ? 0 : await Student.countDocuments({
+      collegeId,
+      status: 'active',
+      feePins: { $elemMatch: { archivedAt: null, feeStructureInstanceId: { $in: ids } } },
+    }));
+  }
+
+  return groups.map((g) => {
+    const sem = byId.get(String(g._id));
+    return {
+      semesterId: String(g._id),
+      // A deleted semester must not erase money that was billed — fall back to
+      // the raw id rather than dropping the row.
+      semesterLabel: sem ? `Semester ${sem.number} — ${sem.year}` : String(g._id),
+      invoiceCount: g.invoiceCount,
+      totalBilled: g.totalBilled,
+      firstGeneratedAt: g.firstGeneratedAt,
+      lastGeneratedAt: g.lastGeneratedAt,
+      pinnedStudents: sem ? (pinnedByAy.get(String(sem.academicYearId)) ?? 0) : 0,
+    };
+  });
+}
+
 export interface BatchBillInput {
   semesterId: string;
   /** Explicit students (individual / selected-rows path). Omit to bill everyone pinned. */

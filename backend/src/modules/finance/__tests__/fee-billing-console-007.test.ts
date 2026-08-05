@@ -35,7 +35,7 @@ import { Branch } from '../../../models/academic-structure/Branch';
 import { Semester } from '../../../models/academic-structure/Semester';
 import { FeeStructureInstance } from '../../../models/finance/FeeStructureInstance';
 import { Invoice } from '../../../models/finance/Invoice';
-import { generateSemesterInstallmentsForPinned } from '../fee-billing-service';
+import { generateSemesterInstallmentsForPinned, getBillingHistory } from '../fee-billing-service';
 
 const COLLEGE = new Types.ObjectId();
 const AY = new Types.ObjectId();
@@ -334,5 +334,147 @@ describe('console rows — axis filters, dedupe and due date', () => {
 
     expect(r.errors).toHaveLength(1);
     expect(r.rows[0]).toMatchObject({ studentId: ghost, outcome: 'error' });
+  });
+});
+
+describe('billing history', () => {
+  beforeAll(async () => { await setupMongo(); });
+  afterAll(async () => { await teardownMongo(); });
+  afterEach(async () => { await clearCollections(); });
+
+  it('groups what was billed by semester, with count and total', async () => {
+    await makeCatalog();
+    const sem1 = await makeSemester(1);
+    const sem2 = await makeSemester(2);
+    const fsiId = await makeFsi(90000);
+    await makeStudent({ fsiId, name: 'A' });
+    await makeStudent({ fsiId, name: 'B' });
+
+    await generateSemesterInstallmentsForPinned(String(COLLEGE), { semesterId: sem1 }, 'tester');
+    await generateSemesterInstallmentsForPinned(String(COLLEGE), { semesterId: sem2 }, 'tester');
+
+    const history = await getBillingHistory(String(COLLEGE));
+
+    expect(history).toHaveLength(2);
+    const bySem = new Map(history.map((h) => [h.semesterId, h]));
+    // 90000 splits floor+remainder: Sem 1 gets 45000 each, Sem 2 the rest.
+    expect(bySem.get(sem1)).toMatchObject({
+      semesterLabel: 'Semester 1 — 2025', invoiceCount: 2, totalBilled: 90000,
+    });
+    expect(bySem.get(sem2)).toMatchObject({ invoiceCount: 2, totalBilled: 90000 });
+  });
+
+  it('excludes cancelled invoices but counts written-off ones', async () => {
+    await makeCatalog();
+    const semesterId = await makeSemester(1);
+    const fsiId = await makeFsi(90000);
+    await makeStudent({ fsiId, name: 'A' });
+    await makeStudent({ fsiId, name: 'B' });
+    await generateSemesterInstallmentsForPinned(String(COLLEGE), { semesterId }, 'tester');
+
+    const [first, second] = await Invoice.find({ collegeId: COLLEGE, isSemesterInstallment: true });
+    await Invoice.updateOne({ _id: first!._id }, { status: 'cancelled' });
+    await Invoice.updateOne({ _id: second!._id }, { status: 'written_off' });
+
+    const history = await getBillingHistory(String(COLLEGE));
+
+    // Cancelled means the bill should not have existed; written-off was
+    // genuinely raised and later resolved, so it stays in the billed figure.
+    expect(history[0]).toMatchObject({ invoiceCount: 1, totalBilled: 45000 });
+  });
+
+  it('falls back to the raw id when the semester is gone — billed money never vanishes', async () => {
+    await makeCatalog();
+    const semesterId = await makeSemester(1);
+    await makeStudent({ fsiId: await makeFsi(), name: 'A' });
+    await generateSemesterInstallmentsForPinned(String(COLLEGE), { semesterId }, 'tester');
+
+    await Semester.deleteOne({ _id: semesterId });
+    const history = await getBillingHistory(String(COLLEGE));
+
+    expect(history).toHaveLength(1);
+    expect(history[0]?.semesterLabel).toBe(semesterId);
+  });
+
+  it('ignores non-installment invoices entirely', async () => {
+    await makeCatalog();
+    const semesterId = await makeSemester(1);
+    await Invoice.create({
+      collegeId: COLLEGE, invoiceNumber: 'EXAM-1', type: 'fee', semesterId,
+      totalAmount: 5000, netPayable: 5000, dueDate: new Date(), status: 'generated',
+    });
+
+    expect(await getBillingHistory(String(COLLEGE))).toEqual([]);
+  });
+
+  it('returns an empty list when nothing has been billed', async () => {
+    expect(await getBillingHistory(String(new Types.ObjectId()))).toEqual([]);
+  });
+});
+
+describe('billing history — coverage', () => {
+  beforeAll(async () => { await setupMongo(); });
+  afterAll(async () => { await teardownMongo(); });
+  afterEach(async () => { await clearCollections(); });
+
+  it('reports billed-vs-billable so a half-done semester is visible', async () => {
+    await makeCatalog();
+    const semesterId = await makeSemester(1);
+    const fsiId = await makeFsi(90000);
+    const a = await makeStudent({ fsiId, name: 'A' });
+    await makeStudent({ fsiId, name: 'B' });
+    await makeStudent({ fsiId, name: 'C' });
+
+    // Bill only one of the three pinned students.
+    await generateSemesterInstallmentsForPinned(
+      String(COLLEGE), { semesterId, studentIds: [a] }, 'tester',
+    );
+
+    const [row] = await getBillingHistory(String(COLLEGE));
+    expect(row).toMatchObject({ invoiceCount: 1, pinnedStudents: 3 });
+  });
+
+  it('counts equal when every pinned student was billed', async () => {
+    await makeCatalog();
+    const semesterId = await makeSemester(1);
+    const fsiId = await makeFsi(90000);
+    await makeStudent({ fsiId, name: 'A' });
+    await makeStudent({ fsiId, name: 'B' });
+
+    await generateSemesterInstallmentsForPinned(String(COLLEGE), { semesterId }, 'tester');
+
+    const [row] = await getBillingHistory(String(COLLEGE));
+    expect(row?.invoiceCount).toBe(2);
+    expect(row?.pinnedStudents).toBe(2);
+  });
+
+  it('excludes students pinned to a DIFFERENT academic year — mirrors the writer guard', async () => {
+    await makeCatalog();
+    const semesterId = await makeSemester(1);           // AY
+    const otherAy = new Types.ObjectId();
+    const fsiId = await makeFsi(90000);                 // AY
+    const otherFsi = await makeFsi(90000, otherAy);     // a different year
+    await makeStudent({ fsiId, name: 'Same year' });
+    await makeStudent({ fsiId: otherFsi, name: 'Other year' });
+
+    await generateSemesterInstallmentsForPinned(String(COLLEGE), { semesterId }, 'tester');
+
+    const [row] = await getBillingHistory(String(COLLEGE));
+    // Only the same-year student is billable, so coverage reads 1 of 1 — the
+    // other-year student is not a shortfall, they are out of scope.
+    expect(row).toMatchObject({ invoiceCount: 1, pinnedStudents: 1 });
+  });
+
+  it('reports 0 billable when the semester document is gone', async () => {
+    await makeCatalog();
+    const semesterId = await makeSemester(1);
+    await makeStudent({ fsiId: await makeFsi(), name: 'A' });
+    await generateSemesterInstallmentsForPinned(String(COLLEGE), { semesterId }, 'tester');
+
+    await Semester.deleteOne({ _id: semesterId });
+    const [row] = await getBillingHistory(String(COLLEGE));
+
+    expect(row?.invoiceCount).toBe(1);
+    expect(row?.pinnedStudents).toBe(0);
   });
 });

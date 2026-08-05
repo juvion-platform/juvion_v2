@@ -566,10 +566,12 @@ export async function deleteFinePenalty(collegeId: string, id: string, who: stri
 
 // ═══ Invoices ═════════════════════════════════════════════
 
-export async function listInvoices(collegeId: string, page = 1, limit = 20, status?: string, studentId?: string, authScope?: AuthScope) {
+export async function listInvoices(collegeId: string, page = 1, limit = 20, status?: string, studentId?: string, authScope?: AuthScope, semesterId?: string) {
   const filter: any = { collegeId };
   if (status) filter.status = status;
   if (studentId) filter.studentId = studentId;
+  // Drill-down from the billing-history table.
+  if (semesterId) filter.semesterId = semesterId;
   if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
   return paginate(Invoice, filter, page, limit, { createdAt: -1 }, [STUDENT_POPULATE] as any);
 }

@@ -187,8 +187,8 @@ export async function deleteFinePenalty(req: AuthRequest, res: Response, next: N
 
 export async function listInvoices(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const { page, limit, status, studentId } = req.query as any;
-    res.json(await service.listInvoices(req.collegeId!, Number(page) || 1, Number(limit) || 20, status, studentId, req.authScope));
+    const { page, limit, status, studentId, semesterId } = req.query as any;
+    res.json(await service.listInvoices(req.collegeId!, Number(page) || 1, Number(limit) || 20, status, studentId, req.authScope, semesterId));
   } catch (err) { next(err); }
 }
 export async function getInvoice(req: AuthRequest, res: Response, next: NextFunction) {
@@ -1209,6 +1209,12 @@ import * as feeBillingService from './fee-billing-service';
  * `finance:create` gated (see routes). Body validated by generateFeeBillsSchema:
  * { semesterId, studentIds?, yearOfStudy?, dryRun? }. Returns the per-outcome roll-up.
  */
+export async function billingHistoryCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    res.json(await feeBillingService.getBillingHistory(req.collegeId!));
+  } catch (e) { next(e); }
+}
+
 export async function generateFeeBillsCtrl(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     res.status(201).json(
