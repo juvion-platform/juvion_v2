@@ -106,8 +106,8 @@ export const deleteFinePenalty = (id: string) =>
   api.delete(`${BASE}/fines/${id}`).then(r => r.data);
 
 // ─── Invoices ─────────────────────────────────────────────
-export const listInvoices = (page = 1, limit = 20, status?: string, studentId?: string, search?: string) =>
-  api.get(`${BASE}/invoices`, { params: { page, limit, status, studentId, ...(search ? { search } : {}) } }).then(r => r.data);
+export const listInvoices = (page = 1, limit = 20, status?: string, studentId?: string, search?: string, semesterId?: string) =>
+  api.get(`${BASE}/invoices`, { params: { page, limit, status, studentId, ...(search ? { search } : {}), ...(semesterId ? { semesterId } : {}) } }).then(r => r.data);
 export const getInvoice = (id: string) =>
   api.get(`${BASE}/invoices/${id}`).then(r => r.data);
 export const createInvoice = (data: any) =>
@@ -119,6 +119,24 @@ export const deleteInvoice = (id: string) =>
 
 // 007 — pin-driven semester-installment billing. Omit studentIds to bill every active
 // pinned student; dryRun previews the outcome counts without writing.
+export type BillRowOutcome =
+  | 'generated' | 'already-billed' | 'no-active-pin' | 'pinned-to-different-ay'
+  | 'no-amount' | 'unsupported-semester-number' | 'error';
+
+/** One student as the billing console renders them. */
+export interface BillRow {
+  studentId: string;
+  name: string;
+  rollNumber?: string;
+  programmeCode?: string;
+  branchCode?: string;
+  /** 0 when it could not be derived — render an em dash, never a guess. */
+  yearOfStudy: number;
+  amount: number;
+  outcome: BillRowOutcome;
+  error?: string;
+}
+
 export interface GenerateFeeBillsResult {
   dryRun: boolean;
   generated: number;
@@ -128,11 +146,21 @@ export interface GenerateFeeBillsResult {
   noAmount: number;
   unsupportedSemesterNumber: number;
   errors: Array<{ studentId: string; error: string }>;
+  rows: BillRow[];
+  /**
+   * Σ over generated rows server-side. The console deliberately does NOT render
+   * this — its footer sums the SELECTED rows, and this figure stops matching the
+   * moment anyone unticks one.
+   */
+  totalAmount: number;
 }
 export const generateFeeBills = (body: {
   semesterId: string;
   studentIds?: string[];
   yearOfStudy?: number;
+  programmeId?: string;
+  branchId?: string;
+  dueDate?: string;
   dryRun?: boolean;
 }): Promise<GenerateFeeBillsResult> =>
   api.post(`${BASE}/invoices/generate-from-pins`, body).then(r => r.data);

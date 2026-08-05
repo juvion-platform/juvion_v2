@@ -13,6 +13,8 @@ export default defineConfig({
     // the dev server keeps serving the pre-edit module until it is restarted.
     // Polling is the only thing that sees those writes. Costs a little CPU;
     // cheaper than debugging a fix that "didn't work" because it never shipped.
+    //
+    // Dev server only — tests read vitest.config.ts, not this file.
     watch: { usePolling: true, interval: 300 },
   },
 });
