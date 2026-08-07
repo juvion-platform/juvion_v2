@@ -333,7 +333,7 @@ export default function GenerateBillsPage() {
   }
 
   return (
-    <div className="pb-24">
+    <div>
       <div className="mb-5 flex items-center gap-2">
         <Receipt size={20} className="text-primary-600" />
         <h2 className="text-xl font-bold text-navy">Generate Semester Bills</h2>
@@ -436,9 +436,21 @@ export default function GenerateBillsPage() {
 
       <BillingHistory />
 
+      {/*
+        `sticky`, not `fixed`. DashboardLayout's <main> is the scroll container
+        (flex-1 overflow-y-auto p-6), so sticking to its bottom gives the
+        correct width and left edge for free, and follows the sidebar as it
+        collapses (w-56 to w-16). The previous `fixed bottom-0 left-0 right-0`
+        anchored to the VIEWPORT: the bar ran under the sidebar, and
+        `mx-auto max-w-6xl` then centred its contents on the viewport rather
+        than the content column, printing the running total on top of the nav.
+
+        -mx-6 cancels <main>'s p-6 so the bar bleeds to the content edges while
+        its contents stay aligned with the table above.
+      */}
       {preview && rows.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 border-t border-gray-200 bg-white/95 px-6 py-3 backdrop-blur">
-          <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
+        <div className="sticky bottom-0 z-10 -mx-6 border-t border-gray-200 bg-white/95 px-6 py-3 backdrop-blur">
+          <div className="flex items-center justify-between gap-4">
             <div className="text-sm text-gray-700">
               <strong data-testid="selected-count">{selected.size}</strong> of {billable.length} selected
               {' · '}
