@@ -1,6 +1,7 @@
 {
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
+    "incremental": true,
     "outDir": "dist",
     "rootDir": "src",
     "module": "commonjs",
