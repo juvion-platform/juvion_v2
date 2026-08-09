@@ -35,7 +35,7 @@ function FinanceHome() {
           </div>
           <div className="bg-gradient-to-br from-red-50 to-rose-50 border border-red-200 rounded-xl p-4">
             <span className="text-xs font-medium text-red-600 uppercase">Overdue Items</span>
-            <div className="text-2xl font-bold text-red-700 mt-1">{stats.overdueLineItems || 0}</div>
+            <div className="text-2xl font-bold text-red-700 mt-1">{stats.overdueInvoices || 0}</div>
           </div>
           <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
             <span className="text-xs font-medium text-blue-600 uppercase">Total Payments</span>
@@ -107,7 +107,7 @@ function FinanceHome() {
           const hasStat = Boolean(card.statKey);
           const count = hasStat && stats ? ((stats as any)[card.statKey!] ?? 0) : null;
           return (
-            <button key={card.to} onClick={() => navigate(card.to)} className={`bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all ${card.border}`}>
+            <button key={card.to} onClick={() => navigate(`/finance/${card.to}`)} className={`bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all ${card.border}`}>
               <div className={`inline-flex p-2.5 rounded-lg mb-3 ${card.iconBg}`}><Icon size={22} /></div>
               {hasStat && (count === null
                 ? <div className="h-7 w-12 mb-1 animate-pulse rounded bg-slate-100" aria-hidden="true" />
@@ -132,7 +132,7 @@ function FinanceHome() {
           const hasStat = Boolean(card.statKey);
           const count = hasStat && stats ? ((stats as any)[card.statKey!] ?? 0) : null;
           return (
-            <button key={card.to} onClick={() => navigate(card.to)} className={`bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all ${card.border}`}>
+            <button key={card.to} onClick={() => navigate(`/finance/${card.to}`)} className={`bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all ${card.border}`}>
               <div className={`inline-flex p-2.5 rounded-lg mb-3 ${card.iconBg}`}><Icon size={22} /></div>
               {hasStat && (count === null
                 ? <div className="h-7 w-12 mb-1 animate-pulse rounded bg-slate-100" aria-hidden="true" />
@@ -156,7 +156,7 @@ function FinanceHome() {
           const hasStat = Boolean(card.statKey);
           const count = hasStat && stats ? ((stats as any)[card.statKey!] ?? 0) : null;
           return (
-            <button key={card.to} onClick={() => navigate(card.to)} className={`bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all ${card.border}`}>
+            <button key={card.to} onClick={() => navigate(`/finance/${card.to}`)} className={`bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all ${card.border}`}>
               <div className={`inline-flex p-2.5 rounded-lg mb-3 ${card.iconBg}`}><Icon size={22} /></div>
               {hasStat && (count === null
                 ? <div className="h-7 w-12 mb-1 animate-pulse rounded bg-slate-100" aria-hidden="true" />

@@ -33,7 +33,7 @@ export async function deleteFeeStructure(req: AuthRequest, res: Response, next: 
 // ═══ Student Fee Account ══════════════════════════════════
 
 export async function listStudentFeeAccounts(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await service.listStudentFeeAccounts(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.authScope)); } catch (err) { next(err); }
+  try { res.json(await service.listStudentFeeAccounts(req.collegeId!, Number(req.query.page) || 1, Number(req.query.limit) || 20, req.query.studentId as string | undefined, req.authScope)); } catch (err) { next(err); }
 }
 export async function getStudentFeeAccount(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.getStudentFeeAccount(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
@@ -187,8 +187,8 @@ export async function deleteFinePenalty(req: AuthRequest, res: Response, next: N
 
 export async function listInvoices(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const { page, limit, status, studentId } = req.query as any;
-    res.json(await service.listInvoices(req.collegeId!, Number(page) || 1, Number(limit) || 20, status, studentId, req.authScope));
+    const { page, limit, status, studentId, semesterId } = req.query as any;
+    res.json(await service.listInvoices(req.collegeId!, Number(page) || 1, Number(limit) || 20, status, studentId, req.authScope, semesterId));
   } catch (err) { next(err); }
 }
 export async function getInvoice(req: AuthRequest, res: Response, next: NextFunction) {
@@ -1197,6 +1197,29 @@ export async function triggerReminderSequence(req: AuthRequest, res: Response, n
   try {
     const result = await service.executeReminderSequence(req.collegeId!, req.body.defaulterRecordId, who(req));
     res.json(result);
+  } catch (e) { next(e); }
+}
+
+// ═══ 007 Fee Billing — semester-installment generation from pins ═══
+
+import * as feeBillingService from './fee-billing-service';
+
+/**
+ * POST /invoices/generate-from-pins — bill pinned students for a semester.
+ * `finance:create` gated (see routes). Body validated by generateFeeBillsSchema:
+ * { semesterId, studentIds?, yearOfStudy?, dryRun? }. Returns the per-outcome roll-up.
+ */
+export async function billingHistoryCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    res.json(await feeBillingService.getBillingHistory(req.collegeId!));
+  } catch (e) { next(e); }
+}
+
+export async function generateFeeBillsCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    res.status(201).json(
+      await feeBillingService.generateSemesterInstallmentsForPinned(req.collegeId!, req.body, who(req)),
+    );
   } catch (e) { next(e); }
 }
 

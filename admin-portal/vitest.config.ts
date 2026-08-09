@@ -24,6 +24,20 @@ export default defineConfig({
     include: ['src/**/__tests__/**/*.test.{ts,tsx}'],
     exclude: ['node_modules/**', 'dist/**'],
     css: false, // skip CSS imports in tests; we don't snapshot styles
+    /**
+     * The default `forks` pool spawns a fresh worker per test file, and each one
+     * must load jsdom + React + testing-library before answering the pool's ping.
+     * On a repo living under /mnt/c (WSL2 reading the Windows filesystem) that
+     * routinely exceeds vitest's START_TIMEOUT — which is hardcoded at 60s and
+     * NOT configurable, so no timeout setting can rescue it. The run then dies
+     * with "Failed to start forks worker" before a single test executes, which
+     * reads like a broken test rather than a slow filesystem.
+     *
+     * `vmThreads` reuses a VM context instead, so that cost is paid once.
+     * Harmless on a normal filesystem; on this one it is the difference between
+     * a green suite and a suite that cannot start.
+     */
+    pool: 'vmThreads',
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],

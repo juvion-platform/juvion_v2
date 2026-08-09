@@ -9,15 +9,24 @@
  *
  * Data sources (all college-scoped via the existing axios interceptor):
  *   - `getStudentPins(studentId)` → active FSI name + total + status
- *   - `listFeeLineItems(1, 100, studentId)` → per-component breakdown
+ *   - `listStudentFeeAccounts(…, studentId)` → the four headline totals
+ *   - `listInvoices(…, studentId)` + `listPayments(…, studentId)` → breakdown
  *   - `listHolds({ studentId })` → any pending/active holds
+ *
+ * The totals read `StudentFeeAccount`, the same maintained balance the finance
+ * dashboard sums for net AR. They previously summed `FeeLineItem` — a legacy
+ * collection the pin→invoice billing path never writes — so a billed student
+ * showed ₹0 across all four tiles and no payment ever moved them.
+ *
+ * Per-invoice `paid` is derived by grouping this student's successful payments
+ * on `invoiceId`, because `Invoice` carries no paid amount of its own.
  */
 
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Loader2, ShieldAlert, BookOpen, IndianRupee } from 'lucide-react';
 
-import { listFeeLineItems } from '../../services/finance';
+import { listInvoices, listPayments, listStudentFeeAccounts } from '../../services/finance';
 import { getStudentPins, type IFeePin, type PopulatedFeeStructureInstance } from '../../services/fee-configuration';
 import { listHolds, type FinancialHold } from '../../services/fee-holds';
 
@@ -25,20 +34,48 @@ interface Props {
   studentId: string;
 }
 
-interface FeeLineItem {
+type InvoiceStatus =
+  | 'draft' | 'generated' | 'sent' | 'partially_paid' | 'paid'
+  | 'overdue' | 'disputed' | 'confirmed' | 'written_off' | 'cancelled';
+
+interface StudentInvoice {
   _id: string;
-  component: string;
-  semester?: number;
-  amount: number;
-  paidAmount: number;
-  waivedAmount: number;
-  status: 'pending' | 'partial' | 'paid' | 'overdue' | 'waived';
+  invoiceNumber: string;
+  totalAmount: number;
+  netPayable?: number;
+  scholarshipAllocated?: number;
+  concessionApplied?: number;
+  status: InvoiceStatus;
   dueDate?: string | null;
-  academicYearId?: { _id: string; name?: string } | string;
+  isSemesterInstallment?: boolean;
 }
 
-interface FeeLineItemsResponse {
-  items: FeeLineItem[];
+interface PaymentRow {
+  _id: string;
+  amount: number;
+  status?: string;
+  invoiceId?: string | { _id: string } | null;
+}
+
+/** One invoice joined to the payments raised against it. */
+interface InvoiceRow extends StudentInvoice {
+  amount: number;
+  paid: number;
+  waived: number;
+  balance: number;
+}
+
+interface FeeAccount {
+  _id: string;
+  totalDue: number;
+  totalPaid: number;
+  totalWaived: number;
+  totalRefunded: number;
+  balance: number;
+}
+
+interface Paged<T> {
+  items: T[];
   total: number;
 }
 
@@ -48,19 +85,33 @@ function formatInr(v: number | undefined | null): string {
   return `\u20B9${(v ?? 0).toLocaleString('en-IN')}`;
 }
 
-function statusBadge(status: FeeLineItem['status']): { label: string; className: string } {
+function statusBadge(status: InvoiceStatus): { label: string; className: string } {
   switch (status) {
     case 'paid':
       return { label: 'Paid', className: 'bg-emerald-100 text-emerald-800' };
-    case 'partial':
+    case 'partially_paid':
       return { label: 'Partial', className: 'bg-amber-100 text-amber-800' };
     case 'overdue':
       return { label: 'Overdue', className: 'bg-red-100 text-red-800' };
-    case 'waived':
-      return { label: 'Waived', className: 'bg-violet-100 text-violet-800' };
+    case 'written_off':
+      return { label: 'Written off', className: 'bg-violet-100 text-violet-800' };
+    case 'cancelled':
+      return { label: 'Cancelled', className: 'bg-slate-100 text-slate-500' };
+    case 'disputed':
+      return { label: 'Disputed', className: 'bg-orange-100 text-orange-800' };
+    case 'draft':
+      return { label: 'Draft', className: 'bg-slate-100 text-slate-600' };
     default:
+      // generated / sent / confirmed — issued and awaiting payment.
       return { label: 'Pending', className: 'bg-slate-100 text-slate-700' };
   }
+}
+
+/** Past its due date and not settled — the invoice model has no derived flag. */
+function isOverdue(inv: StudentInvoice, balance: number): boolean {
+  if (balance <= 0) return false;
+  if (['paid', 'cancelled', 'written_off', 'draft'].includes(inv.status)) return false;
+  return Boolean(inv.dueDate) && new Date(inv.dueDate as string).getTime() < Date.now();
 }
 
 function holdStatusBadge(holdStatus: FinancialHold['holdStatus']): {
@@ -191,29 +242,28 @@ function FeeStructureHeader({ pin }: { pin: IFeePin | undefined }) {
   );
 }
 
-function ComponentBreakdownTable({ items }: { items: FeeLineItem[] }) {
-  if (items.length === 0) {
+function InvoiceBreakdownTable({ rows }: { rows: InvoiceRow[] }) {
+  if (rows.length === 0) {
     return (
       <div className="bg-white border border-slate-200 rounded-lg p-6 text-center text-sm text-slate-500">
         <BookOpen size={20} className="inline-block text-slate-400 mb-2" />
-        <div>No fee line items have been generated for this student yet.</div>
+        <div>No bills have been generated for this student yet.</div>
+        <div className="mt-1 text-xs text-slate-400">
+          Pinned students are billed from Finance → Fee Management → Generate Bills.
+        </div>
       </div>
     );
   }
 
-  // Sort: overdue/pending first, then partial, then paid/waived. Within each
-  // group, sort by component name.
-  const order: Record<FeeLineItem['status'], number> = {
-    overdue: 0,
-    pending: 1,
-    partial: 2,
-    paid: 3,
-    waived: 4,
-  };
-  const sorted = [...items].sort((a, b) => {
-    const o = order[a.status] - order[b.status];
-    if (o !== 0) return o;
-    return a.component.localeCompare(b.component);
+  // Unsettled first (oldest due date leads, so the next thing to chase is on
+  // top), then settled invoices newest-first.
+  const sorted = [...rows].sort((a, b) => {
+    const aOpen = a.balance > 0 ? 0 : 1;
+    const bOpen = b.balance > 0 ? 0 : 1;
+    if (aOpen !== bOpen) return aOpen - bOpen;
+    const at = a.dueDate ? new Date(a.dueDate).getTime() : 0;
+    const bt = b.dueDate ? new Date(b.dueDate).getTime() : 0;
+    return aOpen === 0 ? at - bt : bt - at;
   });
 
   return (
@@ -222,8 +272,8 @@ function ComponentBreakdownTable({ items }: { items: FeeLineItem[] }) {
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-wider text-slate-600">
             <tr>
-              <th className="text-left px-4 py-2">Component</th>
-              <th className="text-left px-4 py-2">Semester</th>
+              <th className="text-left px-4 py-2">Invoice</th>
+              <th className="text-left px-4 py-2">Due</th>
               <th className="text-right px-4 py-2">Amount</th>
               <th className="text-right px-4 py-2">Paid</th>
               <th className="text-right px-4 py-2">Waived</th>
@@ -232,30 +282,36 @@ function ComponentBreakdownTable({ items }: { items: FeeLineItem[] }) {
             </tr>
           </thead>
           <tbody>
-            {sorted.map((it) => {
-              const balance = it.amount - it.paidAmount - it.waivedAmount;
-              const badge = statusBadge(it.status);
+            {sorted.map((r) => {
+              const badge = statusBadge(isOverdue(r, r.balance) ? 'overdue' : r.status);
               return (
-                <tr key={it._id} className="border-t border-slate-100 hover:bg-slate-50/40">
-                  <td className="px-4 py-2 font-medium text-slate-800">{it.component}</td>
+                <tr key={r._id} className="border-t border-slate-100 hover:bg-slate-50/40">
+                  <td className="px-4 py-2 font-medium text-slate-800">
+                    {r.invoiceNumber}
+                    {r.isSemesterInstallment && (
+                      <span className="ml-2 text-[10px] font-normal text-slate-500">
+                        semester installment
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-2 text-slate-600">
-                    {it.semester ? `Sem ${it.semester}` : '—'}
+                    {r.dueDate ? new Date(r.dueDate).toLocaleDateString('en-IN') : '—'}
                   </td>
                   <td className="px-4 py-2 text-right font-mono text-slate-800">
-                    {formatInr(it.amount)}
+                    {formatInr(r.amount)}
                   </td>
                   <td className="px-4 py-2 text-right font-mono text-emerald-700">
-                    {it.paidAmount > 0 ? formatInr(it.paidAmount) : '—'}
+                    {r.paid > 0 ? formatInr(r.paid) : '—'}
                   </td>
                   <td className="px-4 py-2 text-right font-mono text-violet-700">
-                    {it.waivedAmount > 0 ? formatInr(it.waivedAmount) : '—'}
+                    {r.waived > 0 ? formatInr(r.waived) : '—'}
                   </td>
                   <td
                     className={`px-4 py-2 text-right font-mono font-semibold ${
-                      balance > 0 ? 'text-red-700' : 'text-slate-500'
+                      r.balance > 0 ? 'text-red-700' : 'text-slate-500'
                     }`}
                   >
-                    {balance > 0 ? formatInr(balance) : '—'}
+                    {r.balance > 0 ? formatInr(r.balance) : '—'}
                   </td>
                   <td className="px-4 py-2">
                     <span
@@ -283,10 +339,26 @@ export default function StudentFeeStructurePanel({ studentId }: Props) {
     staleTime: 60_000,
   });
 
-  const lineItemsQuery = useQuery({
-    queryKey: ['student-fee-line-items', studentId],
+  // The four headline totals come from the maintained account balance, not from
+  // summing the table below — the account is what the payment path updates and
+  // what the finance dashboard reports as net AR.
+  const accountQuery = useQuery({
+    queryKey: ['student-fee-account', studentId],
     queryFn: () =>
-      listFeeLineItems(1, 100, studentId) as Promise<FeeLineItemsResponse>,
+      listStudentFeeAccounts(1, 1, undefined, studentId) as Promise<Paged<FeeAccount>>,
+    staleTime: 60_000,
+  });
+
+  const invoicesQuery = useQuery({
+    queryKey: ['student-invoices', studentId],
+    queryFn: () =>
+      listInvoices(1, 100, undefined, studentId) as Promise<Paged<StudentInvoice>>,
+    staleTime: 60_000,
+  });
+
+  const paymentsQuery = useQuery({
+    queryKey: ['student-payments', studentId],
+    queryFn: () => listPayments(1, 200, studentId) as Promise<Paged<PaymentRow>>,
     staleTime: 60_000,
   });
 
@@ -296,22 +368,50 @@ export default function StudentFeeStructurePanel({ studentId }: Props) {
     staleTime: 60_000,
   });
 
-  const items = lineItemsQuery.data?.items ?? [];
   const pins = pinsQuery.data?.pins ?? [];
   const active = activePin(pins);
   const holds = holdsQuery.data?.items ?? [];
 
   const totals = useMemo(() => {
-    const billed = items.reduce((s, x) => s + x.amount, 0);
-    const paid = items.reduce((s, x) => s + x.paidAmount, 0);
-    const waived = items.reduce((s, x) => s + x.waivedAmount, 0);
-    const balance = billed - paid - waived;
-    return { billed, paid, waived, balance };
-  }, [items]);
+    const acct = accountQuery.data?.items?.[0];
+    return {
+      billed: acct?.totalDue ?? 0,
+      paid: acct?.totalPaid ?? 0,
+      waived: acct?.totalWaived ?? 0,
+      balance: acct?.balance ?? 0,
+    };
+  }, [accountQuery.data]);
+
+  const rows = useMemo<InvoiceRow[]>(() => {
+    const invoices = invoicesQuery.data?.items ?? [];
+    const payments = paymentsQuery.data?.items ?? [];
+
+    // Invoice carries no paid amount, so fold this student's successful
+    // payments onto their invoiceId. Unapplied payments (no invoiceId) reduce
+    // the account balance but belong to no row — they show in the totals only.
+    const paidByInvoice = new Map<string, number>();
+    for (const p of payments) {
+      if (p.status && p.status !== 'success') continue;
+      const raw = p.invoiceId;
+      const id = typeof raw === 'string' ? raw : raw?._id;
+      if (!id) continue;
+      paidByInvoice.set(id, (paidByInvoice.get(id) ?? 0) + p.amount);
+    }
+
+    return invoices.map((inv) => {
+      const amount = inv.netPayable ?? inv.totalAmount ?? 0;
+      const paid = paidByInvoice.get(inv._id) ?? 0;
+      const waived = (inv.scholarshipAllocated ?? 0) + (inv.concessionApplied ?? 0);
+      return { ...inv, amount, paid, waived, balance: amount - paid - waived };
+    });
+  }, [invoicesQuery.data, paymentsQuery.data]);
 
   const isLoading =
-    pinsQuery.isLoading || lineItemsQuery.isLoading || holdsQuery.isLoading;
-  const isError = pinsQuery.isError || lineItemsQuery.isError || holdsQuery.isError;
+    pinsQuery.isLoading || accountQuery.isLoading || invoicesQuery.isLoading
+    || paymentsQuery.isLoading || holdsQuery.isLoading;
+  const isError =
+    pinsQuery.isError || accountQuery.isError || invoicesQuery.isError
+    || paymentsQuery.isError || holdsQuery.isError;
 
   return (
     <section className="mt-6">
@@ -350,7 +450,7 @@ export default function StudentFeeStructurePanel({ studentId }: Props) {
             />
           </div>
 
-          <ComponentBreakdownTable items={items} />
+          <InvoiceBreakdownTable rows={rows} />
         </>
       )}
     </section>

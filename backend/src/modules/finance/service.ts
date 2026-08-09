@@ -11,7 +11,7 @@ import { ScholarshipAllocation } from '../../models/finance/ScholarshipAllocatio
 import { Concession } from '../../models/finance/Concession';
 import { Refund } from '../../models/finance/Refund';
 import { FinePenalty } from '../../models/finance/FinePenalty';
-import { Invoice } from '../../models/finance/Invoice';
+import { Invoice, IInvoice } from '../../models/finance/Invoice';
 import { Budget } from '../../models/finance/Budget';
 import { Expense } from '../../models/finance/Expense';
 import { FinancialLedger } from '../../models/finance/FinancialLedger';
@@ -51,10 +51,18 @@ const STUDENT_POPULATE = { path: 'studentId', populate: { path: 'personId' } };
 async function assertStudentFeeGuardianReady(collegeId: string, studentId?: string) {
   if (!studentId) return;
 
+  // Existence + college-match ALWAYS runs — even with guardian enforcement off — or a
+  // college-A caller could write finance records referencing a college-B studentId
+  // (orphan rows, cross-tenant AR noise). G2-M1.
   const student = await Student.findOne({ _id: studentId, collegeId }).lean();
   if (!student) {
     throw new AppError(404, 'Student not found');
   }
+  // DEMO CHOICE (2026-07): the fee-guardian REQUIREMENT is flag-gated OFF, so
+  // bulk-imported students can be billed/paid without a linked guardian. The guard
+  // exists because production finance needs a payer-of-record (receipts, dunning,
+  // refunds). RE-ENABLE for real-college onboarding: FINANCE_ENFORCE_FEE_GUARDIAN=true.
+  if (process.env.FINANCE_ENFORCE_FEE_GUARDIAN !== 'true') return;
   if (!student.feeResponsibleParentId) {
     throw new AppError(400, 'Fee responsible guardian is required before creating finance records for this student');
   }
@@ -65,7 +73,7 @@ export async function getStats(collegeId: string) {
   const [
     feeStructures, studentFeeAccounts, feeLineItems, payments,
     scholarships, concessions, refunds, budgets, expenses, invoices,
-    fines, pendingLineItems, overdueLineItems,
+    fines, pendingLineItems, overdueLineItems, overdueInvoices,
   ] = await Promise.all([
     FeeStructure.countDocuments({ collegeId }),
     StudentFeeAccount.countDocuments({ collegeId }),
@@ -80,6 +88,13 @@ export async function getStats(collegeId: string) {
     FinePenalty.countDocuments({ collegeId }),
     FeeLineItem.countDocuments({ collegeId, status: 'pending' }),
     FeeLineItem.countDocuments({ collegeId, status: 'overdue' }),
+    // Overdue on the pin→invoice billing path: issued, past due, not settled.
+    // `draft` is excluded because nothing was ever presented to the payer.
+    Invoice.countDocuments({
+      collegeId,
+      dueDate: { $lt: new Date() },
+      status: { $nin: ['paid', 'cancelled', 'written_off', 'draft'] },
+    }),
   ]);
 
   // Aggregate totals.
@@ -93,15 +108,22 @@ export async function getStats(collegeId: string) {
     { $match: { collegeId: cidObj, status: 'success' } },
     { $group: { _id: null, total: { $sum: '$amount' } } },
   ]);
-  const [pendingAgg] = await FeeLineItem.aggregate([
-    { $match: { collegeId: cidObj, status: { $in: ['pending', 'partial', 'overdue'] } } },
-    { $group: { _id: null, total: { $sum: { $subtract: ['$amount', '$paidAmount'] } } } },
+  // NET Accounts Receivable = Σ StudentFeeAccount.balance — the same source the
+  // analytics dashboard uses (fee-analytics-service.ts:253). This previously summed
+  // FeeLineItem, a collection the pin→invoice billing path never writes, so the hub
+  // reported a frozen number that contradicted the dashboard. Reading the maintained
+  // balance is also what makes a PARTIAL payment move the figure.
+  const [pendingAgg] = await StudentFeeAccount.aggregate([
+    { $match: { collegeId: cidObj } },
+    { $group: { _id: null, total: { $sum: '$balance' } } },
   ]);
 
   return {
     feeStructures, studentFeeAccounts, feeLineItems, payments,
     scholarships, concessions, refunds, budgets, expenses, invoices, fines,
-    pendingLineItems, overdueLineItems,
+    // `pendingLineItems`/`overdueLineItems` still describe the manual FeeLineItem
+    // ledger, which has its own page. `overdueInvoices` is the billing-path figure.
+    pendingLineItems, overdueLineItems, overdueInvoices,
     totalCollected: collectionAgg?.total || 0,
     totalPending: pendingAgg?.total || 0,
   };
@@ -180,8 +202,9 @@ export async function deleteFeeStructure(collegeId: string, id: string, who: str
 
 // ═══ Student Fee Account ══════════════════════════════════
 
-export async function listStudentFeeAccounts(collegeId: string, page = 1, limit = 20, authScope?: AuthScope) {
+export async function listStudentFeeAccounts(collegeId: string, page = 1, limit = 20, studentId?: string, authScope?: AuthScope) {
   const filter: any = { collegeId };
+  if (studentId) filter.studentId = studentId;
   if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
   return paginate(StudentFeeAccount, filter, page, limit, { createdAt: -1 }, [STUDENT_POPULATE] as any);
 }
@@ -273,13 +296,48 @@ export async function createPayment(collegeId: string, data: any, who: string) {
     ? data.receiptNumber.trim()
     : await generateReceiptNumber(collegeId, paymentDate);
 
+  // 007 — when the payment targets an invoice, apply it against that invoice and the
+  // student's balance so recording a payment reduces Accounts Receivable live.
+  let targetInvoice: IInvoice | null = null;
+  if (data.invoiceId) {
+    targetInvoice = await Invoice.findOne({ _id: data.invoiceId, collegeId, studentId: data.studentId });
+    if (!targetInvoice) throw new AppError(400, 'Invoice not found for this student');
+    // Overpayment guard, BEFORE writing the Payment. Sum prior successful payments.
+    const [agg] = await Payment.aggregate([
+      { $match: { collegeId: new mongoose.Types.ObjectId(collegeId), invoiceId: targetInvoice._id, status: 'success' } },
+      { $group: { _id: null, paid: { $sum: '$amount' } } },
+    ]);
+    const paidSoFar: number = agg?.paid ?? 0;
+    const net = targetInvoice.netPayable ?? targetInvoice.totalAmount;
+    if (data.amount > net - paidSoFar) {
+      throw new AppError(400, "Payment exceeds the invoice's remaining balance");
+    }
+  }
+
   const doc = await Payment.create({
     ...data,
     collegeId,
     receiptNumber,
     paymentDate,
   });
-  // Update allocated line items
+
+  // 007 — apply to the invoice + student account (status is always 'success' now).
+  if (targetInvoice && doc.status === 'success') {
+    const paidNow = await Payment.aggregate([
+      { $match: { collegeId: new mongoose.Types.ObjectId(collegeId), invoiceId: targetInvoice._id, status: 'success' } },
+      { $group: { _id: null, paid: { $sum: '$amount' } } },
+    ]).then(([r]) => (r?.paid ?? 0) as number);
+    const net = targetInvoice.netPayable ?? targetInvoice.totalAmount;
+    targetInvoice.status = paidNow >= net ? 'paid' : 'partially_paid';
+    await targetInvoice.save();
+    await StudentFeeAccount.findOneAndUpdate(
+      { collegeId, studentId: data.studentId },
+      { $inc: { totalPaid: doc.amount, balance: -doc.amount }, $set: { lastPaymentDate: paymentDate } },
+      { upsert: true },
+    );
+  }
+
+  // Update allocated line items (legacy FeeLineItem path — unused by 007, kept for compat)
   if (data.allocations?.length) {
     for (const alloc of data.allocations) {
       await FeeLineItem.findByIdAndUpdate(alloc.lineItemId, {
@@ -308,6 +366,27 @@ export async function updatePayment(collegeId: string, id: string, data: any, wh
 export async function deletePayment(collegeId: string, id: string, who: string) {
   const doc = await Payment.findOneAndDelete({ _id: id, collegeId });
   if (!doc) throw new AppError(404, 'Payment not found');
+  // 007 — delete is the correction path for a mis-keyed counter payment, so it must
+  // REVERSE the balance effect (removing the UI status controls left delete as the only
+  // way to undo one). A settled, invoice-linked payment credited the account and moved
+  // the invoice status; undo both. A bare payment (no invoiceId) had no such effect.
+  if (doc.status === 'success' && doc.invoiceId) {
+    await StudentFeeAccount.findOneAndUpdate(
+      { collegeId, studentId: doc.studentId },
+      { $inc: { totalPaid: -doc.amount, balance: doc.amount } },
+    );
+    const invoice = await Invoice.findOne({ _id: doc.invoiceId, collegeId });
+    if (invoice) {
+      const [agg] = await Payment.aggregate([
+        { $match: { collegeId: new mongoose.Types.ObjectId(collegeId), invoiceId: invoice._id, status: 'success' } },
+        { $group: { _id: null, paid: { $sum: '$amount' } } },
+      ]);
+      const paid: number = agg?.paid ?? 0;
+      const net = invoice.netPayable ?? invoice.totalAmount;
+      invoice.status = paid <= 0 ? 'generated' : paid >= net ? 'paid' : 'partially_paid';
+      await invoice.save();
+    }
+  }
   await createAuditLog({ collegeId, entityType: 'Payment', entityId: id, entityName: doc.receiptNumber, action: 'delete', changes: [], performedBy: who });
   return doc;
 }
@@ -487,10 +566,12 @@ export async function deleteFinePenalty(collegeId: string, id: string, who: stri
 
 // ═══ Invoices ═════════════════════════════════════════════
 
-export async function listInvoices(collegeId: string, page = 1, limit = 20, status?: string, studentId?: string, authScope?: AuthScope) {
+export async function listInvoices(collegeId: string, page = 1, limit = 20, status?: string, studentId?: string, authScope?: AuthScope, semesterId?: string) {
   const filter: any = { collegeId };
   if (status) filter.status = status;
   if (studentId) filter.studentId = studentId;
+  // Drill-down from the billing-history table.
+  if (semesterId) filter.semesterId = semesterId;
   if (authScope) applyAuthScope(filter, authScope, { selfField: 'studentId' });
   return paginate(Invoice, filter, page, limit, { createdAt: -1 }, [STUDENT_POPULATE] as any);
 }

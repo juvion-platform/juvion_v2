@@ -487,7 +487,11 @@ export default function StudentImportDrawer({ open, onClose }: Props) {
                     <th className="px-3 py-2 text-left font-medium text-gray-600">Resolves to</th>
                     <th className="px-3 py-2 text-left font-medium text-gray-600">Fee structure</th>
                     <th className="px-3 py-2 text-left font-medium text-gray-600">Status</th>
-                    <th className="px-3 py-2 text-left font-medium text-gray-600">Issues</th>
+                    {/* Not "Issues" — most rows here are clean, and the cell is
+                        carrying what the commit WILL do (pin a fee, create a
+                        guardian). Errors are the exception, and the Status
+                        column already flags them. */}
+                    <th className="px-3 py-2 text-left font-medium text-gray-600">Notes</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">

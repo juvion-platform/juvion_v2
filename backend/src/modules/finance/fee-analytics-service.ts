@@ -22,6 +22,7 @@ import { Types, PipelineStage } from 'mongoose';
 
 import { Invoice } from '../../models/finance/Invoice';
 import { Payment } from '../../models/finance/Payment';
+import { StudentFeeAccount } from '../../models/finance/StudentFeeAccount';
 import { DefaulterRecord } from '../../models/finance/DefaulterRecord';
 
 // ── Types ─────────────────────────────────────────────────────────────
@@ -249,12 +250,16 @@ export async function getDashboard(
 
   const { from, to } = filters;
 
-  // ── 1. totalOutstanding — sum of totalAmount on unpaid invoices,
-  //      minus successful payments for those students.
+  // ── 1. totalOutstanding — NET Accounts Receivable = Σ StudentFeeAccount.balance
+  //      (dues − paid − waived + refunded, maintained by the payment path). Reading the
+  //      net balance rather than gross unpaid-invoice totals is what makes a PARTIAL
+  //      payment move AR live (007). `collegeObjId` (cast) is load-bearing — aggregate()
+  //      does not auto-cast the string, so a raw string would silently sum to 0 (G2-M5).
+  // NICE-TO-HAVE (later, out of scope): AR aging buckets (0–30 / 30–60 / 60–90 / 90+).
   const outstandingPipeline: PipelineStage[] = [
-    { $match: { collegeId: collegeObjId, status: { $in: UNPAID_INVOICE_STATUSES } } },
+    { $match: { collegeId: collegeObjId } },
     ...addStudentScopeStages(programmeScope, 'studentId'),
-    { $group: { _id: null, due: { $sum: '$totalAmount' } } },
+    { $group: { _id: null, due: { $sum: '$balance' } } },
   ];
 
   // ── 2. collectedInRange — sum of successful Payment.amount in window.
@@ -370,15 +375,8 @@ export async function getDashboard(
       $group: {
         _id: '$_programme._id',
         programmeName: { $first: '$_programme.name' },
-        due: {
-          $sum: {
-            $cond: [
-              { $in: ['$status', UNPAID_INVOICE_STATUSES] },
-              '$totalAmount',
-              0,
-            ],
-          },
-        },
+        // 007 — net receivable per programme, same source as totalOutstanding.
+        due: { $sum: '$balance' },
       },
     },
     { $sort: { programmeName: 1 } },
@@ -473,7 +471,7 @@ export async function getDashboard(
     dueByMonthRows,
     collectedByMonthRows,
   ] = await Promise.all([
-    Invoice.aggregate<{ _id: null; due: number }>(outstandingPipeline),
+    StudentFeeAccount.aggregate<{ _id: null; due: number }>(outstandingPipeline),
     Payment.aggregate<{ _id: null; amount: number }>(collectedPipeline),
     DefaulterRecord.aggregate<{ _id: string; count: number }>(funnelPipeline),
     DefaulterRecord.aggregate<{ overdueStudentsCount: number; overdueAmount: number }>(
@@ -481,7 +479,7 @@ export async function getDashboard(
     ),
     Payment.aggregate<{ _id: Date; amount: number }>(timeSeriesPipeline),
     Payment.aggregate<{ _id: string | null; amount: number }>(modePipeline),
-    Invoice.aggregate<{ _id: Types.ObjectId; programmeName: string; due: number }>(
+    StudentFeeAccount.aggregate<{ _id: Types.ObjectId; programmeName: string; due: number }>(
       byProgrammePipeline,
     ),
     Payment.aggregate<{ _id: Types.ObjectId; collected: number }>(

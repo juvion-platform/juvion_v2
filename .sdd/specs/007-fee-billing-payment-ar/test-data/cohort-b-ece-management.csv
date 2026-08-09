@@ -1,0 +1,6 @@
+name,phone,email,gender,dob,aadhaar,addressLine1,addressLine2,city,state,pincode,programmeCode,branchCode,batchCode,regulationCode,admissionYear,studyYearAtAdmission,rollNumber,quota,category,status,primaryParentPhone,primaryParentName,feeResponsibleParentPhone
+Meera Krishnan,9900000011,meera.krishnan@demo.edu,female,2007-02-19,500000000201,3 Kondapur,,Hyderabad,Telangana,500084,BTECH,ECE,,R22,2025,1,25B01A0411,management,OC,active,9900001011,Rajan Krishnan,9900001011
+Arjun Pillai,9900000012,arjun.pillai@demo.edu,male,2007-09-28,500000000202,62 Miyapur,Block C,Hyderabad,Telangana,500049,BTECH,ECE,,R22,2025,1,25B01A0412,management,OC,active,9900001012,Vinod Pillai,9900001012
+Divya Bhat,9900000013,divya.bhat@demo.edu,female,2007-05-14,500000000203,19 Begumpet,,Hyderabad,Telangana,500016,BTECH,ECE,,R22,2025,1,25B01A0413,management,OC,active,9900001013,Ganesh Bhat,9900001013
+Karthik Shetty,9900000014,karthik.shetty@demo.edu,male,2007-12-02,500000000204,101 Ameerpet,Above SBI,Hyderabad,Telangana,500038,BTECH,ECE,,R22,2025,1,25B01A0414,management,OC,active,9900001014,Sunil Shetty,9900001014
+Nisha Gowda,9900000015,nisha.gowda@demo.edu,female,2007-07-21,500000000205,56 Manikonda,,Hyderabad,Telangana,500089,BTECH,ECE,,R22,2025,1,25B01A0415,management,OC,active,9900001015,Harish Gowda,9900001015

@@ -12,10 +12,14 @@
  * the nightly `fee-pin-audit` BullMQ job (Task 17) writes historical
  * snapshots to a dedicated collection.
  *
- * Year-of-study derivation uses the canonical `resolveStudentYearOfStudy`
- * helper (T20, OQ-11). If a student's year-of-study can't be resolved
- * (missing Batch, missing active AcademicYear, etc.) they are classified
- * as "missing pin" so Finance can investigate the upstream data issue.
+ * Year-of-study derivation uses `resolvePinYearForExistingStudent` — the same
+ * helper the write paths use (billing, bulk-pin, import auto-pin), which falls
+ * back to `studyYearAtAdmission` when a student has no Batch. Coverage must
+ * answer the question billing answers; using the stricter
+ * `resolveStudentYearOfStudy` here meant every batch-less student was reported
+ * as having no usable pin even when they were pinned and billable.
+ * A batch-less student who is NOT pinned is still surfaced as
+ * `year-unresolvable` — assigning a batch remains the Registrar's job.
  *
  * Spec: .captain/specs/fee-configuration/spec.md
  * Plan: .captain/specs/fee-configuration/plan.md §1.9, §5
@@ -32,6 +36,7 @@ import { resolveMatchingFeeStructureInstance } from './fee-pin-service';
 import { FeeStructureInstance } from '../../models/finance/FeeStructureInstance';
 import { Invoice } from '../../models/finance/Invoice';
 import { resolveStudentYearOfStudy } from './resolve-year-of-study';
+import { resolvePinYearForExistingStudent } from '../people/student-import-pin';
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -156,6 +161,9 @@ export async function getCoverage(
     .select({
       _id: 1, collegeId: 1, personId: 1, rollNumber: 1, programmeId: 1, branchId: 1,
       quota: 1, category: 1, feePins: 1, feeResponsibleParentId: 1,
+      // Feeds the batch-less fallback in resolvePinYearForExistingStudent.
+      // Omit it and every batch-less student silently resolves to Year 1.
+      studyYearAtAdmission: 1,
     })
     .lean();
 
@@ -215,28 +223,35 @@ export async function getCoverage(
       category: s.category,
     };
 
-    // Year-of-study comes from the canonical helper, which needs a Batch.
-    // A student without one is not "unpinned" — we cannot even say which
-    // year to look at — so it is its own reason, owned by the Registrar.
-    let yearOfStudy = 0;
-    try {
-      yearOfStudy = (await resolveStudentYearOfStudy(String(s._id))).yearOfStudy;
-    } catch {
-      yearOfStudy = 0;
-    }
-
-    if (yearOfStudy === 0) {
-      flagged.push({
-        studentId: String(s._id), personId: s.personId, name: '',
-        ...axes, yearOfStudy, reason: 'year-unresolvable',
-      });
-      continue;
-    }
+    // Year-of-study via the SAME helper the write paths use
+    // (`fee-billing-service`, `bulk-pin-service`, import auto-pin). It falls
+    // back to `studyYearAtAdmission` when there is no Batch, so it always
+    // answers. Coverage previously called `resolveStudentYearOfStudy`
+    // directly, which hard-fails without a Batch — and because that check ran
+    // BEFORE the pin lookup, a batch-less student with a perfectly good pin
+    // was bucketed `year-unresolvable` and never counted as covered. Coverage
+    // was measuring a different question from the one billing answers.
+    const { yearOfStudy, derivedFrom } = await resolvePinYearForExistingStudent(
+      String(s._id),
+      s.studyYearAtAdmission,
+    );
 
     const pins = (s.feePins ?? []) as unknown as Array<{
       yearOfStudy: number; archivedAt?: Date | null;
     }>;
     const hasActive = pins.some((p) => p.yearOfStudy === yearOfStudy && !p.archivedAt);
+
+    // No batch AND no pin: still the Registrar's job (E4/F12). The assumed
+    // year is not reported — we are guessing it, and `yearOfStudy: 0` keeps
+    // the "we do not know" contract the UI renders as "—". A batch-less
+    // student who IS pinned no longer lands here; billing would bill them.
+    if (!hasActive && derivedFrom === 'admission') {
+      flagged.push({
+        studentId: String(s._id), personId: s.personId, name: '',
+        ...axes, yearOfStudy: 0, reason: 'year-unresolvable',
+      });
+      continue;
+    }
 
     if (hasActive) {
       withActivePin += 1;

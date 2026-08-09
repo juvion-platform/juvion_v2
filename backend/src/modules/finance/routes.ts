@@ -40,6 +40,7 @@ import {
   evaluateFeeRulesSchema,
   testFeeRulesSchema,
   generateSemesterInvoiceBatchSchema,
+  generateFeeBillsSchema,
   generateEnrolmentInvoiceSchema,
   generateExamFeeInvoiceBatchSchema,
   generateAdHocInvoiceSchema,
@@ -311,6 +312,10 @@ router.put('/fines/:id', authorize('finance', 'update'), validate(updateFinePena
 router.delete('/fines/:id', authorize('finance', 'delete'), ctrl.deleteFinePenalty);
 
 // ═══ W03: Invoice Batch Generation ═══════════════════════════
+// 007 — pin-driven semester-installment billing. finance:create for parity with the
+// other invoice-generation routes below (bulk-pin is finance:approve — a separate
+// pinning precedent; bump this to approve if batch billing must be gated higher).
+router.post('/invoices/generate-from-pins', authorize('finance', 'create'), validate(generateFeeBillsSchema), ctrl.generateFeeBillsCtrl);
 router.post('/invoices/batch/semester', authorize('finance', 'create'), validate(generateSemesterInvoiceBatchSchema), ctrl.generateSemesterInvoiceBatch);
 router.post('/invoices/enrolment', authorize('finance', 'create'), validate(generateEnrolmentInvoiceSchema), ctrl.generateEnrolmentInvoice);
 router.post('/invoices/batch/exam', authorize('finance', 'create'), validate(generateExamFeeInvoiceBatchSchema), ctrl.generateExamFeeInvoiceBatch);
@@ -318,6 +323,16 @@ router.post('/invoices/ad-hoc', authorize('finance', 'create'), validate(generat
 
 // Invoices
 router.get('/invoices', authorize('finance', 'read'), ctrl.listInvoices);
+// 007 — what has been billed per semester, for the Generate Bills console.
+//
+// MUST stay above `/invoices/:id`: Express matches in declaration order, so
+// registering it after would resolve 'billing-history' as an :id and hand it to
+// getInvoice, which fails as a cast error that looks nothing like a routing bug.
+//
+// finance:create, not read — this is billing-run history on a screen already
+// gated finance:create. A read gate would advertise access the only caller never
+// grants.
+router.get('/invoices/billing-history', authorize('finance', 'create'), ctrl.billingHistoryCtrl);
 router.get('/invoices/:id', authorize('finance', 'read'), ctrl.getInvoice);
 router.post('/invoices', authorize('finance', 'create'), validate(createInvoiceSchema), ctrl.createInvoice);
 router.put('/invoices/:id', authorize('finance', 'update'), validate(updateInvoiceSchema), ctrl.updateInvoice);

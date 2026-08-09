@@ -68,11 +68,23 @@ export const createPaymentSchema = z.object({
     lineItemId: z.string().min(1),
     amount: z.number().min(0),
   })).optional(),
-  status: z.enum(['success', 'pending', 'failed', 'reversed']).optional(),
+  // 007 — the invoice this payment settles. When present, createPayment applies the
+  // amount to that invoice and decrements StudentFeeAccount.balance.
+  invoiceId: z.string().min(1).optional(),
   collectedBy: z.string().optional(),
   remarks: z.string().optional(),
+  // NOTE (007): `status` is deliberately NOT accepted. Counter/manual capture is always
+  // money-in-hand → the model default 'success' is the only reachable value. Allowing a
+  // client to set status (esp. via PUT) would desync AR with no reversal. See T7/§4.3a.
 });
-export const updatePaymentSchema = createPaymentSchema.partial();
+// 007 — standalone .strict() schema, NOT createPaymentSchema.partial(). A partial would
+// still accept amount/invoiceId/status on PUT, and updatePayment does a raw
+// findOneAndUpdate with no recompute → AR desync. Only non-financial fields are editable;
+// corrections go through delete-and-reenter (deletePayment reverses the balance).
+export const updatePaymentSchema = z.object({
+  remarks: z.string().optional(),
+  transactionRef: z.string().optional(),
+}).strict();
 
 // ═══ Scholarships ═════════════════════════════════════════
 
@@ -340,6 +352,29 @@ export const testFeeRulesSchema = z.object({
 export const generateSemesterInvoiceBatchSchema = z.object({
   semesterId: z.string().min(1),
   academicYearId: z.string().min(1),
+});
+
+// 007 — pin-driven semester-installment billing. `studentIds` omitted = bill every
+// active pinned student; `yearOfStudy` narrows; `dryRun` previews without writing.
+export const generateFeeBillsSchema = z.object({
+  semesterId: z.string().min(1),
+  /**
+   * `.min(1)` on the ARRAY is a correctness guard, not tidying: an empty array
+   * would pass validation, then fail the `length > 0` check in
+   * fee-billing-service and fall through to billing EVERY pinned student in the
+   * college. Untick everything, press Generate, mass-bill. Reject it here.
+   */
+  studentIds: z.array(z.string().min(1)).min(1).optional(),
+  yearOfStudy: z.number().int().min(1).max(8).optional(),
+  programmeId: z.string().min(1).optional(),
+  branchId: z.string().min(1).optional(),
+  /**
+   * Announced deadline; omit for the standing +30 days. Deliberately NOT
+   * constrained to the future — a late-entered installment is genuinely overdue
+   * on arrival, which is a true statement rather than an input error.
+   */
+  dueDate: z.coerce.date().optional(),
+  dryRun: z.boolean().optional(),
 });
 
 export const generateEnrolmentInvoiceSchema = z.object({

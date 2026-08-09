@@ -4,6 +4,8 @@ import * as service from '../service';
 import { Student } from '../../../models/people/Student';
 import { Payment } from '../../../models/finance/Payment';
 import { FeeLineItem } from '../../../models/finance/FeeLineItem';
+import { StudentFeeAccount } from '../../../models/finance/StudentFeeAccount';
+import { Invoice } from '../../../models/finance/Invoice';
 import { AuditLog } from '../../../shared/audit';
 import { setupMongo, teardownMongo, clearCollections } from '../../../__tests__/helpers/mongoMemory';
 
@@ -255,17 +257,24 @@ describe('finance.createPayment — money paths', () => {
   });
 
   describe('student fee-guardian gate', () => {
-    it('rejects 400 when student has no feeResponsibleParentId', async () => {
-      const cid = String(oid());
-      const student = await seedStudent(cid, { withGuardian: false });
+    // 007 T8 — the guardian REQUIREMENT is now flag-gated (off for the demo). Pin it ON
+    // to exercise the guard; flag-off behaviour is covered by guardian-flag-007.test.ts.
+    it('rejects 400 when enforcement is ON and student has no feeResponsibleParentId', async () => {
+      process.env.FINANCE_ENFORCE_FEE_GUARDIAN = 'true';
+      try {
+        const cid = String(oid());
+        const student = await seedStudent(cid, { withGuardian: false });
 
-      await expect(
-        service.createPayment(cid, {
-          studentId: String(student._id),
-          amount: 1000,
-          paymentMode: 'cash',
-        }, 'u'),
-      ).rejects.toMatchObject({ statusCode: 400 });
+        await expect(
+          service.createPayment(cid, {
+            studentId: String(student._id),
+            amount: 1000,
+            paymentMode: 'cash',
+          }, 'u'),
+        ).rejects.toMatchObject({ statusCode: 400 });
+      } finally {
+        delete process.env.FINANCE_ENFORCE_FEE_GUARDIAN;
+      }
     });
 
     it('rejects 404 when studentId does not exist', async () => {
@@ -334,24 +343,50 @@ describe('finance.getStats — aggregate math', () => {
     expect(stats.totalCollected).toBe(5000); // only the 'success' one
   });
 
-  it("sums (amount - paidAmount) of pending/partial/overdue into totalPending", async () => {
+  it('sums StudentFeeAccount.balance into totalPending — NOT FeeLineItem', async () => {
     const cid = String(oid());
-    const student = await seedStudent(cid);
+    const s1 = await seedStudent(cid);
+    const s2 = await seedStudent(cid);
 
-    // Pending: amount 10000, paid 0 → 10000 outstanding
-    await seedLineItem(cid, student._id, 10000, 0);
-    // Partial: amount 5000, paid 2000 → 3000 outstanding
-    await seedLineItem(cid, student._id, 5000, 2000);
-    // Paid (shouldn't count): amount 4000, paid 4000
-    await seedLineItem(cid, student._id, 4000, 4000);
-    // Overdue: set manually
-    const overdue = await seedLineItem(cid, student._id, 6000, 1000);
-    overdue.status = 'overdue';
-    await overdue.save();
+    // Net AR is the maintained balance, so a PARTIAL payment is already
+    // reflected: 60000 billed − 25000 paid = 35000 still receivable.
+    await StudentFeeAccount.create({
+      collegeId: cid, studentId: s1._id, totalDue: 60000, totalPaid: 25000, balance: 35000,
+    });
+    await StudentFeeAccount.create({
+      collegeId: cid, studentId: s2._id, totalDue: 60000, totalPaid: 0, balance: 60000,
+    });
+
+    // Regression guard: the hub used to read FeeLineItem, a collection the
+    // pin→invoice billing path never writes. A stray row must not leak in.
+    await seedLineItem(cid, s1._id, 999999, 0);
 
     const stats = await service.getStats(cid);
-    // 10000 + 3000 + 5000 = 18000 ('paid' excluded)
-    expect(stats.totalPending).toBe(18000);
+    expect(stats.totalPending).toBe(95000);
+  });
+
+  it('counts only past-due unsettled invoices into overdueInvoices', async () => {
+    const cid = String(oid());
+    const student = await seedStudent(cid);
+    const past = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const future = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    const inv = (invoiceNumber: string, dueDate: Date, status: string) =>
+      Invoice.create({
+        collegeId: cid, studentId: student._id, invoiceNumber, type: 'fee',
+        totalAmount: 1000, netPayable: 1000, dueDate, status,
+      });
+
+    await inv('I-1', past, 'generated');       // counts
+    await inv('I-2', past, 'partially_paid');  // counts
+    await inv('I-3', past, 'paid');            // settled — excluded
+    await inv('I-4', past, 'cancelled');       // void — excluded
+    await inv('I-5', past, 'written_off');     // void — excluded
+    await inv('I-6', past, 'draft');           // never issued — excluded
+    await inv('I-7', future, 'generated');     // not yet due — excluded
+
+    const stats = await service.getStats(cid);
+    expect(stats.overdueInvoices).toBe(2);
   });
 
   it('returns 0s for a college with no data', async () => {
