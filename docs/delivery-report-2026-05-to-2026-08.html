@@ -1,0 +1,802 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Juvion v2 — Delivery Report, May–August 2026</title>
+<meta name="description" content="What shipped in Juvion v2 between 13 May and 9 August 2026, compiled from 131 commits across 30 pull requests.">
+<style>
+  /* ─────────────────────────────────────────────────────────────
+     Tokens. Palette derived from admin-portal/tailwind.config.js
+     (navy #0F2744, primary-500 #2B6CB0, teal #38B2AC, orange).
+     Complete light palette lives on bare :root.
+     ───────────────────────────────────────────────────────────── */
+  :root {
+    --ground:        #F1F5F9;
+    --surface:       #FFFFFF;
+    --surface-sunk:  #E7EEF5;
+    --rule:          #D2DEE9;
+    --rule-soft:     #E3EBF3;
+
+    --ink:           #0F2744;
+    --body:          #33415A;
+    --muted:         #6B7A93;
+    --faint:         #93A2B8;
+
+    --accent:        #2B6CB0;
+    --accent-deep:   #1E4F82;
+    --accent-wash:   #E4EDF7;
+
+    --shadow: 0 1px 2px rgba(15,39,68,.05), 0 8px 24px -12px rgba(15,39,68,.16);
+
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, "Times New Roman", serif;
+    --sans:  ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono:  ui-monospace, "SF Mono", SFMono-Regular, "Cascadia Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:       #0A1524;
+      --surface:      #102034;
+      --surface-sunk: #16293F;
+      --rule:         #24405E;
+      --rule-soft:    #1B3350;
+      --ink:          #E8F0F9;
+      --body:         #BFD0E2;
+      --muted:        #8CA2BC;
+      --faint:        #647993;
+      --accent:       #7BAED4;
+      --accent-deep:  #A9CBE6;
+      --accent-wash:  #17304B;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 28px -14px rgba(0,0,0,.6);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:       #0A1524;
+    --surface:      #102034;
+    --surface-sunk: #16293F;
+    --rule:         #24405E;
+    --rule-soft:    #1B3350;
+    --ink:          #E8F0F9;
+    --body:         #BFD0E2;
+    --muted:        #8CA2BC;
+    --faint:        #647993;
+    --accent:       #7BAED4;
+    --accent-deep:  #A9CBE6;
+    --accent-wash:  #17304B;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 28px -14px rgba(0,0,0,.6);
+  }
+
+  /* ── Base ─────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--body);
+    font-family: var(--sans);
+    font-size: 15.5px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .doc {
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 0 24px 88px;
+  }
+
+  /* ── Masthead ─────────────────────────────────────────────── */
+  header.masthead {
+    padding: 60px 0 30px;
+    border-bottom: 2px solid var(--ink);
+  }
+
+  .kicker {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 16px;
+  }
+
+  h1 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(2rem, 4.8vw, 2.9rem);
+    line-height: 1.08;
+    letter-spacing: -.015em;
+    color: var(--ink);
+    text-wrap: balance;
+    margin: 0 0 20px;
+    max-width: 22ch;
+  }
+
+  dl.meta {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 6px 20px;
+    margin: 0;
+    font-size: .925rem;
+  }
+  dl.meta dt {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding-top: 4px;
+  }
+  dl.meta dd { margin: 0; color: var(--body); }
+
+  /* ── Contents ─────────────────────────────────────────────── */
+  nav.toc {
+    margin: 34px 0 0;
+    padding: 20px 24px 18px;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    box-shadow: var(--shadow);
+  }
+  nav.toc h2 {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 12px;
+    max-width: none;
+  }
+  nav.toc ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    columns: 2;
+    column-gap: 36px;
+    font-size: .93rem;
+  }
+  @media (max-width: 640px) { nav.toc ol { columns: 1; } }
+  nav.toc li { margin: 0 0 6px; break-inside: avoid; }
+  nav.toc a { color: var(--accent-deep); text-decoration: none; }
+  nav.toc a:hover, nav.toc a:focus-visible { text-decoration: underline; }
+  nav.toc .n {
+    font-family: var(--mono);
+    font-size: .82em;
+    color: var(--faint);
+    margin-right: 8px;
+  }
+
+  /* ── Sections ─────────────────────────────────────────────── */
+  section { padding: 46px 0 2px; border-top: 1px solid var(--rule-soft); margin-top: 8px; }
+  section:first-of-type { border-top: 0; }
+
+  .sec-meta {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 9px;
+  }
+
+  h2 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(1.45rem, 3.2vw, 1.85rem);
+    line-height: 1.18;
+    letter-spacing: -.012em;
+    color: var(--ink);
+    text-wrap: balance;
+    margin: 0 0 14px;
+    max-width: 28ch;
+  }
+
+  h3 {
+    font-family: var(--sans);
+    font-weight: 650;
+    font-size: 1.02rem;
+    line-height: 1.36;
+    color: var(--ink);
+    text-wrap: balance;
+    margin: 32px 0 8px;
+  }
+
+  h4 {
+    font-family: var(--mono);
+    font-weight: 600;
+    font-size: 11px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 26px 0 9px;
+  }
+
+  p  { margin: 0 0 13px; max-width: 74ch; }
+  ul, ol.body { margin: 0 0 13px; padding-left: 20px; max-width: 74ch; }
+  li { margin-bottom: 6px; }
+  li::marker { color: var(--faint); }
+
+  a { color: var(--accent-deep); }
+  strong { color: var(--ink); font-weight: 640; }
+  em { font-style: italic; }
+
+  .lede { font-size: 1.02rem; max-width: 70ch; }
+
+  /* ── Inline code & commit chips ───────────────────────────── */
+  code {
+    font-family: var(--mono);
+    font-size: .855em;
+    background: var(--surface-sunk);
+    color: var(--ink);
+    padding: 1.5px 5px;
+    border-radius: 3px;
+    word-break: break-word;
+  }
+
+  .sha {
+    font-family: var(--mono);
+    font-size: .8em;
+    letter-spacing: .02em;
+    background: var(--accent-wash);
+    color: var(--accent-deep);
+    border: 1px solid var(--rule);
+    padding: 1px 6px;
+    border-radius: 3px;
+    white-space: nowrap;
+  }
+
+  .shas { margin: 0 0 13px; font-size: .88rem; color: var(--muted); }
+  .shas .sha { margin-right: 4px; }
+
+  /* ── Tables ───────────────────────────────────────────────── */
+  .scroller {
+    overflow-x: auto;
+    margin: 18px 0 16px;
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    background: var(--surface);
+  }
+
+  table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+
+  th {
+    text-align: left;
+    font-family: var(--mono);
+    font-weight: 600;
+    font-size: 10px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 10px 15px;
+    border-bottom: 1px solid var(--rule);
+    background: var(--surface-sunk);
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 11px 15px;
+    border-bottom: 1px solid var(--rule-soft);
+    vertical-align: top;
+    color: var(--body);
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  td.k { color: var(--ink); font-weight: 560; }
+  td.num { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+
+  /* ── Callout ──────────────────────────────────────────────── */
+  .note {
+    border-left: 3px solid var(--accent);
+    background: var(--accent-wash);
+    padding: 15px 20px;
+    border-radius: 0 4px 4px 0;
+    margin: 20px 0;
+  }
+  .note p { margin: 0; max-width: 70ch; font-size: .93rem; }
+  .note p + p { margin-top: 9px; }
+  .note .lbl {
+    display: block;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .11em;
+    text-transform: uppercase;
+    color: var(--accent-deep);
+    margin-bottom: 7px;
+  }
+
+  /* ── Footer ───────────────────────────────────────────────── */
+  footer {
+    margin-top: 58px;
+    padding-top: 20px;
+    border-top: 2px solid var(--ink);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .05em;
+    color: var(--muted);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 9px 26px;
+  }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+
+  /* ── Print ────────────────────────────────────────────────── */
+  @media print {
+    :root {
+      --ground: #FFFFFF; --surface: #FFFFFF; --surface-sunk: #F2F5F8;
+      --rule: #BBC7D4; --rule-soft: #DDE4EC;
+      --ink: #0F2744; --body: #1F2C42; --muted: #4A5A72; --faint: #7A8CA3;
+      --accent: #1E4F82; --accent-deep: #14385E; --accent-wash: #EDF3F9;
+      --shadow: none;
+    }
+    body { font-size: 10.5pt; background: #fff; }
+    .doc { max-width: none; padding: 0; }
+    nav.toc { break-inside: avoid; box-shadow: none; }
+    section { break-before: auto; page-break-inside: auto; }
+    h2, h3, h4 { break-after: avoid; page-break-after: avoid; }
+    .scroller, .note, tr { break-inside: avoid; page-break-inside: avoid; }
+    footer { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="doc">
+
+<header class="masthead">
+  <p class="kicker">Juvion v2 · Engineering delivery report</p>
+  <h1>What shipped, May – August 2026</h1>
+  <dl class="meta">
+    <dt>Period</dt><dd>2026-05-13 → 2026-08-09 (trailing three months to 2026-08-10)</dd>
+    <dt>Scope</dt><dd>All commits merged to <code>main</code> — backend, admin-portal, e2e, <code>.sdd/</code> artifacts</dd>
+    <dt>Method</dt><dd>Read of the full git history, commit bodies and diffstats</dd>
+    <dt>Source</dt><dd><code>docs/delivery-report-2026-05-to-2026-08.md</code> — keep the two in step when editing</dd>
+  </dl>
+</header>
+
+<nav class="toc" aria-label="Contents">
+  <h2>Contents</h2>
+  <ol>
+    <li><span class="n">§</span><a href="#glance">At a glance</a></li>
+    <li><span class="n">1</span><a href="#gaps">Eight strategic gaps</a></li>
+    <li><span class="n">2</span><a href="#ai">The AI layer</a></li>
+    <li><span class="n">3</span><a href="#quality">Test &amp; CI platform</a></li>
+    <li><span class="n">4</span><a href="#feepin">Fee-pin foundations</a></li>
+    <li><span class="n">5</span><a href="#audit">Bug-audit remediation &amp; UX</a></li>
+    <li><span class="n">6</span><a href="#import">Student bulk import</a></li>
+    <li><span class="n">7</span><a href="#billing">Billing, payment &amp; live AR</a></li>
+    <li><span class="n">8</span><a href="#practice">Engineering practices</a></li>
+    <li><span class="n">9</span><a href="#open">Open items</a></li>
+  </ol>
+</nav>
+
+<!-- ══ At a glance ══════════════════════════════════════════ -->
+<section id="glance">
+  <p class="sec-meta">Summary</p>
+  <h2>At a glance</h2>
+
+  <div class="scroller">
+    <table>
+      <thead><tr><th>Measure</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Commits</td><td class="num">131 (99 non-merge)</td></tr>
+        <tr><td class="k">Pull requests</td><td class="num">30 (#57 – #86)</td></tr>
+        <tr><td class="k">Files touched</td><td class="num">634</td></tr>
+        <tr><td class="k">Lines</td><td class="num">+69,212 / −4,080</td></tr>
+        <tr><td class="k">New Mongoose models</td><td class="num">26</td></tr>
+        <tr><td class="k">New test files</td><td class="num">98</td></tr>
+        <tr><td class="k">New Playwright specs</td><td class="num">13</td></tr>
+        <tr><td class="k">Contributors</td><td class="num">5</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Delivery came in two dense bursts rather than a steady drip.</p>
+
+  <div class="scroller">
+    <table>
+      <thead><tr><th>Dates</th><th>Commits</th><th>Theme</th></tr></thead>
+      <tbody>
+        <tr><td class="k">2026-05-13 → 05-18</td><td class="num">70</td><td>Strategic gaps, AI layer, e2e + CI platform</td></tr>
+        <tr><td class="k">2026-05-26 → 05-27</td><td class="num">2</td><td>Fee snapshot at pin time, daily AI cache</td></tr>
+        <tr><td class="k">2026-07-13</td><td class="num">1</td><td>Campus Ops route fix</td></tr>
+        <tr><td class="k">2026-07-26 → 07-31</td><td class="num">24</td><td>Bug-audit remediation, student bulk import, fee-pin coverage</td></tr>
+        <tr><td class="k">2026-08-09</td><td class="num">2</td><td>Semester billing / payment / AR, incremental tsc</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <span class="lbl">Counting caveat</span>
+    <p>The late-period commit counts understate the volume. From 2026-07-26 onward, work landed as squash-merged PRs bundling many underlying commits — <span class="sha">105579f</span> (31 Jul) is one commit carrying 41 files and 4,290 insertions; <span class="sha">1d1604c</span> (9 Aug) carries 49 files and 5,935 insertions.</p>
+  </div>
+</section>
+
+<!-- ══ 1 · Strategic gaps ═══════════════════════════════════ -->
+<section id="gaps">
+  <p class="sec-meta">2026-05-13 → 05-14 · PR #57–#60</p>
+  <h2>1 · Eight strategic gaps</h2>
+  <p class="lede">A competitive comparison against CampX identified eight capabilities where Juvion would be disqualified before its architecture got a hearing. Each was closed to a “Phase A” floor, with deeper phases scheduled rather than half-built.</p>
+
+  <h3>Gap 1 — Faculty Profile depth &amp; NAAC alignment</h3>
+  <p class="shas"><span class="sha">dc72c6a</span><span class="sha">ac0bcf0</span><span class="sha">6422329</span><span class="sha">6c2ffaf</span><span class="sha">4613b35</span><span class="sha">18f5e27</span><span class="sha">06e4d48</span></p>
+
+  <div class="scroller">
+    <table>
+      <thead><tr><th>Phase</th><th>Delivered</th></tr></thead>
+      <tbody>
+        <tr><td class="k">A</td><td>33 external credential IDs across 5 NAAC-relevant groups (Indian regulators, international research, MOOC, code platforms, social/web)</td></tr>
+        <tr><td class="k">B1</td><td><code>profileBio</code> + <code>office</code> sub-documents; generic <code>FacultyDocument</code> evidence store with S3, presigned view URLs, soft delete</td></tr>
+        <tr><td class="k">B2</td><td>24 document types across the 12 NAAC categories, with 1:1 vs 1:N card semantics</td></tr>
+        <tr><td class="k">B3</td><td>Verification workflow — pending → approve/reject with mandatory reason, audit entry, college-wide FIFO queue</td></tr>
+        <tr><td class="k">B4</td><td>Per-document audit timeline, SLA badges (&gt;7d amber / &gt;30d red), filter-aware bulk approve/reject</td></tr>
+        <tr><td class="k">D1</td><td><code>FacultySubjectAssignment</code>, <code>FacultyResearchScholar</code>, <code>FacultyBook</code></td></tr>
+        <tr><td class="k">B (orig.)</td><td><code>FacultyPublication</code>, <code>FacultyPatent</code>, <code>FacultyProject</code> with NAAC scoring fields — indexing service, quartile, impact percentile, level, author position, UN SDG mapping</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Bulk approve/reject dispatches the existing per-document service so the audit trail stays row-grained (one entry per approval) rather than one entry per batch.</p>
+
+  <h3>Gap 2 — Schema-driven bulk import <span class="sha">976a203</span> <span class="sha">f6e6f6d</span></h3>
+  <p><code>ImportJob</code> lifecycle state machine (pending → parsing → preview_ready → committing → completed/partial/failed), inline RFC-4180 CSV parser (no new dependency), per-row validation preview, and a commit step that calls the same canonical service-layer create a manual entry would — so audit logs and downstream hooks fire identically.</p>
+  <ul>
+    <li>Multi-tenancy enforced in the Mongo query <strong>and</strong> the S3 key.</li>
+    <li>Caps: 10 MB file, 10,000 rows, CSV only.</li>
+    <li>Five entity types: student, faculty, staff, applicant, programme. The applicant schema’s 18 fields exist specifically to batch-import EAMCET / JEE rank lists.</li>
+  </ul>
+
+  <h3>Gap 3 — Schema-driven config registry <span class="sha">6accd9c</span></h3>
+  <p>Generic <code>ConfigEntry</code> model, <code>config-registry.ts</code> describing fields server-side, and one <code>SchemaConfigPage.tsx</code> handling both singleton and multi-record cardinalities. Adding a config subsystem is a one-line registry append — no model, service, route or page.</p>
+
+  <h3>Gap 4 — Declarative report engine <span class="sha">9cc8ecc</span></h3>
+  <p>12 <code>ReportDefinition</code> entries with parameter schema, column schema and runner. Three implemented (admissions-funnel, lead-source-performance, student-roster-snapshot); nine stubbed with a <code>PhaseBStubError</code> sentinel the service converts to <code>status: 'unimplemented'</code> so the UI shows a clean notice, not a stack trace. Every execution persists a <code>ReportRun</code> row.</p>
+
+  <h3>Gap 5 — Admissions CRM depth <span class="sha">28b1858</span> <span class="sha">fd7db6c</span></h3>
+  <p>Depth on existing entities rather than new tables:</p>
+  <ul>
+    <li>5 UTM fields carried Inquiry → Applicant, so campaign spend traces to enrolments.</li>
+    <li>MQL/SQL classification, orthogonal to lead grade.</li>
+    <li>Inquiry status enum widened 9 → 28 values; Applicant 11 → 17.</li>
+    <li>New <code>AssignmentRule</code> model — 11 testable fields, 8 operators, priority-ordered first-match-wins — wired into <code>createInquiry</code> as a best-effort hook, plus a preview endpoint that dry-runs a hypothetical inquiry before a rule goes live.</li>
+    <li>4 single-roundtrip CRM aggregations: pipeline, funnel, per-officer conversion, source/UTM attribution.</li>
+  </ul>
+  <p>Also fixed a pre-existing silent Zod strip: <code>leadGrade</code> was on the model but absent from the schema, so it was dropped on every create.</p>
+
+  <h3>Gap 6 — Examination administration depth <span class="sha">e0c3585</span></h3>
+  <p>7 new models under <code>models/academic-ops/</code>: <code>ExamRoom</code>, <code>Evaluator</code>, <code>GradeTemplate</code>, <code>ExamCentreTemplate</code>, <code>QuestionPaperSchema</code>, <code>SignatureType</code> (versioned, so an old certificate renders with the signature valid at issue time), <code>MoocSubject</code>. 35 routes, plus two config types (naming-series, award-classification) registered against the Gap 3 registry with no new infrastructure.</p>
+
+  <h3>Gap 7 — L3 sub-personas &amp; cluster heads <span class="sha">42b7a89</span></h3>
+  <p>9 new third-level personas added without expanding the workspace count — the architectural thesis being defended. <code>shared/rbac/personas.ts</code> became the canonical catalogue; <code>Staff</code> gained <code>personaCode</code> and <code>clusterHeadOfPersonIds</code>; <code>GET /api/people/personas</code> and a read-only catalogue page make the tier structure browsable.</p>
+
+  <h3>Gap 8 — HR build-vs-buy <span class="sha">9dd809d</span></h3>
+  <p>Decision: <strong>buy</strong>. ERPNext / Frappe HR owns the personnel side (leave, attendance, payroll, expenses); Juvion keeps the academic side and the intelligence layer. Phase A ships config, a 6-event → DocType mapping registry, integration logging and an admin page — but makes <strong>no outbound HTTP calls</strong>. Shipping the wire before the ERPNext deployment and secrets vault exist would mean production dialling out.</p>
+</section>
+
+<!-- ══ 2 · AI layer ═════════════════════════════════════════ -->
+<section id="ai">
+  <p class="sec-meta">2026-05-14 → 05-17 · SDD 001–004</p>
+  <h2>2 · The AI layer</h2>
+  <p class="lede">Four features, each through the full spec → validate → plan → tasks → audit workflow before implementation.</p>
+
+  <h3>001 — AI lead scoring</h3>
+  <p class="shas"><span class="sha">bdd46eb</span><span class="sha">1a9287f</span><span class="sha">95696ca</span><span class="sha">656fb36</span><span class="sha">e02ffa7</span></p>
+  <p>Hybrid scorer: deterministic rules (source, academic fit, programme interest, interaction count/recency/outcome) blended 60/40 with a masked-context LLM call into a 0–100 score and one of four grades. Runs as a BullMQ worker triggered on inquiry create and on positive lead interactions, with a 5-minute debounce collapsing repeat scores into one job via a minute-bucketed <code>jobId</code>.</p>
+  <p>Frontend: grade badge, filter chips, sort-by-score, recompute button distinguishing 202-enqueued from 208-already-scored, and a rationale card breaking out rule vs LLM contribution with the top 5 weighted factors and their source. Dashboard tile reports 7-day volume, LLM/rules split, daily cost, average latency.</p>
+
+  <h3>002 — AI-assisted config</h3>
+  <p class="shas"><span class="sha">b838b5c</span><span class="sha">395f079</span><span class="sha">a62763c</span><span class="sha">1c55f4b</span><span class="sha">168691e</span></p>
+  <p>Confidence-scored field suggestions with rationale, accepted or rejected inline. Accepted values write to the audit log with <code>source: 'ai'</code> per field, so a reviewer can later distinguish AI-accepted from manual values. Fields marked <code>aiSuggestable: false</code> are projected out of the prompt <strong>before</strong> assembly, never stripped after the call.</p>
+
+  <h3>003 — NL report queries</h3>
+  <p class="shas"><span class="sha">04b59d3</span><span class="sha">9aee321</span><span class="sha">f8bb420</span><span class="sha">8350245</span><span class="sha">3463753</span></p>
+  <p>Plain-English question → one of three implemented reports, or a clean refusal. 11-step pipeline: mask → dedup → cap → prompt → 10 s abort → parse → validate → runReport → persist → audit → cache. The allow-list is enforced at the type level via a Zod enum on <code>reportCode</code>, so an unknown code is a parse failure rather than a runtime branch. Every refusal path still persists a query row and writes an audit entry.</p>
+
+  <h3>004 — Opening NL to non-admin personas</h3>
+  <p class="shas"><span class="sha">1101ada</span> → <span class="sha">f6ce1f6</span></p>
+  <p>Replaces the hard <code>requireRole(['admin','super_admin'])</code> gate with policy-based access plus scope-aware runners.</p>
+  <ul>
+    <li>Every <code>ReportDefinition</code> declares <code>scopeEligibility: { departmentOnly, selfOnly }</code>.</li>
+    <li><code>runReport()</code> checks it and throws <code>ScopeNotSupportedError</code> <strong>before</strong> any side effect — no <code>ReportRun</code> row, no runner invocation, no audit entry.</li>
+    <li>Dedup cache key extended with a SHA-1 over (role, personaType, dept segment, self segment) so two personas can never share a cached answer.</li>
+    <li>Rollout behind <code>RBAC_NL_ENFORCE</code>, read per-request.</li>
+  </ul>
+
+  <div class="note">
+    <span class="lbl">Gate 2 materially reshaped this feature</span>
+    <p>Five critical findings, two worth naming: the spec’s persona codes did not exist in <code>personas.ts</code> at all, and <code>AuthScope.departmentId</code> is a <code>Department._id</code> while <code>Student.branchId</code> is a <code>Branch._id</code> — different collections, requiring a two-step lookup the spec assumed away. Both caught on paper.</p>
+  </div>
+
+  <h4>Safety patterns shared across all four</h4>
+  <div class="scroller">
+    <table>
+      <thead><tr><th>Concern</th><th>Mechanism</th><th>Failure behaviour</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Cost</td><td>Atomic Redis INCR per college per day, namespaced per feature</td><td><strong>Fail closed</strong> — no LLM call if Redis is unreachable</td></tr>
+        <tr><td class="k">PII</td><td>Masker runs upstream of persistence</td><td>Stored question is always the masked form</td></tr>
+        <tr><td class="k">Duplicate spend</td><td>30 s dedup on a hash of the masked input</td><td><strong>Fail open</strong> — a duplicate charge beats a broken flow</td></tr>
+        <tr><td class="k">Latency</td><td><code>AbortController</code> at 10–12 s</td><td>Falls back to rules-only, or refuses with a stated reason</td></tr>
+        <tr><td class="k">Hallucination</td><td>Strict JSON schema, allow-list enum, per-runner param validation, extra-key rejection</td><td>Dropped silently from results, logged as a metric</td></tr>
+        <tr><td class="k">Provenance</td><td>Dedicated audit actions + per-field <code>source</code> marker</td><td>Every outcome, including refusals, is recorded</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ══ 3 · Test & CI ════════════════════════════════════════ -->
+<section id="quality">
+  <p class="sec-meta">2026-05-16 → 05-18 · PR #65–#67, #70, #71, #74, #75</p>
+  <h2>3 · Test &amp; CI platform</h2>
+
+  <h3>Playwright against the live stack <span class="sha">9930d30</span> <span class="sha">a995c66</span></h3>
+  <p>A dedicated <code>e2e/</code> workspace, sibling to backend and admin-portal — the tests assert full-stack behaviour, so filing them under the frontend misframed what they cover. Discipline: <strong>zero retries</strong> as a hard acceptance criterion (a retry hides drift), no <code>page.waitForTimeout</code>, <code>page.route</code> mocks where determinism matters.</p>
+  <p>Also caught a real bug: the 401 interceptor hard-redirected on <em>any</em> 401 including the login response itself, so bad credentials reloaded the page before the error could render.</p>
+
+  <h3>RBAC seeding consolidated <span class="sha">f4af314</span></h3>
+  <p><code>DEFAULT_POLICIES</code> was being written from three places, two of them non-idempotent <code>insertMany</code>. Consolidated into <code>shared/seed/policies.ts</code>, upserting by natural key — re-run is a row-level no-op, operator-added college-specific policies survive, edits to <code>defaults.ts</code> propagate on next run.</p>
+
+  <h3>CI hardening</h3>
+  <p>Seven commits, each a real environment defect rather than a test tweak:</p>
+  <div class="scroller">
+    <table>
+      <thead><tr><th>Commit</th><th>Defect</th></tr></thead>
+      <tbody>
+        <tr><td class="k"><span class="sha">3bbe403</span></td><td>No Redis service — backend blocked on ECONNREFUSED, health never came up</td></tr>
+        <tr><td class="k"><span class="sha">cc0b555</span></td><td>CI set <code>MONGO_URI</code> but <code>config/db.ts</code> reads <code>MONGODB_URI</code></td></tr>
+        <tr><td class="k"><span class="sha">d0ab32e</span></td><td>Job-level <code>NODE_ENV=production</code> made <code>npm ci</code> skip the devDeps typecheck needs</td></tr>
+        <tr><td class="k"><span class="sha">5c3b14d</span></td><td>Same var tripped the <code>PAYMENT_WEBHOOK_SECRET</code> startup guard inside vitest</td></tr>
+        <tr><td class="k"><span class="sha">d0344c9</span></td><td><code>vite preview</code> doesn’t inherit the dev proxy — login 404’d, every auth test timed out</td></tr>
+        <tr><td class="k"><span class="sha">c137086</span></td><td>Empty <code>Policy</code> collection → <code>authorize()</code> denied universally → 9 of 29 tests timed out</td></tr>
+        <tr><td class="k"><span class="sha">04e82a8</span></td><td>TS5107 <code>moduleResolution: node10</code> deprecation as a hard error in CI only</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Documentation <span class="sha">686b30e</span> <span class="sha">4a356b3</span></h3>
+  <p><code>CLAUDE.md</code> refreshed with the RBAC model, fee-pin contract, SDD workflow and e2e discipline. <code>AGENTS.md</code> became a symlink to it, eliminating a file that had already drifted. A PR template added a docs-impact checklist.</p>
+</section>
+
+<!-- ══ 4 · Fee-pin ══════════════════════════════════════════ -->
+<section id="feepin">
+  <p class="sec-meta">2026-05-17 → 05-27 · PR #72, #73, #76</p>
+  <h2>4 · Fee-pin foundations</h2>
+
+  <h3>Four axes, one contract <span class="sha">61d19ca</span> <span class="sha">f150451</span></h3>
+  <p>A discovery exercise (<code>.sdd/discovery/005-fee-mapping-architecture/</code>) found the matching rule was only derivable by reading the scoring code. Now explicit in <code>FeeStructureInstance.ts</code> and <code>fee-pin-service.ts</code>:</p>
+  <ul>
+    <li><strong>Required exact:</strong> <code>collegeId</code>, <code>programmeId</code>, <code>academicYearId</code>, <code>status: 'active'</code>.</li>
+    <li><strong>Wildcardable:</strong> <code>branchId</code>, <code>category</code>, <code>quota</code>, <code>yearOfStudy</code> — null on the FSI means “match any”.</li>
+    <li><code>scoreAxis()</code> returns 0 (mismatch, reject) / 1 (wildcard) / 2 (exact), with powers-of-ten weighting so branch-exact always beats any combination of lower-tier exacts.</li>
+    <li><strong>Course is not a fee axis.</strong></li>
+  </ul>
+  <p>Two real defects fell out: quota was scored asymmetrically, so a student with a declared quota could not match a wildcard FSI, and a student with none could match anything. <code>checkPinValidity</code> had the same inversion and would have raised false-positive drift banners in production.</p>
+
+  <h3>Fee snapshot at pin time <span class="sha">3123c5b</span></h3>
+  <p>Evaluated components are frozen into the pin subdocument at pin time, so invoice generation is immune to post-pin <code>FeeComponent</code> edits. Legacy pins without a snapshot fall back to a live fetch. Same commit fixed four W01 admission-workflow engine bugs (handler result vs raw input passed to <code>advanceWorkflow</code>, unguarded handler throws, concurrent sibling completions each spawning the next step, an invalid Invoice status enum value).</p>
+
+  <h3>Programme transfer UI <span class="sha">a522a28</span></h3>
+  <p>The backend rejects <code>programmeId</code> changes through the generic student PATCH by design — fee pins must rebind atomically. The transfer endpoint and its FE service wrapper both existed; nothing called it. Administrators editing academic details hit a 403 with no path forward. Now the field is read-only in edit mode with a transfer affordance beside it.</p>
+
+  <h3>Server-side AI cache <span class="sha">2ad4f9b</span></h3>
+  <p>Forecast, situations and risk-scores each hit an LLM on every dashboard load. Now Redis-cached with TTL to UTC midnight, per-section and master force-refresh, “Cached · HH:MM” chips. Dismissing a situation card invalidates the key immediately.</p>
+</section>
+
+<!-- ══ 5 · Bug audit ════════════════════════════════════════ -->
+<section id="audit">
+  <p class="sec-meta">2026-07-26 → 07-27 · PR #77–#80</p>
+  <h2>5 · Bug-audit remediation &amp; the UX platform</h2>
+  <p class="lede"><code>Juvion_v2_Bugs.docx</code> produced five critical defects, global UX gaps, per-module validation holes, and 36 pages with no frontend. Fixes were applied in shared components wherever possible.</p>
+
+  <h3>Five critical defects <span class="sha">9bd1458</span></h3>
+  <ol class="body">
+    <li><strong>Campus Ops entirely dead</strong> — <code>campus-ops.ts</code> BASE was <code>/campus-ops</code>; M08 mounts at <code>/campus</code>. All 34+ sub-pages silently showed “No data”. Every other service base was audited against <code>routes/index.ts</code>; this was the only mismatch.</li>
+    <li><strong>User null after refresh</strong> — the user object was never persisted, so name/role/email went null on F5 and role-gated UI fell false.</li>
+    <li><strong>No error boundary</strong> — any render error produced a blank white screen.</li>
+    <li><strong>No token refresh</strong> — expiry did <code>window.location.href = '/login'</code>, destroying unsaved forms. Replaced with background renewal 5 min before expiry, a deduped refresh-and-replay on 401, and soft navigation only on genuine renewal failure.</li>
+    <li><strong>Plaintext <code>admin123</code> on the login page</strong> — the sample-credentials panel had no DEV guard.</li>
+  </ol>
+
+  <h3>Global list primitives <span class="sha">5d1162c</span></h3>
+  <div class="scroller">
+    <table>
+      <thead><tr><th>Surface</th><th>Scale</th><th>Change</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Confirm dialogs</td><td class="num">195 sites</td><td>Promise-based <code>confirmStore</code> + <code>ConfirmDialog</code> replacing every native <code>confirm()</code> / <code>prompt()</code>; supports typed confirmation and a required-reason field</td></tr>
+        <tr><td class="k">Pagination</td><td class="num">157 pages</td><td>Shared component with record count and page-size selector. 34 Campus Ops pages had been paginating their query while rendering no pager — page 1 was the only reachable page</td></tr>
+        <tr><td class="k">Search</td><td class="num">146 pages</td><td>Debounced <code>SearchInput</code>, backed by generic server-side <code>?search=</code> in <code>paginate()</code> — schema-derived string fields, regex-escaped, capped at 12, denylist for credential-ish paths. ANDed with the caller’s filter, so search can never widen tenancy/RBAC scope</td></tr>
+        <tr><td class="k">Empty states</td><td class="num">173 pages</td><td>Each page distinguishes “no records” from “filter matched nothing” using its own heading as the noun</td></tr>
+        <tr><td class="k">Accessibility</td><td class="num">Modal + DataTable</td><td><code>role="dialog"</code>, <code>aria-modal</code>, real Tab focus trap, focus-in/restore; click-to-sort, skeleton rows, labelled clickable rows</td></tr>
+        <tr><td class="k">Feedback</td><td class="num">~200 sites</td><td>Toasts implemented once in the React Query MutationCache/QueryCache, plus an explicit 404 page</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>The search term reaches <code>paginate()</code> via an AsyncLocalStorage request context (<code>shared/request-context.ts</code>) rather than being threaded through 216 service signatures for a concern none of them model.</p>
+
+  <h3>36 missing pages <span class="sha">3ca664b</span> <span class="sha">7d39564</span> <span class="sha">a80ddb3</span></h3>
+  <p>12 Placement, 10 HR, 8 Student Development, 4 People surfaces had complete backends and no frontend — <code>/placement/drives</code> did not resolve. They share a config-driven <code>ResourcePage</code>: each declares fields, ref pickers and lifecycle actions; the shared component supplies table, sorting, search, confirm dialogs and toasts.</p>
+  <p>Lifecycle transitions are modelled as <strong>row actions</strong>, not a status dropdown, because these modules expose state changes as dedicated endpoints. Create/Edit are hidden where the API genuinely has no such endpoint, so the UI stops offering actions the server would reject.</p>
+  <p>Four surfaces got bespoke panels (attendance marking, internal marks, timetable periods, HR appraisal workflow). Building them surfaced a real backend bug: <code>bulkCreateAttendanceRecords</code> / <code>bulkCreateInternalMarks</code> used <code>insertMany</code>, which threw on the unique index the second time a sheet was saved — <strong>correcting a register was impossible</strong>. Both are now <code>bulkWrite</code> upserts.</p>
+
+  <h3>Derived values locked down <span class="sha">2566ef7</span> <span class="sha">2c0c240</span></h3>
+  <ul>
+    <li>Student fee accounts exposed <code>totalPaid</code> / <code>totalWaived</code> / <code>totalRefunded</code> / <code>balance</code> as editable inputs while the payment pipeline owns them via <code>$inc</code>. Manual edits silently desynced an account from its transactions. Now read-only in the form <strong>and</strong> rejected by a <code>.strict()</code> schema.</li>
+    <li>Payroll gross/net derive from components. Leave applications compute days from the range and expose real approve/reject/withdraw actions hitting the lifecycle endpoints — a PUT of <code>status</code> skipped balance deduction and approver recording.</li>
+    <li>System-generated records (delivery logs, Juvi conversations/messages/usage metrics) lost create and delete entirely.</li>
+    <li>Anti-ragging complaints and crisis alerts — statutory records — now require typing DELETE plus a recorded reason.</li>
+  </ul>
+
+  <h3>Validation, both halves <span class="sha">2c0c240</span> <span class="sha">ef81a55</span> <span class="sha">4ccea25</span></h3>
+  <p>Exam schedule times, placement season dates, hostel visitor log times and filing-date-required-when-filed were accepted silently on client <strong>and</strong> server. Both closed, with shared <code>refineRange</code> / <code>refineRequiredWhenStatus</code> helpers rather than three copies of the same <code>superRefine</code>. Both skip when a field is absent, so they compose with <code>.partial()</code> schemas.</p>
+
+  <h3>13 pre-existing test failures repaired <span class="sha">b34f37b</span></h3>
+  <p>Two were genuine implementation regressions from <span class="sha">2ad4f9b</span>: <code>situationsSchema</code> lost <code>.strict()</code> (so a body carrying <code>collegeId</code> would be silently stripped rather than rejected), and two response shapes changed without their tests. Four were time bombs — <code>backfill-fee-pins</code> hard-coded a 2025-26 academic year, so past 2026-05-31 every student became “unresolvable”. One was order-dependence from the daily AI cache. One was a fixture seeded in an order that made the code path it was named for unreachable.</p>
+</section>
+
+<!-- ══ 6 · Import ═══════════════════════════════════════════ -->
+<section id="import">
+  <p class="sec-meta">2026-07-27 → 07-31 · PR #81</p>
+  <h2>6 · Student bulk import</h2>
+
+  <h3>Two doors, one engine</h3>
+  <p><code>/platform/bulk-imports</code> needs <code>platform:create</code> (admin/principal only), so a Registrar — who owns student records — got a 403. A thin <code>people</code>-gated facade at <code>/api/people/students/import/{template,preview,commit}</code> delegates to the same service.</p>
+  <ul>
+    <li>Student schema grew 11 → 24 fields (address, academic placement, guardians).</li>
+    <li>Template headers mark mandatory columns with a trailing <code>*</code> that <code>normalizeImportHeader</code> strips on upload. This is a <strong>two-way contract across workspaces</strong>, so <code>student-import-header-roundtrip.test.ts</code> asserts it holds for every field, including ones added later.</li>
+    <li>Field validators are synchronous and cannot reach the DB, so an optional async <code>validateRow</code> hook was added — this is what lets preview honestly label rows Create / Update / Blocked before anything is written.</li>
+    <li><code>onboardingStatus</code> was dropped from the template: a spreadsheet could mark onboarding complete with no fee-responsible guardian, bypassing <code>assertStudentOnboardingRules</code>.</li>
+  </ul>
+
+  <h4>What re-import used to do, and now doesn’t</h4>
+  <div class="scroller">
+    <table>
+      <thead><tr><th>Failure</th><th>Consequence</th><th>Resolution</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Fee-axis change applied directly</td><td>Unguarded programme transfer bypassing the 403; fee pin left bound to the old programme with no <code>staleSince</code> marker</td><td>Blocked at preview naming the transfer screen; re-checked at commit (409)</td></tr>
+        <tr><td class="k">Duplicate natural keys within one file</td><td>Two rows sharing a <code>rollNumber</code> both previewed Create; at commit row 2 overwrote row 1 and the job reported two successes</td><td>Opt-in <code>naturalKeys</code> schema declaration evaluated by the engine’s per-file loop</td></tr>
+        <tr><td class="k">Whole <code>address</code> object <code>$set</code></td><td>A row with no address columns silently wiped stored addresses</td><td>Only the specific <code>address.*</code> dotted paths the row supplies</td></tr>
+        <tr><td class="k"><code>status</code> defaulted unconditionally</td><td>Re-importing a withdrawn/expelled student flipped them back to active</td><td>Default is create-only</td></tr>
+        <tr><td class="k">No rollback on the update path</td><td><code>Person.updateOne</code> could succeed then <code>Student.updateOne</code> fail, leaving the Person permanently overwritten</td><td>Snapshot/restore compensations, including re-<code>$unset</code>ting paths that did not previously exist</td></tr>
+        <tr><td class="k">Guardian resolved to the student</td><td>In Indian intake the student’s phone is often the family phone, so a student could become their own guardian — silent corruption, since <code>feeResponsibleParentId</code> gates onboarding</td><td>Resolve every Person on the phone, prefer an existing guardian, never attach to a known Student or Faculty</td></tr>
+        <tr><td class="k"><code>Number('')</code> on blank <code>admissionYear</code></td><td>Wrote 0 on create, clobbered a real value on update, corrupting the phone+year natural key</td><td>Blank treated as absent</td></tr>
+        <tr><td class="k">Blocked rows counted as failures</td><td>A job whose only anomaly was one ineligible row finished <code>partial</code> with “1 failed”</td><td>Blocked is its own outcome and its own counter, excluded from the status ladder</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <span class="lbl">The roll-number index</span>
+    <p>The students index was <code>{ collegeId: 1, rollNumber: 1 }</code> with <code>{ unique: true, sparse: true }</code>. On a <strong>compound</strong> index, <code>sparse</code> omits a document only when <em>every</em> indexed field is absent — and <code>collegeId</code> never is. So every student without a roll number was indexed under <code>{ collegeId, null }</code>, and a college could hold exactly one of them.</p>
+    <p><code>rollNumber</code> is optional by design (admissions allocates it later; the import does not require the column). Importing two roll-number-less students was therefore impossible — and it explained a long-red test attributed to phone normalisation. Fixed with <code>partialFilterExpression: { rollNumber: { $type: 'string' } }</code>, shipped with <code>scripts/fix-student-rollnumber-index.ts</code> because <code>createIndex</code> on an existing key pattern with different options raises <code>IndexOptionsConflict</code>.</p>
+  </div>
+
+  <h3>Making the outcome visible <span class="sha">44e2ee5</span> <span class="sha">b38dbd0</span> <span class="sha">5794776</span> <span class="sha">e6169eb</span></h3>
+  <ul>
+    <li>Per-row commit failures land on the <code>ImportJob</code>, which a Registrar cannot read. They now travel with the commit response; the drawer stays open on anything but a clean import, listing failed rows with errors and blocked rows with reasons.</li>
+    <li>Two read-only history routes under <code>authorize('people','read')</code> let a past job be reopened, rendering through the same component as a fresh commit via an extracted <code>jobSummary()</code>.</li>
+    <li>The update audit now records <strong>what</strong> changed — one entry per field that moved, with <code>oldValue</code>, <code>newValue</code> and <code>source: 'import'</code>. This is precisely why the address-wipe and status-flip defects left no trace.</li>
+    <li><code>validPhone</code> now strips separators and an optional <code>+91</code> / <code>91</code> / leading <code>0</code> before the 10-digit check, storing the canonical form — phone is a natural key compared by exact equality in <code>matchExistingStudent</code> and <code>linkOrCreateParent</code>.</li>
+  </ul>
+</section>
+
+<!-- ══ 7 · Billing ══════════════════════════════════════════ -->
+<section id="billing">
+  <p class="sec-meta">2026-07-29 → 08-09 · PR #82–#86 · SDD 006 &amp; 007</p>
+  <h2>7 · Billing, payment capture and live AR</h2>
+
+  <h3>Authoring fee structures at all <span class="sha">74fa6fe</span> <span class="sha">2085a76</span></h3>
+  <p><code>FeeStructureInstance</code> — the record students actually pin to — could only be created by the seed script.</p>
+  <ul>
+    <li>The create schema was silently stripping <code>yearOfStudy</code>, so per-year fees were unreachable through the API.</li>
+    <li><code>PATCH</code> and <code>DELETE</code> added for drafts, locked once submitted; a rejected structure returns to draft on edit.</li>
+    <li>New <code>FeeStructureInstancesPage</code> covering author → submit → approve → activate → reject → archive, with a live “already active for this slot” warning.</li>
+    <li><strong>Supersede scoping fix:</strong> activating an FSI superseded existing actives by (programme, branch, quota, category) only — so activating a Year-2 structure silently retired the Year-1 one for the same combination and unpinned that cohort. The filter now matches the full axis tuple including <code>academicYearId</code> and <code>yearOfStudy</code>.</li>
+  </ul>
+
+  <h3>006 — Auto-pin on import + Pin Coverage worklist <span class="sha">105579f</span></h3>
+  <p>Three decisions shaped it:</p>
+  <ul>
+    <li><strong>The academic year is resolved once per job and frozen</strong> on the <code>ImportJob</code>, not derived per row — a long import could otherwise straddle a year rollover and split one cohort across two years, and preview/commit could disagree if <code>isCurrent</code> flips between them. Two years flagged current is <strong>refused, not guessed</strong>.</li>
+    <li><strong>Pin outcomes are tallied on their own axis</strong> and never touch <code>successCount</code> / <code>failureCount</code> / <code>blockedCount</code> or the status ladder. A file where every row fails to pin still reports <code>completed</code> — “the college has not published next year’s fee structures” must not read as a broken import.</li>
+    <li><strong>Preview echoes the resolved pin year</strong> per row, not just the amount. <code>studyYearAtAdmission</code> is optional, so a blank column silently means Year 1; a mid-lifecycle intake would otherwise show a confident figure against a year nobody chose.</li>
+  </ul>
+  <p>Pin Coverage reports <em>whose job it is</em> — publishing a fee structure, assigning a batch and pressing re-pin are three different tasks with three different owners — and rolls students up onto their fee axes, so “BTECH / CSE / convener / Year 2 — 46 students, no structure published” is one task rather than 46 rows. Bulk pin is gated <code>finance:approve</code>, capped at 1000 per call, with no row-level throw. <code>previewPinYearAvailability</code> mirrors the writer’s decision tree in the same order, asserted by test, so a dry run cannot promise an outcome the real run would not produce.</p>
+  <p>Also fixed: <code>resolve-permissions</code> only emitted read/create/update/delete, so the frontend could never detect an <code>approve</code> grant and any button needing it fell back to a role check that disagreed with the backend.</p>
+
+  <h3>007 — Semester billing, payment, net AR <span class="sha">1d1604c</span></h3>
+  <div class="scroller">
+    <table>
+      <thead><tr><th>Task</th><th>Delivered</th></tr></thead>
+      <tbody>
+        <tr><td class="k">T1–T2</td><td><code>Payment.invoiceId</code>, <code>Invoice.isSemesterInstallment</code> as a positive discriminator (exam-fee invoices share <code>type: 'fee'</code>), plus a partial unique index with <code>$type: objectId</code> guards and an idempotent migration that refuses to build over existing violators</td></tr>
+        <tr><td class="k">T3–T5</td><td>Pin-driven invoice generation — annual splits floor+remainder so two semesters sum exactly, guarded by an academic-year match, under compensating rollback. Batch generation with dry-run; a throw on one student drops to <code>errors</code> and the batch continues</td></tr>
+        <tr><td class="k">T6–T7</td><td>Payment mutations locked: create strips <code>status</code>, update is a standalone <code>.strict()</code> <code>{remarks, transactionRef}</code> so PUT cannot touch amount/status/invoiceId. Delete became a <strong>reversing</strong> operation. Create now settles the invoice and decrements the account balance, so net AR moves live including on partials; overpayment is rejected before any write</td></tr>
+        <tr><td class="k">T8</td><td><code>FINANCE_ENFORCE_FEE_GUARDIAN</code> gates only the guardian <em>requirement</em>; the existence + college-match check runs unconditionally, so the flag can never open a cross-tenant write</td></tr>
+        <tr><td class="k">T9</td><td>Dashboard AR sums <code>StudentFeeAccount.balance</code> (net) instead of gross unpaid-invoice totals</td></tr>
+        <tr><td class="k">T10</td><td>Test-only invariant verifier: <code>balance == totalDue − totalPaid − totalWaived + totalRefunded</code>, scoped to 007 students so the ~dozen other <code>StudentFeeAccount</code> writers don’t false-flag</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p><strong>Three surfaces reported money from the wrong collection.</strong> The finance hub “Pending”, hub “Overdue Items” and the student Fee Structure panel all computed from <code>FeeLineItem</code>, which the pin → invoice billing path never writes. One showed a student holding a real ₹1,20,000 invoice as ₹0 across Billed/Paid/Waived/Balance. All three now read <code>StudentFeeAccount</code>; the hub and dashboard return an identical figure where they previously disagreed by lakhs.</p>
+
+  <h3>The Generate Bills console (007 C1–C3)</h3>
+  <p>The first cut was two dropdowns and a dialog reading “Generate 12 bills?”. It is now a table naming all twelve:</p>
+  <ul>
+    <li>One row per student — name · roll · programme/branch · year · ₹ · outcome. Non-billable rows stay visible and greyed with the reason as the badge and a Fix link into Pin Coverage, so a skip names a person rather than a count.</li>
+    <li>Per-row checkbox, sticky footer with selected count and rupee total in en-IN grouping. Generate is disabled on empty selection, matching the new <code>.min(1)</code> validation — shut at both ends.</li>
+    <li>Changing any filter clears the table and selection. <em>A table that outlived its filters is how you bill the cohort you stopped looking at.</em></li>
+    <li>Generate posts <code>studentIds</code> and nothing else: the backend re-applies <code>yearOfStudy</code> on top of an explicit list, which would silently drop ticked students.</li>
+  </ul>
+  <p><code>GET /finance/invoices/billing-history</code> answers “did we bill Semester 1?” by aggregating existing invoices rather than adding a <code>BillingRun</code> model — one would only describe runs made after it shipped, and would add a write to a money path to answer a question the invoices already answer. Registered above <code>GET /invoices/:id</code>, with a source-order test pinning it.</p>
+  <p><strong>Pin Coverage was answering a different question from billing.</strong> It derived year-of-study with <code>resolveStudentYearOfStudy</code>, which hard-fails without a Batch, and ran that check <em>before</em> looking at the student’s pins — so a batch-less student with a good pin was bucketed <code>year-unresolvable</code>. It was the only caller using the strict helper; billing, bulk-pin and import auto-pin all use <code>resolvePinYearForExistingStudent</code>. On the dev dataset: 0% (0 of 45) → 37.78% (17 of 45).</p>
+</section>
+
+<!-- ══ 8 · Practices ════════════════════════════════════════ -->
+<section id="practice">
+  <p class="sec-meta">Method</p>
+  <h2>8 · Engineering practices observed</h2>
+
+  <h3>Specs before code, with load-bearing gates</h3>
+  <p>Seven features ran the full SDD workflow. The gates are not ceremonial:</p>
+  <ul>
+    <li><strong>001</strong> closed 6 CRITICAL + 9 HIGH before implementation.</li>
+    <li><strong>004</strong> Gate 2 returned 5 CRITICAL + 6 HIGH and materially narrowed v1 scope — only HOD and faculty, only on one runner.</li>
+    <li><strong>007</strong> Gate 2 data-layer returned FAIL (1C + 2H), reshaping the invoice discriminator, the balance invariant sign and the rollback strategy.</li>
+  </ul>
+  <p>Artifacts stay in-repo under <code>.sdd/</code>, so any future change has a paper trail to the trade-offs.</p>
+
+  <h3>Regression tests verified red first</h3>
+  <p>A recurring discipline: a fix is not proven until its test has been watched to fail against the old code. Where a test <em>cannot</em> be made to fail — a determinism guard whose in-memory Mongo returns insertion order anyway — the commit says so, so nobody deletes the sort on the strength of a passing test.</p>
+
+  <h3>Compensating rollback instead of transactions</h3>
+  <p>The test harness is not a replica set, so <code>withTransaction</code> is unavailable. Multi-write paths register explicit undo actions, with deliberate per-operation ordering:</p>
+  <ul>
+    <li><strong>Parent links</strong> register their compensation <em>before</em> the forward write, because <code>syncStudentParentLinks</code> issues two <code>updateMany</code> calls and a failure between them would leave a half-applied change uncompensated. Safe because the undo is a set reconciliation, not a delete.</li>
+    <li><strong>Fee pins</strong> register <em>after</em>, because the undo needs a real pin id. Rollback <strong>archives</strong> the pin rather than deleting it — a pin is an auditable financial event and <code>commitPin</code> has already written an audit entry referencing it.</li>
+  </ul>
+
+  <h3>Deferrals recorded, not silently dropped</h3>
+  <p>Phase B report runners return a typed sentinel converted to <code>status: 'unimplemented'</code>. The ERPNext bridge ships listeners that log and stop, so Phase B is a one-function edit. Import follow-ups were tracked in <code>docs/superpowers/specs/2026-07-28-student-bulk-import-followups.md</code> with a state table — one closed <em>unfixed</em>, with the reasoning written down.</p>
+</section>
+
+<!-- ══ 9 · Open ═════════════════════════════════════════════ -->
+<section id="open">
+  <p class="sec-meta">Status</p>
+  <h2>9 · Open items</h2>
+  <p class="lede">Taken from the commit record, not inferred.</p>
+
+  <div class="scroller">
+    <table>
+      <thead><tr><th>Item</th><th>Area</th><th>Note</th></tr></thead>
+      <tbody>
+        <tr><td class="k">3 Playwright specs quarantined (<code>test.fixme</code>)</td><td>Testing</td><td>2 fee-pin flows in <code>import-fee-pin.spec.ts</code>, 1 history-reopen in <code>student-import.spec.ts</code>. Features covered by backend integration suites + manual QA; merged skipped rather than red</td></tr>
+        <tr><td class="k">007 T14 manual QA</td><td>Finance</td><td>The Generate Bills console and billing history have <strong>no automated coverage at all</strong></td></tr>
+        <tr><td class="k">Phone normalisation on the manual form</td><td>People</td><td>Fixed on the import door only. A phone typed manually may not match an imported one; closing it needs the Zod schema tightened, admissions checked, and a <code>Person.phone</code> backfill</td></tr>
+        <tr><td class="k"><code>changes: []</code> at ~837 other call sites</td><td>Platform</td><td>Bulk import now populates field-level changes. Whether the rest should is a codebase-wide question left with the audit-trail owner</td></tr>
+        <tr><td class="k">9 Phase B report runners</td><td>Governance</td><td>Wave 1 implemented backlog-report and hostel-occupancy. The rest return a clean unimplemented status</td></tr>
+        <tr><td class="k">ERPNext outbound calls</td><td>Integrations</td><td>Phase A by design — needs the deployment and secrets vault first</td></tr>
+        <tr><td class="k">Counsellor / cluster-head NL access</td><td>Governance</td><td>Deferred to v1.5 pending backfill — <code>Inquiry.assignedTo</code> holds emails, not user ids</td></tr>
+        <tr><td class="k"><code>faculty_documents.verify</code> fine-grained RBAC</td><td>People</td><td>Any holder of <code>people:update</code> can approve a credential. Splitting it needs changes across middleware, the permission registry and every gated call site</td></tr>
+        <tr><td class="k">Faculty Profile phases D2–D5</td><td>People</td><td>Exam duties, in-house awards, external committees, consultancy</td></tr>
+        <tr><td class="k">Bulk-import Phase C entity types</td><td>Platform</td><td>Branches/Departments need ref-by-code resolution; Subjects need a model first; fee structures don’t fit flat CSV</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<footer>
+  <span>Juvion v2 · backend, admin-portal, e2e</span>
+  <span>Period 2026-05-13 → 2026-08-09</span>
+  <span>131 commits · 30 PRs · 5 contributors</span>
+  <span>Current as of a141426</span>
+</footer>
+
+</div>
+</body>
+</html>
