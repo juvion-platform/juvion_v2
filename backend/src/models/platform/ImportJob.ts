@@ -48,7 +48,7 @@ export interface IImportJobRowResult {
    * is deliberately NOT an error: it never reaches commit and never counts
    * toward failureCount. Only schemas with a validateRow hook can produce it.
    */
-  outcome: 'success' | 'error' | 'blocked';
+  outcome: 'success' | 'error' | 'blocked' | 'skipped';
   /** Mongo _id of the row created on success — empty on error. */
   createdId?: string;
   /** Human-readable failure reason. */
@@ -136,6 +136,7 @@ export interface IImportJob extends Document {
    * anomaly is a sealed record does not report a failure that never happened.
    */
   blockedCount: number;
+  skippedCount: number;
 
   /** Per-row outcomes — populated during validation + commit. */
   results: IImportJobRowResult[];
@@ -167,7 +168,7 @@ export interface IImportJob extends Document {
 const rowResultSchema = new Schema<IImportJobRowResult>(
   {
     row: { type: Number, required: true },
-    outcome: { type: String, enum: ['success', 'error', 'blocked'], required: true },
+    outcome: { type: String, enum: ['success', 'error', 'blocked', 'skipped'], required: true },
     createdId: { type: String },
     error: { type: String },
     raw: { type: Schema.Types.Mixed },
@@ -219,6 +220,7 @@ const schema = new Schema<IImportJob>(
     successCount: { type: Number, required: true, default: 0 },
     failureCount: { type: Number, required: true, default: 0 },
     blockedCount: { type: Number, required: true, default: 0 },
+    skippedCount: { type: Number, required: true, default: 0 },
 
     results: { type: [rowResultSchema], default: [] },
 

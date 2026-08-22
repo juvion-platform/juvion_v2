@@ -50,6 +50,7 @@ const JOB_LIST_LIMIT = 10;
 function jobSummary(job: IImportJob) {
   const failed = job.results.filter((r) => r.outcome === 'error');
   const blocked = job.results.filter((r) => r.outcome === 'blocked');
+  const skipped = job.results.filter((r) => r.outcome === 'skipped');
   return {
     jobId: String(job._id),
     fileName: job.fileName,
@@ -58,6 +59,7 @@ function jobSummary(job: IImportJob) {
     successCount: job.successCount,
     failureCount: job.failureCount,
     blockedCount: job.blockedCount,
+    skippedCount: job.skippedCount,
     errorSummary: job.errorSummary,
     createdAt: job.createdAt,
     completedAt: job.completedAt,
@@ -67,7 +69,10 @@ function jobSummary(job: IImportJob) {
     blockedRows: blocked
       .slice(0, FAILED_ROW_LIMIT)
       .map((r) => ({ row: r.row, reason: r.notes?.join(' ') ?? 'blocked' })),
-    truncated: failed.length > FAILED_ROW_LIMIT || blocked.length > FAILED_ROW_LIMIT,
+    skippedRows: skipped
+      .slice(0, FAILED_ROW_LIMIT)
+      .map((r) => ({ row: r.row, reason: r.notes?.join(' ') ?? 'skipped' })),
+    truncated: failed.length > FAILED_ROW_LIMIT || blocked.length > FAILED_ROW_LIMIT || skipped.length > FAILED_ROW_LIMIT,
     // Travels with the response for the same reason the failed rows do: a
     // Registrar holds no platform:read and cannot open the job afterwards, so
     // a student left unpinned is invisible to them unless it is here.
@@ -123,7 +128,7 @@ export async function previewHandler(req: AuthRequest, res: Response, next: Next
 
 export async function commitHandler(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const { jobId } = req.body as { jobId?: string };
+    const { jobId, selectedRowNumbers } = req.body as { jobId?: string; selectedRowNumbers?: number[] };
     if (!jobId) throw new AppError(400, 'jobId is required.');
 
     // previewHandler pins entityType to the constant; this handler must too.
@@ -141,7 +146,7 @@ export async function commitHandler(req: AuthRequest, res: Response, next: NextF
     const job = await getImportJob(req.collegeId!, jobId);
     if (job.entityType !== ENTITY_TYPE) throw new AppError(404, 'Import job not found');
 
-    const committed = await commitImportJob(req.collegeId!, jobId, req.user?.name ?? 'System');
+    const committed = await commitImportJob(req.collegeId!, jobId, req.user?.name ?? 'System', { selectedRowNumbers });
 
     // A trimmed summary, not the whole IImportJob. The document carries every
     // row's raw input and the full schema snapshot — megabytes on a large

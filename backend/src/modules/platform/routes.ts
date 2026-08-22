@@ -15,6 +15,7 @@ import {
   createSMSLogSchema, updateSMSLogSchema,
   createWhatsAppLogSchema, updateWhatsAppLogSchema,
   createRbacPolicySchema, updateRbacPolicySchema,
+  commitImportJobSchema,
 } from './validation';
 
 const router = Router();
@@ -119,6 +120,7 @@ router.get(
 router.post(
   '/bulk-imports/:id/commit',
   authorize('platform', 'update'),
+  validate(commitImportJobSchema),
   bulkImportCtrl.commitImportJobHandler,
 );
 router.delete(

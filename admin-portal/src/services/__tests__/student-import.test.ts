@@ -125,6 +125,7 @@ describe('previewStudentImport', () => {
       errorCount: 0,
       actionCounts: { create: 0, update: 0, blocked: 0 },
       sideEffectTotals: {},
+      eligibleRowNumbers: [],
     };
     mockedPost.mockResolvedValue({ data: preview });
     const file = new File(['name,email\nAarav,a@b.c'], 'students.csv', { type: 'text/csv' });

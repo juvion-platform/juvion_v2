@@ -52,6 +52,7 @@ const preview: ImportPreview = {
   errorCount: 0,
   actionCounts: { create: 3, update: 0, blocked: 0 },
   sideEffectTotals: {},
+  eligibleRowNumbers: [1, 2, 3],
 };
 
 function renderWith(node: React.ReactElement) {
@@ -70,7 +71,7 @@ async function commitOnce(onClose: () => void) {
   fireEvent.click(screen.getByRole('button', { name: /^preview$/i }));
   await screen.findByTestId('import-summary');
   fireEvent.click(screen.getByRole('button', { name: /^import 3$/i }));
-  await waitFor(() => expect(mockedCommit).toHaveBeenCalledWith('job-1'));
+  await waitFor(() => expect(mockedCommit).toHaveBeenCalledWith('job-1', expect.any(Array)));
 }
 
 beforeEach(() => {
@@ -157,4 +158,114 @@ describe('<StudentImportDrawer /> commit outcome', () => {
     expect(toast.warning).not.toHaveBeenCalled();
     expect(screen.queryByTestId('import-result')).toBeNull();
   });
+});
+
+describe('StudentImportDrawer per-row selection UI', () => {
+  it('allows selecting/deselecting eligible rows, disables blocked/error checkboxes, updates count, and sends selectedRowNumbers on commit', async () => {
+    // 3 rows: Row 1, Row 2 are eligible, Row 3 is blocked
+    const previewWithBlocked: ImportPreview = {
+      job: { _id: 'job-1' },
+      headers: ['name'],
+      previewRows: [
+        { row: 1, raw: { name: 'Eligible One' }, valid: true, errors: [], action: 'create' },
+        { row: 2, raw: { name: 'Eligible Two' }, valid: true, errors: [], action: 'create' },
+        { row: 3, raw: { name: 'Blocked Three' }, valid: true, errors: [], action: 'blocked' },
+      ],
+      validCount: 2,
+      errorCount: 0,
+      actionCounts: { create: 2, update: 0, blocked: 1 },
+      sideEffectTotals: {},
+      eligibleRowNumbers: [1, 2],
+    };
+
+    mockedTemplate.mockResolvedValue({
+      entityType: 'student', label: 'Students', description: 'x', fields: [], sampleRow: {},
+    });
+    // Mock the results field inside job so frontend can find all eligible rows
+    (previewWithBlocked.job as any).results = [
+      { row: 1, outcome: 'success' },
+      { row: 2, outcome: 'success' },
+      { row: 3, outcome: 'blocked' },
+    ];
+    mockedPreview.mockResolvedValue(previewWithBlocked);
+    mockedConfirm.mockResolvedValue({ confirmed: true });
+    mockedCommit.mockResolvedValue({
+      jobId: 'job-1',
+      status: 'completed',
+      totalRows: 3,
+      successCount: 1,
+      failureCount: 0,
+      blockedCount: 1,
+      skippedCount: 1,
+      failedRows: [],
+      blockedRows: [{ row: 3, reason: 'blocked' }],
+      skippedRows: [{ row: 2, reason: 'skipped' }],
+    } satisfies ImportCommitSummary);
+
+    const onClose = vi.fn();
+    renderWith(<StudentImportDrawer open onClose={onClose} />);
+
+    // Upload and click preview
+    fireEvent.change(await screen.findByLabelText(/csv file/i), {
+      target: { files: [new File(['name\nEligible One'], 'students.csv', { type: 'text/csv' })] },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^preview$/i }));
+
+    // Wait for preview to render
+    await screen.findByTestId('import-summary');
+
+    // Verify initial select counts
+    expect(screen.getByText(/2 of 2 eligible rows selected/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^import 2$/i })).toBeInTheDocument();
+
+    const checkboxes = screen.getAllByRole('checkbox');
+    const selectAllCheckbox = checkboxes[0] as HTMLInputElement;
+    const row1Checkbox = checkboxes[1] as HTMLInputElement;
+    const row2Checkbox = checkboxes[2] as HTMLInputElement;
+    const row3Checkbox = checkboxes[3] as HTMLInputElement;
+
+    expect(selectAllCheckbox.checked).toBe(true);
+    expect(row1Checkbox.checked).toBe(true);
+    expect(row2Checkbox.checked).toBe(true);
+    expect(row3Checkbox.disabled).toBe(true);
+
+    // Untick Row 2
+    fireEvent.click(row2Checkbox);
+    expect(row2Checkbox.checked).toBe(false);
+
+    // Count should update to "1 of 2 eligible rows selected"
+    expect(screen.getByText(/1 of 2 eligible rows selected/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^import 1$/i })).toBeInTheDocument();
+
+    // Click Import
+    fireEvent.click(screen.getByRole('button', { name: /^import 1$/i }));
+
+    // Verify that commitStudentImport was called with selectedRowNumbers array [1]
+    await waitFor(() => expect(mockedCommit).toHaveBeenCalledWith('job-1', [1]));
+  });
+
+  // Regression: previewRows is a capped display slice, so on a large file some
+  // eligible rows have no checkbox. They still import — the operator must be
+  // told, or the count above the table contradicts the table itself.
+  it('warns when eligible rows exist beyond the rendered preview slice', async () => {
+    const truncated: ImportPreview = {
+      ...preview,
+      // Three rows rendered, but the job holds five eligible ones.
+      eligibleRowNumbers: [1, 2, 3, 4, 5],
+    };
+    mockedPreview.mockResolvedValue(truncated);
+
+    renderWith(<StudentImportDrawer open onClose={vi.fn()} />);
+    fireEvent.change(await screen.findByLabelText(/csv file/i), {
+      target: { files: [new File(['name\nRow One'], 'students.csv', { type: 'text/csv' })] },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^preview$/i }));
+    await screen.findByTestId('import-summary');
+
+    expect(screen.getByText(/5 of 5 eligible rows selected/i)).toBeInTheDocument();
+    // 5 eligible - 3 rendered = 2 that cannot be excluded here
+    expect(screen.getByRole('status')).toHaveTextContent(/2 further eligible rows/i);
+    expect(screen.getByRole('status')).toHaveTextContent(/cannot be excluded/i);
+  });
+
 });

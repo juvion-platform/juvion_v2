@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Upload, Download, Loader2, CheckCircle2, XCircle, History } from 'lucide-react';
 import Modal from '../ui/Modal';
@@ -28,6 +28,9 @@ export default function StudentImportDrawer({ open, onClose }: Props) {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [result, setResult] = useState<ImportCommitSummary | null>(null);
+  const [selectedRowNumbers, setSelectedRowNumbers] = useState<Set<number>>(new Set());
+
+  const selectAllRef = useRef<HTMLInputElement | null>(null);
 
   const { data: tpl } = useQuery({
     queryKey: ['student-import-template'],
@@ -62,8 +65,62 @@ export default function StudentImportDrawer({ open, onClose }: Props) {
     onSuccess: setPreview,
   });
 
+  // Server-supplied and authoritative: every row commit would write, not just
+  // the ones rendered. `previewRows` stops at 50 valid rows, so deriving the
+  // selection from it would silently drop everything past the cap.
+  const allEligibleRows = useMemo(
+    () => preview?.eligibleRowNumbers ?? [],
+    [preview],
+  );
+
+  // Rows the operator can actually tick. Anything eligible but past the
+  // display cap stays selected and cannot be excluded — say so rather than
+  // letting the count and the table disagree in silence.
+  const hiddenEligibleCount = useMemo(() => {
+    if (!preview) return 0;
+    const shown = new Set(preview.previewRows.map((r) => r.row));
+    return allEligibleRows.filter((n) => !shown.has(n)).length;
+  }, [preview, allEligibleRows]);
+
+  const eligibleCount = allEligibleRows.length;
+  const selectedCount = selectedRowNumbers.size;
+
+  // Initialize selected rows when preview changes
+  useEffect(() => {
+    if (preview) {
+      setSelectedRowNumbers(new Set(allEligibleRows));
+    } else {
+      setSelectedRowNumbers(new Set());
+    }
+  }, [preview, allEligibleRows]);
+
+  // Set indeterminate state on select all checkbox
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = selectedCount > 0 && selectedCount < eligibleCount;
+    }
+  }, [selectedCount, eligibleCount]);
+
+  const handleToggleRow = (rowNum: number) => {
+    const next = new Set(selectedRowNumbers);
+    if (next.has(rowNum)) {
+      next.delete(rowNum);
+    } else {
+      next.add(rowNum);
+    }
+    setSelectedRowNumbers(next);
+  };
+
+  const handleToggleAll = () => {
+    if (selectedCount === eligibleCount) {
+      setSelectedRowNumbers(new Set());
+    } else {
+      setSelectedRowNumbers(new Set(allEligibleRows));
+    }
+  };
+
   const commitMut = useMutation({
-    mutationFn: (jobId: string) => commitStudentImport(jobId),
+    mutationFn: (jobId: string) => commitStudentImport(jobId, Array.from(selectedRowNumbers)),
     // The fixed "Import committed" toast used to fire whatever happened, and
     // the response was thrown away — a half-failed import looked identical to
     // a clean one. Per-row commit errors are recorded on the job, which a
@@ -109,7 +166,12 @@ export default function StudentImportDrawer({ open, onClose }: Props) {
     },
   });
 
-  function reset() { setFile(null); setPreview(null); setResult(null); }
+  function reset() {
+    setFile(null);
+    setPreview(null);
+    setResult(null);
+    setSelectedRowNumbers(new Set());
+  }
 
   function downloadTemplate() {
     if (!tpl) return;
@@ -126,28 +188,49 @@ export default function StudentImportDrawer({ open, onClose }: Props) {
 
   async function handleCommit() {
     if (!preview?.job?._id) return;
-    const guardianTotal = preview.sideEffectTotals.guardians ?? 0;
-    const willPin = preview.sideEffectTotals.pinWillPin ?? 0;
-    const noMatch = preview.sideEffectTotals.pinNoMatch ?? 0;
-    const pinAmount = preview.sideEffectTotals.pinAmount ?? 0;
+    // Only the rendered rows carry notes/pinPreview, so the confirmation
+    // figures are computed over those. Rows past the display cap are counted
+    // in `hiddenEligibleCount` and called out separately.
+    const selectedRowsData = preview.previewRows.filter((r) => selectedRowNumbers.has(r.row));
+
+    let dynamicGuardians = 0;
+    let dynamicWillPin = 0;
+    let dynamicPinAmount = 0;
+
+    for (const r of selectedRowsData) {
+      const notesList = r.notes || [];
+      const guardianNotesCount = notesList.filter((n: string) =>
+        n.startsWith('will create a guardian for')
+      ).length;
+      dynamicGuardians += guardianNotesCount;
+
+      if (r.pinPreview?.willPin) {
+        dynamicWillPin += 1;
+        dynamicPinAmount += (r.pinPreview.totalAmount ?? 0);
+      }
+    }
+
     const ok = await confirmAction({
-      title: `Import ${preview.validCount} student${preview.validCount === 1 ? '' : 's'}?`,
+      title: `Import ${selectedCount} student${selectedCount === 1 ? '' : 's'}?`,
       message: [
-        `${preview.actionCounts.create} created, ${preview.actionCounts.update} updated.`,
+        `${selectedCount} eligible row(s) will be committed.`,
         preview.actionCounts.blocked > 0
           ? `${preview.actionCounts.blocked} blocked row(s) will be skipped.` : '',
         preview.errorCount > 0 ? `${preview.errorCount} row(s) with errors will be skipped.` : '',
-        guardianTotal > 0
-          ? `Up to ${guardianTotal} guardian record(s) will also be created.` : '',
+        dynamicGuardians > 0
+          ? `Up to ${dynamicGuardians} guardian record(s) will also be created.` : '',
         // Consequence, not an approval — the import approves nothing, Finance
         // already approved these structures. Counts lead; the money is
         // secondary and labelled estimated because the amount is read at
         // preview and frozen again at commit.
-        willPin > 0
-          ? `${willPin} student(s) will be bound to an estimated ${inr(pinAmount)} in fees.` : '',
-        noMatch > 0
-          ? `${noMatch} will import without a fee structure and can be pinned later `
-            + 'from Finance → Fee Management → Pin Coverage.' : '',
+        dynamicWillPin > 0
+          ? `${dynamicWillPin} student(s) will be bound to an estimated ${inr(dynamicPinAmount)} in fees.` : '',
+        // A job is single-use: once committed it leaves preview_ready and the
+        // unticked rows can never be committed from it. "Skipped" must not be
+        // read as "queued for later".
+        eligibleCount - selectedCount > 0
+          ? `${eligibleCount - selectedCount} unselected row(s) will NOT be imported and cannot be `
+            + 'added later from this file — re-upload them if you change your mind.' : '',
       ].filter(Boolean).join(' '),
       confirmLabel: 'Import',
     });
@@ -194,20 +277,23 @@ export default function StudentImportDrawer({ open, onClose }: Props) {
                 : 0;
               const pinnedNote = result.pinSummary
                 ? ` ${result.pinSummary.pinned} pinned to a fee structure.` : '';
-              if (result.failureCount + result.blockedCount > 0) {
+              const skippedCount = result.skippedCount ?? 0;
+              if (result.failureCount + result.blockedCount + skippedCount > 0) {
                 return (
                   <div className="rounded-lg border border-amber-300 bg-amber-50 p-3">
                     <p className="text-sm font-semibold text-amber-900">
-                      Import finished with problems
+                      Import finished
                     </p>
                     <p className="mt-1 text-sm text-amber-900">
                       {result.successCount} imported · {result.failureCount} failed
-                      {result.blockedCount > 0 ? ` · ${result.blockedCount} blocked` : ''} of{' '}
+                      {result.blockedCount > 0 ? ` · ${result.blockedCount} blocked` : ''}
+                      {skippedCount > 0 ? ` · ${skippedCount} skipped` : ''} of{' '}
                       {result.totalRows} row{result.totalRows === 1 ? '' : 's'}.{pinnedNote}
                     </p>
                     <p className="mt-1 text-xs text-amber-800">
-                      Rows listed below were not written. Fix them in the source file and upload it
-                      again — re-importing is safe, matched rows are updated rather than duplicated.
+                      {result.failureCount + result.blockedCount > 0
+                        ? 'Rows listed below were not written. Fix them in the source file and upload it again — re-importing is safe, matched rows are updated rather than duplicated.'
+                        : 'All selected eligible rows were successfully imported.'}
                     </p>
                   </div>
                 );
@@ -326,6 +412,27 @@ export default function StudentImportDrawer({ open, onClose }: Props) {
                 </table>
               </div>
             )}
+            {result.skippedRows && result.skippedRows.length > 0 && (
+              <div className="max-h-56 overflow-auto rounded-lg border">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-medium text-gray-600">Row</th>
+                      <th className="px-3 py-2 text-left font-medium text-gray-600">Skipped because</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {result.skippedRows.map((r) => (
+                      <tr key={`s-${r.row}`}>
+                        <td className="px-3 py-2 text-gray-500">{r.row}</td>
+                        <td className="px-3 py-2 text-xs text-gray-500">{r.reason}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
 
             <div className="flex justify-end gap-2 border-t pt-3">
               <button type="button" onClick={reset} className="rounded-lg border px-4 py-2 text-sm">
@@ -440,7 +547,28 @@ export default function StudentImportDrawer({ open, onClose }: Props) {
                   {guardianTotal === 1 ? '' : 's'} will be created
                 </span>
               )}
+              <span className="text-slate-800 font-medium ml-auto">
+                {selectedCount} of {eligibleCount} eligible rows selected
+              </span>
             </div>
+
+            {/*
+              The table is a capped slice (50 valid rows). Everything past it is
+              still selected and still imports — it just cannot be unticked.
+              Without this the header says "300 of 300 selected" over a table of
+              50 and the operator has no way to know why.
+            */}
+            {hiddenEligibleCount > 0 && (
+              <div
+                className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+                role="status"
+              >
+                Showing the first {preview.previewRows.length} rows.{' '}
+                <strong>{hiddenEligibleCount}</strong> further eligible row
+                {hiddenEligibleCount === 1 ? '' : 's'} will be imported but cannot be
+                excluded here — remove them from the file if you need to leave them out.
+              </div>
+            )}
 
             {preview.pinContext?.warning ? (
               <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
@@ -482,6 +610,15 @@ export default function StudentImportDrawer({ open, onClose }: Props) {
               <table className="w-full text-sm">
                 <thead className="bg-gray-50">
                   <tr>
+                    <th className="px-3 py-2 text-left font-medium text-gray-600 w-10">
+                      <input
+                        ref={selectAllRef}
+                        type="checkbox"
+                        checked={eligibleCount > 0 && selectedCount === eligibleCount}
+                        onChange={handleToggleAll}
+                        className="rounded border-gray-300 cursor-pointer"
+                      />
+                    </th>
                     <th className="px-3 py-2 text-left font-medium text-gray-600">Row</th>
                     <th className="px-3 py-2 text-left font-medium text-gray-600">Name</th>
                     <th className="px-3 py-2 text-left font-medium text-gray-600">Resolves to</th>
@@ -495,65 +632,82 @@ export default function StudentImportDrawer({ open, onClose }: Props) {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {preview.previewRows.map((r: ImportPreviewRow) => (
-                    <tr key={r.row}>
-                      <td className="px-3 py-2">{r.row}</td>
-                      <td className="px-3 py-2">{r.raw.name ?? '—'}</td>
-                      <td className="px-3 py-2 text-xs text-gray-600">
-                        {r.resolved
-                          ? Object.entries(r.resolved).map(([k, v]) => `${k}: ${v}`).join(' · ')
-                          : '—'}
-                      </td>
-                      <td className="px-3 py-2 text-xs">
-                        {r.pinPreview?.willPin ? (
-                          <span className="text-slate-700">
-                            {inr(r.pinPreview.totalAmount ?? 0)}
-                            <span className="text-gray-500"> · Year {r.pinPreview.yearOfStudy}</span>
+                  {preview.previewRows.map((r: ImportPreviewRow) => {
+                    const isEligible = r.valid && r.action !== 'blocked';
+                    return (
+                      <tr key={r.row}>
+                        <td className="px-3 py-2">
+                          <input
+                            type="checkbox"
+                            disabled={!isEligible}
+                            checked={isEligible && selectedRowNumbers.has(r.row)}
+                            onChange={() => handleToggleRow(r.row)}
+                            className="rounded border-gray-300 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                          />
+                        </td>
+                        <td className="px-3 py-2">{r.row}</td>
+                        <td className="px-3 py-2">{r.raw.name ?? '—'}</td>
+                        <td className="px-3 py-2 text-xs text-gray-600">
+                          {r.resolved
+                            ? Object.entries(r.resolved).map(([k, v]) => `${k}: ${v}`).join(' · ')
+                            : '—'}
+                        </td>
+                        <td className="px-3 py-2 text-xs">
+                          {r.pinPreview?.willPin ? (
+                            <span className="text-slate-700">
+                              {inr(r.pinPreview.totalAmount ?? 0)}
+                              <span className="text-gray-500"> · Year {r.pinPreview.yearOfStudy}</span>
+                            </span>
+                          ) : (
+                            <span className="text-gray-500">
+                              {r.pinPreview ? `— ${r.pinPreview.reason}` : '—'}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          <Badge
+                            variant={
+                              r.action === 'blocked' ? 'warning'
+                                : r.valid ? (r.action === 'update' ? 'info' : 'success')
+                                  : 'danger'
+                            }
+                          >
+                            {r.action === 'blocked' ? 'Blocked'
+                              : r.valid ? (r.action === 'update' ? 'Update' : 'Create')
+                                : 'Error'}
+                          </Badge>
+                        </td>
+                        <td className="px-3 py-2 text-xs">
+                          <span className="text-red-600">
+                            {r.errors.map((e) => `${e.field}: ${e.error}`).join('; ')}
                           </span>
-                        ) : (
-                          <span className="text-gray-500">
-                            {r.pinPreview ? `— ${r.pinPreview.reason}` : '—'}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2">
-                        <Badge
-                          variant={
-                            r.action === 'blocked' ? 'warning'
-                              : r.valid ? (r.action === 'update' ? 'info' : 'success')
-                                : 'danger'
-                          }
-                        >
-                          {r.action === 'blocked' ? 'Blocked'
-                            : r.valid ? (r.action === 'update' ? 'Update' : 'Create')
-                              : 'Error'}
-                        </Badge>
-                      </td>
-                      <td className="px-3 py-2 text-xs">
-                        <span className="text-red-600">
-                          {r.errors.map((e) => `${e.field}: ${e.error}`).join('; ')}
-                        </span>
-                        {r.notes && r.notes.length > 0 ? (
-                          <span className="block text-amber-700">{r.notes.join('; ')}</span>
-                        ) : null}
-                      </td>
-                    </tr>
-                  ))}
+                          {r.notes && r.notes.length > 0 ? (
+                            <span className="block text-amber-700">{r.notes.join('; ')}</span>
+                          ) : null}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
 
-            <div className="flex justify-end gap-2 border-t pt-3">
+            <div className="flex justify-end items-center gap-2 border-t pt-3">
+              {selectedCount === 0 && (
+                <span className="text-xs text-red-600 font-medium mr-auto" role="alert">
+                  Select at least one eligible row to import.
+                </span>
+              )}
               <button type="button" onClick={reset} className="rounded-lg border px-4 py-2 text-sm">
                 Choose another file
               </button>
               <button
                 type="button"
-                disabled={preview.validCount === 0 || commitMut.isPending}
+                disabled={selectedCount === 0 || commitMut.isPending}
                 onClick={() => void handleCommit()}
                 className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-primary-700 disabled:opacity-50"
               >
-                {commitMut.isPending ? 'Importing…' : `Import ${preview.validCount}`}
+                {commitMut.isPending ? 'Importing…' : `Import ${selectedCount}`}
               </button>
             </div>
           </div>
