@@ -41,7 +41,7 @@ export interface ImportJobRowResult {
    * it never reaches commit and never counts toward `failureCount`. The
    * reason lives in `notes`.
    */
-  outcome: 'success' | 'error' | 'blocked';
+  outcome: 'success' | 'error' | 'blocked' | 'skipped';
   createdId?: string;
   error?: string;
   raw?: Record<string, unknown>;
@@ -65,6 +65,7 @@ export interface ImportJobDoc {
   failureCount: number;
   /** Rows the business rules refused to write. Never part of failureCount. */
   blockedCount?: number;
+  skippedCount?: number;
   results: ImportJobRowResult[];
   errorSummary?: string;
   startedAt: string;
@@ -114,8 +115,8 @@ export const uploadImportFile = (
     .then((r) => r.data);
 };
 
-export const commitImportJob = (jobId: string): Promise<ImportJobDoc> =>
-  api.post(`${BASE}/${jobId}/commit`).then((r) => r.data);
+export const commitImportJob = (jobId: string, selectedRowNumbers?: number[]): Promise<ImportJobDoc> =>
+  api.post(`${BASE}/${jobId}/commit`, { selectedRowNumbers }).then((r) => r.data);
 
 export const archiveImportJob = (
   jobId: string,

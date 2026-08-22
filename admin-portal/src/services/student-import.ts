@@ -122,9 +122,11 @@ export interface ImportCommitSummary {
   failureCount: number;
   /** Rows the business rules refused to write. Never attempted. */
   blockedCount: number;
+  skippedCount?: number;
   errorSummary?: string;
   failedRows: Array<{ row: number; error: string }>;
   blockedRows: Array<{ row: number; reason: string }>;
+  skippedRows?: Array<{ row: number; reason: string }>;
   /**
    * Fee-pin roll-up. Travels with the response for the same reason the failed
    * rows do: a Registrar holds no `platform:read` and cannot open the job
@@ -146,8 +148,8 @@ export interface ImportCommitSummary {
   truncated?: boolean;
 }
 
-export const commitStudentImport = (jobId: string): Promise<ImportCommitSummary> =>
-  api.post(`${BASE}/commit`, { jobId }).then((r) => r.data);
+export const commitStudentImport = (jobId: string, selectedRowNumbers?: number[]): Promise<ImportCommitSummary> =>
+  api.post(`${BASE}/commit`, { jobId, selectedRowNumbers }).then((r) => r.data);
 
 /** One row of the drawer's "recent imports" list — no per-row detail. */
 export interface ImportJobListEntry {
@@ -158,6 +160,7 @@ export interface ImportJobListEntry {
   successCount: number;
   failureCount: number;
   blockedCount: number;
+  skippedCount?: number;
   errorSummary?: string;
   createdAt?: string;
   completedAt?: string;

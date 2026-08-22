@@ -224,3 +224,9 @@ export const signDocumentSchema = z.object({ role: z.string().min(1), signedBy: 
 export const issueDocumentSchema = z.object({ serialNumber: z.string().optional() });
 export const revokeDocumentSchema = z.object({ reason: z.string().min(1) });
 export const createAlumniRecordSchema = z.object({ personId: z.string().min(1), studentId: z.string().min(1), programmeId: z.string().min(1), branchId: z.string().min(1), batchId: z.string().optional(), regulationId: z.string().optional(), graduationDate: z.string().min(1), degreeAwarded: z.string().min(1), finalCgpa: z.number(), classObtained: z.enum(['first_class_distinction', 'first_class', 'second_class', 'pass']) });
+
+// ─── Student Bulk Import ──────────────────────────────────────────
+export const commitStudentImportSchema = z.object({
+  jobId: z.string().min(1),
+  selectedRowNumbers: z.array(z.number().int().positive()).optional(),
+}).strict();

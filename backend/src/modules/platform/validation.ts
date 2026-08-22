@@ -161,3 +161,8 @@ export const upsertConfigEntryBodySchema = z.object({
   aiAcceptedFields: z.array(z.string()).optional(),
   batchId: z.string().optional(),
 }).strict();
+
+// ─── Bulk Imports ──────────────────────────────────────────────────
+export const commitImportJobSchema = z.object({
+  selectedRowNumbers: z.array(z.number().int().positive()).optional(),
+}).strict();

@@ -13,7 +13,7 @@
  * past import for support / debug.
  */
 
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Upload, FileText, CheckCircle2, XCircle, Loader2, AlertTriangle,
@@ -377,12 +377,59 @@ function PreviewStep({
   onCommitted: (job: ImportJobDoc) => void;
 }) {
   const [showOnlyErrors, setShowOnlyErrors] = useState(false);
+  const [selectedRowNumbers, setSelectedRowNumbers] = useState<Set<number>>(new Set());
+  const selectAllRef = useRef<HTMLInputElement | null>(null);
+
+  const allEligibleRows = useMemo(() => {
+    if (!preview?.job?.results) {
+      return preview.previewRows.filter((r) => r.valid).map((r) => r.row);
+    }
+    return preview.job.results.filter((r) => r.outcome === 'success').map((r) => r.row);
+  }, [preview]);
+
+  const eligibleCount = allEligibleRows.length;
+  const selectedCount = selectedRowNumbers.size;
+
+  // Initialize selected rows when preview changes
+  useEffect(() => {
+    if (preview) {
+      setSelectedRowNumbers(new Set(allEligibleRows));
+    } else {
+      setSelectedRowNumbers(new Set());
+    }
+  }, [preview, allEligibleRows]);
+
+  // Set indeterminate state on select all checkbox
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = selectedCount > 0 && selectedCount < eligibleCount;
+    }
+  }, [selectedCount, eligibleCount]);
+
+  const handleToggleRow = (rowNum: number) => {
+    const next = new Set(selectedRowNumbers);
+    if (next.has(rowNum)) {
+      next.delete(rowNum);
+    } else {
+      next.add(rowNum);
+    }
+    setSelectedRowNumbers(next);
+  };
+
+  const handleToggleAll = () => {
+    if (selectedCount === eligibleCount) {
+      setSelectedRowNumbers(new Set());
+    } else {
+      setSelectedRowNumbers(new Set(allEligibleRows));
+    }
+  };
+
   const rows = useMemo(() => {
     return showOnlyErrors ? preview.previewRows.filter((r) => !r.valid) : preview.previewRows;
   }, [preview.previewRows, showOnlyErrors]);
 
   const commitMut = useMutation({
-    mutationFn: () => commitImportJob(preview.job._id),
+    mutationFn: () => commitImportJob(preview.job._id, Array.from(selectedRowNumbers)),
     onSuccess: (job) => onCommitted(job),
   });
 
@@ -440,11 +487,17 @@ function PreviewStep({
           />
           Show only error rows
         </label>
-        <div className="text-xs text-gray-500">
-          Showing {rows.length} of {preview.previewRows.length} preview rows
-          {preview.previewRows.length < preview.job.totalRows && (
-            <> · {preview.job.totalRows - preview.previewRows.length} hidden</>
-          )}
+        <div className="text-xs text-gray-500 flex items-center gap-3">
+          <span className="font-semibold text-slate-700">
+            {selectedCount} of {eligibleCount} eligible rows selected
+          </span>
+          <span>·</span>
+          <span>
+            Showing {rows.length} of {preview.previewRows.length} preview rows
+            {preview.previewRows.length < preview.job.totalRows && (
+              <> · {preview.job.totalRows - preview.previewRows.length} hidden</>
+            )}
+          </span>
         </div>
       </div>
 
@@ -452,6 +505,15 @@ function PreviewStep({
         <table className="text-xs min-w-full">
           <thead className="bg-navy/[0.03] text-[10px] uppercase tracking-wide text-gray-500">
             <tr>
+              <th className="px-2 py-1.5 font-medium text-left w-10">
+                <input
+                  ref={selectAllRef}
+                  type="checkbox"
+                  checked={eligibleCount > 0 && selectedCount === eligibleCount}
+                  onChange={handleToggleAll}
+                  className="rounded border-gray-300 cursor-pointer"
+                />
+              </th>
               <th className="px-2 py-1.5 font-medium text-left">#</th>
               <th className="px-2 py-1.5 font-medium text-left">Status</th>
               {entityType.fields.map((f) => (
@@ -462,49 +524,66 @@ function PreviewStep({
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
-              <tr key={r.row} className={`border-t border-gray-100 ${r.valid ? '' : 'bg-red-50/40'}`}>
-                <td className="px-2 py-1.5 text-gray-500">{r.row}</td>
-                <td className="px-2 py-1.5">
-                  {r.valid ? (
-                    <span className="inline-flex items-center gap-0.5 text-emerald-700">
-                      <CheckCircle2 size={11} />
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-0.5 text-red-700" title={r.errors.map((e) => e.error).join('; ')}>
-                      <XCircle size={11} />
-                    </span>
-                  )}
-                </td>
-                {entityType.fields.map((f) => {
-                  const err = errorByField.get(f.fieldKey)?.get(r.row);
-                  const value = r.raw[f.fieldKey] ?? '';
-                  return (
-                    <td
-                      key={f.fieldKey}
-                      className={`px-2 py-1.5 whitespace-nowrap ${err ? 'bg-red-100 text-red-900' : 'text-gray-700'}`}
-                      title={err}
-                    >
-                      <div className="truncate max-w-[180px]">{value || <span className="text-gray-400">—</span>}</div>
-                      {err && <div className="text-[10px] text-red-700">⚠ {err}</div>}
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
+            {rows.map((r) => {
+              const isEligible = r.valid;
+              return (
+                <tr key={r.row} className={`border-t border-gray-100 ${r.valid ? '' : 'bg-red-50/40'}`}>
+                  <td className="px-2 py-1.5">
+                    <input
+                      type="checkbox"
+                      disabled={!isEligible}
+                      checked={isEligible && selectedRowNumbers.has(r.row)}
+                      onChange={() => handleToggleRow(r.row)}
+                      className="rounded border-gray-300 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                    />
+                  </td>
+                  <td className="px-2 py-1.5 text-gray-500">{r.row}</td>
+                  <td className="px-2 py-1.5">
+                    {r.valid ? (
+                      <span className="inline-flex items-center gap-0.5 text-emerald-700">
+                        <CheckCircle2 size={11} />
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-0.5 text-red-700" title={r.errors.map((e) => e.error).join('; ')}>
+                        <XCircle size={11} />
+                      </span>
+                    )}
+                  </td>
+                  {entityType.fields.map((f) => {
+                    const err = errorByField.get(f.fieldKey)?.get(r.row);
+                    const value = r.raw[f.fieldKey] ?? '';
+                    return (
+                      <td
+                        key={f.fieldKey}
+                        className={`px-2 py-1.5 whitespace-nowrap ${err ? 'bg-red-100 text-red-900' : 'text-gray-700'}`}
+                        title={err}
+                      >
+                        <div className="truncate max-w-[180px]">{value || <span className="text-gray-400">—</span>}</div>
+                        {err && <div className="text-[10px] text-red-700">⚠ {err}</div>}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
 
-      <div className="flex justify-end gap-2">
+      <div className="flex justify-end items-center gap-3">
+        {selectedCount === 0 && (
+          <span className="text-xs text-red-600 font-medium mr-auto" role="alert">
+            Select at least one eligible row to import.
+          </span>
+        )}
         <button
           type="button"
-          disabled={preview.job.status !== 'preview_ready' || preview.validCount === 0 || commitMut.isPending}
+          disabled={preview.job.status !== 'preview_ready' || selectedCount === 0 || commitMut.isPending}
           onClick={() => commitMut.mutate()}
           className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded hover:bg-primary-700 disabled:opacity-50"
         >
           {commitMut.isPending ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-          Commit {preview.validCount} row{preview.validCount === 1 ? '' : 's'}
+          Commit {selectedCount} row{selectedCount === 1 ? '' : 's'}
         </button>
       </div>
     </div>
@@ -548,14 +627,24 @@ function JobDetailView({ job }: { job: ImportJobDoc }) {
           entity types that cannot produce blocked rows (everything except
           student) render exactly the three cards they always did.
         */}
-        <div className={`grid gap-3 mt-4 ${blockedRows.length > 0 ? 'grid-cols-4' : 'grid-cols-3'}`}>
-          <SummaryCard label="Total rows" value={job.totalRows} cls="bg-slate-50 border-slate-200 text-slate-800" />
-          <SummaryCard label="Created" value={job.successCount} cls="bg-emerald-50 border-emerald-200 text-emerald-800" />
-          <SummaryCard label="Failed" value={job.failureCount} cls="bg-red-50 border-red-200 text-red-800" />
-          {blockedRows.length > 0 && (
-            <SummaryCard label="Blocked" value={blockedRows.length} cls="bg-amber-50 border-amber-200 text-amber-900" />
-          )}
-        </div>
+        {(() => {
+          const skippedCount = job.skippedCount ?? 0;
+          const cols = 3 + (blockedRows.length > 0 ? 1 : 0) + (skippedCount > 0 ? 1 : 0);
+          const gridColsClass = cols === 5 ? 'grid-cols-5' : cols === 4 ? 'grid-cols-4' : 'grid-cols-3';
+          return (
+            <div className={`grid gap-3 mt-4 ${gridColsClass}`}>
+              <SummaryCard label="Total rows" value={job.totalRows} cls="bg-slate-50 border-slate-200 text-slate-800" />
+              <SummaryCard label="Created" value={job.successCount} cls="bg-emerald-50 border-emerald-200 text-emerald-800" />
+              <SummaryCard label="Failed" value={job.failureCount} cls="bg-red-50 border-red-200 text-red-800" />
+              {blockedRows.length > 0 && (
+                <SummaryCard label="Blocked" value={blockedRows.length} cls="bg-amber-50 border-amber-200 text-amber-900" />
+              )}
+              {skippedCount > 0 && (
+                <SummaryCard label="Skipped" value={skippedCount} cls="bg-slate-100 border-slate-300 text-slate-700" />
+              )}
+            </div>
+          );
+        })()}
         {job.errorSummary && (
           <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
             {job.errorSummary}
@@ -624,6 +713,33 @@ function JobDetailView({ job }: { job: ImportJobDoc }) {
               + {blockedRows.length - 200} more blocked rows not shown
             </div>
           )}
+        </div>
+      )}
+
+      {job.results.filter((r) => r.outcome === 'skipped').length > 0 && (
+        <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
+          <div className="px-5 py-3 border-b bg-slate-50">
+            <h3 className="text-sm font-semibold text-navy-dark">Skipped rows ({job.results.filter((r) => r.outcome === 'skipped').length})</h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Eligible rows that were excluded by the operator and not written.
+            </p>
+          </div>
+          <table className="w-full text-xs">
+            <thead className="bg-gray-50 text-[10px] uppercase tracking-wide text-gray-500">
+              <tr>
+                <th className="px-3 py-1.5 text-left font-medium">Row</th>
+                <th className="px-3 py-1.5 text-left font-medium">Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              {job.results.filter((r) => r.outcome === 'skipped').slice(0, 200).map((r) => (
+                <tr key={r.row} className="border-t border-gray-100">
+                  <td className="px-3 py-1.5 text-gray-500">{r.row}</td>
+                  <td className="px-3 py-1.5 text-slate-500">{r.notes?.join(' ') ?? 'Skipped'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
