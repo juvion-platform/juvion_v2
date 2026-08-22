@@ -124,6 +124,15 @@ export interface ImportJobPreview {
    * ones. Empty for schemas without a validateRow hook.
    */
   sideEffectTotals: Record<string, number>;
+  /**
+   * EVERY row that commit would write, not just the ones in `previewRows`.
+   *
+   * `previewRows` is a display slice capped at PREVIEW_SUCCESS_LIMIT valid
+   * rows; a client that derived its selection from it would silently drop
+   * everything past the cap. This is the authoritative list to select from.
+   * Integers only — the caller already has the display data it needs.
+   */
+  eligibleRowNumbers: number[];
   /** Absent for entity types that do not fee-pin. */
   pinContext?: ImportPinContext;
 }
@@ -391,6 +400,7 @@ export async function uploadAndValidate(
       job: failedJob,
       headers: [],
       previewRows: [],
+      eligibleRowNumbers: [],
       validCount: 0,
       errorCount: 0,
       actionCounts: { create: 0, update: 0, blocked: 0 },
@@ -421,6 +431,7 @@ export async function uploadAndValidate(
       job: failedJob,
       headers: parsed.headers,
       previewRows: [],
+      eligibleRowNumbers: [],
       validCount: 0,
       errorCount: 0,
       actionCounts: { create: 0, update: 0, blocked: 0 },
@@ -626,6 +637,9 @@ export async function uploadAndValidate(
     errorCount,
     actionCounts,
     sideEffectTotals,
+    eligibleRowNumbers: job.results
+      .filter((r) => r.outcome === 'success')
+      .map((r) => r.row),
     ...(pinContext ? { pinContext } : {}),
   };
 }
@@ -715,10 +729,6 @@ export async function commitImportJob(
       // Never attempted, and never a failure: the business rules refused it
       // at preview and the operator was told so before confirming.
       blockedCount += 1;
-      continue;
-    }
-    if (r.outcome === 'skipped') {
-      skippedCount += 1;
       continue;
     }
     if (r.outcome !== 'success') {

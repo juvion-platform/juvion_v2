@@ -68,6 +68,12 @@ export interface ImportPreview {
    * so these cannot be recomputed in the browser.
    */
   sideEffectTotals: Record<string, number>;
+  /**
+   * Every row commit would write, not just the ones in `previewRows`. Select
+   * from this, never from the rendered slice — the slice stops at 50 valid
+   * rows and a selection derived from it would silently drop the rest.
+   */
+  eligibleRowNumbers: number[];
   /** Absent for entity types that do not fee-pin. */
   pinContext?: ImportPinContext;
 }

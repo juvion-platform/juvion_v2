@@ -163,6 +163,10 @@ export const upsertConfigEntryBodySchema = z.object({
 }).strict();
 
 // ─── Bulk Imports ──────────────────────────────────────────────────
+// An empty array is rejected rather than treated as "commit nothing": the UI
+// disables Import at zero, so an empty list on the wire means a client bug, and
+// silently reporting a successful import that wrote nothing is the worst way to
+// surface it. Omit the field entirely to commit everything.
 export const commitImportJobSchema = z.object({
-  selectedRowNumbers: z.array(z.number().int().positive()).optional(),
+  selectedRowNumbers: z.array(z.number().int().positive()).min(1).optional(),
 }).strict();

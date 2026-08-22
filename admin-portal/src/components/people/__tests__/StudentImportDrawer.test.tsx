@@ -52,6 +52,7 @@ const preview: ImportPreview = {
   errorCount: 0,
   actionCounts: { create: 3, update: 0, blocked: 0 },
   sideEffectTotals: {},
+  eligibleRowNumbers: [1, 2, 3],
 };
 
 function renderWith(node: React.ReactElement) {
@@ -174,6 +175,7 @@ describe('StudentImportDrawer per-row selection UI', () => {
       errorCount: 0,
       actionCounts: { create: 2, update: 0, blocked: 1 },
       sideEffectTotals: {},
+      eligibleRowNumbers: [1, 2],
     };
 
     mockedTemplate.mockResolvedValue({
@@ -241,4 +243,29 @@ describe('StudentImportDrawer per-row selection UI', () => {
     // Verify that commitStudentImport was called with selectedRowNumbers array [1]
     await waitFor(() => expect(mockedCommit).toHaveBeenCalledWith('job-1', [1]));
   });
+
+  // Regression: previewRows is a capped display slice, so on a large file some
+  // eligible rows have no checkbox. They still import — the operator must be
+  // told, or the count above the table contradicts the table itself.
+  it('warns when eligible rows exist beyond the rendered preview slice', async () => {
+    const truncated: ImportPreview = {
+      ...preview,
+      // Three rows rendered, but the job holds five eligible ones.
+      eligibleRowNumbers: [1, 2, 3, 4, 5],
+    };
+    mockedPreview.mockResolvedValue(truncated);
+
+    renderWith(<StudentImportDrawer open onClose={vi.fn()} />);
+    fireEvent.change(await screen.findByLabelText(/csv file/i), {
+      target: { files: [new File(['name\nRow One'], 'students.csv', { type: 'text/csv' })] },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^preview$/i }));
+    await screen.findByTestId('import-summary');
+
+    expect(screen.getByText(/5 of 5 eligible rows selected/i)).toBeInTheDocument();
+    // 5 eligible - 3 rendered = 2 that cannot be excluded here
+    expect(screen.getByRole('status')).toHaveTextContent(/2 further eligible rows/i);
+    expect(screen.getByRole('status')).toHaveTextContent(/cannot be excluded/i);
+  });
+
 });

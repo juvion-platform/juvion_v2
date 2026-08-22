@@ -88,6 +88,11 @@ export interface ImportPreviewResponse {
   previewRows: ImportPreviewRow[];
   validCount: number;
   errorCount: number;
+  /**
+   * Every row commit would write. `previewRows` is a capped display slice, so
+   * a selection derived from it would silently drop rows past the cap.
+   */
+  eligibleRowNumbers: number[];
 }
 
 export const listImportEntityTypes = (): Promise<{ items: ImportEntityTypeDef[] }> =>

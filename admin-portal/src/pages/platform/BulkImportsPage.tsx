@@ -380,12 +380,20 @@ function PreviewStep({
   const [selectedRowNumbers, setSelectedRowNumbers] = useState<Set<number>>(new Set());
   const selectAllRef = useRef<HTMLInputElement | null>(null);
 
-  const allEligibleRows = useMemo(() => {
-    if (!preview?.job?.results) {
-      return preview.previewRows.filter((r) => r.valid).map((r) => r.row);
-    }
-    return preview.job.results.filter((r) => r.outcome === 'success').map((r) => r.row);
-  }, [preview]);
+  // Server-supplied and authoritative — `previewRows` is a capped display
+  // slice, so a selection derived from it would silently drop rows past the cap.
+  const allEligibleRows = useMemo(
+    () => preview?.eligibleRowNumbers ?? [],
+    [preview],
+  );
+
+  // Eligible but not rendered: still imported, cannot be unticked. Surfaced
+  // rather than left to contradict the count above the table.
+  const hiddenEligibleCount = useMemo(() => {
+    if (!preview) return 0;
+    const shown = new Set(preview.previewRows.map((r) => r.row));
+    return allEligibleRows.filter((n) => !shown.has(n)).length;
+  }, [preview, allEligibleRows]);
 
   const eligibleCount = allEligibleRows.length;
   const selectedCount = selectedRowNumbers.size;
@@ -491,6 +499,13 @@ function PreviewStep({
           <span className="font-semibold text-slate-700">
             {selectedCount} of {eligibleCount} eligible rows selected
           </span>
+          {hiddenEligibleCount > 0 && (
+            <span className="text-amber-700" role="status">
+              · {hiddenEligibleCount} further eligible row
+              {hiddenEligibleCount === 1 ? '' : 's'} not shown; they will be imported
+              and cannot be excluded here
+            </span>
+          )}
           <span>·</span>
           <span>
             Showing {rows.length} of {preview.previewRows.length} preview rows

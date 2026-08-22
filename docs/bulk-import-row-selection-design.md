@@ -56,12 +56,42 @@ Row identifiers sent by the client are strictly validated:
 The selection payload field `selectedRowNumbers` is optional. If omitted (or `undefined`), the import service commits all eligible rows, maintaining complete backward compatibility with older API clients or screens that have not implemented row-level selection UI.
 
 ## Large Files
-* **Ceiling Support**: Up to 10,000 rows are supported.
-* **Memory & Lookup Efficiency**: The server converts the incoming selection array into a `Set<number>`. This allows checking row inclusion in $O(1)$ time during the commit loop, keeping loop overhead minimal.
+* **Commit ceiling**: The commit path handles the full 10,000-row ceiling. The server converts the incoming selection array into a `Set<number>`, so row inclusion is an $O(1)$ check inside the existing loop.
+* **Selection ceiling is lower, and is disclosed.** The preview renders a capped
+  display slice — `PREVIEW_SUCCESS_LIMIT` (50) valid rows plus every error row.
+  Rows past that cap are still eligible and still imported, but they have no
+  checkbox and cannot be excluded from this screen. Both screens now show a
+  notice naming how many rows that affects; the operator is told rather than
+  left to wonder why "300 of 300 selected" sits above a table of 50.
+* **Selection source**: the client selects from `eligibleRowNumbers`, returned
+  explicitly by the preview endpoint. It deliberately does **not** derive the
+  list from `previewRows` (which is capped, so the selection would silently
+  drop rows) nor from `job.results` (the raw job document, which carries every
+  row's raw input and is megabytes on a large import — `jobSummary` exists
+  precisely to avoid putting that on the wire).
+* **Not addressed**: making the full row set selectable needs a paginated or
+  virtualised preview, which is a larger change than this one. Raising the cap
+  instead would grow the preview payload for every import, selection or not.
 
 ## Scope
 * **Unrelated warning fixes**: Unrelated warnings about fee-structure mismatches, program configurations, or guardian schemas are out of scope.
 * **Schema definitions modification**: Column schemas and CSV templates remain unchanged.
 
+## Excluded rows are not deferred — they are dropped
+A job is single-use: `commitImportJob` refuses anything not in `preview_ready`
+and moves the job to `completed`/`partial` when it finishes. There is therefore
+no way to come back and commit the rows that were unticked — the operator has to
+re-upload a file containing them. Making jobs resumable would mean new lifecycle
+states, partial-commit semantics, and a decision about how stale a row's `raw`
+may be against live data by the time it is finally committed. That is out of
+scope here, but it is a real limitation of the feature as shipped and worth
+saying plainly rather than leaving the operator to assume "skipped" means "later".
+
 ## Issues Found
-* No unrelated issues found during implementation of this feature.
+* `previewRows` being a capped slice is easy to mistake for the full row set;
+  this feature is the first thing that depended on the distinction. Addressed
+  above by returning `eligibleRowNumbers` explicitly.
+* The preview endpoint returns the raw `IImportJob` (including every row's raw
+  input), which the commit/history endpoints deliberately avoid via `jobSummary`.
+  Not changed here — it predates this work — but it is the reason this feature
+  does not read `job.results` from the client.

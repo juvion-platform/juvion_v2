@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
 import { setupMongo, teardownMongo, clearCollections } from '../../../__tests__/helpers/mongoMemory';
 import * as registry from '../bulk-import-registry';
-import { uploadAndValidate, commitImportJob } from '../bulk-import-service';
+import { uploadAndValidate, commitImportJob, PREVIEW_SUCCESS_LIMIT } from '../bulk-import-service';
 import type { ImportSchemaDefinition } from '../import-schemas/types';
 import { AppError } from '../../../middleware/errorHandler';
 
@@ -147,6 +147,42 @@ describe('Bulk Import Per-Row Selection', () => {
     ).rejects.toThrow(new AppError(409, 'Cannot commit job in status "completed". Re-upload the file to retry.'));
   });
 
+  // Regression: the preview only RENDERS PREVIEW_SUCCESS_LIMIT valid rows, but
+  // every eligible row is committable. A client that built its selection from
+  // `previewRows` would silently drop everything past the cap — importing 50 of
+  // 60 while reporting success. `eligibleRowNumbers` is the authoritative list
+  // and must cover rows the display slice never mentions.
+  it('exposes every eligible row number, including ones past the preview display cap', async () => {
+    const def = selectionFakeSchema();
+    const rows = Array.from({ length: 60 }, (_, i) => `A${i + 1}`).join('\n');
+    const preview = await run(def, `code\n${rows}`);
+
+    expect(preview.previewRows.length).toBe(PREVIEW_SUCCESS_LIMIT);
+    expect(preview.eligibleRowNumbers.length).toBe(60);
+
+    const rendered = new Set(preview.previewRows.map((r) => r.row));
+    const hidden = preview.eligibleRowNumbers.filter((n) => !rendered.has(n));
+    expect(hidden.length).toBe(60 - PREVIEW_SUCCESS_LIMIT);
+  });
+
+  // ...and committing that full list writes all of them, so the selection the
+  // drawer sends by default is not quietly truncated.
+  it('commits every eligible row when the client selects the full eligible list', async () => {
+    const commitOne = vi.fn(async () => ({ id: 'x' }));
+    const def = selectionFakeSchema(commitOne);
+    const rows = Array.from({ length: 60 }, (_, i) => `A${i + 1}`).join('\n');
+    const preview = await run(def, `code\n${rows}`);
+
+    const done = await commitImportJob(COLLEGE, String(preview.job._id), 'tester', {
+      selectedRowNumbers: preview.eligibleRowNumbers,
+    });
+
+    expect(commitOne).toHaveBeenCalledTimes(60);
+    expect(done.successCount).toBe(60);
+    expect(done.skippedCount).toBe(0);
+    expect(done.status).toBe('completed');
+  });
+
   it('Test 6 - Large selection: works efficiently up to the ceiling (e.g. 2,000 identifiers)', async () => {
     const commitOne = vi.fn(async () => ({ id: 'x' }));
     const def = selectionFakeSchema(commitOne);
@@ -181,17 +217,15 @@ describe('Bulk Import Per-Row Selection', () => {
     });
 
     vi.spyOn(registry, 'getImportSchema').mockReturnValue(def);
-    const start = Date.now();
     const completedJob = await commitImportJob(COLLEGE, String(jobDoc._id), 'tester', {
       selectedRowNumbers,
     });
-    const elapsed = Date.now() - start;
 
     expect(commitOne).toHaveBeenCalledTimes(2000);
     expect(completedJob.successCount).toBe(2000);
     expect(completedJob.skippedCount).toBe(2000);
-    
-    // Performance assertion: committing 2,000 rows (excluding mock DB logic) should process selection instantly (e.g. within 15 seconds)
-    expect(elapsed).toBeLessThan(15000);
+    // Selection lookup is Set-based, so the loop stays linear in row count.
+    // Deliberately not asserted on wall-clock time: a threshold loose enough
+    // not to flake on a loaded runner is too loose to catch a regression.
   });
 });

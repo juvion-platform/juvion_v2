@@ -226,7 +226,11 @@ export const revokeDocumentSchema = z.object({ reason: z.string().min(1) });
 export const createAlumniRecordSchema = z.object({ personId: z.string().min(1), studentId: z.string().min(1), programmeId: z.string().min(1), branchId: z.string().min(1), batchId: z.string().optional(), regulationId: z.string().optional(), graduationDate: z.string().min(1), degreeAwarded: z.string().min(1), finalCgpa: z.number(), classObtained: z.enum(['first_class_distinction', 'first_class', 'second_class', 'pass']) });
 
 // ─── Student Bulk Import ──────────────────────────────────────────
+// An empty array is rejected rather than treated as "commit nothing": the UI
+// disables Import at zero, so an empty list on the wire means a client bug, and
+// silently reporting a successful import that wrote nothing is the worst way to
+// surface it. Omit the field entirely to commit everything.
 export const commitStudentImportSchema = z.object({
   jobId: z.string().min(1),
-  selectedRowNumbers: z.array(z.number().int().positive()).optional(),
+  selectedRowNumbers: z.array(z.number().int().positive()).min(1).optional(),
 }).strict();

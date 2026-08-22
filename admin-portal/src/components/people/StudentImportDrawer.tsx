@@ -65,15 +65,22 @@ export default function StudentImportDrawer({ open, onClose }: Props) {
     onSuccess: setPreview,
   });
 
-  // Find all eligible row numbers from preview.job.results
-  const allEligibleRows = useMemo(() => {
-    if (!preview) return [];
-    const results = (preview.job as any).results as any[];
-    if (!results) {
-      return preview.previewRows.filter((r) => r.valid && r.action !== 'blocked').map((r) => r.row);
-    }
-    return results.filter((r) => r.outcome === 'success').map((r) => r.row);
-  }, [preview]);
+  // Server-supplied and authoritative: every row commit would write, not just
+  // the ones rendered. `previewRows` stops at 50 valid rows, so deriving the
+  // selection from it would silently drop everything past the cap.
+  const allEligibleRows = useMemo(
+    () => preview?.eligibleRowNumbers ?? [],
+    [preview],
+  );
+
+  // Rows the operator can actually tick. Anything eligible but past the
+  // display cap stays selected and cannot be excluded — say so rather than
+  // letting the count and the table disagree in silence.
+  const hiddenEligibleCount = useMemo(() => {
+    if (!preview) return 0;
+    const shown = new Set(preview.previewRows.map((r) => r.row));
+    return allEligibleRows.filter((n) => !shown.has(n)).length;
+  }, [preview, allEligibleRows]);
 
   const eligibleCount = allEligibleRows.length;
   const selectedCount = selectedRowNumbers.size;
@@ -181,8 +188,10 @@ export default function StudentImportDrawer({ open, onClose }: Props) {
 
   async function handleCommit() {
     if (!preview?.job?._id) return;
-    const results = ((preview.job as any).results as any[]) || preview.previewRows;
-    const selectedRowsData = results.filter((r) => selectedRowNumbers.has(r.row));
+    // Only the rendered rows carry notes/pinPreview, so the confirmation
+    // figures are computed over those. Rows past the display cap are counted
+    // in `hiddenEligibleCount` and called out separately.
+    const selectedRowsData = preview.previewRows.filter((r) => selectedRowNumbers.has(r.row));
 
     let dynamicGuardians = 0;
     let dynamicWillPin = 0;
@@ -216,6 +225,12 @@ export default function StudentImportDrawer({ open, onClose }: Props) {
         // preview and frozen again at commit.
         dynamicWillPin > 0
           ? `${dynamicWillPin} student(s) will be bound to an estimated ${inr(dynamicPinAmount)} in fees.` : '',
+        // A job is single-use: once committed it leaves preview_ready and the
+        // unticked rows can never be committed from it. "Skipped" must not be
+        // read as "queued for later".
+        eligibleCount - selectedCount > 0
+          ? `${eligibleCount - selectedCount} unselected row(s) will NOT be imported and cannot be `
+            + 'added later from this file — re-upload them if you change your mind.' : '',
       ].filter(Boolean).join(' '),
       confirmLabel: 'Import',
     });
@@ -536,6 +551,24 @@ export default function StudentImportDrawer({ open, onClose }: Props) {
                 {selectedCount} of {eligibleCount} eligible rows selected
               </span>
             </div>
+
+            {/*
+              The table is a capped slice (50 valid rows). Everything past it is
+              still selected and still imports — it just cannot be unticked.
+              Without this the header says "300 of 300 selected" over a table of
+              50 and the operator has no way to know why.
+            */}
+            {hiddenEligibleCount > 0 && (
+              <div
+                className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+                role="status"
+              >
+                Showing the first {preview.previewRows.length} rows.{' '}
+                <strong>{hiddenEligibleCount}</strong> further eligible row
+                {hiddenEligibleCount === 1 ? '' : 's'} will be imported but cannot be
+                excluded here — remove them from the file if you need to leave them out.
+              </div>
+            )}
 
             {preview.pinContext?.warning ? (
               <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
