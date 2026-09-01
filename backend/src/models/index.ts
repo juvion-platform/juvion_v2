@@ -236,7 +236,6 @@ export { MisconductReport } from './welfare/MisconductReport';
 export { RiskSignal } from './welfare/RiskSignal';
 export { CCDThreshold } from './welfare/CCDThreshold';
 export { CCDIntervention } from './welfare/CCDIntervention';
-export { DropoutRiskAlert } from './welfare/DropoutRiskAlert';
 export { ExitInterview } from './welfare/ExitInterview';
 
 // === Campus ===

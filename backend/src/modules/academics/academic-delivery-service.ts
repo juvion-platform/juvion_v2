@@ -5,6 +5,7 @@ import { AttendanceRecord } from '../../models/academic-ops/AttendanceRecord';
 import { AttendanceSession } from '../../models/academic-ops/AttendanceSession';
 import { AttendanceSummary } from '../../models/academic-ops/AttendanceSummary';
 import { AttendanceAlert } from '../../models/academic-ops/AttendanceAlert';
+import { emitRiskSignal } from '../welfare/risk-emitters';
 import { CondonationRequest } from '../../models/academic-ops/CondonationRequest';
 import { InternalAssessment } from '../../models/academic-ops/InternalAssessment';
 import { InternalMark } from '../../models/academic-ops/InternalMark';
@@ -457,6 +458,17 @@ export async function generateAttendanceAlerts(
         isNotified: false,
       });
       alertCount++;
+
+      // 008 Phase 1 — report to the CCD engine. We already know this student
+      // is below the line; welfare has never been told. Never throws, and is
+      // deduped per student per day so re-running this job cannot inflate the
+      // compound score.
+      await emitRiskSignal(collegeId, {
+        studentId: String(enrollment.studentId),
+        source: 'M03',
+        signalType: 'attendance_drop',
+        triggerData: { attendancePercent: pct, threshold: 75, alertType, courseOfferingId },
+      });
     }
   }
 
@@ -1130,6 +1142,18 @@ export async function registerBacklog(
     originalExamType: data.examType ?? 'regular',
     attempts: 1,
     currentStatus: 'registered_for_supplementary',
+  });
+
+  await emitRiskSignal(collegeId, {
+    studentId: data.studentId,
+    source: 'M03',
+    signalType: 'backlog_accumulation',
+    triggerData: {
+      backlogId: String(backlog._id),
+      courseId: String(offering.courseId),
+      semesterId: data.semesterId,
+      examType: data.examType ?? 'regular',
+    },
   });
 
   await createAuditLog({

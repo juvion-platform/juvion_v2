@@ -54,7 +54,7 @@ import {
   GrievanceAssignment, SystemicPattern, ICCComplaint, ICCAnnualReport,
   SCSTComplaint, GRCComplaint, MentorAssignment, MentorSession, MentorConcern,
   CounsellingReferral, MisconductReport, RiskSignal, CCDThreshold, CCDIntervention,
-  DropoutRiskAlert, ExitInterview,
+  ExitInterview,
   // Campus
   Building, Room, RoomBooking, EmergencyContact,
   GatePass, SecurityIncident, Vehicle, VisitorEntry,
@@ -408,7 +408,6 @@ async function seed() {
     RiskSignal.deleteMany({ collegeId: CID }),
     CCDThreshold.deleteMany({ collegeId: CID }),
     CCDIntervention.deleteMany({ collegeId: CID }),
-    DropoutRiskAlert.deleteMany({ collegeId: CID }),
     ExitInterview.deleteMany({ collegeId: CID }),
     // W08 Campus ops
     Bed.deleteMany({ collegeId: CID }),
@@ -2764,10 +2763,6 @@ async function seed() {
   ]);
   console.log('RiskSignals created');
 
-  await DropoutRiskAlert.create([
-    { collegeId: CID, studentId: students[3]._id, riskScore: 65, priority: 'P2', contributingSignals: [{ source: 'M04', signalType: 'fee_default', description: 'Fee overdue > 90 days', weight: 25 }, { source: 'M03', signalType: 'attendance_drop', description: 'Attendance dropped to 68%', weight: 18 }], status: 'under_outreach', outreachAttempts: [{ date: new Date('2025-03-05'), method: 'Mentor meeting', contactedBy: persons[13]._id, outcome: 'Student cooperative, cited financial issues' }], assignedMentorId: faculties[3]._id },
-  ]);
-  console.log('DropoutRiskAlerts created');
 
   await ICCAnnualReport.create([
     { collegeId: CID, year: 2024, totalComplaints: 3, resolvedCount: 2, pendingCount: 1, actionsTaken: ['Awareness workshops conducted', 'Suggestion boxes installed'], status: 'submitted', submittedBy: persons[24]._id, submittedAt: new Date('2025-01-15') },

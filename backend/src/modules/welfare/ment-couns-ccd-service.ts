@@ -7,6 +7,7 @@ import { RiskSignal } from '../../models/welfare/RiskSignal';
 import { CrisisAlert } from '../../models/welfare/CrisisAlert';
 import { CCDThreshold } from '../../models/welfare/CCDThreshold';
 import { CCDIntervention } from '../../models/welfare/CCDIntervention';
+import { RiskScoreSnapshot } from '../../models/welfare/RiskScoreSnapshot';
 import { AppError } from '../../middleware/errorHandler';
 import { createAuditLog } from '../../shared/audit';
 import { paginate } from '../../shared/pagination';
@@ -719,8 +720,46 @@ export async function computeRiskScore(
 
 // ─── Internal: Compute & Update CCD Alert ───────────────────────────────
 
+/**
+ * Persist a point-in-time copy of a student's compound score.
+ *
+ * `computeRiskScore` reads live, decaying signals and keeps no history, so
+ * without this the score that existed on any past date is unrecoverable — it
+ * cannot be backfilled once signals expire. Never throws: losing a snapshot
+ * must not break alert generation.
+ */
+async function recordRiskSnapshot(
+  collegeId: string,
+  studentId: string,
+  result: Awaited<ReturnType<typeof computeRiskScore>>,
+): Promise<void> {
+  try {
+    await RiskScoreSnapshot.create({
+      collegeId,
+      studentId,
+      score: result.score,
+      priority: result.priority,
+      breakdown: result.breakdown,
+      capturedAt: new Date(),
+    });
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[risk-snapshot] write failed college=${collegeId} student=${studentId}: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
+  }
+}
+
 async function computeAndUpdateCCDAlert(collegeId: string, studentId: string) {
   const result = await computeRiskScore(collegeId, studentId);
+
+  // Snapshot BEFORE the early return. A student who falls back below the P3
+  // line produces no alert, and that recovery is precisely what the outreach
+  // effectiveness view needs to see.
+  await recordRiskSnapshot(collegeId, studentId, result);
+
   if (!result.priority) return;
 
   const severityMap: Record<string, string> = { P1: 'critical', P2: 'high', P3: 'medium' };
@@ -761,7 +800,7 @@ async function computeAndUpdateCCDAlert(collegeId: string, studentId: string) {
     collegeId,
     reportedBy: '000000000000000000000000', // system-generated
     studentId,
-    type: 'mental_health', // compound_risk maps to mental_health in enum
+    type: 'compound_risk',
     severity,
     description: `CCD compound risk alert — score ${result.score} (${result.priority})`,
     status: 'generated',

@@ -38,6 +38,23 @@ export function riskScoreCacheKey(collegeId: string, studentId: string): string 
   return `juvi:ai:risk:${collegeId}:${studentId}:${todayUTC()}`;
 }
 
+/**
+ * Generic namespaced key so a new AI surface does not have to edit this file
+ * to get a cache slot. `collegeId` stays the first interpolated segment, which
+ * is what keeps tenants from colliding.
+ *
+ *   aiCacheKey('people-narration', collegeId, alertId)
+ *     -> juvi:ai:people-narration:<collegeId>:<alertId>:<YYYY-MM-DD>
+ */
+export function aiCacheKey(
+  namespace: string,
+  collegeId: string,
+  ...parts: string[]
+): string {
+  const tail = parts.length > 0 ? `${parts.join(':')}:` : '';
+  return `juvi:ai:${namespace}:${collegeId}:${tail}${todayUTC()}`;
+}
+
 export interface AICacheEntry<T> {
   data: T;
   cachedAt: string;
