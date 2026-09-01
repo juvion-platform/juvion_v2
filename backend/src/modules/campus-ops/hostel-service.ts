@@ -3,6 +3,7 @@ import { Bed } from '../../models/campus/Bed';
 import { HostelAttendance } from '../../models/campus/HostelAttendance';
 import { HostelLeave } from '../../models/campus/HostelLeave';
 import { HostelViolation } from '../../models/campus/HostelViolation';
+import { emitRiskSignal } from '../welfare/risk-emitters';
 import { HostelPenalty } from '../../models/campus/HostelPenalty';
 import { HostelAppeal } from '../../models/campus/HostelAppeal';
 import { HostelClearance } from '../../models/campus/HostelClearance';
@@ -959,6 +960,25 @@ export async function reportViolation(
     status: 'reported',
     welfareSignalSent: false,
   });
+
+  // 008 Phase 1 — report to the CCD engine. `welfareSignalSent` has been on
+  // this model from the start with nothing ever setting it; this is the path
+  // it was waiting for. Flipped only when the signal was actually written, so
+  // a deduped or failed emit leaves it false and stays honest.
+  const signalled = await emitRiskSignal(collegeId, {
+    studentId: data.studentId,
+    source: 'M08',
+    signalType: 'warden_concern',
+    triggerData: {
+      violationId: String(doc._id),
+      violationType: data.violationType,
+      severity: data.severity,
+    },
+  });
+  if (signalled) {
+    doc.welfareSignalSent = true;
+    await doc.save();
+  }
 
   await createAuditLog({
     collegeId,

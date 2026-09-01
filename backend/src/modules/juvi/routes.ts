@@ -4,6 +4,7 @@ import { authorize } from '../../middleware/authorize';
 import { validate } from '../../middleware/validate';
 import * as ctrl from './controller';
 import financeAgentRouter from './finance-agent/routes';
+import peopleAgentRouter from './people-agent/routes';
 import {
   createConversationSchema, updateConversationSchema,
   createMessageSchema, updateMessageSchema,
@@ -22,6 +23,11 @@ const router = Router();
 // + per-route `authorize()` chain is what runs for those paths; the
 // outer juvi `authenticate` below still works for the legacy CRUD.
 router.use('/finance-agent', financeAgentRouter);
+
+// 008 — People agent (student risk narration + guardian outreach). Mounted
+// before the outer `authenticate` for the same reason as finance-agent: its
+// routes authorize on `welfare`, not `juvi`.
+router.use('/people-agent', peopleAgentRouter);
 
 router.use(authenticate);
 

@@ -196,3 +196,69 @@ export const updateParentMeeting = (id: string, data: any) =>
   api.put(`${BASE}/parent-meetings/${id}`, data).then(r => r.data);
 export const deleteParentMeeting = (id: string) =>
   api.delete(`${BASE}/parent-meetings/${id}`).then(r => r.data);
+
+// ─── 008 Phase 2: CCD Student Risk ────────────────────────
+// The compound-risk engine has been scoring students since Phase 1; these are
+// the reads the Student Risk board needs. Scores and priorities are computed
+// server-side — nothing here derives a number.
+
+export interface RiskBoardRow {
+  alertId: string;
+  studentId: string;
+  studentName: string;
+  rollNumber: string;
+  priority: 'P1' | 'P2' | 'P3' | null;
+  score: number;
+  status: string;
+  daysOpen: number;
+  sources: string[];
+  signalCount: number;
+  crossModuleMultiplier: number;
+  temporalMultiplier: number;
+  mentorName: string | null;
+  lastActionAt: string | null;
+}
+
+export const getRiskBoard = (priority?: string): Promise<RiskBoardRow[]> =>
+  api.get(`${BASE}/ccd/board`, { params: { ...(priority ? { priority } : {}) } }).then(r => r.data);
+
+export const getSignalsBySource = (days = 7) =>
+  api.get(`${BASE}/ccd/signals-by-source`, { params: { days } }).then(r => r.data);
+
+export const getMentorWorkload = () =>
+  api.get(`${BASE}/ccd/mentor-workload`).then(r => r.data);
+
+export interface OutreachEffectiveness {
+  windowDays: number;
+  raised: number;
+  contacted: number;
+  resolved: number;
+  recurred: number;
+}
+
+export const getOutreachEffectiveness = (days = 90): Promise<OutreachEffectiveness> =>
+  api.get(`${BASE}/ccd/outreach-effectiveness`, { params: { days } }).then(r => r.data);
+
+export const getStudentRiskProfile = (studentId: string) =>
+  api.get(`${BASE}/ccd/students/${studentId}/risk-profile`).then(r => r.data);
+
+export const getStudentScoreHistory = (studentId: string, days = 90) =>
+  api.get(`${BASE}/ccd/students/${studentId}/score-history`, { params: { days } }).then(r => r.data);
+
+export const recomputeStudentScore = (studentId: string) =>
+  api.post(`${BASE}/ccd/students/${studentId}/recompute`).then(r => r.data);
+
+export const acknowledgeCCDAlert = (alertId: string, initialAssessment: string) =>
+  api.post(`${BASE}/ccd/alerts/${alertId}/acknowledge`, { initialAssessment }).then(r => r.data);
+
+export const investigateCCDAlert = (alertId: string, findings?: string) =>
+  api.post(`${BASE}/ccd/alerts/${alertId}/investigate`, { findings }).then(r => r.data);
+
+export const interveneCCDAlert = (alertId: string, data: { type: string; description: string }) =>
+  api.post(`${BASE}/ccd/alerts/${alertId}/intervene`, data).then(r => r.data);
+
+export const resolveCCDAlert = (alertId: string) =>
+  api.post(`${BASE}/ccd/alerts/${alertId}/resolve`).then(r => r.data);
+
+export const markCCDFalsePositive = (alertId: string, falsePositiveReason: string) =>
+  api.post(`${BASE}/ccd/alerts/${alertId}/false-positive`, { falsePositiveReason }).then(r => r.data);

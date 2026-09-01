@@ -691,10 +691,6 @@ export const updateCCDThresholdSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
-// ═══ W10 Dropout Risk & Exit Interview Schemas ══════════════
-export const createDropoutRiskAlertSchema = z.object({ studentId: z.string().min(1), riskScore: z.number().min(0).max(100), signals: z.array(z.object({ source: z.string(), signalType: z.string(), description: z.string(), weight: z.number(), dataRef: z.string().optional() })).min(1) });
-export const assignDropoutAlertSchema = z.object({ assignedTo: z.string().min(1), mentorId: z.string().optional() });
-export const logOutreachAttemptSchema = z.object({ method: z.string().min(1), contactedBy: z.string().min(1), outcome: z.string().min(1), notes: z.string().optional() });
-export const resolveDropoutAlertSchema = z.object({ resolution: z.string().min(1), resolvedBy: z.string().min(1) });
+// ═══ W10 Exit Interview Schemas ═════════════════════════════
 export const recordExitInterviewSchema = z.object({ studentId: z.string().min(1), exitRequestId: z.string().optional(), interviewerId: z.string().min(1), interviewDate: z.string().min(1), primaryReason: z.enum(['financial', 'personal', 'academic', 'family', 'health', 'career_change', 'relocation', 'institutional', 'other']), secondaryReasons: z.array(z.string()).optional(), institutionalFeedback: z.object({ teachingQuality: z.number().min(1).max(5), infrastructure: z.number().min(1).max(5), support: z.number().min(1).max(5), overallSatisfaction: z.number().min(1).max(5), suggestions: z.string().optional() }).optional(), followUpRequired: z.boolean().optional(), followUpNotes: z.string().optional() });
 export const scheduleExitInterviewSchema = z.object({ studentId: z.string().min(1), exitRequestId: z.string().optional(), interviewerId: z.string().min(1), interviewDate: z.string().min(1) });
