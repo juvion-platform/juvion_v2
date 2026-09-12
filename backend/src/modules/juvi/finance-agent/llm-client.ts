@@ -1,4 +1,6 @@
 import { AppError } from '../../../middleware/errorHandler';
+import { assertWithinSpendLimit } from '../../platform/spend-limits/service';
+import type { AgentActionType } from '../../../models/juvi/AgentAction';
 import { createClaudeAdapter } from './claude-adapter';
 import { createOpenAIAdapter } from './openai-adapter';
 
@@ -139,37 +141,170 @@ export function resolveModel(provider: LLMProvider, optsModel?: string): string 
 }
 
 /**
- * Factory: returns the active LLMClient. Throws AppError(503) when the
- * required API key for the active provider is missing.
+ * Placeholder API keys that pass a non-empty check but 401 at call time.
  *
- * Key resolution per provider (first non-empty wins):
- *   claude  → AI_API_KEY  → ANTHROPIC_API_KEY
- *   openai  → AI_API_KEY  → OPENAI_API_KEY
- *
- * The shared `AI_API_KEY` is the existing repo-wide env name. Provider-
- * specific names are still honoured as a fallback for environments that
- * keep both keys configured.
+ * This repo has already been burned by exactly that: 41 audit rows recorded
+ * `model: 'unknown'`, 0 tokens and zero cost because `AI_API_KEY` was the
+ * literal string `change-`. Every one of those calls silently degraded to
+ * rule-based fallback text and nobody noticed across 41 attempts. Failing at
+ * construction turns a silent multi-week degradation into a loud 503.
  */
-export function createLLMClient(provider?: LLMProvider): LLMClient {
-  const active = resolveProvider(provider);
+const PLACEHOLDER_PREFIXES = ['change', 'your-', 'your_', 'xxx', 'todo', '<', 'placeholder', 'replace'];
 
-  if (active === 'claude') {
-    const key = process.env.AI_API_KEY ?? process.env.ANTHROPIC_API_KEY;
-    if (!key) {
-      throw new AppError(
-        503,
-        'LLM provider misconfigured: AI_API_KEY (or ANTHROPIC_API_KEY) missing',
-      );
-    }
-    return createClaudeAdapter({ apiKey: key });
-  }
+export function looksLikePlaceholder(key: string): boolean {
+  const k = key.trim().toLowerCase();
+  if (k.length === 0) return true;
+  // Deliberately prefix-only. A length floor was tried and rejected: it fails
+  // legitimate short keys (test fixtures use 'sk-test') while catching nothing
+  // a prefix does not. The documented real-world failure was the literal
+  // string 'change-', which the prefix list covers exactly.
+  return PLACEHOLDER_PREFIXES.some((p) => k.startsWith(p));
+}
 
-  const key = process.env.AI_API_KEY ?? process.env.OPENAI_API_KEY;
+function resolveKey(active: LLMProvider): string {
+  const fallbackName = active === 'claude' ? 'ANTHROPIC_API_KEY' : 'OPENAI_API_KEY';
+  const key =
+    process.env.AI_API_KEY ??
+    (active === 'claude' ? process.env.ANTHROPIC_API_KEY : process.env.OPENAI_API_KEY);
+
   if (!key) {
     throw new AppError(
       503,
-      'LLM provider misconfigured: AI_API_KEY (or OPENAI_API_KEY) missing',
+      `LLM provider misconfigured: AI_API_KEY (or ${fallbackName}) missing`,
     );
   }
-  return createOpenAIAdapter({ apiKey: key });
+  if (looksLikePlaceholder(key)) {
+    throw new AppError(
+      503,
+      `LLM provider misconfigured: AI_API_KEY looks like a placeholder, not a real key`,
+    );
+  }
+  return key;
+}
+
+/**
+ * Per-call accounting context.
+ *
+ * OPTIONAL by design. `createLLMClient()` keeps working with no arguments, so
+ * the eight existing call sites and every test that constructs a client stay
+ * untouched. When context IS supplied, the returned client additionally:
+ *
+ *   - checks the college's weekly spend limit BEFORE the call, and
+ *   - writes the `AgentAction` audit row AFTER it.
+ *
+ * Both of those live in the orchestrator today, which is why only the finance
+ * agent is metered — NL reports, config-suggest and lead-scoring spend money
+ * the budget cannot see. Passing context here is how a consumer opts in
+ * without each one re-implementing the pair.
+ *
+ * The gate cannot move into the factory itself: the factory is synchronous and
+ * `stream()` returns a sync AsyncIterable, so gating happens on the first call
+ * rather than at construction. Cost is only known after the call (and for a
+ * stream, only on the final chunk), so the audit write hooks the call's end.
+ */
+export interface LLMCallContext {
+  collegeId: string;
+  /** AgentAction.userId is required; pass the college id for batch/system work. */
+  userId: string;
+  actionType: AgentActionType;
+  /**
+   * Prompts reaching this layer are ALREADY PII-masked by the caller — masking
+   * happens before prompt assembly. Nothing here re-masks.
+   */
+  promptLabel?: string;
+}
+
+export function createLLMClient(
+  provider?: LLMProvider,
+  ctx?: LLMCallContext,
+): LLMClient {
+  const active = resolveProvider(provider);
+  const key = resolveKey(active);
+  const base =
+    active === 'claude'
+      ? createClaudeAdapter({ apiKey: key })
+      : createOpenAIAdapter({ apiKey: key });
+
+  if (!ctx) return base;
+  return withAccounting(base, ctx);
+}
+
+/** Serialise the outbound messages for the audit row (already masked). */
+function promptFor(ctx: LLMCallContext, messages: LLMMessage[]): string {
+  if (ctx.promptLabel) return ctx.promptLabel;
+  return messages[messages.length - 1]?.content ?? '(no prompt)';
+}
+
+/**
+ * Wrap a client so every call is gated then audited.
+ *
+ * Failure posture is deliberate and asymmetric:
+ *   - the spend gate's 429 PROPAGATES (an over-budget tenant must be stopped)
+ *   - an audit write failure NEVER propagates (losing a log entry must not
+ *     lose the caller's answer)
+ */
+function withAccounting(base: LLMClient, ctx: LLMCallContext): LLMClient {
+  return {
+    provider: base.provider,
+
+    async complete(messages, opts) {
+      await assertWithinSpendLimit(ctx.collegeId);
+      try {
+        const res = await base.complete(messages, opts);
+        await writeAudit(ctx, promptFor(ctx, messages), res.text, res);
+        return res;
+      } catch (err) {
+        await writeAudit(ctx, promptFor(ctx, messages), '(llm-failed)', null);
+        throw err;
+      }
+    },
+
+    async *stream(messages, opts) {
+      await assertWithinSpendLimit(ctx.collegeId);
+      let text = '';
+      let final: LLMResponse | null = null;
+      try {
+        for await (const chunk of base.stream(messages, opts)) {
+          if (chunk.delta) text += chunk.delta;
+          if (chunk.done && chunk.final) final = chunk.final;
+          yield chunk;
+        }
+      } finally {
+        // `finally` so an aborted stream still records what it spent.
+        await writeAudit(ctx, promptFor(ctx, messages), text || '(no output)', final);
+      }
+    },
+  };
+}
+
+async function writeAudit(
+  ctx: LLMCallContext,
+  maskedPrompt: string,
+  maskedResponse: string,
+  llm: LLMResponse | null,
+): Promise<void> {
+  try {
+    const { AgentAction } = await import('../../../models/juvi/AgentAction');
+    await AgentAction.create({
+      collegeId: ctx.collegeId,
+      userId: ctx.userId,
+      type: ctx.actionType,
+      // Mongoose 6+ rejects empty strings on required String fields.
+      maskedPrompt: maskedPrompt || '(no prompt)',
+      maskedResponse: maskedResponse || '(no response)',
+      provider: llm?.provider ?? 'claude',
+      model: llm?.model ?? 'unknown',
+      durationMs: llm?.durationMs ?? 0,
+      inputTokens: llm?.inputTokens ?? 0,
+      outputTokens: llm?.outputTokens ?? 0,
+      costInr: llm?.costInr ?? 0,
+    });
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[llm-audit] write failed college=${ctx.collegeId} type=${ctx.actionType}: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
+  }
 }

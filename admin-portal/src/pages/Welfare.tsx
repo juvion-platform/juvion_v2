@@ -1,7 +1,7 @@
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getWelfareStats } from '../services/welfare';
-import { Building2, DoorOpen, BedDouble, UserCheck, Utensils, MessageSquare, Bus, MapPin, Heart, Stethoscope, Brain, AlertTriangle, ShieldAlert, FileWarning, Shield, Users } from 'lucide-react';
+import { Building2, DoorOpen, BedDouble, UserCheck, Utensils, MessageSquare, Bus, MapPin, Heart, Stethoscope, Brain, AlertTriangle, ShieldAlert, FileWarning, Shield, Users, Activity } from 'lucide-react';
 import Breadcrumbs from '../components/ui/Breadcrumbs';
 import { StatBannerSkeleton } from '../components/ui/Skeleton';
 
@@ -21,6 +21,7 @@ import AntiRaggingComplaintsPage from './welfare/AntiRaggingComplaintsPage';
 import StudentGrievancesPage from './welfare/StudentGrievancesPage';
 import InsuranceClaimsPage from './welfare/InsuranceClaimsPage';
 import ParentMeetingsPage from './welfare/ParentMeetingsPage';
+import StudentRiskPage from './welfare/StudentRiskPage';
 
 function WelfareHome() {
   const navigate = useNavigate();
@@ -125,6 +126,21 @@ function WelfareHome() {
         })}
       </div>
 
+      {/* Student Risk — the cross-module early-warning board */}
+      <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Early Warning</h3>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
+        <button
+          onClick={() => navigate('student-risk')}
+          className="bg-white rounded-xl border-2 border-red-200 hover:border-red-400 shadow-sm p-5 text-left hover:shadow-lg transition-all"
+        >
+          <div className="inline-flex p-2.5 rounded-lg mb-3 bg-red-50 text-red-600"><Activity size={22} /></div>
+          <div className="font-semibold text-navy-dark text-sm">Student Risk</div>
+          <p className="text-xs text-gray-500 mt-1">
+            Students flagged by combining attendance, fees, hostel and counselling signals
+          </p>
+        </button>
+      </div>
+
       {/* Health */}
       <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Health & Wellness</h3>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -224,6 +240,7 @@ export default function Welfare() {
         <Route path="health-records" element={<HealthRecordsPage />} />
         <Route path="medical-visits" element={<MedicalVisitsPage />} />
         <Route path="counseling-sessions" element={<CounselingSessionsPage />} />
+        <Route path="student-risk" element={<StudentRiskPage />} />
         <Route path="crisis-alerts" element={<CrisisAlertsPage />} />
         <Route path="anti-ragging" element={<AntiRaggingComplaintsPage />} />
         <Route path="student-grievances" element={<StudentGrievancesPage />} />

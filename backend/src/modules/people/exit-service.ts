@@ -49,7 +49,6 @@ export async function submitExitRequest(
     destinationInstitution?: string;
     destinationUniversity?: string;
     disciplinaryCaseId?: string;
-    dropoutRiskAlertId?: string;
     outreachExhausted?: boolean;
   },
   performedBy: string,
@@ -75,7 +74,6 @@ export async function submitExitRequest(
     destinationInstitution: data.destinationInstitution,
     destinationUniversity: data.destinationUniversity,
     disciplinaryCaseId: data.disciplinaryCaseId,
-    dropoutRiskAlertId: data.dropoutRiskAlertId,
     outreachExhausted: data.outreachExhausted ?? false,
   });
 

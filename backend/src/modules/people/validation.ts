@@ -210,7 +210,7 @@ export const createOrganizationSchema = z.object({
 export const updateOrganizationSchema = createOrganizationSchema.partial();
 
 // ═══ W10 Exit Workflow Schemas ═══════════════════════════════
-export const submitExitRequestSchema = z.object({ studentId: z.string().min(1), exitType: z.enum(['withdrawal', 'transfer', 'expulsion', 'dropout_formalization']), reason: z.string().min(1), reasonCategory: z.enum(['personal', 'financial', 'academic', 'transfer', 'family', 'health', 'disciplinary', 'other']), reasonDetails: z.string().optional(), requestedBy: z.string().min(1), destinationInstitution: z.string().optional(), destinationUniversity: z.string().optional(), disciplinaryCaseId: z.string().optional(), dropoutRiskAlertId: z.string().optional(), outreachExhausted: z.boolean().optional() });
+export const submitExitRequestSchema = z.object({ studentId: z.string().min(1), exitType: z.enum(['withdrawal', 'transfer', 'expulsion', 'dropout_formalization']), reason: z.string().min(1), reasonCategory: z.enum(['personal', 'financial', 'academic', 'transfer', 'family', 'health', 'disciplinary', 'other']), reasonDetails: z.string().optional(), requestedBy: z.string().min(1), destinationInstitution: z.string().optional(), destinationUniversity: z.string().optional(), disciplinaryCaseId: z.string().optional(), outreachExhausted: z.boolean().optional() });
 export const approveExitRequestSchema = z.object({ approvedBy: z.string().min(1), notes: z.string().optional() });
 export const rejectExitRequestSchema = z.object({ notes: z.string().min(1) });
 export const transitionStudentSchema = z.object({ status: z.string().min(1) });

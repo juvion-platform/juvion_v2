@@ -45,9 +45,7 @@ import {
   ingestRiskSignalSchema, acknowledgeCCDAlertSchema, investigateCCDAlertSchema,
   ccdInterventionSchema, ccdFalsePositiveSchema,
   createCCDThresholdSchema, updateCCDThresholdSchema,
-  // W10 dropout & exit interview schemas
-  createDropoutRiskAlertSchema, assignDropoutAlertSchema,
-  logOutreachAttemptSchema, resolveDropoutAlertSchema,
+  // W10 exit interview schemas
   recordExitInterviewSchema, scheduleExitInterviewSchema,
 } from './validation';
 
@@ -305,6 +303,12 @@ router.get('/ccd/alerts/:id', authorize('welfare', 'read'), ctrl.getCCDAlertCtrl
 router.get('/ccd/students/:studentId/risk-profile', authorize('welfare', 'read'), ctrl.getStudentRiskProfileCtrl);
 router.post('/ccd/students/:studentId/recompute', authorize('welfare', 'update'), ctrl.recomputeStudentScoreCtrl);
 router.get('/ccd/dashboard', authorize('welfare', 'read'), ctrl.getCCDDashboardCtrl);
+// 008 Phase 2 — Student Risk board reads
+router.get('/ccd/board', authorize('welfare', 'read'), ctrl.getRiskBoardCtrl);
+router.get('/ccd/signals-by-source', authorize('welfare', 'read'), ctrl.getSignalsBySourceCtrl);
+router.get('/ccd/mentor-workload', authorize('welfare', 'read'), ctrl.getMentorWorkloadCtrl);
+router.get('/ccd/students/:studentId/score-history', authorize('welfare', 'read'), ctrl.getStudentScoreHistoryCtrl);
+router.get('/ccd/outreach-effectiveness', authorize('welfare', 'read'), ctrl.getOutreachEffectivenessCtrl);
 router.get('/ccd/interventions', authorize('welfare', 'read'), ctrl.listCCDInterventionsCtrl);
 router.get('/ccd/interventions/:id', authorize('welfare', 'read'), ctrl.getCCDInterventionCtrl);
 router.get('/ccd/thresholds', authorize('welfare', 'read'), ctrl.listCCDThresholdsCtrl);
@@ -312,13 +316,6 @@ router.get('/ccd/thresholds/:id', authorize('welfare', 'read'), ctrl.getCCDThres
 router.post('/ccd/thresholds', authorize('welfare', 'create'), validate(createCCDThresholdSchema), ctrl.createCCDThresholdCtrl);
 router.put('/ccd/thresholds/:id', authorize('welfare', 'update'), validate(updateCCDThresholdSchema), ctrl.updateCCDThresholdCtrl);
 
-// ── W10 Dropout Risk Alerts ────────────────────────────────
-router.get('/dropout-risk-alerts', authorize('welfare', 'read'), ctrl.listDropoutRiskAlertsCtrl);
-router.get('/dropout-risk-alerts/:id', authorize('welfare', 'read'), ctrl.getDropoutRiskAlertCtrl);
-router.post('/dropout-risk-alerts', authorize('welfare', 'create'), validate(createDropoutRiskAlertSchema), ctrl.createDropoutRiskAlertCtrl);
-router.put('/dropout-risk-alerts/:id/assign', authorize('welfare', 'update'), validate(assignDropoutAlertSchema), ctrl.assignDropoutAlertCtrl);
-router.post('/dropout-risk-alerts/:id/outreach', authorize('welfare', 'update'), validate(logOutreachAttemptSchema), ctrl.logOutreachAttemptCtrl);
-router.put('/dropout-risk-alerts/:id/resolve', authorize('welfare', 'update'), validate(resolveDropoutAlertSchema), ctrl.resolveDropoutAlertCtrl);
 
 // ── W10 Exit Interviews ────────────────────────────────────
 router.get('/exit-interviews', authorize('welfare', 'read'), ctrl.listExitInterviewsCtrl);

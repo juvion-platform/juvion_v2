@@ -4,7 +4,7 @@ const schema = new Schema<ICrisisAlert>({
   collegeId: { type: Schema.Types.ObjectId, required: true, index: true },
   reportedBy: { type: Schema.Types.ObjectId, ref: 'Person', required: true },
   studentId: { type: Schema.Types.ObjectId, ref: 'Student' },
-  type: { type: String, enum: ['mental_health', 'ragging', 'harassment', 'medical_emergency', 'substance_abuse', 'other'], required: true },
+  type: { type: String, enum: ['compound_risk', 'mental_health', 'ragging', 'harassment', 'medical_emergency', 'substance_abuse', 'other'], required: true },
   severity: { type: String, enum: ['low', 'medium', 'high', 'critical'], required: true },
   description: { type: String, required: true },
   status: { type: String, enum: ['generated', 'acknowledged', 'investigating', 'intervening', 'resolved', 'false_positive', 'reported', 'in_progress', 'escalated'], default: 'reported' },

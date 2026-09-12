@@ -23,7 +23,6 @@ export interface IExitRequest extends Document {
   destinationInstitution?: string;
   destinationUniversity?: string;
   disciplinaryCaseId?: Schema.Types.ObjectId;
-  dropoutRiskAlertId?: Schema.Types.ObjectId;
   outreachExhausted: boolean;
 }
 
@@ -62,7 +61,6 @@ const schema = new Schema<IExitRequest>({
   destinationInstitution: String,
   destinationUniversity: String,
   disciplinaryCaseId: { type: Schema.Types.ObjectId },
-  dropoutRiskAlertId: { type: Schema.Types.ObjectId },
   outreachExhausted: { type: Boolean, default: false },
 }, { timestamps: true });
 

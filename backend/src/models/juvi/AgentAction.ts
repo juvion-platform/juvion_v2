@@ -27,7 +27,10 @@ export type AgentActionType =
   | 'situations'
   | 'reminder-draft'
   | 'reminder-approve'
-  | 'situation-dismiss';
+  | 'situation-dismiss'
+  | 'narration-people'
+  | 'outreach-draft'
+  | 'outreach-approve';
 
 export interface IAgentActionReversal {
   at: Date;
@@ -75,6 +78,9 @@ const schema = new Schema<IAgentAction>(
         'reminder-draft',
         'reminder-approve',
         'situation-dismiss',
+      'narration-people',
+      'outreach-draft',
+      'outreach-approve',
       ],
       required: true,
     },

@@ -15,6 +15,7 @@ import { ScholarshipReceivable } from '../../models/finance/ScholarshipReceivabl
 import { ScholarshipCredit } from '../../models/finance/ScholarshipCredit';
 import { Concession } from '../../models/finance/Concession';
 import { DefaulterRecord } from '../../models/finance/DefaulterRecord';
+import { emitRiskSignal } from '../welfare/risk-emitters';
 import { EscalationAction } from '../../models/finance/EscalationAction';
 import { FinancialHold } from '../../models/finance/FinancialHold';
 import { WelfareReferral } from '../../models/finance/WelfareReferral';
@@ -1987,6 +1988,23 @@ export async function escalateDefaulter(
   };
 
   const actionType = stageActions[data.stage] ?? 'sms_reminder';
+
+  // 008 Phase 1 — report to the CCD engine from stage 2 onward. Stage 1 is a
+  // routine SMS nudge and firing on it would flag most of the cohort every
+  // billing cycle, which is how a risk board becomes noise. Stage 2 means a
+  // parent has been contacted and the dues are still open.
+  if (data.stage !== 'stage_1') {
+    await emitRiskSignal(collegeId, {
+      studentId: String(record.studentId),
+      source: 'M04',
+      signalType: 'fee_default',
+      triggerData: {
+        defaulterRecordId: defaulterId,
+        escalationStage: data.stage,
+        previousStage: oldStage,
+      },
+    });
+  }
 
   const action = await EscalationAction.create({
     collegeId,
