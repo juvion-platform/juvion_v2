@@ -828,6 +828,7 @@ async function computeAndUpdateCCDAlert(collegeId: string, studentId: string) {
 export async function acknowledgeCCDAlert(
   collegeId: string, alertId: string,
   data: { initialAssessment: string },
+  actorId: string,
   performedBy: string,
 ) {
   const doc = await CrisisAlert.findOne({ _id: alertId, collegeId });
@@ -839,7 +840,7 @@ export async function acknowledgeCCDAlert(
 
   doc.status = 'acknowledged';
   doc.acknowledgment = {
-    acknowledgedBy: performedBy,
+    acknowledgedBy: actorId,
     acknowledgedAt: new Date(),
     initialAssessment: data.initialAssessment,
   };
@@ -859,6 +860,7 @@ export async function acknowledgeCCDAlert(
 export async function investigateCCDAlert(
   collegeId: string, alertId: string,
   data: { findings?: string },
+  actorId: string,
   performedBy: string,
 ) {
   const doc = await CrisisAlert.findOne({ _id: alertId, collegeId });
@@ -870,7 +872,7 @@ export async function investigateCCDAlert(
 
   doc.status = 'investigating';
   doc.investigation = {
-    investigatorId: performedBy,
+    investigatorId: actorId,
     startedAt: new Date(),
     findings: data.findings,
   };
@@ -893,6 +895,7 @@ export async function recordCCDIntervention(
     type: string; description: string; followUpDate?: string;
     linkedEntityId?: string; linkedEntityType?: string;
   },
+  actorId: string,
   performedBy: string,
 ) {
   const alert = await CrisisAlert.findOne({ _id: alertId, collegeId });
@@ -904,7 +907,7 @@ export async function recordCCDIntervention(
     studentId: alert.studentId,
     type: data.type,
     description: data.description,
-    executedBy: performedBy,
+    executedBy: actorId,
     executedAt: new Date(),
     followUpDate: data.followUpDate ? new Date(data.followUpDate) : undefined,
     followUpStatus: data.followUpDate ? 'pending' : undefined,
@@ -920,7 +923,7 @@ export async function recordCCDIntervention(
   alert.intervention = {
     type: data.type,
     description: data.description,
-    executedBy: performedBy,
+    executedBy: actorId,
     executedAt: new Date(),
     followUpDate: data.followUpDate ? new Date(data.followUpDate) : undefined,
   };

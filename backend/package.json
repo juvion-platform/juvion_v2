@@ -8,6 +8,7 @@
     "start": "node dist/server.js",
     "seed": "ts-node -r dotenv/config src/seed.ts",
     "seed:e2e-users": "ts-node -r dotenv/config src/scripts/seed-e2e-users.ts",
+    "seed:demo-ai": "ts-node -r dotenv/config src/scripts/seed-demo-ai.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
