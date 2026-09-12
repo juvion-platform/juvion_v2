@@ -28,7 +28,7 @@ import type { Job, Queue } from 'bullmq';
 import { College } from '../models/College';
 import { AgentAction } from '../models/juvi/AgentAction';
 import { LLMUsageSnapshot } from '../models/juvi/LLMUsageSnapshot';
-import { withBoundedConcurrency } from '../modules/juvi/finance-agent/orchestrator-helpers';
+import { withBoundedConcurrency } from '../shared/ai/helpers';
 import { registerQueue, QUEUE_NAMES } from '../shared/queue/QueueManager';
 
 // ─── Tunables / contract ───────────────────────────────────────────────

@@ -18,7 +18,7 @@
  * docs can be distinguished by the prompt that produced them.
  */
 
-import type { LLMMessage } from '../../juvi/finance-agent/llm-client';
+import type { LLMMessage } from '../../../shared/ai/llm/client';
 
 export const PROMPT_VERSION = 'nl-report-prompt-v2';
 

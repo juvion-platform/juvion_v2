@@ -16,6 +16,7 @@ import {
   alertNarrationsSchema,
   outreachDraftsSchema,
   approveOutreachSchema,
+  peopleQuerySchema,
 } from './validation';
 
 const router = Router();
@@ -23,6 +24,15 @@ router.use(authenticate);
 
 // Matches the finance agent's shared limiter.
 const peopleAgentRateLimit = createUserRateLimit({ max: 60, windowMs: 60_000 });
+
+// 009 — the command bar. SSE; answers from the scoped board bundle only.
+router.post(
+  '/query',
+  authorize('welfare', 'read'),
+  peopleAgentRateLimit,
+  validate(peopleQuerySchema),
+  ctrl.queryHandler,
+);
 
 router.post(
   '/narrations',

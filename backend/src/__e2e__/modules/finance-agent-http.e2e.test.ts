@@ -43,10 +43,10 @@ const { completeMock, streamMock, addJobMock } = vi.hoisted(() => ({
 
 // Mock the LLM client BEFORE importing the app (so the orchestrator
 // resolves to a stub provider whether the env keys exist or not).
-vi.mock('../../modules/juvi/finance-agent/llm-client', async () => {
+vi.mock('../../shared/ai/llm/client', async () => {
   const actual = await vi.importActual<
-    typeof import('../../modules/juvi/finance-agent/llm-client')
-  >('../../modules/juvi/finance-agent/llm-client');
+    typeof import('../../shared/ai/llm/client')
+  >('../../shared/ai/llm/client');
   return {
     ...actual,
     createLLMClient: () => ({

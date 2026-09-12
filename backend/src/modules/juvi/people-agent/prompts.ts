@@ -15,7 +15,7 @@
  * produced by a model.
  */
 
-import type { LLMMessage } from '../finance-agent/llm-client';
+import type { LLMMessage } from '../../../shared/ai/llm/client';
 import type { AlertNarrationContext, OutreachDraftContext } from './context';
 
 export interface SystemContext {
@@ -121,4 +121,76 @@ export function determineTone(ctx: {
   if (ctx.priority === 'P1') return 'urgent';
   if (ctx.priorOutreachCount >= 2) return 'direct';
   return 'supportive';
+}
+
+// ── Command bar query (009 T8) ─────────────────────────────────────────────
+
+export interface PeopleQueryPromptInput {
+  sys: SystemContext;
+  /** Already-masked `PeopleQueryBundle`. */
+  contextBundle: unknown;
+  userPrompt: string;
+}
+
+/**
+ * The honesty rules are the feature. The model sees a capped, scoped bundle
+ * and must say so; it may not compute, and when the answer lives on another
+ * screen it must point there instead of guessing.
+ */
+const SOURCE_WORD: Record<string, string> = { M03: 'academics', M04: 'fees', M08: 'campus', M06: 'welfare', Juvi: 'messaging' };
+
+/**
+ * One labelled line per board row. A small model checks "first-generation: yes"
+ * and "7-day change: +12" reliably; it misreads the same facts as nested JSON
+ * booleans inside a 10k-character bundle.
+ */
+function renderBoardRow(r: Record<string, unknown>): string {
+  const d = r['delta7d'];
+  const change = typeof d === 'number' ? (d > 0 ? `+${d} (went up)` : d < 0 ? `${d} (went down)` : '0 (no change)') : 'no earlier score';
+  const sigs = Array.isArray(r['signalTypes']) ? (r['signalTypes'] as string[]) : [];
+  const srcs = Array.isArray(r['sources']) ? (r['sources'] as string[]).map((x) => SOURCE_WORD[x] ?? x) : [];
+  return [
+    `${r['rollNumber']} | ${r['studentName']}`,
+    `${r['priority'] ?? 'no priority'} | score ${r['score']} | 7-day change: ${change}`,
+    `${r['branch'] ?? 'branch unknown'} | year ${r['yearOfStudy']} | quota ${r['quota'] ?? 'unspecified'} | category ${r['category'] ?? 'unspecified'}`,
+    `first-generation: ${r['firstGeneration'] ? 'yes' : 'no'} | hostel resident: ${r['hostelResident'] ? 'yes' : 'no'}`,
+    `mentor: ${r['mentorName'] ?? 'none assigned'} | status ${r['status']} | open ${r['daysOpen']} days | last action: ${r['lastActionAt'] ? String(r['lastActionAt']).slice(0, 10) : 'none — nobody has acted'}`,
+    `signals: ${sigs.join(', ') || 'none'} | from: ${srcs.join(', ') || 'none'}`,
+  ].join(' || ');
+}
+
+function renderBundle(bundle: unknown): string {
+  const b = bundle as { board?: unknown[]; scope?: unknown } | null;
+  if (!b || !Array.isArray(b.board)) return JSON.stringify(bundle, null, 2);
+  const { board, ...rest } = b;
+  const rows = (board as Array<Record<string, unknown>>).map((r, i) => `${i + 1}. ${renderBoardRow(r)}`);
+  return [
+    `board (${rows.length} rows; one student per numbered line, fields separated by ||):`,
+    ...rows,
+    '',
+    'other data (JSON):',
+    JSON.stringify(rest, null, 2),
+  ].join('\n');
+}
+
+export function buildPeopleQueryMessages(input: PeopleQueryPromptInput): LLMMessage[] {
+  const rules = [
+    systemPrefix(input.sys),
+    '',
+    'Answer only from the data in <context>. Do not use outside knowledge about any student.',
+    'Every number you quote must appear in <context> verbatim; you may count rows that match a filter, but say how many rows you counted from.',
+    'The board is capped at the top 50 alerts by score — say "of the top 50 shown" when the total exceeds 50, never imply you saw everyone.',
+    'If the question needs data that is not in <context> (fee ledger, counselling notes, attendance registers, a student not on the board), say so and name the screen that has it: Finance → Fee Dashboard, Welfare → Counselling, Academics → Attendance, People → Students.',
+    'Each board line states the facts explicitly: "first-generation: yes/no", "hostel resident: yes/no", "7-day change: +N (went up) / -N (went down)", "year N" (year 2 = second-year), "last action: none — nobody has acted", and the signals with the module they came from. Use those words literally; do not infer a flag from anything else.',
+    'Before listing a student, check every condition in the question against that row\'s fields. Exclude any row that fails one. If no row matches, say so.',
+    'When listing students give roll number, priority, score and the signal types. Keep it under 8 lines unless asked for a full list.',
+    'Never recommend a clinical action. Never claim a message was sent.',
+  ].join('\n');
+  return [
+    { role: 'system', content: rules },
+    {
+      role: 'user',
+      content: ['<context>', renderBundle(input.contextBundle), '</context>', '', input.userPrompt].join('\n'),
+    },
+  ];
 }

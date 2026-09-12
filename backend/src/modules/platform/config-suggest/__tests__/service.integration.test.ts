@@ -22,7 +22,7 @@ const { completeMock, tryClaimMock } = vi.hoisted(() => ({
   tryClaimMock: vi.fn(),
 }));
 
-vi.mock('../../../juvi/finance-agent/llm-client', () => ({
+vi.mock('../../../../shared/ai/llm/client', () => ({
   createLLMClient: () => ({ provider: 'claude', complete: completeMock, stream: () => ({}) }),
 }));
 

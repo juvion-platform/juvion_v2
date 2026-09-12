@@ -10,6 +10,7 @@ import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../../../middleware/authenticate';
 import { AppError } from '../../../middleware/errorHandler';
 import * as service from './service';
+import { streamSse } from '../../../shared/ai/sse';
 
 function getUserId(req: AuthRequest): string {
   const id = req.user?.id;
@@ -39,5 +40,16 @@ export async function approveOutreachHandler(req: AuthRequest, res: Response, ne
   try {
     const { approved } = req.body as { approved: service.ApprovedOutreach[] };
     res.json(await service.handleApproveOutreach(req.collegeId!, getUserId(req), approved));
+  } catch (e) { next(e); }
+}
+
+export async function queryHandler(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { prompt, conversationId } = req.body as { prompt: string; conversationId?: string };
+    const collegeId = req.collegeId!;
+    const userId = getUserId(req);
+    await streamSse(req, res, (signal) =>
+      service.handleQuery(collegeId, userId, prompt, conversationId, req.authScope, signal, req.user?.role),
+    );
   } catch (e) { next(e); }
 }

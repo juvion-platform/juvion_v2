@@ -12,7 +12,7 @@
  * which prompt revision produced any historical score.
  */
 
-import type { LLMMessage } from '../../juvi/finance-agent/llm-client';
+import type { LLMMessage } from '../../../shared/ai/llm/client';
 
 export const PROMPT_VERSION = 'lead-scoring-prompt-v1';
 

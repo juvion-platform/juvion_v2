@@ -77,15 +77,17 @@ async function pickStudents(
   count: number,
   exclude: mongoose.Types.ObjectId[] = [],
 ): Promise<mongoose.Types.ObjectId[]> {
-  const docs = await Student.find({
-    collegeId,
-    status: 'active',
-    _id: { $nin: exclude },
-  })
-    .select('_id')
-    .limit(count)
-    .lean();
-  return docs.map((d) => d._id as mongoose.Types.ObjectId);
+  // Real-looking roll numbers first, so the cards never name a fixture student
+  // while enough exist; fixture students fill the remainder.
+  const real = await Student.find({ collegeId, status: 'active', _id: { $nin: exclude }, rollNumber: /^\d{2}B01A\d{4}$/ })
+    .select('_id').limit(count).lean();
+  const ids = real.map((d) => d._id as mongoose.Types.ObjectId);
+  if (ids.length < count) {
+    const rest = await Student.find({ collegeId, status: 'active', _id: { $nin: [...exclude, ...ids] } })
+      .select('_id').limit(count - ids.length).lean();
+    ids.push(...rest.map((d) => d._id as mongoose.Types.ObjectId));
+  }
+  return ids;
 }
 
 export async function seedAgentFindings(opts: SeedOpts): Promise<Summary> {

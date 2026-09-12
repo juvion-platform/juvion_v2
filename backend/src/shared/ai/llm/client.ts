@@ -1,8 +1,9 @@
 import { AppError } from '../../../middleware/errorHandler';
-import { assertWithinSpendLimit } from '../../platform/spend-limits/service';
+import { assertWithinSpendLimit } from '../../../modules/platform/spend-limits/service';
 import type { AgentActionType } from '../../../models/juvi/AgentAction';
 import { createClaudeAdapter } from './claude-adapter';
 import { createOpenAIAdapter } from './openai-adapter';
+import { priceFor } from './pricing';
 
 /**
  * Provider-agnostic LLM client interface for the fee-analytics-ai-native
@@ -67,47 +68,7 @@ export const DEFAULT_MAX_TOKENS = 1500;
 export const CLAUDE_DEFAULT_MODEL = 'claude-sonnet-4-5';
 export const OPENAI_DEFAULT_MODEL = 'gpt-4o-mini';
 
-/**
- * Per-million-token pricing (USD) — current public rates as of 2026-04.
- *
- *   Claude Sonnet 4.5: $3 input / $15 output
- *   GPT-4o-mini:       $0.15 input / $0.60 output
- *
- * Update here if Anthropic/OpenAI publish new pricing. Cost is converted
- * to INR via `LLM_INR_RATE` env (default 85.0).
- */
-export const PRICING_USD_PER_MILLION: Record<LLMProvider, { input: number; output: number }> = {
-  claude: { input: 3, output: 15 },
-  openai: { input: 0.15, output: 0.6 },
-};
-
-const DEFAULT_INR_RATE = 85.0;
-
-/**
- * Compute INR cost for a (provider, model, inputTokens, outputTokens) tuple.
- * Rounded to 4 decimal places.
- *
- * Exposed as a named export so both adapters share the same call site
- * (refactor target) and tests can assert exact numeric outputs.
- */
-export function computeCostInr(
-  provider: LLMProvider,
-  inputTokens: number,
-  outputTokens: number,
-  inrRate: number = readInrRate(),
-): number {
-  const pricing = PRICING_USD_PER_MILLION[provider];
-  const usd = (inputTokens * pricing.input) / 1_000_000 + (outputTokens * pricing.output) / 1_000_000;
-  const inr = usd * inrRate;
-  return Number(inr.toFixed(4));
-}
-
-function readInrRate(): number {
-  const raw = process.env.LLM_INR_RATE;
-  if (!raw) return DEFAULT_INR_RATE;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_INR_RATE;
-}
+export { computeCostInr, PRICING_USD_PER_MILLION } from './pricing';
 
 /**
  * Resolve the active provider from explicit arg → env → fallback.
@@ -220,6 +181,9 @@ export function createLLMClient(
 ): LLMClient {
   const active = resolveProvider(provider);
   const key = resolveKey(active);
+  // Fail here, not on the first call: an unpriced model would otherwise
+  // write ₹0 rows into the ledger the spend gate reads.
+  priceFor(resolveModel(active));
   const base =
     active === 'claude'
       ? createClaudeAdapter({ apiKey: key })

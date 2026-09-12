@@ -19,7 +19,7 @@ import mongoose from 'mongoose';
 import { createAuditLog } from '../../../shared/audit';
 import { maskPII } from '../../../shared/llm/pii';
 import { NlReportQuery } from '../../../models/governance/NlReportQuery';
-import { createLLMClient, type LLMMessage } from '../../juvi/finance-agent/llm-client';
+import { createLLMClient, type LLMCallContext, type LLMMessage } from '../../../shared/ai/llm/client';
 import {
   runReport,
   ADMIN_FULL_SCOPE,
@@ -93,11 +93,12 @@ export function supportedReportsFor(authScope: AuthScope): ReadonlyArray<string>
   });
 }
 
-async function callLLM(messages: LLMMessage[]): Promise<{ text: string; costInr: number; model: string } | null> {
+async function callLLM(messages: LLMMessage[], ctx: LLMCallContext): Promise<{ text: string; costInr: number; model: string } | null> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), LLM_TIMEOUT_MS);
   try {
-    const client = createLLMClient();
+    // Spend-gated + audited by construction — this call used to be invisible to the weekly budget.
+    const client = createLLMClient(undefined, ctx);
     const resp = await client.complete(messages, { abortSignal: ctrl.signal });
     return { text: resp.text, costInr: resp.costInr, model: resp.model };
   } catch {
@@ -198,7 +199,7 @@ export async function nlQuery(
 
   // 4 + 5. Build prompt, 10s abort LLM call.
   const messages = buildNlReportPrompt({ today: now, maskedQuestion });
-  const llm = await callLLM(messages);
+  const llm = await callLLM(messages, { collegeId, userId: performedBy, actionType: 'nl-report' });
   if (!llm) {
     const refused: NlRefusedResponse = {
       status: 'refused', reason: 'timeout', supportedReports, llmModel: 'n/a', costInr: 0,

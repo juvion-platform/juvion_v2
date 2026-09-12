@@ -215,7 +215,7 @@ describe('createLLMClient — factory + env switching', () => {
   it('returns claude adapter when LLM_PROVIDER=claude and ANTHROPIC_API_KEY set', async () => {
     process.env.LLM_PROVIDER = 'claude';
     process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
-    const { createLLMClient } = await import('../llm-client');
+    const { createLLMClient } = await import('../client');
 
     const client = createLLMClient();
     expect(client.provider).toBe('claude');
@@ -224,7 +224,7 @@ describe('createLLMClient — factory + env switching', () => {
   it('returns openai adapter when LLM_PROVIDER=openai and OPENAI_API_KEY set', async () => {
     process.env.LLM_PROVIDER = 'openai';
     process.env.OPENAI_API_KEY = 'sk-test';
-    const { createLLMClient } = await import('../llm-client');
+    const { createLLMClient } = await import('../client');
 
     const client = createLLMClient();
     expect(client.provider).toBe('openai');
@@ -234,7 +234,7 @@ describe('createLLMClient — factory + env switching', () => {
     process.env.LLM_PROVIDER = 'claude';
     process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
     process.env.OPENAI_API_KEY = 'sk-test';
-    const { createLLMClient } = await import('../llm-client');
+    const { createLLMClient } = await import('../client');
 
     const client = createLLMClient('openai');
     expect(client.provider).toBe('openai');
@@ -243,7 +243,7 @@ describe('createLLMClient — factory + env switching', () => {
   it('falls back to claude when LLM_PROVIDER is invalid', async () => {
     process.env.LLM_PROVIDER = 'gemini-blah';
     process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
-    const { createLLMClient } = await import('../llm-client');
+    const { createLLMClient } = await import('../client');
 
     const client = createLLMClient();
     expect(client.provider).toBe('claude');
@@ -251,7 +251,7 @@ describe('createLLMClient — factory + env switching', () => {
 
   it('falls back to claude when LLM_PROVIDER is unset', async () => {
     process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
-    const { createLLMClient } = await import('../llm-client');
+    const { createLLMClient } = await import('../client');
 
     const client = createLLMClient();
     expect(client.provider).toBe('claude');
@@ -259,7 +259,7 @@ describe('createLLMClient — factory + env switching', () => {
 
   it('throws AppError(503) when claude selected but ANTHROPIC_API_KEY missing', async () => {
     process.env.LLM_PROVIDER = 'claude';
-    const { createLLMClient } = await import('../llm-client');
+    const { createLLMClient } = await import('../client');
 
     let caught: unknown = null;
     try {
@@ -274,7 +274,7 @@ describe('createLLMClient — factory + env switching', () => {
 
   it('throws AppError(503) when openai selected but OPENAI_API_KEY missing', async () => {
     process.env.LLM_PROVIDER = 'openai';
-    const { createLLMClient } = await import('../llm-client');
+    const { createLLMClient } = await import('../client');
 
     let caught: unknown = null;
     try {
@@ -292,6 +292,17 @@ describe('createLLMClient — factory + env switching', () => {
 // Claude adapter
 // ─────────────────────────────────────────────────────────────────────────
 
+describe('createLLMClient — pricing guard', () => {
+  it('throws AppError(503) at construction when LLM_MODEL has no pricing entry', async () => {
+    process.env.LLM_PROVIDER = 'claude';
+    process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
+    process.env.LLM_MODEL = 'claude-unpriced-99';
+    const { createLLMClient } = await import('../client');
+    expect(() => createLLMClient()).toThrow(AppError);
+    expect(() => createLLMClient()).toThrow(/pricing/i);
+  });
+});
+
 describe('claude adapter — complete()', () => {
   it('returns text + tokens + model + provider + costInr', async () => {
     process.env.LLM_PROVIDER = 'claude';
@@ -300,7 +311,7 @@ describe('claude adapter — complete()', () => {
     anthropicCreateMock.mockResolvedValueOnce(
       anthropicResponse({ text: 'Collection is healthy.', inputTokens: 600, outputTokens: 80 }),
     );
-    const { createLLMClient } = await import('../llm-client');
+    const { createLLMClient } = await import('../client');
 
     const client = createLLMClient('claude');
     const res = await client.complete([
@@ -323,7 +334,7 @@ describe('claude adapter — complete()', () => {
     anthropicCreateMock.mockResolvedValueOnce(
       anthropicResponse({ text: 'ok', inputTokens: 10, outputTokens: 5 }),
     );
-    const { createLLMClient } = await import('../llm-client');
+    const { createLLMClient } = await import('../client');
 
     const client = createLLMClient('claude');
     await client.complete([
@@ -347,24 +358,24 @@ describe('claude adapter — complete()', () => {
   it('per-call opts.model overrides default; LLM_MODEL env overrides default', async () => {
     process.env.LLM_PROVIDER = 'claude';
     process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
-    process.env.LLM_MODEL = 'claude-3-5-sonnet-latest';
+    process.env.LLM_MODEL = 'claude-sonnet-4-6';
     anthropicCreateMock.mockResolvedValue(
-      anthropicResponse({ text: 'x', inputTokens: 1, outputTokens: 1, model: 'claude-3-5-sonnet-latest' }),
+      anthropicResponse({ text: 'x', inputTokens: 1, outputTokens: 1, model: 'claude-sonnet-4-6' }),
     );
-    const { createLLMClient } = await import('../llm-client');
+    const { createLLMClient } = await import('../client');
 
     const client = createLLMClient('claude');
 
     // env override
     await client.complete([{ role: 'user', content: 'q' }]);
-    expect(anthropicCreateMock.mock.calls[0]?.[0]?.model).toBe('claude-3-5-sonnet-latest');
+    expect(anthropicCreateMock.mock.calls[0]?.[0]?.model).toBe('claude-sonnet-4-6');
 
     // per-call override beats env
     anthropicCreateMock.mockResolvedValueOnce(
-      anthropicResponse({ text: 'x', inputTokens: 1, outputTokens: 1, model: 'claude-opus-latest' }),
+      anthropicResponse({ text: 'x', inputTokens: 1, outputTokens: 1, model: 'claude-opus-5' }),
     );
-    await client.complete([{ role: 'user', content: 'q' }], { model: 'claude-opus-latest' });
-    expect(anthropicCreateMock.mock.calls[1]?.[0]?.model).toBe('claude-opus-latest');
+    await client.complete([{ role: 'user', content: 'q' }], { model: 'claude-opus-5' });
+    expect(anthropicCreateMock.mock.calls[1]?.[0]?.model).toBe('claude-opus-5');
   });
 
   it('uses default temperature 0.3 + maxTokens 1500 when opts not provided', async () => {
@@ -373,7 +384,7 @@ describe('claude adapter — complete()', () => {
     anthropicCreateMock.mockResolvedValueOnce(
       anthropicResponse({ text: 'x', inputTokens: 1, outputTokens: 1 }),
     );
-    const { createLLMClient } = await import('../llm-client');
+    const { createLLMClient } = await import('../client');
 
     await createLLMClient('claude').complete([{ role: 'user', content: 'q' }]);
     const args = anthropicCreateMock.mock.calls[0]?.[0];
@@ -388,7 +399,7 @@ describe('claude adapter — complete()', () => {
     anthropicCreateMock.mockResolvedValueOnce(
       anthropicResponse({ text: 'x', inputTokens: 1000, outputTokens: 500 }),
     );
-    const { createLLMClient } = await import('../llm-client');
+    const { createLLMClient } = await import('../client');
 
     const res = await createLLMClient('claude').complete([{ role: 'user', content: 'q' }]);
     expect(res.costInr).toBe(claudeCost(1000, 500, 90.0));
@@ -407,7 +418,7 @@ describe('openai adapter — complete()', () => {
     openaiCreateMock.mockResolvedValueOnce(
       openaiResponse({ text: 'fees due tomorrow', inputTokens: 1200, outputTokens: 60 }),
     );
-    const { createLLMClient } = await import('../llm-client');
+    const { createLLMClient } = await import('../client');
 
     const res = await createLLMClient('openai').complete([{ role: 'user', content: 'hi' }]);
 
@@ -425,7 +436,7 @@ describe('openai adapter — complete()', () => {
     openaiCreateMock.mockResolvedValueOnce(
       openaiResponse({ text: 'ok', inputTokens: 1, outputTokens: 1 }),
     );
-    const { createLLMClient } = await import('../llm-client');
+    const { createLLMClient } = await import('../client');
 
     await createLLMClient('openai').complete([
       { role: 'system', content: 'sys' },
@@ -455,7 +466,7 @@ describe('claude adapter — stream()', () => {
     process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
     const events = anthropicStreamEvents('Hi.', 30, 5);
     anthropicCreateMock.mockResolvedValueOnce(asAsyncIterable(events));
-    const { createLLMClient } = await import('../llm-client');
+    const { createLLMClient } = await import('../client');
 
     const out: Array<{ delta: string; done: boolean }> = [];
     let final: any;
@@ -481,7 +492,7 @@ describe('openai adapter — stream()', () => {
     process.env.OPENAI_API_KEY = 'sk-test';
     const chunks = openaiStreamChunks('Hi!', 50, 8);
     openaiCreateMock.mockResolvedValueOnce(asAsyncIterable(chunks));
-    const { createLLMClient } = await import('../llm-client');
+    const { createLLMClient } = await import('../client');
 
     const out: Array<{ delta: string; done: boolean }> = [];
     let final: any;
@@ -511,7 +522,7 @@ describe('abort signal — claude.complete', () => {
     anthropicCreateMock.mockResolvedValueOnce(
       anthropicResponse({ text: 'x', inputTokens: 1, outputTokens: 1 }),
     );
-    const { createLLMClient } = await import('../llm-client');
+    const { createLLMClient } = await import('../client');
 
     const ac = new AbortController();
     await createLLMClient('claude').complete([{ role: 'user', content: 'q' }], {
@@ -527,7 +538,7 @@ describe('abort signal — claude.complete', () => {
   it('claude.stream() forwards abort signal + aborting before stream throws', async () => {
     process.env.LLM_PROVIDER = 'claude';
     process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
-    const { createLLMClient } = await import('../llm-client');
+    const { createLLMClient } = await import('../client');
 
     const ac = new AbortController();
     ac.abort();

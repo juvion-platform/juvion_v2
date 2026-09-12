@@ -16,27 +16,26 @@
  */
 
 import { randomUUID, createHash } from 'crypto';
+import {
+  runAgentChat,
+  logAgentAction,
+  toBudgetWarning,
+  type AgentChatChunk,
+  type BudgetWarning,
+} from '../../../shared/ai/chat';
 import { Types } from 'mongoose';
 import { z } from 'zod';
 
 import { AppError } from '../../../middleware/errorHandler';
 import { addJob, QUEUE_NAMES } from '../../../shared/queue/QueueManager';
-import {
-  assertWithinSpendLimit,
-  type SpendCheckResult,
-} from '../../platform/spend-limits/service';
+import { assertWithinSpendLimit } from '../../platform/spend-limits/service';
 
 import { FeeReminder } from '../../../models/finance/FeeReminder';
 import { Student } from '../../../models/people/Student';
 
-import { AgentConversation } from '../../../models/juvi/AgentConversation';
-import {
-  AgentAction,
-  type AgentActionType,
-} from '../../../models/juvi/AgentAction';
 import { SituationDismissal } from '../../../models/juvi/SituationDismissal';
 
-import { createLLMClient, type LLMResponse } from './llm-client';
+import { createLLMClient, type LLMResponse } from '../../../shared/ai/llm/client';
 import { maskPII, unmaskText } from '../../../shared/llm/pii';
 import {
   forChat,
@@ -65,9 +64,8 @@ import {
 import {
   withBoundedConcurrency,
   tryParseJson,
-  trimTurnsForBudget,
   truncateNarrative,
-} from './orchestrator-helpers';
+} from '../../../shared/ai/helpers';
 
 // ── Public types (consumed by A5 controller) ───────────────────────────
 
@@ -81,45 +79,11 @@ import {
  * — likely via response header — to avoid a body-shape break for the
  * frontend.
  */
-export interface BudgetWarning {
-  spent: number;
-  limit: number;
-  pct: number;
-  resetsAt: string; // ISO
-}
-
-function toBudgetWarning(check: SpendCheckResult): BudgetWarning | undefined {
-  if (!check.warning) return undefined;
-  return {
-    spent: check.spent,
-    limit: check.limit,
-    pct: check.pct,
-    resetsAt: check.resetsAt.toISOString(),
-  };
-}
+export type { BudgetWarning, AgentChatFinal, AgentChatChunk } from '../../../shared/ai/chat';
 
 export interface AgentChatContext {
   filters?: { from?: Date; to?: Date; programmeIds?: string[] };
   visibleDefaulterIds?: string[];
-}
-
-export interface AgentChatFinal {
-  provider: 'claude' | 'openai';
-  model: string;
-  inputTokens: number;
-  outputTokens: number;
-  costInr: number;
-  durationMs: number;
-  auditId: string;
-  conversationId: string;
-  budgetWarning?: BudgetWarning;
-}
-
-export interface AgentChatChunk {
-  type: 'delta' | 'done' | 'error';
-  text?: string;
-  final?: AgentChatFinal;
-  error?: string;
 }
 
 export interface ForecastWithNarrative {
@@ -190,8 +154,6 @@ export interface ApprovalResult {
 // ── Constants ──────────────────────────────────────────────────────────
 
 const NARRATIVE_CONCURRENCY = 5;
-const TURN_INPUT_BUDGET_TOKENS = 8000;
-const CHAR_PER_TOKEN_ESTIMATE = 4;
 const SITUATIONS_MAX_TOKENS = 1500;
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -201,39 +163,6 @@ function ensureCollegeId(collegeId: string): Types.ObjectId {
     throw new AppError(400, 'Invalid collegeId');
   }
   return new Types.ObjectId(collegeId);
-}
-
-interface AgentActionPayload {
-  collegeId: string;
-  userId: string;
-  type: AgentActionType;
-  maskedPrompt: string;
-  maskedResponse: string;
-  llm: Pick<
-    LLMResponse,
-    'provider' | 'model' | 'durationMs' | 'inputTokens' | 'outputTokens' | 'costInr'
-  > | null;
-}
-
-/**
- * Persist an AgentAction. Always uses the masked prompt + response per
- * spec ("audit log stores the MASKED prompt + response").
- */
-async function logAgentAction(p: AgentActionPayload): Promise<string> {
-  const doc = await AgentAction.create({
-    collegeId: p.collegeId,
-    userId: p.userId,
-    type: p.type,
-    maskedPrompt: p.maskedPrompt,
-    maskedResponse: p.maskedResponse,
-    provider: p.llm?.provider ?? 'claude',
-    model: p.llm?.model ?? 'unknown',
-    durationMs: p.llm?.durationMs ?? 0,
-    inputTokens: p.llm?.inputTokens ?? 0,
-    outputTokens: p.llm?.outputTokens ?? 0,
-    costInr: p.llm?.costInr ?? 0,
-  });
-  return String(doc._id);
 }
 
 // ── Streaming chat ─────────────────────────────────────────────────────
@@ -246,177 +175,15 @@ export async function* handleChat(
   context?: AgentChatContext,
   abortSignal?: AbortSignal,
 ): AsyncGenerator<AgentChatChunk> {
-  const start = Date.now();
   ensureCollegeId(collegeId);
-
-  // 0. Spend-limit gate. Fires once at request entry; mid-stream is NOT
-  // re-gated (per L4 AC). On 429, yield a single error chunk and end the
-  // stream cleanly so the SSE controller can write `event: error` rather
-  // than aborting after headers were already flushed.
-  let spendCheck: SpendCheckResult;
-  try {
-    spendCheck = await assertWithinSpendLimit(collegeId);
-  } catch (e) {
-    if (e instanceof AppError && e.statusCode === 429) {
-      yield { type: 'error', error: e.message };
-      return;
-    }
-    throw e;
-  }
-
-  // 1. Load (or start) conversation
-  let convoDoc = null;
-  let resolvedConvoId = conversationId;
-  if (conversationId) {
-    convoDoc = await AgentConversation.findOne({
-      collegeId,
-      userId,
-      conversationId,
-    });
-  }
-  if (!convoDoc) {
-    resolvedConvoId = randomUUID();
-  }
-
-  // 2. Build prior-turn list (cap last 10) and trim to token budget
-  const priorTurnsAll = (convoDoc?.turns ?? []).slice(-10).map((t) => ({
-    role: t.role,
-    content: t.content,
-  }));
-  const priorTurns = trimTurnsForBudget(
-    priorTurnsAll,
-    TURN_INPUT_BUDGET_TOKENS,
-    CHAR_PER_TOKEN_ESTIMATE,
-  );
-
-  // 3. Assemble + mask context
-  const ctxBundle = await forChat(collegeId, context);
-  const { masked, tokenMap } = maskPII(ctxBundle);
-
-  // 4. Build messages: [system, ...priorTurns, contextual user turn]
-  const baseMessages = buildChatMessages({
-    sys: { today: new Date() },
-    contextBundle: masked,
-    userPrompt: prompt,
+  yield* runAgentChat({
+    collegeId, userId, prompt, conversationId, abortSignal,
+    agent: 'finance',
+    actionType: 'chat',
+    buildContext: () => forChat(collegeId, context),
+    buildMessages: (masked, userPrompt) =>
+      buildChatMessages({ sys: { today: new Date() }, contextBundle: masked, userPrompt }),
   });
-  // Insert prior turns between the system + final user turn
-  const messages = [
-    baseMessages[0]!,
-    ...priorTurns.map((t) => ({
-      role: t.role as 'user' | 'assistant',
-      content: t.content,
-    })),
-    baseMessages[1]!,
-  ];
-
-  // 5. Stream the LLM response
-  let client;
-  try {
-    client = createLLMClient();
-  } catch (e) {
-    yield {
-      type: 'error',
-      error: e instanceof Error ? e.message : String(e),
-    };
-    return;
-  }
-
-  let accumulated = '';
-  let final: LLMResponse | null = null;
-  try {
-    for await (const chunk of client.stream(messages, { abortSignal })) {
-      if (chunk.delta) {
-        accumulated += chunk.delta;
-        yield { type: 'delta', text: chunk.delta };
-      }
-      if (chunk.done && chunk.final) {
-        final = chunk.final;
-      }
-    }
-  } catch (e) {
-    yield {
-      type: 'error',
-      error: e instanceof Error ? e.message : String(e),
-    };
-    return;
-  }
-
-  // 6. Unmask final text + persist
-  const unmasked = unmaskText(accumulated, tokenMap);
-  const finalResponse = final ?? {
-    text: unmasked,
-    inputTokens: 0,
-    outputTokens: 0,
-    model: 'unknown',
-    provider: 'claude',
-    costInr: 0,
-    durationMs: Date.now() - start,
-  };
-
-  // Update or create AgentConversation
-  const newTurns = [
-    {
-      role: 'user' as const,
-      content: prompt,
-      timestamp: new Date(),
-    },
-    {
-      role: 'assistant' as const,
-      content: unmasked,
-      timestamp: new Date(),
-    },
-  ];
-  if (convoDoc) {
-    convoDoc.turns.push(...newTurns);
-    convoDoc.lastModel = finalResponse.model;
-    convoDoc.lastProvider = finalResponse.provider;
-    convoDoc.totalInputTokens =
-      (convoDoc.totalInputTokens ?? 0) + finalResponse.inputTokens;
-    convoDoc.totalOutputTokens =
-      (convoDoc.totalOutputTokens ?? 0) + finalResponse.outputTokens;
-    convoDoc.totalCostInr =
-      (convoDoc.totalCostInr ?? 0) + finalResponse.costInr;
-    await convoDoc.save();
-  } else {
-    await AgentConversation.create({
-      collegeId,
-      userId,
-      conversationId: resolvedConvoId!,
-      turns: newTurns,
-      lastModel: finalResponse.model,
-      lastProvider: finalResponse.provider,
-      totalInputTokens: finalResponse.inputTokens,
-      totalOutputTokens: finalResponse.outputTokens,
-      totalCostInr: finalResponse.costInr,
-    });
-  }
-
-  // The maskedPrompt is the full user-message body that was sent to the LLM.
-  // (Includes the masked context bundle.)
-  const sentUser = messages[messages.length - 1]?.content ?? prompt;
-  const auditId = await logAgentAction({
-    collegeId,
-    userId,
-    type: 'chat',
-    maskedPrompt: sentUser,
-    maskedResponse: accumulated, // accumulated is masked-tokenised
-    llm: finalResponse,
-  });
-
-  yield {
-    type: 'done',
-    final: {
-      provider: finalResponse.provider,
-      model: finalResponse.model,
-      inputTokens: finalResponse.inputTokens,
-      outputTokens: finalResponse.outputTokens,
-      costInr: finalResponse.costInr,
-      durationMs: finalResponse.durationMs,
-      auditId,
-      conversationId: resolvedConvoId!,
-      budgetWarning: toBudgetWarning(spendCheck),
-    },
-  };
 }
 
 // ── Forecast narrative ─────────────────────────────────────────────────

@@ -69,3 +69,4 @@
 | 2026-04-22 10:40 | captain-tdd | fee-analytics-ai-native/task-3 | spec gap — forecast seasonality test reframed: perfect periodic input → sigma=0 → band width 0 by construction; assertion shifted to "mean reflects spike pattern" |
 | 2026-04-22 10:40 | captain-tdd | fee-analytics-ai-native/task-3 | spec gap — daysInWindow trims leading zero days, reflects observed span (not historyDays request) |
 | 2026-04-22 10:40 | captain-tdd | fee-analytics-ai-native/task-3 | spec gap — sibling lookup keys on primaryParentId, not feeResponsibleParentId (more common case) |
+- 2026-09-11T21:12:40Z [tdd] 009-shared-ai-extraction-people-nl: T2 pricing, T7 query-context, T8 prompt, T9 cohorts, handleQuery — red→green (vitest); FE render checks via Playwright (student-risk, fee-dashboard)

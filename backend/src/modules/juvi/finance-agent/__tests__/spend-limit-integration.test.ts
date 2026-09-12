@@ -46,8 +46,8 @@ const { completeMock, streamMock } = vi.hoisted(() => ({
   streamMock: vi.fn(),
 }));
 
-vi.mock('../llm-client', async () => {
-  const actual = await vi.importActual<typeof import('../llm-client')>('../llm-client');
+vi.mock('../../../../shared/ai/llm/client', async () => {
+  const actual = await vi.importActual<typeof import('../../../../shared/ai/llm/client')>('../../../../shared/ai/llm/client');
   return {
     ...actual,
     createLLMClient: () => ({

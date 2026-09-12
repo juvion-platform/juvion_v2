@@ -400,7 +400,10 @@ export default function DashboardLayout() {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto p-6 bg-bg-app">
+        {/* overflow-anchor off: the agent command bars grow in place while
+            streaming, and browser scroll anchoring would shift this container
+            to compensate — the page must never move because a reply arrived. */}
+        <main className="flex-1 overflow-y-auto p-6 bg-bg-app [overflow-anchor:none]">
           <Outlet />
         </main>
       </div>

@@ -10,7 +10,7 @@ import {
   type LLMOptions,
   type LLMResponse,
   type LLMStreamChunk,
-} from './llm-client';
+} from './client';
 
 /**
  * Anthropic SDK adapter for the LLMClient interface.
@@ -89,7 +89,7 @@ export function createClaudeAdapter(deps: ClaudeAdapterDeps): LLMClient {
       outputTokens,
       model: respModel,
       provider,
-      costInr: computeCostInr(provider, inputTokens, outputTokens),
+      costInr: computeCostInr(model, inputTokens, outputTokens),
       durationMs,
     };
   }
@@ -187,7 +187,7 @@ async function* claudeStream(
     outputTokens,
     model: respModel,
     provider: 'claude',
-    costInr: computeCostInr('claude', inputTokens, outputTokens),
+    costInr: computeCostInr(model, inputTokens, outputTokens),
     durationMs: Date.now() - start,
   };
   yield { delta: '', done: true, final };

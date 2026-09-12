@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getStats, listPersons, deletePerson } from '../services/people';
-import { Users, GraduationCap, Briefcase, UserCheck, Building2, Search, Trash2, Pencil, IdCard, DoorOpen, ClipboardCheck, FileText } from 'lucide-react';
+import { Users, GraduationCap, Briefcase, UserCheck, Building2, Search, Trash2, Pencil, IdCard, DoorOpen, ClipboardCheck, FileText, Activity } from 'lucide-react';
 import Breadcrumbs from '../components/ui/Breadcrumbs';
 import DataTable from '../components/ui/DataTable';
 import Pagination from "../components/ui/Pagination";
@@ -38,6 +38,8 @@ const CARDS = [
   { to: 'clearance-workflows', icon: ClipboardCheck, label: 'Clearance', desc: 'Departmental no-dues on exit', iconBg: 'bg-amber-50 text-amber-600', border: 'border-amber-200 hover:border-amber-400', statKey: '' },
   { to: 'document-templates', icon: FileText, label: 'Document Templates', desc: 'TC, bonafide, conduct templates', iconBg: 'bg-slate-50 text-slate-600', border: 'border-slate-200 hover:border-slate-400', statKey: '' },
   { to: 'alumni', icon: GraduationCap, label: 'Alumni', desc: 'Graduated student records', iconBg: 'bg-teal-50 text-teal-600', border: 'border-teal-200 hover:border-teal-400', statKey: '' },
+  // Lives under Welfare (that module owns the engine and the permission); linked here so a registrar finds it.
+  { to: '/welfare/student-risk', icon: Activity, label: 'Student Risk', desc: 'Flagged students & AI assistant', iconBg: 'bg-red-50 text-red-600', border: 'border-red-200 hover:border-red-400', statKey: '' },
 ];
 
 const ROLE_ROUTE: Record<string, string> = {
