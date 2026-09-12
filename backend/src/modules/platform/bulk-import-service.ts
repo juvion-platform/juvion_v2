@@ -124,6 +124,15 @@ export interface ImportJobPreview {
    * ones. Empty for schemas without a validateRow hook.
    */
   sideEffectTotals: Record<string, number>;
+  /**
+   * EVERY row that commit would write, not just the ones in `previewRows`.
+   *
+   * `previewRows` is a display slice capped at PREVIEW_SUCCESS_LIMIT valid
+   * rows; a client that derived its selection from it would silently drop
+   * everything past the cap. This is the authoritative list to select from.
+   * Integers only — the caller already has the display data it needs.
+   */
+  eligibleRowNumbers: number[];
   /** Absent for entity types that do not fee-pin. */
   pinContext?: ImportPinContext;
 }
@@ -391,6 +400,7 @@ export async function uploadAndValidate(
       job: failedJob,
       headers: [],
       previewRows: [],
+      eligibleRowNumbers: [],
       validCount: 0,
       errorCount: 0,
       actionCounts: { create: 0, update: 0, blocked: 0 },
@@ -421,6 +431,7 @@ export async function uploadAndValidate(
       job: failedJob,
       headers: parsed.headers,
       previewRows: [],
+      eligibleRowNumbers: [],
       validCount: 0,
       errorCount: 0,
       actionCounts: { create: 0, update: 0, blocked: 0 },
@@ -626,6 +637,9 @@ export async function uploadAndValidate(
     errorCount,
     actionCounts,
     sideEffectTotals,
+    eligibleRowNumbers: job.results
+      .filter((r) => r.outcome === 'success')
+      .map((r) => r.row),
     ...(pinContext ? { pinContext } : {}),
   };
 }
@@ -645,6 +659,7 @@ export async function commitImportJob(
   collegeId: string,
   jobId: string,
   performedBy: string,
+  opts?: { selectedRowNumbers?: number[] },
 ): Promise<IImportJob> {
   const job = await getImportJob(collegeId, jobId);
   if (job.status !== 'preview_ready') {
@@ -658,12 +673,38 @@ export async function commitImportJob(
     throw new AppError(500, `Schema for "${job.entityType}" not registered.`);
   }
 
+  // Validate client-supplied row selection
+  const allRowNums = new Set(job.results.map((r) => r.row));
+  const eligibleRowNums = new Set(
+    job.results.filter((r) => r.outcome === 'success').map((r) => r.row)
+  );
+  const selectedSet = opts?.selectedRowNumbers ? new Set(opts.selectedRowNumbers) : null;
+
+  if (selectedSet) {
+    for (const rowNum of selectedSet) {
+      if (!allRowNums.has(rowNum)) {
+        throw new AppError(
+          400,
+          `Invalid row reference: row ${rowNum} does not exist in this import job.`,
+        );
+      }
+      if (!eligibleRowNums.has(rowNum)) {
+        const rowResult = job.results.find((r) => r.row === rowNum);
+        throw new AppError(
+          400,
+          `Invalid row selection: row ${rowNum} is not eligible for import (status: ${rowResult?.outcome}).`,
+        );
+      }
+    }
+  }
+
   job.status = 'committing';
   await job.save();
 
   let successCount = 0;
   let failureCount = 0;
   let blockedCount = 0;
+  let skippedCount = 0;
 
   // No previewCache here on purpose — see ImportCommitContext. Commit always
   // re-resolves against live data so a structure superseded since preview is
@@ -695,6 +736,15 @@ export async function commitImportJob(
       failureCount += 1;
       continue;
     }
+
+    // Exclude if selectedSet is provided but doesn't include this row
+    if (selectedSet && !selectedSet.has(r.row)) {
+      r.outcome = 'skipped';
+      r.notes = ['skipped - not selected by operator'];
+      skippedCount += 1;
+      continue;
+    }
+
     try {
       // eslint-disable-next-line no-await-in-loop
       const { id, pinOutcome } = await def.commitOne(r.raw as Record<string, unknown>, ctx);
@@ -741,20 +791,22 @@ export async function commitImportJob(
   job.successCount = successCount;
   job.failureCount = failureCount;
   job.blockedCount = blockedCount;
+  job.skippedCount = skippedCount;
   job.completedAt = new Date();
-  // Blocked rows are excluded from this ladder on purpose: a job whose only
-  // anomaly is a sealed record did not partially fail, it did exactly what
-  // preview said it would. The summary still names them so nothing is silent.
+  // Blocked and skipped rows are excluded from this ladder on purpose: a job whose only
+  // anomaly is a sealed record or a skipped row did not partially fail, it did exactly what
+  // preview/operator choice said it would. The summary still names them so nothing is silent.
   job.status =
     failureCount === 0
       ? 'completed'
       : successCount === 0
         ? 'failed'
         : 'partial';
-  if (failureCount > 0 || blockedCount > 0) {
+  if (failureCount > 0 || blockedCount > 0 || skippedCount > 0) {
     const parts = [`Committed ${successCount} of ${job.totalRows} rows`];
     if (failureCount > 0) parts.push(`${failureCount} failed`);
     if (blockedCount > 0) parts.push(`${blockedCount} blocked and not written`);
+    if (skippedCount > 0) parts.push(`${skippedCount} skipped`);
     job.errorSummary = `${parts.join('; ')}.`;
   } else {
     job.errorSummary = undefined;

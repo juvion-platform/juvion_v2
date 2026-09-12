@@ -34,6 +34,7 @@ import {
   completeClearanceItemSchema, waiveClearanceItemSchema, logEscalationSchema,
   createDocumentTemplateSchema_wf, generateDocumentSchema, signDocumentSchema,
   issueDocumentSchema, revokeDocumentSchema, createAlumniRecordSchema,
+  commitStudentImportSchema,
 } from './validation';
 
 const router = Router();
@@ -75,7 +76,12 @@ router.post(
   studentImportCtrl.studentImportMulterErrorHandler,
   studentImportCtrl.previewHandler,
 );
-router.post('/students/import/commit', authorize('people', 'create'), studentImportCtrl.commitHandler);
+router.post(
+  '/students/import/commit',
+  authorize('people', 'create'),
+  validate(commitStudentImportSchema),
+  studentImportCtrl.commitHandler,
+);
 // Read-only history: 'people','read' rather than 'create' — looking at what a
 // past import did is not a write. Both are pinned to student jobs inside the
 // controller, so this door never exposes the other four entity types.

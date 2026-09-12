@@ -158,7 +158,8 @@ export async function commitImportJobHandler(
 ): Promise<void> {
   try {
     const { id } = req.params as { id: string };
-    const job = await commitImportJob(req.collegeId!, id, performedBy(req));
+    const { selectedRowNumbers } = req.body as { selectedRowNumbers?: number[] };
+    const job = await commitImportJob(req.collegeId!, id, performedBy(req), { selectedRowNumbers });
     res.json(job);
   } catch (err) {
     next(err);
