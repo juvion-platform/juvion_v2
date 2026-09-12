@@ -12,6 +12,7 @@
     "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test:e2e": "npm run test -w e2e",
+    "deploy": "bash scripts/deploy.sh",
     "clean": "rm -rf node_modules backend/node_modules admin-portal/node_modules e2e/node_modules backend/dist admin-portal/dist"
   },
   "engines": { "node": ">=20.0.0" }
