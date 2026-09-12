@@ -30,7 +30,11 @@ export type AgentActionType =
   | 'situation-dismiss'
   | 'narration-people'
   | 'outreach-draft'
-  | 'outreach-approve';
+  | 'outreach-approve'
+  | 'chat-people'
+  | 'nl-report'
+  | 'config-suggest'
+  | 'lead-score';
 
 export interface IAgentActionReversal {
   at: Date;
@@ -81,6 +85,10 @@ const schema = new Schema<IAgentAction>(
       'narration-people',
       'outreach-draft',
       'outreach-approve',
+      'chat-people',
+      'nl-report',
+      'config-suggest',
+      'lead-score',
       ],
       required: true,
     },

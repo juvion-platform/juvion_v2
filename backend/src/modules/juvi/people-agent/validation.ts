@@ -21,3 +21,9 @@ export const approveOutreachSchema = z.object({
     .min(1)
     .max(25),
 });
+
+/** POST /query (SSE) — same shape as the finance command bar, minus its dashboard filters. */
+export const peopleQuerySchema = z.object({
+  prompt: z.string().min(1).max(2000),
+  conversationId: z.string().uuid().optional(),
+});

@@ -23,9 +23,11 @@
  * by sibling tasks A8–A10.
  */
 import api from './api';
-import { useAuthStore } from '../stores/authStore';
+import { streamAgentQuery, type BudgetWarning, type StreamQueryEvent } from './agent';
 
-// ── Public types ──────────────────────────────────────────────────────
+// ── Chat (A6) ────────────────────────────────────────────────────────
+
+export type { AgentChatFinal, BudgetWarning, StreamQueryEvent } from './agent';
 
 export interface AgentChatContext {
   filters?: {
@@ -36,40 +38,6 @@ export interface AgentChatContext {
   visibleDefaulterIds?: string[];
 }
 
-/**
- * Per-call budget warning payload (L4/L7 — llm-spend-limits).
- *
- * Backend mirror: `BudgetWarning` in `finance-agent/service.ts`. Surfaces
- * the rolling 7-day spend snapshot when the college has crossed its
- * `alertThresholdPct` but is still under the hard limit. Absent on
- * success-without-warning responses.
- */
-export interface BudgetWarning {
-  spent: number;
-  limit: number;
-  /** 0..100 */
-  pct: number;
-  /** ISO timestamp; next Monday 00:00 UTC. */
-  resetsAt: string;
-}
-
-export interface AgentChatFinal {
-  provider: 'claude' | 'openai';
-  model: string;
-  inputTokens: number;
-  outputTokens: number;
-  costInr: number;
-  durationMs: number;
-  auditId: string;
-  conversationId: string;
-  budgetWarning?: BudgetWarning;
-}
-
-export type StreamQueryEvent =
-  | { type: 'delta'; text: string }
-  | { type: 'done'; final: AgentChatFinal }
-  | { type: 'error'; status?: number; error: string };
-
 export interface StreamQueryOpts {
   prompt: string;
   conversationId?: string;
@@ -77,163 +45,9 @@ export interface StreamQueryOpts {
   signal?: AbortSignal;
 }
 
-// ── Internals ─────────────────────────────────────────────────────────
-
-const ENDPOINT = '/api/juvi/finance-agent/query';
-
-/**
- * Parse one SSE event block (everything between two blank lines) into a
- * `{ event, data }` pair. Returns `null` for blocks without both lines or
- * with malformed JSON. Tolerates `\r\n` line endings (per RFC 8895).
- */
-function parseSseEvent(block: string): { event: string; data: unknown } | null {
-  const lines = block.split(/\r?\n/);
-  let event = '';
-  let dataRaw = '';
-  for (const line of lines) {
-    if (line.startsWith('event:')) {
-      event = line.slice('event:'.length).trim();
-    } else if (line.startsWith('data:')) {
-      // SSE allows multiple `data:` lines per event; concatenate with \n
-      // per spec. Backend currently emits a single line, but we handle the
-      // multi-line case defensively.
-      dataRaw += (dataRaw ? '\n' : '') + line.slice('data:'.length).trim();
-    }
-    // ignore comments (lines starting with ':') and id/retry fields
-  }
-  if (!event || !dataRaw) return null;
-  try {
-    return { event, data: JSON.parse(dataRaw) };
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Stream a chat query against the finance-agent SSE endpoint. Yields one
- * event at a time. The caller drives the loop and decides when to stop
- * (typically: stop on `done` or `error`, or when the AbortSignal fires).
- *
- * Error handling:
- *  - non-2xx HTTP status → single `{ type: 'error', status, error }` then return
- *  - missing response body → single error event then return
- *  - aborted by signal → `AbortError` propagates; caller should catch
- *  - connection drops mid-stream → reader.read() returns `done:true`; we
- *    yield a synthetic error event so callers can append "(connection lost)"
- */
-export async function* streamQuery(
-  opts: StreamQueryOpts,
-): AsyncGenerator<StreamQueryEvent, void, void> {
-  const { token, collegeId } = useAuthStore.getState();
-
-  let response: Response;
-  try {
-    response = await fetch(ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'text/event-stream',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...(collegeId ? { 'x-college-id': collegeId } : {}),
-      },
-      body: JSON.stringify({
-        prompt: opts.prompt,
-        conversationId: opts.conversationId,
-        context: opts.context,
-      }),
-      signal: opts.signal,
-    });
-  } catch (e) {
-    // Network error / abort — re-throw aborts; surface other errors as
-    // an error event so callers don't have to wrap in try/catch.
-    if (e instanceof Error && e.name === 'AbortError') throw e;
-    yield { type: 'error', error: e instanceof Error ? e.message : 'Network error' };
-    return;
-  }
-
-  if (!response.ok) {
-    yield {
-      type: 'error',
-      status: response.status,
-      error: `HTTP ${response.status}`,
-    };
-    return;
-  }
-  if (!response.body) {
-    yield { type: 'error', error: 'Empty response body' };
-    return;
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-  let sawDone = false;
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-
-      // SSE events are separated by a blank line (\n\n or \r\n\r\n). Split
-      // on either; whatever remains after the last delimiter stays in the
-      // buffer until more bytes arrive.
-      const parts = buffer.split(/\r?\n\r?\n/);
-      buffer = parts.pop() ?? '';
-
-      for (const block of parts) {
-        if (!block.trim()) continue;
-        const parsed = parseSseEvent(block);
-        if (!parsed) continue;
-        if (parsed.event === 'delta') {
-          const text = (parsed.data as { text?: unknown } | null)?.text;
-          if (typeof text === 'string') {
-            yield { type: 'delta', text };
-          }
-        } else if (parsed.event === 'done') {
-          sawDone = true;
-          yield { type: 'done', final: parsed.data as AgentChatFinal };
-        } else if (parsed.event === 'error') {
-          const message = (parsed.data as { message?: unknown } | null)?.message;
-          yield {
-            type: 'error',
-            error: typeof message === 'string' ? message : 'Stream error',
-          };
-        }
-      }
-    }
-    // Flush any final event still sitting in the buffer (server didn't
-    // emit a trailing blank line).
-    const tail = buffer.trim();
-    if (tail) {
-      const parsed = parseSseEvent(tail);
-      if (parsed?.event === 'delta') {
-        const text = (parsed.data as { text?: unknown } | null)?.text;
-        if (typeof text === 'string') yield { type: 'delta', text };
-      } else if (parsed?.event === 'done') {
-        sawDone = true;
-        yield { type: 'done', final: parsed.data as AgentChatFinal };
-      } else if (parsed?.event === 'error') {
-        const message = (parsed.data as { message?: unknown } | null)?.message;
-        yield {
-          type: 'error',
-          error: typeof message === 'string' ? message : 'Stream error',
-        };
-      }
-    }
-    // Stream closed without a `done` event — connection dropped mid-stream.
-    if (!sawDone) {
-      yield { type: 'error', error: 'connection lost' };
-    }
-  } finally {
-    // Ensure the underlying socket is released even if the consumer
-    // breaks out of the for-await early.
-    try {
-      reader.releaseLock();
-    } catch {
-      // releaseLock throws if a read is still pending; safe to ignore.
-    }
-  }
+/** Finance command bar stream — the generic parser lives in `services/agent.ts`. */
+export function streamQuery(opts: StreamQueryOpts): AsyncGenerator<StreamQueryEvent, void, void> {
+  return streamAgentQuery('/juvi/finance-agent/query', opts);
 }
 
 // ── Forecast narrative (A7) ──────────────────────────────────────────

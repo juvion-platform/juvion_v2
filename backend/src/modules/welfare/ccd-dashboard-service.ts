@@ -18,6 +18,9 @@ import { RiskSignal } from '../../models/welfare/RiskSignal';
 import { MentorAssignment } from '../../models/welfare/MentorAssignment';
 import { RiskScoreSnapshot } from '../../models/welfare/RiskScoreSnapshot';
 import { Faculty } from '../../models/people/Faculty';
+import { Student } from '../../models/people/Student';
+import { Branch } from '../../models/academic-structure/Branch';
+import { HostelAllocation } from '../../models/welfare/HostelAllocation';
 import { AuthScope } from '../../shared/rbac/types';
 import { applyAuthScope } from '../../shared/rbac/apply-scope';
 import { applyMentorScope } from './mentor-scope';
@@ -35,6 +38,8 @@ export interface RiskBoardRow {
   daysOpen: number;
   /** Which upstream modules contributed — the cross-module evidence. */
   sources: string[];
+  /** Signal types on the alert — what actually fired, not just where from. */
+  signalTypes: string[];
   signalCount: number;
   crossModuleMultiplier: number;
   temporalMultiplier: number;
@@ -114,7 +119,7 @@ export async function getRiskBoard(
       | { _id?: unknown; rollNumber?: string; personId?: { name?: string } }
       | null;
     const sid = String(student?._id ?? a.studentId ?? '');
-    const signals = (a.signals ?? []) as Array<{ source?: string }>;
+    const signals = (a.signals ?? []) as Array<{ source?: string; signalType?: string }>;
     const lastAction =
       a.intervention?.executedAt ??
       a.investigation?.startedAt ??
@@ -131,6 +136,7 @@ export async function getRiskBoard(
       status: a.status,
       daysOpen: daysSince((a as { createdAt?: Date }).createdAt),
       sources: [...new Set(signals.map((s) => s.source).filter(Boolean))] as string[],
+      signalTypes: [...new Set(signals.map((s) => s.signalType).filter(Boolean))] as string[],
       signalCount: signals.length,
       crossModuleMultiplier: a.scoreBreakdown?.crossModuleMultiplier ?? 1,
       temporalMultiplier: a.scoreBreakdown?.temporalMultiplier ?? 1,
@@ -190,8 +196,9 @@ export async function getSignalsBySource(
 export async function getMentorWorkload(
   collegeId: string,
   staleAfterDays = 14,
+  authScope?: AuthScope,
 ): Promise<Array<{ mentorName: string; open: number; unactioned: number; p1: number }>> {
-  const board = await getRiskBoard(collegeId);
+  const board = await getRiskBoard(collegeId, authScope);
 
   const byMentor = new Map<string, { open: number; unactioned: number; p1: number }>();
   for (const row of board) {
@@ -295,4 +302,120 @@ export async function getStudentScoreHistory(
     score: s.score,
     priority: s.priority ?? null,
   }));
+}
+
+// ── 009: cohort cuts ───────────────────────────────────────────────────────
+
+export interface CohortFields {
+  branch: string | null;
+  yearOfStudy: number;
+  quota: string | null;
+  category: string | null;
+  hostelResident: boolean;
+  /** From the CCD engine's own signal data — there is no student-level flag. */
+  firstGeneration: boolean;
+  /** Score now minus the latest snapshot at least 7 days old; null when none. */
+  delta7d: number | null;
+}
+
+/**
+ * Join the cohort cuts onto board rows. One query per collection, never per
+ * row. Shared by the People query bundle (009 T7) and the cohort widget (T9)
+ * so both cut the population the same way.
+ */
+export async function enrichBoardRows<T extends { studentId: string; score: number }>(
+  collegeId: string,
+  rows: T[],
+): Promise<Array<T & CohortFields>> {
+  if (rows.length === 0) return [];
+  const ids = rows.map((r) => new mongoose.Types.ObjectId(r.studentId));
+  const cid = new mongoose.Types.ObjectId(collegeId);
+  const since = new Date(Date.now() - 7 * 86_400_000);
+
+  const [students, hostel, firstGen, snaps] = await Promise.all([
+    Student.find({ collegeId, _id: { $in: ids } })
+      .select({ branchId: 1, quota: 1, category: 1, studyYearAtAdmission: 1, feePins: 1 })
+      .lean(),
+    HostelAllocation.find({ collegeId, studentId: { $in: ids }, status: 'active' })
+      .select({ studentId: 1 }).lean(),
+    RiskSignal.distinct('studentId', {
+      collegeId: cid, studentId: { $in: ids },
+      $or: [{ 'triggerData.isFirstGen': true }, { firstGenModifier: { $gt: 0 } }],
+    }),
+    RiskScoreSnapshot.aggregate<{ _id: mongoose.Types.ObjectId; score: number }>([
+      { $match: { collegeId: cid, studentId: { $in: ids }, capturedAt: { $lte: since } } },
+      { $sort: { capturedAt: -1 } },
+      { $group: { _id: '$studentId', score: { $first: '$score' } } },
+    ]),
+  ]);
+
+  const branchIds = [...new Set(students.map((s) => s.branchId).filter(Boolean).map(String))];
+  const branches = branchIds.length
+    ? await Branch.find({ collegeId, _id: { $in: branchIds } }).select({ code: 1 }).lean()
+    : [];
+  const branchCode = new Map(branches.map((b) => [String(b._id), b.code]));
+  const studentById = new Map(students.map((s) => [String(s._id), s]));
+  const hostelSet = new Set(hostel.map((h) => String(h.studentId)));
+  const firstGenSet = new Set(firstGen.map(String));
+  const priorScore = new Map(snaps.map((x) => [String(x._id), x.score]));
+
+  return rows.map((r) => {
+    const s = studentById.get(r.studentId);
+    const pins = (s?.feePins ?? []) as Array<{ yearOfStudy?: number }>;
+    // ponytail: year = highest pinned year, else year at admission. Upgrade when
+    // Student carries a promoted current-year field.
+    const yearOfStudy = Math.max(s?.studyYearAtAdmission ?? 1, ...pins.map((p) => p.yearOfStudy ?? 0));
+    const prior = priorScore.get(r.studentId);
+    return {
+      ...r,
+      branch: s?.branchId ? branchCode.get(String(s.branchId)) ?? null : null,
+      yearOfStudy,
+      quota: s?.quota ?? null,
+      category: s?.category ?? null,
+      hostelResident: hostelSet.has(r.studentId),
+      firstGeneration: firstGenSet.has(r.studentId),
+      delta7d: prior === undefined ? null : r.score - prior,
+    };
+  });
+}
+
+export interface CohortCut { key: string; open: number; p1: number; avgScore: number }
+
+function cutBy<T extends { priority: string | null; score: number }>(
+  rows: T[],
+  keyOf: (r: T) => string,
+): CohortCut[] {
+  const m = new Map<string, { open: number; p1: number; sum: number }>();
+  for (const r of rows) {
+    const k = keyOf(r);
+    const e = m.get(k) ?? { open: 0, p1: 0, sum: 0 };
+    e.open += 1; e.sum += r.score; if (r.priority === 'P1') e.p1 += 1;
+    m.set(k, e);
+  }
+  return [...m.entries()]
+    .map(([key, e]) => ({ key, open: e.open, p1: e.p1, avgScore: Math.round(e.sum / e.open) }))
+    .sort((a, b) => b.open - a.open || a.key.localeCompare(b.key));
+}
+
+/**
+ * T9 — open alerts and average score cut by cohort. Pure aggregation over
+ * the (scoped) board; the last unbuilt widget in ROADMAP §2.1.
+ */
+export async function getCohortCuts(collegeId: string, authScope?: AuthScope): Promise<{
+  total: number;
+  byBranch: CohortCut[];
+  byQuota: CohortCut[];
+  hostel: CohortCut;
+  firstGeneration: CohortCut;
+}> {
+  const rows = await enrichBoardRows(collegeId, await getRiskBoard(collegeId, authScope));
+  const one = (key: string, sub: typeof rows): CohortCut =>
+    cutBy(sub, () => key)[0] ?? { key, open: 0, p1: 0, avgScore: 0 };
+  return {
+    total: rows.length,
+    byBranch: cutBy(rows, (r) => r.branch ?? 'Unassigned'),
+    byQuota: cutBy(rows, (r) => r.quota ?? 'Unspecified'),
+    hostel: one('Hostel residents', rows.filter((r) => r.hostelResident)),
+    firstGeneration: one('First-generation', rows.filter((r) => r.firstGeneration)),
+  };
 }

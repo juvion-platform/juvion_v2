@@ -12,6 +12,7 @@ import FeePinsPanel from '../../components/finance/FeePinsPanel';
 import StudentFeeStructurePanel from '../../components/finance/StudentFeeStructurePanel';
 import PersonPhotoBlock from '../../components/people/PersonPhotoBlock';
 import StudentPortfolioPanel from '../../components/student-dev/StudentPortfolioPanel';
+import StudentRiskBlock from '../../components/welfare/StudentRiskBlock';
 
 /** Returns the most recent non-archived pin, or undefined. */
 function pickActivePin(pins: IFeePin[]): IFeePin | undefined {
@@ -286,6 +287,9 @@ export default function StudentDetailPage() {
       {/* ── Profile tab ──────────────────────────────────────────── */}
       {tab === 'profile' && (
         <div role="tabpanel" id="tabpanel-profile" aria-labelledby="tab-profile" className="space-y-4">
+          {/* Risk — engine score + the agent's one-sentence "why". Silent without welfare access. */}
+          {id && <StudentRiskBlock studentId={id} />}
+
           {/* Personal Information */}
           <DetailSection title="Personal Information">
             <DetailField label="Full Name" value={person.name} />

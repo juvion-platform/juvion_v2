@@ -10,7 +10,7 @@ import {
   type LLMOptions,
   type LLMResponse,
   type LLMStreamChunk,
-} from './llm-client';
+} from './client';
 
 /**
  * OpenAI SDK adapter for the LLMClient interface.
@@ -54,7 +54,7 @@ export function createOpenAIAdapter(deps: OpenAIAdapterDeps): LLMClient {
       outputTokens,
       model: respModel,
       provider,
-      costInr: computeCostInr(provider, inputTokens, outputTokens),
+      costInr: computeCostInr(model, inputTokens, outputTokens),
       durationMs,
     };
   }
@@ -122,7 +122,7 @@ async function* openaiStream(
     outputTokens,
     model: respModel,
     provider: 'openai',
-    costInr: computeCostInr('openai', inputTokens, outputTokens),
+    costInr: computeCostInr(model, inputTokens, outputTokens),
     durationMs: Date.now() - start,
   };
   yield { delta: '', done: true, final };

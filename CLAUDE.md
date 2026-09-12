@@ -151,6 +151,17 @@ export async function listStudents(collegeId: string, authScope?: AuthScope) {
 - Policies: `backend/src/shared/rbac/defaults.ts` exports `DEFAULT_POLICIES`. They're upserted via `shared/seed/policies.ts` — **don't** call `Policy.insertMany` directly; that path drifts.
 - Env flags: `RBAC_ENFORCE='false'` makes `authorize()` a pass-through (dev mode); `RBAC_NL_ENFORCE='true'` lifts the hard `requireRole(['admin','super_admin'])` gate on the NL endpoint and switches to policy-based access.
 
+### Shared AI stack — `backend/src/shared/ai/`
+
+One LLM stack for every module; nothing under `modules/` owns a client.
+
+- `llm/client.ts` `createLLMClient(provider?, ctx?)` — pass an `LLMCallContext` and the call is spend-gated and written to `AgentAction`. All five consumers (finance-agent, people-agent, nl-reports, config-suggest, lead-scoring) do; a new one must too.
+- `llm/pricing.ts` is keyed by **model** (longest-prefix, so dated snapshots resolve). Changing `LLM_MODEL` to a model without a row fails at construction with a 503 — add the row, never let cost fall to ₹0.
+- `chat.ts` `runAgentChat()` is the streaming command-bar orchestration (spend gate → conversation → mask bundle + prompt → stream → audit). A module supplies `buildContext`, `buildMessages`, `agent` and `actionType`; see `people-agent/service.ts` `handleQuery`.
+- `sse.ts` `streamSse()` is the only SSE writer; `admin-portal/src/services/agent.ts` `streamAgentQuery()` is the only parser.
+- Frontend widgets live in `admin-portal/src/components/agent/` (`CommandBar`, `states`, `useAgent`, `DraftsPanel`, …). Mount `CommandBar` with a new `endpoint` rather than writing a second chat input; build any human-in-the-loop review on `DraftsPanel` + `useDraftReview` (finance reminders and People outreach both do).
+- The People AI surface is the Welfare **Student Risk** board (`/welfare/student-risk`), not a page under People: M06 owns the engine and the `welfare` permission. People links to it; the student detail Profile tab shows `StudentRiskBlock`. Narrations are cached per (alert, score) per day.
+
 ### Report Engine — `scopeEligibility` is required
 
 Every `ReportDefinition` in `backend/src/modules/governance/report-registry.ts` declares:

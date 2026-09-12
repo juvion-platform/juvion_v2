@@ -118,3 +118,36 @@ describe('determineTone', () => {
     expect(determineTone({ priority: 'P1', priorOutreachCount: 5 })).toBe('urgent');
   });
 });
+
+describe('buildPeopleQueryMessages', () => {
+  it('wraps the bundle in <context> and states the honesty rules the command bar depends on', async () => {
+    const { buildPeopleQueryMessages } = await import('../prompts');
+    const msgs = buildPeopleQueryMessages({
+      sys: SYS,
+      contextBundle: {
+        board: [{ rollNumber: 'R-1', studentName: 'A', priority: 'P1', score: 82, delta7d: 12, branch: 'CSE', yearOfStudy: 2, firstGeneration: true, hostelResident: false, mentorName: null, status: 'generated', daysOpen: 3, lastActionAt: null, signalTypes: ['attendance_drop'], sources: ['M03'] }],
+        scope: { note: 'top 50 by score' },
+      },
+      userPrompt: 'Which mentor has the most P1 students?',
+    });
+    expect(msgs).toHaveLength(2);
+    expect(msgs[0]!.role).toBe('system');
+    const sys = msgs[0]!.content;
+    // Answer only from the bundle; quote numbers verbatim; say when the data is elsewhere.
+    expect(sys).toMatch(/only from the data in <context>/i);
+    expect(sys).toMatch(/number .*must appear/i);
+    expect(sys).toMatch(/name the screen/i);
+    expect(sys).toMatch(/top 50/i);
+    const user = msgs[1]!.content;
+    expect(user).toMatch(/^<context>\n[\s\S]*<\/context>\n\nWhich mentor has the most P1 students\?$/);
+    // Rows are rendered as labelled lines, not JSON — the flags a small model must check are spelled out.
+    expect(user).toContain('1. R-1 | A');
+    expect(user).toContain('7-day change: +12 (went up)');
+    expect(user).toContain('year 2');
+    expect(user).toContain('first-generation: yes');
+    expect(user).toContain('mentor: none assigned');
+    expect(user).toContain('last action: none — nobody has acted');
+    expect(user).toContain('signals: attendance_drop | from: academics');
+    expect(user).toContain('"note": "top 50 by score"');
+  });
+});

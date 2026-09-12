@@ -138,7 +138,7 @@ export async function scoreInquiry(
     }));
 
     const messages = buildLeadScoringPrompt({ today: now, maskedInquiry: maskedInq, maskedInteractions });
-    const llm = await computeLLMScore(messages);
+    const llm = await computeLLMScore(messages, { collegeId, userId: performedBy });
     if (llm) {
       llmScore = llm.score;
       llmFactors = llm.factors;

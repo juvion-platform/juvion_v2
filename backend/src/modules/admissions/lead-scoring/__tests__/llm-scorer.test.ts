@@ -10,7 +10,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const { completeMock } = vi.hoisted(() => ({ completeMock: vi.fn() }));
 
-vi.mock('../../../juvi/finance-agent/llm-client', () => ({
+vi.mock('../../../../shared/ai/llm/client', () => ({
   createLLMClient: () => ({ provider: 'claude', complete: completeMock, stream: () => ({}) }),
 }));
 
@@ -19,6 +19,8 @@ import { computeLLMScore, LLM_TIMEOUT_MS } from '../llm-scorer';
 beforeEach(() => {
   completeMock.mockReset();
 });
+
+const CTX = { collegeId: '000000000000000000000001', userId: '000000000000000000000002' };
 
 describe('computeLLMScore', () => {
   const promptMessages = [
@@ -44,7 +46,7 @@ describe('computeLLMScore', () => {
       durationMs: 3200,
     });
 
-    const r = await computeLLMScore(promptMessages);
+    const r = await computeLLMScore(promptMessages, CTX);
     expect(r).not.toBeNull();
     expect(r!.score).toBe(76);
     expect(r!.factors).toHaveLength(2);
@@ -58,7 +60,7 @@ describe('computeLLMScore', () => {
       text: JSON.stringify({ score: 250, factors: [], summary: 'over' }),
       inputTokens: 1, outputTokens: 1, costInr: 0, model: 'm', provider: 'claude', durationMs: 1,
     });
-    const r = await computeLLMScore(promptMessages);
+    const r = await computeLLMScore(promptMessages, CTX);
     expect(r!.score).toBe(100);
   });
 
@@ -67,7 +69,7 @@ describe('computeLLMScore', () => {
       text: 'sorry I cannot do that today',
       inputTokens: 10, outputTokens: 5, costInr: 0.1, model: 'm', provider: 'claude', durationMs: 100,
     });
-    const r = await computeLLMScore(promptMessages);
+    const r = await computeLLMScore(promptMessages, CTX);
     expect(r).toBeNull();
   });
 
@@ -76,13 +78,13 @@ describe('computeLLMScore', () => {
       text: JSON.stringify({ score: 50 }), // missing factors + summary
       inputTokens: 5, outputTokens: 5, costInr: 0.1, model: 'm', provider: 'claude', durationMs: 50,
     });
-    const r = await computeLLMScore(promptMessages);
+    const r = await computeLLMScore(promptMessages, CTX);
     expect(r).toBeNull();
   });
 
   it('returns null when the LLM client throws', async () => {
     completeMock.mockRejectedValueOnce(new Error('upstream 503'));
-    const r = await computeLLMScore(promptMessages);
+    const r = await computeLLMScore(promptMessages, CTX);
     expect(r).toBeNull();
   });
 
@@ -91,7 +93,7 @@ describe('computeLLMScore', () => {
       text: '```json\n{ "score": 65, "factors": [{"label":"x","weight":5}], "summary":"y" }\n```',
       inputTokens: 1, outputTokens: 1, costInr: 0, model: 'm', provider: 'claude', durationMs: 1,
     });
-    const r = await computeLLMScore(promptMessages);
+    const r = await computeLLMScore(promptMessages, CTX);
     expect(r!.score).toBe(65);
   });
 
@@ -101,7 +103,7 @@ describe('computeLLMScore', () => {
       inputTokens: 1, outputTokens: 1, costInr: 0, model: 'm', provider: 'claude', durationMs: 1,
     });
     const ctrl = new AbortController();
-    await computeLLMScore(promptMessages, { abortSignal: ctrl.signal });
+    await computeLLMScore(promptMessages, CTX, { abortSignal: ctrl.signal });
     const opts = completeMock.mock.calls[0]![1] as { abortSignal?: AbortSignal };
     expect(opts.abortSignal).toBe(ctrl.signal);
   });

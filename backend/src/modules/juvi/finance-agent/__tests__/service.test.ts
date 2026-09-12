@@ -57,10 +57,10 @@ const { completeMock, streamMock, addJobMock } = vi.hoisted(() => {
   };
 });
 
-vi.mock('../llm-client', async () => {
+vi.mock('../../../../shared/ai/llm/client', async () => {
   const actual = await vi.importActual<
-    typeof import('../llm-client')
-  >('../llm-client');
+    typeof import('../../../../shared/ai/llm/client')
+  >('../../../../shared/ai/llm/client');
   return {
     ...actual,
     createLLMClient: () => ({

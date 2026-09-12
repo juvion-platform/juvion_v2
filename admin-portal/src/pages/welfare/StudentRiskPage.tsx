@@ -17,22 +17,34 @@
  * load doesn't flash) · error with retry that does not block the rest of the
  * page.
  */
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ShieldAlert, RefreshCw, AlertCircle, ArrowRight, Activity,
-  CheckCircle2, Search, HeartHandshake, XCircle, Users,
+  CheckCircle2, Search, HeartHandshake, XCircle, Users, Layers, Sparkles,
 } from 'lucide-react';
 
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
 import { Skeleton } from '../../components/ui/Skeleton';
+import CommandBar from '../../components/agent/CommandBar';
+import { InlineRetry, useDelayedEmpty } from '../../components/agent/states';
+import { OutreachDraftsPanel } from '../../components/welfare/OutreachDraftsPanel';
+import { getAlertNarrations } from '../../services/people-agent';
 import {
   getRiskBoard, getSignalsBySource, getMentorWorkload, getOutreachEffectiveness,
-  getStudentRiskProfile, acknowledgeCCDAlert, investigateCCDAlert,
+  getCohortCuts, getStudentRiskProfile, acknowledgeCCDAlert, investigateCCDAlert,
   interveneCCDAlert, resolveCCDAlert, markCCDFalsePositive,
-  type RiskBoardRow,
+  type RiskBoardRow, type CohortCut,
 } from '../../services/welfare';
+
+/** 009 §2.1 — the acceptance set for the People command bar. */
+const QUERY_SUGGESTIONS = [
+  'Which CSE second-years have both a fee signal and an attendance signal?',
+  'Who did we flag last month that nobody has contacted?',
+  'Which mentor has the most P1 students?',
+  'Show me first-generation students whose risk went up this week.',
+];
 
 const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none';
 const lbl = 'block text-sm font-medium text-gray-700 mb-1';
@@ -123,7 +135,9 @@ function SignalsBySource() {
 
 // ─── The breakdown — the reason this page exists ───────────────────────────
 
-function BreakdownPanel({ row, onClose }: { row: RiskBoardRow; onClose: () => void }) {
+function BreakdownPanel({ row, onClose, onDraftOutreach }: {
+  row: RiskBoardRow; onClose: () => void; onDraftOutreach: () => void;
+}) {
   const queryClient = useQueryClient();
   const [action, setAction] = useState<'acknowledge' | 'investigate' | 'intervene' | 'false-positive' | null>(null);
   const [text, setText] = useState('');
@@ -184,10 +198,7 @@ function BreakdownPanel({ row, onClose }: { row: RiskBoardRow; onClose: () => vo
         {profile.isLoading ? (
           <Skeleton className="h-48 w-full rounded-lg" />
         ) : profile.isError ? (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800 flex items-center justify-between">
-            <span>Could not load the signal breakdown.</span>
-            <button onClick={() => void profile.refetch()} className="underline font-medium">Retry</button>
-          </div>
+          <InlineRetry label="Could not load the signal breakdown." onRetry={() => void profile.refetch()} />
         ) : (
           <div className="border border-gray-200 rounded-lg overflow-hidden">
             <table className="w-full text-sm">
@@ -297,6 +308,10 @@ function BreakdownPanel({ row, onClose }: { row: RiskBoardRow; onClose: () => vo
                     className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-300 text-sm hover:bg-gray-50">
               <HeartHandshake size={15} /> Log outreach
             </button>
+            <button onClick={onDraftOutreach}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white text-sm hover:shadow-md">
+              <Sparkles size={15} /> Draft outreach
+            </button>
             <button onClick={() => resolveMutation.mutate()} disabled={resolveMutation.isPending}
                     className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-green-300 text-green-700 text-sm hover:bg-green-50 disabled:opacity-50">
               <CheckCircle2 size={15} /> Resolve
@@ -314,7 +329,7 @@ function BreakdownPanel({ row, onClose }: { row: RiskBoardRow; onClose: () => vo
 
 // ─── Board ─────────────────────────────────────────────────────────────────
 
-function RiskCard({ row, onOpen }: { row: RiskBoardRow; onOpen: () => void }) {
+function RiskCard({ row, narrative, onOpen }: { row: RiskBoardRow; narrative?: string | null; onOpen: () => void }) {
   return (
     <button
       onClick={onOpen}
@@ -328,6 +343,13 @@ function RiskCard({ row, onOpen }: { row: RiskBoardRow; onOpen: () => void }) {
         </div>
         <span className={`text-2xl font-bold tabular-nums ${scoreTone(row.score)}`}>{row.score}</span>
       </div>
+
+      {narrative && (
+        <p className="mt-2 text-xs text-gray-600 leading-snug flex items-start gap-1" data-testid="risk-card-narration">
+          <Sparkles size={11} className="text-violet-500 mt-0.5 flex-shrink-0" aria-hidden />
+          <span>{narrative}</span>
+        </p>
+      )}
 
       <div className="flex flex-wrap gap-1 mt-3">
         {row.sources.map(s => (
@@ -396,6 +418,81 @@ function MentorWorkload() {
   );
 }
 
+// ─── Cohort view (009 T9) ──────────────────────────────────────────────────
+
+function CohortRows({ rows }: { rows: CohortCut[] }) {
+  const max = Math.max(1, ...rows.map(r => r.open));
+  return (
+    <>
+      {rows.map(r => (
+        <tr key={r.key} className="border-t border-gray-100">
+          <td className="px-4 py-2 text-navy-dark">{r.key}</td>
+          <td className="px-4 py-2">
+            <div className="flex items-center gap-2">
+              <div className="h-2 flex-1 bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-full bg-primary-400 rounded-full" style={{ width: `${(r.open / max) * 100}%` }} />
+              </div>
+              <span className="tabular-nums w-6 text-right">{r.open}</span>
+            </div>
+          </td>
+          <td className={`px-4 py-2 text-right tabular-nums ${r.p1 > 0 ? 'font-medium text-red-700' : 'text-gray-400'}`}>{r.p1}</td>
+          <td className={`px-4 py-2 text-right tabular-nums ${scoreTone(r.avgScore)}`}>{r.open ? r.avgScore : '—'}</td>
+        </tr>
+      ))}
+    </>
+  );
+}
+
+function CohortView() {
+  const q = useQuery({
+    queryKey: ['ccd-cohorts'],
+    queryFn: getCohortCuts,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+
+  if (q.isLoading) return <Skeleton className="h-40 w-full rounded-xl mt-10" />;
+  if (q.isError || !q.data || q.data.total === 0) return null;
+  const d = q.data;
+
+  const group = (label: string, rows: CohortCut[]) => (
+    <>
+      <tr className="bg-gray-50">
+        <th scope="rowgroup" colSpan={4} className="text-left text-xs font-semibold text-gray-500 uppercase px-4 py-1.5">{label}</th>
+      </tr>
+      <CohortRows rows={rows} />
+    </>
+  );
+
+  return (
+    <section aria-labelledby="cohort-heading" className="mt-10" data-testid="cohort-view">
+      <h3 id="cohort-heading" className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+        <Layers size={15} /> Who is flagged — by cohort
+      </h3>
+      <div className="bg-white border border-gray-200 rounded-xl overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50">
+            <tr>
+              <th scope="col" className="text-left font-medium text-gray-500 px-4 py-2">Cohort</th>
+              <th scope="col" className="text-left font-medium text-gray-500 px-4 py-2">Open alerts</th>
+              <th scope="col" className="text-right font-medium text-gray-500 px-4 py-2">P1</th>
+              <th scope="col" className="text-right font-medium text-gray-500 px-4 py-2">Avg score</th>
+            </tr>
+          </thead>
+          <tbody>
+            {group('Branch', d.byBranch)}
+            {group('Quota', d.byQuota)}
+            {group('Flags', [d.hostel, d.firstGeneration])}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-xs text-gray-400 mt-2">
+        {d.total} open alert{d.total === 1 ? '' : 's'} in view. First-generation is taken from the signal data the engine scored — there is no student-level flag yet.
+      </p>
+    </section>
+  );
+}
+
 function OutreachEffectiveness() {
   const q = useQuery({
     queryKey: ['ccd-outreach-effectiveness'],
@@ -440,7 +537,9 @@ function OutreachEffectiveness() {
 export default function StudentRiskPage() {
   const queryClient = useQueryClient();
   const [selected, setSelected] = useState<RiskBoardRow | null>(null);
-  const [showEmpty, setShowEmpty] = useState(false);
+  const [draftIds, setDraftIds] = useState<string[]>([]);
+  const [draftOpen, setDraftOpen] = useState(false);
+  const openDrafts = (ids: string[]) => { setDraftIds(ids); setDraftOpen(true); };
 
   const board = useQuery({
     queryKey: ['ccd-board'],
@@ -449,18 +548,25 @@ export default function StudentRiskPage() {
     retry: false,
   });
 
-  // Delay the empty message so a fast load doesn't flash it.
-  useEffect(() => {
-    if (board.isSuccess && (board.data?.length ?? 0) === 0) {
-      const t = window.setTimeout(() => setShowEmpty(true), 500);
-      return () => window.clearTimeout(t);
-    }
-    setShowEmpty(false);
-    return undefined;
-  }, [board.isSuccess, board.data]);
+  // Delayed so a fast load doesn't flash the empty message.
+  const showEmpty = useDelayedEmpty(board.isSuccess && (board.data?.length ?? 0) === 0);
 
   const rows = board.data ?? [];
   const byPriority = (p: string) => rows.filter(r => r.priority === p);
+
+  // One sentence per card for the top of the board. The request cap is 25
+  // and the server caches per (alert, score) for the day, so this is one
+  // call per board load, not one per card.
+  // ponytail: narrates the top 25 by score; page the rest when boards grow.
+  const narratedIds = rows.slice(0, 25).map(r => r.alertId);
+  const narrations = useQuery({
+    queryKey: ['ccd-narrations', narratedIds.join(',')],
+    queryFn: () => getAlertNarrations(narratedIds),
+    enabled: narratedIds.length > 0,
+    staleTime: 10 * 60 * 1000,
+    retry: false,
+  });
+  const narrativeFor = new Map((narrations.data ?? []).map(n => [n.alertId, n.narrative]));
 
   return (
     <div>
@@ -468,17 +574,35 @@ export default function StudentRiskPage() {
         <h2 className="text-2xl font-bold text-navy flex items-center gap-2">
           <ShieldAlert size={24} className="text-red-600" /> Student Risk
         </h2>
-        <button
-          onClick={() => void queryClient.invalidateQueries({ queryKey: ['ccd-board'] })}
-          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-300 text-sm hover:bg-gray-50"
-        >
-          <RefreshCw size={15} className={board.isFetching ? 'animate-spin' : ''} /> Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => openDrafts(byPriority('P1').map(r => r.studentId).slice(0, 25))}
+            disabled={byPriority('P1').length === 0}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white text-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Sparkles size={15} /> Draft outreach for P1
+          </button>
+          <button
+            onClick={() => void queryClient.invalidateQueries({ queryKey: ['ccd-board'] })}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-300 text-sm hover:bg-gray-50"
+          >
+            <RefreshCw size={15} className={board.isFetching ? 'animate-spin' : ''} /> Refresh
+          </button>
+        </div>
       </div>
       <p className="text-sm text-gray-500 mb-6">
         Students flagged by combining attendance, fees, hostel and counselling signals. Every score is
         computed from recorded activity — open a student to see the arithmetic.
       </p>
+
+      <CommandBar
+        endpoint="/juvi/people-agent/query"
+        title="Student Welfare assistant"
+        storageKey="people-agent-convo"
+        placeholder='Ask about the risk board — "which mentor has the most P1 students?"'
+        suggestions={QUERY_SUGGESTIONS}
+        footer="Answers come only from the risk board you can see here (top 50 by score). Nothing is sent to anyone. Press Esc to cancel a streaming reply."
+      />
 
       <SignalsBySource />
 
@@ -487,12 +611,7 @@ export default function StudentRiskPage() {
           {[0, 1, 2].map(i => <Skeleton key={i} className="h-48 w-full rounded-xl" />)}
         </div>
       ) : board.isError ? (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center justify-between">
-          <span className="text-sm text-amber-800">Could not load the risk board.</span>
-          <button onClick={() => void board.refetch()} className="text-sm font-medium text-amber-900 underline">
-            Retry
-          </button>
-        </div>
+        <InlineRetry label="Could not load the risk board." onRetry={() => void board.refetch()} />
       ) : rows.length === 0 ? (
         showEmpty ? (
           <div className="bg-white border border-gray-200 rounded-xl px-6 py-10 text-center" data-testid="risk-board-empty">
@@ -521,7 +640,7 @@ export default function StudentRiskPage() {
                       None
                     </div>
                   ) : items.map(row => (
-                    <RiskCard key={row.alertId} row={row} onOpen={() => setSelected(row)} />
+                    <RiskCard key={row.alertId} row={row} narrative={narrativeFor.get(row.alertId)} onOpen={() => setSelected(row)} />
                   ))}
                 </div>
               </section>
@@ -531,9 +650,18 @@ export default function StudentRiskPage() {
       )}
 
       <MentorWorkload />
+      <CohortView />
       <OutreachEffectiveness />
 
-      {selected && <BreakdownPanel row={selected} onClose={() => setSelected(null)} />}
+      {selected && (
+        <BreakdownPanel
+          row={selected}
+          onClose={() => setSelected(null)}
+          onDraftOutreach={() => { openDrafts([selected.studentId]); setSelected(null); }}
+        />
+      )}
+
+      <OutreachDraftsPanel open={draftOpen} studentIds={draftIds} onClose={() => setDraftOpen(false)} />
     </div>
   );
 }

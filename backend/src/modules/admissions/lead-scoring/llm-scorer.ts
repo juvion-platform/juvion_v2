@@ -11,7 +11,7 @@
  *   - Composing the AbortSignal with worker-level cancellation if needed
  */
 
-import { createLLMClient, type LLMMessage } from '../../juvi/finance-agent/llm-client';
+import { createLLMClient, type LLMCallContext, type LLMMessage } from '../../../shared/ai/llm/client';
 import type { ScoreFactor } from './rule-scorer';
 
 export const LLM_TIMEOUT_MS = 12_000;
@@ -69,6 +69,7 @@ function parseStrict(raw: string): RawLlmPayload | null {
 
 export async function computeLLMScore(
   messages: LLMMessage[],
+  ctx: Pick<LLMCallContext, 'collegeId' | 'userId'>,
   opts: LLMScorerOptions = {},
 ): Promise<LLMScoreResult | null> {
   const ctrl = new AbortController();
@@ -79,7 +80,8 @@ export async function computeLLMScore(
   }
 
   try {
-    const client = createLLMClient();
+    // Spend-gated + audited by construction — this call used to be invisible to the weekly budget.
+    const client = createLLMClient(undefined, { ...ctx, actionType: 'lead-score' });
     const resp = await client.complete(messages, { abortSignal: opts.abortSignal ?? ctrl.signal });
     const parsed = parseStrict(resp.text);
     if (!parsed) return null;

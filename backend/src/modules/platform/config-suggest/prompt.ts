@@ -14,7 +14,7 @@
  * Spec: `.sdd/specs/002-ai-assisted-config/spec.md` §3, §10.7.
  */
 
-import type { LLMMessage } from '../../juvi/finance-agent/llm-client';
+import type { LLMMessage } from '../../../shared/ai/llm/client';
 import type { ConfigSchema, ConfigField } from '../config-registry';
 
 export const PROMPT_VERSION = 'config-suggest-prompt-v1';

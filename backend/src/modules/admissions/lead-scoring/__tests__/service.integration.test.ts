@@ -20,7 +20,7 @@ const { completeMock, incrMock, expireMock, decrMock } = vi.hoisted(() => ({
   decrMock: vi.fn().mockResolvedValue(0),
 }));
 
-vi.mock('../../../juvi/finance-agent/llm-client', () => ({
+vi.mock('../../../../shared/ai/llm/client', () => ({
   createLLMClient: () => ({ provider: 'claude', complete: completeMock, stream: () => ({}) }),
 }));
 

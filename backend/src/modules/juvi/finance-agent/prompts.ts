@@ -17,7 +17,7 @@
  *     between them in `service.ts`.
  */
 
-import type { LLMMessage } from './llm-client';
+import type { LLMMessage } from '../../../shared/ai/llm/client';
 
 export interface SystemContext {
   today: Date;

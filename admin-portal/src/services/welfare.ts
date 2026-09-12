@@ -239,6 +239,18 @@ export interface OutreachEffectiveness {
 export const getOutreachEffectiveness = (days = 90): Promise<OutreachEffectiveness> =>
   api.get(`${BASE}/ccd/outreach-effectiveness`, { params: { days } }).then(r => r.data);
 
+export interface CohortCut { key: string; open: number; p1: number; avgScore: number }
+export interface CohortCuts {
+  total: number;
+  byBranch: CohortCut[];
+  byQuota: CohortCut[];
+  hostel: CohortCut;
+  firstGeneration: CohortCut;
+}
+
+export const getCohortCuts = (): Promise<CohortCuts> =>
+  api.get(`${BASE}/ccd/cohorts`).then(r => r.data);
+
 export const getStudentRiskProfile = (studentId: string) =>
   api.get(`${BASE}/ccd/students/${studentId}/risk-profile`).then(r => r.data);
 
@@ -261,4 +273,4 @@ export const resolveCCDAlert = (alertId: string) =>
   api.post(`${BASE}/ccd/alerts/${alertId}/resolve`).then(r => r.data);
 
 export const markCCDFalsePositive = (alertId: string, falsePositiveReason: string) =>
-  api.post(`${BASE}/ccd/alerts/${alertId}/false-positive`, { falsePositiveReason }).then(r => r.data);
+  api.post(`${BASE}/ccd/alerts/${alertId}/false-positive`, { reason: falsePositiveReason }).then(r => r.data);

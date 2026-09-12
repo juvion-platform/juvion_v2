@@ -9,6 +9,8 @@ import * as exitInterviewService from './exit-interview-service';
 import * as ccdDashboard from './ccd-dashboard-service';
 
 const who = (req: AuthRequest) => req.user?.name || 'System';
+// For ref:'Person' ObjectId fields — `who()` is a display name and must never be cast.
+const actorId = (req: AuthRequest) => req.user?.id || '000000000000000000000099';
 
 // ─── Dashboard ────────────────────────────────────────────
 export async function dashboardStats(req: AuthRequest, res: Response, next: NextFunction) {
@@ -703,13 +705,13 @@ export async function ingestRiskSignalCtrl(req: AuthRequest, res: Response, next
   try { res.status(201).json(await mentCounsCcdService.ingestRiskSignal(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
 }
 export async function acknowledgeCCDAlertCtrl(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await mentCounsCcdService.acknowledgeCCDAlert(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+  try { res.json(await mentCounsCcdService.acknowledgeCCDAlert(req.collegeId!, req.params.id as string, req.body, actorId(req), who(req))); } catch (err) { next(err); }
 }
 export async function investigateCCDAlertCtrl(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await mentCounsCcdService.investigateCCDAlert(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+  try { res.json(await mentCounsCcdService.investigateCCDAlert(req.collegeId!, req.params.id as string, req.body, actorId(req), who(req))); } catch (err) { next(err); }
 }
 export async function recordCCDInterventionCtrl(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.status(201).json(await mentCounsCcdService.recordCCDIntervention(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+  try { res.status(201).json(await mentCounsCcdService.recordCCDIntervention(req.collegeId!, req.params.id as string, req.body, actorId(req), who(req))); } catch (err) { next(err); }
 }
 export async function resolveCCDAlertCtrl(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await mentCounsCcdService.resolveCCDAlert(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
@@ -804,7 +806,10 @@ export async function getSignalsBySourceCtrl(req: AuthRequest, res: Response, ne
   } catch (err) { next(err); }
 }
 export async function getMentorWorkloadCtrl(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await ccdDashboard.getMentorWorkload(req.collegeId!)); } catch (err) { next(err); }
+  try { res.json(await ccdDashboard.getMentorWorkload(req.collegeId!, 14, req.authScope)); } catch (err) { next(err); }
+}
+export async function getCohortCutsCtrl(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await ccdDashboard.getCohortCuts(req.collegeId!, req.authScope)); } catch (err) { next(err); }
 }
 export async function getStudentScoreHistoryCtrl(req: AuthRequest, res: Response, next: NextFunction) {
   try {

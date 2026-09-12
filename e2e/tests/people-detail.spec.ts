@@ -36,3 +36,50 @@ test.describe('People — list pages', () => {
     await expect(page.getByRole('heading', { name: /faculty/i }).first()).toBeVisible({ timeout: 10_000 });
   });
 });
+
+test.describe('People — student detail risk block (009)', () => {
+  test('009-P4 principal: the profile tab shows the engine score and the agent sentence', async ({ page, loginAs }) => {
+    await page.route('**/api/welfare/ccd/students/*/risk-profile', (route) =>
+      route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({
+          activeSignals: [{ _id: 'sig1', signalType: 'attendance_drop', source: 'M03' }],
+          riskScore: { score: 76, priority: 'P1', breakdown: { baseTotal: 76, crossModuleMultiplier: 1, temporalMultiplier: 1, finalScore: 76 } },
+          activeAlerts: [{ _id: 'alert1' }],
+          pastInterventions: [],
+        }),
+      }),
+    );
+    await page.route('**/api/welfare/ccd/students/*/score-history**', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([{ at: '2026-08-01T00:00:00Z', score: 40, priority: 'P3' }, { at: '2026-09-01T00:00:00Z', score: 76, priority: 'P1' }]) }),
+    );
+    await page.route('**/api/juvi/people-agent/narrations', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ narrations: [{ alertId: 'alert1', narrative: 'Attendance dropped sharply this month.' }] }) }),
+    );
+    await loginAs('principal');
+
+    // Any seeded student will do — the risk endpoints above are mocked. Read
+    // the id with the session the login just stored rather than depending on
+    // list-table markup.
+    const id = await page.evaluate(async () => {
+      const r = await fetch('/api/people/students?limit=1', {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token') ?? ''}`,
+          'x-college-id': localStorage.getItem('collegeId') ?? '',
+        },
+      });
+      const j = (await r.json()) as { items?: Array<{ _id: string }> };
+      return j.items?.[0]?._id ?? null;
+    });
+    test.skip(!id, 'no students in the seeded data');
+    await page.goto(`/people/students/${id}`);
+
+    const block = page.getByTestId('student-risk-block');
+    await expect(block).toBeVisible({ timeout: 10_000 });
+    await expect(block.getByText('76')).toBeVisible();
+    await expect(block.getByText('P1')).toBeVisible();
+    await expect(block.getByTestId('student-risk-narration')).toContainText('Attendance dropped sharply');
+    await expect(block.getByText('Attendance drop', { exact: true })).toBeVisible();
+    await expect(block.getByRole('link', { name: /open on risk board/i })).toBeVisible();
+  });
+});

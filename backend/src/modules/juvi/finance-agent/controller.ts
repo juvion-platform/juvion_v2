@@ -24,6 +24,7 @@ import { AppError } from '../../../middleware/errorHandler';
 import { Student } from '../../../models/people/Student';
 
 import * as service from './service';
+import { streamSse } from '../../../shared/ai/sse';
 import {
   batchGetAICache,
   batchSetAICache,
@@ -97,49 +98,9 @@ export async function chatHandler(
     const collegeId = req.collegeId!;
     const userId = getUserId(req);
 
-    // SSE headers — set BEFORE first write. `X-Accel-Buffering: no` keeps
-    // nginx from buffering the stream in production deployments.
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.setHeader('X-Accel-Buffering', 'no');
-    res.flushHeaders();
-
-    // Wire up client disconnect → upstream LLM abort.
-    const ac = new AbortController();
-    const onClose = (): void => {
-      if (!ac.signal.aborted) ac.abort();
-    };
-    req.on('close', onClose);
-
-    try {
-      for await (const chunk of service.handleChat(
-        collegeId,
-        userId,
-        body.prompt,
-        body.conversationId,
-        body.context,
-        ac.signal,
-      )) {
-        if (chunk.type === 'delta') {
-          res.write(
-            `event: delta\ndata: ${JSON.stringify({ text: chunk.text ?? '' })}\n\n`,
-          );
-        } else if (chunk.type === 'done') {
-          res.write(
-            `event: done\ndata: ${JSON.stringify(chunk.final ?? {})}\n\n`,
-          );
-        } else if (chunk.type === 'error') {
-          res.write(
-            `event: error\ndata: ${JSON.stringify({ message: chunk.error ?? 'unknown' })}\n\n`,
-          );
-        }
-      }
-    } finally {
-      req.off('close', onClose);
-    }
-
-    res.end();
+    await streamSse(req, res, (signal) =>
+      service.handleChat(collegeId, userId, body.prompt, body.conversationId, body.context, signal),
+    );
   } catch (e) {
     next(e);
   }

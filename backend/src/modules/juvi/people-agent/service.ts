@@ -18,8 +18,12 @@ import { z } from 'zod';
 
 import { AppError } from '../../../middleware/errorHandler';
 import { maskPII, unmaskText } from '../../../shared/llm/pii';
-import { createLLMClient } from '../finance-agent/llm-client';
-import { withBoundedConcurrency, tryParseJson } from '../finance-agent/orchestrator-helpers';
+import { createLLMClient } from '../../../shared/ai/llm/client';
+import { runAgentChat, type AgentChatChunk } from '../../../shared/ai/chat';
+import type { AuthScope } from '../../../shared/rbac/types';
+import { forPeopleQuery } from './query-context';
+import { aiCacheKey, getAICache, setAICache } from '../../../shared/cache/ai-feature-cache';
+import { withBoundedConcurrency, tryParseJson } from '../../../shared/ai/helpers';
 import { CrisisAlert } from '../../../models/welfare/CrisisAlert';
 import { Student } from '../../../models/people/Student';
 import { College } from '../../../models/College';
@@ -27,6 +31,7 @@ import { forAlertNarration, forOutreachDraft } from './context';
 import {
   buildAlertNarrationMessages,
   buildOutreachDraftMessages,
+  buildPeopleQueryMessages,
   determineTone,
 } from './prompts';
 
@@ -136,6 +141,12 @@ export async function handleAlertNarrations(
       // A missing alert is a skip, never a batch failure.
       if (!ctx) return { alertId, narrative: null };
 
+      // The board narrates its top rows on every load, so one sentence per
+      // (alert, score) is cached for the day — a changed score re-narrates.
+      const cacheKey = aiCacheKey('narration', collegeId, alertId, String(ctx.score));
+      const cached = await getAICache<string>(cacheKey);
+      if (cached) return { alertId, narrative: cached.data };
+
       const { masked, tokenMap } = maskPII(ctx);
       const messages = buildAlertNarrationMessages({
         sys: { today: new Date(), collegeName: name, role: 'Mentor' },
@@ -149,7 +160,9 @@ export async function handleAlertNarrations(
           actionType: 'narration-people',
         });
         const out = await client.complete(messages, { maxTokens: 120 });
-        return { alertId, narrative: unmaskText(out.text.trim(), tokenMap) };
+        const narrative = unmaskText(out.text.trim(), tokenMap);
+        await setAICache(cacheKey, narrative);
+        return { alertId, narrative };
       } catch {
         // Degrade to no narrative — the board's numbers stand on their own.
         return { alertId, narrative: null };
@@ -322,4 +335,36 @@ export async function handleApproveOutreach(
     deliveryNote:
       'Outreach recorded against the alert. No message was sent — no delivery provider is configured.',
   };
+}
+
+// ── 009: command bar ───────────────────────────────────────────────────────
+
+/**
+ * Free-text question over the scoped risk board, streamed. Spend gate,
+ * conversation memory, masking and audit all live in `runAgentChat`; this
+ * only supplies the bundle and the prompt.
+ */
+export async function* handleQuery(
+  collegeId: string,
+  userId: string,
+  prompt: string,
+  conversationId?: string,
+  authScope?: AuthScope,
+  abortSignal?: AbortSignal,
+  role?: string,
+): AsyncGenerator<AgentChatChunk> {
+  ensureCollegeId(collegeId);
+  const name = await collegeName(collegeId);
+  yield* runAgentChat({
+    collegeId, userId, prompt, conversationId, abortSignal,
+    agent: 'people',
+    actionType: 'chat-people',
+    buildContext: () => forPeopleQuery(collegeId, authScope),
+    buildMessages: (masked, userPrompt) =>
+      buildPeopleQueryMessages({
+        sys: { today: new Date(), collegeName: name, role },
+        contextBundle: masked,
+        userPrompt,
+      }),
+  });
 }

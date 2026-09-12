@@ -24,6 +24,8 @@ export interface IAgentConversation {
   _id: Types.ObjectId;
   collegeId: Types.ObjectId;
   userId: Types.ObjectId;
+  /** Which agent owns this thread. A people conversation id never resumes a finance one. */
+  agent: 'finance' | 'people';
   conversationId: string;
   turns: IAgentConversationTurn[];
   lastModel: string;
@@ -48,6 +50,7 @@ const schema = new Schema<IAgentConversation>(
   {
     collegeId: { type: Schema.Types.ObjectId, required: true },
     userId: { type: Schema.Types.ObjectId, required: true },
+    agent: { type: String, enum: ['finance', 'people'], required: true, default: 'finance' },
     conversationId: { type: String, required: true },
     turns: { type: [turnSchema], default: [] },
     lastModel: { type: String, required: true },

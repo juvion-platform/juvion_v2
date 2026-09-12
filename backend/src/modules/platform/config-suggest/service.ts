@@ -21,7 +21,7 @@ import { AppError } from '../../../middleware/errorHandler';
 import { createAuditLog } from '../../../shared/audit';
 import { maskPII } from '../../../shared/llm/pii';
 import { ConfigSuggestion } from '../../../models/platform/ConfigSuggestion';
-import { createLLMClient, type LLMMessage } from '../../juvi/finance-agent/llm-client';
+import { createLLMClient, type LLMCallContext, type LLMMessage } from '../../../shared/ai/llm/client';
 import { getRegisteredSchema } from '../config-registry';
 
 import { tryClaimConfigSuggestSlot } from './cap-guard';
@@ -62,11 +62,13 @@ function nowOr(d?: Date): Date {
 
 async function callLLM(
   messages: LLMMessage[],
+  ctx: LLMCallContext,
 ): Promise<{ text: string; costInr: number; model: string } | null> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), LLM_TIMEOUT_MS);
   try {
-    const client = createLLMClient();
+    // Spend-gated + audited by construction — this call used to be invisible to the weekly budget.
+    const client = createLLMClient(undefined, ctx);
     const resp = await client.complete(messages, { abortSignal: ctrl.signal });
     return { text: resp.text, costInr: resp.costInr, model: resp.model };
   } catch {
@@ -150,7 +152,7 @@ export async function suggestConfig(
     },
   });
 
-  const llm = await callLLM(messages);
+  const llm = await callLLM(messages, { collegeId, userId: performedBy, actionType: 'config-suggest' });
   if (!llm) {
     return {
       batchId: '',

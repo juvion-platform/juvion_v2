@@ -24,7 +24,7 @@ const { completeMock, tryClaimMock, redisGetMock, redisSetexMock, runReportMock 
   runReportMock: vi.fn(),
 }));
 
-vi.mock('../../../juvi/finance-agent/llm-client', () => ({
+vi.mock('../../../../shared/ai/llm/client', () => ({
   createLLMClient: () => ({ provider: 'claude', complete: completeMock, stream: () => ({}) }),
 }));
 

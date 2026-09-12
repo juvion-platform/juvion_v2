@@ -309,6 +309,7 @@ router.get('/ccd/signals-by-source', authorize('welfare', 'read'), ctrl.getSigna
 router.get('/ccd/mentor-workload', authorize('welfare', 'read'), ctrl.getMentorWorkloadCtrl);
 router.get('/ccd/students/:studentId/score-history', authorize('welfare', 'read'), ctrl.getStudentScoreHistoryCtrl);
 router.get('/ccd/outreach-effectiveness', authorize('welfare', 'read'), ctrl.getOutreachEffectivenessCtrl);
+router.get('/ccd/cohorts', authorize('welfare', 'read'), ctrl.getCohortCutsCtrl);
 router.get('/ccd/interventions', authorize('welfare', 'read'), ctrl.listCCDInterventionsCtrl);
 router.get('/ccd/interventions/:id', authorize('welfare', 'read'), ctrl.getCCDInterventionCtrl);
 router.get('/ccd/thresholds', authorize('welfare', 'read'), ctrl.listCCDThresholdsCtrl);

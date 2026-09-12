@@ -4,23 +4,31 @@ import mongoose from 'mongoose';
 // Partial mock — spreads the real module so the placeholder guard, cost math
 // and every other export keep working. A full replacement would silently make
 // them undefined.
-vi.mock('../../finance-agent/llm-client', async () => {
-  const actual = await vi.importActual<typeof import('../../finance-agent/llm-client')>(
-    '../../finance-agent/llm-client',
+vi.mock('../../../../shared/ai/llm/client', async () => {
+  const actual = await vi.importActual<typeof import('../../../../shared/ai/llm/client')>(
+    '../../../../shared/ai/llm/client',
   );
   return { ...actual, createLLMClient: vi.fn() };
 });
+
+// No Redis in unit tests — the narration cache must miss, never hang.
+vi.mock('../../../../config/redis', () => ({
+  default: { get: vi.fn().mockResolvedValue(null), setex: vi.fn().mockResolvedValue('OK') },
+}));
 
 import { setupMongo, teardownMongo, clearCollections } from '../../../../__tests__/helpers/mongoMemory';
 import { Person } from '../../../../models/people/Person';
 import { Student } from '../../../../models/people/Student';
 import { Parent } from '../../../../models/people/Parent';
 import { CrisisAlert } from '../../../../models/welfare/CrisisAlert';
-import { createLLMClient } from '../../finance-agent/llm-client';
+import { createLLMClient } from '../../../../shared/ai/llm/client';
+import { AgentConversation } from '../../../../models/juvi/AgentConversation';
+import { AgentAction } from '../../../../models/juvi/AgentAction';
 import {
   handleAlertNarrations,
   handleOutreachDrafts,
   handleApproveOutreach,
+  handleQuery,
 } from '../service';
 
 const COLLEGE = new mongoose.Types.ObjectId();
@@ -212,6 +220,39 @@ describe('people-agent service', () => {
       expect(result.approvedCount).toBe(0);
       const after = await CrisisAlert.findById(alert._id).lean();
       expect(after!.status).toBe('resolved');
+    });
+  });
+
+  describe('handleQuery (command bar)', () => {
+    it('streams deltas then done, and persists a people-namespaced conversation + chat-people audit row', async () => {
+      await seedStudentWithAlert('Priya', 'R-1');
+      async function* fakeStream() {
+        yield { delta: 'Priya ', done: false };
+        yield { delta: 'is P1.', done: false };
+        yield {
+          delta: '', done: true,
+          final: { text: 'Priya is P1.', inputTokens: 9, outputTokens: 4, model: 'gpt-4o-mini', provider: 'openai', costInr: 0.001, durationMs: 3 },
+        };
+      }
+      vi.mocked(createLLMClient).mockReturnValue({
+        provider: 'openai', complete: vi.fn(), stream: vi.fn().mockReturnValue(fakeStream()),
+      } as never);
+
+      const chunks = [];
+      for await (const c of handleQuery(String(COLLEGE), String(USER), 'Who is P1?')) chunks.push(c);
+
+      expect(chunks.filter((c) => c.type === 'delta').map((c) => c.text).join('')).toBe('Priya is P1.');
+      const done = chunks.find((c) => c.type === 'done')!;
+      expect(done.final?.conversationId).toBeTruthy();
+
+      const convo = await AgentConversation.findOne({ collegeId: COLLEGE });
+      expect(convo?.agent).toBe('people');
+      expect(convo?.turns).toHaveLength(2);
+      const action = await AgentAction.findOne({ collegeId: COLLEGE, type: 'chat-people' });
+      expect(action?.maskedResponse).toBe('Priya is P1.');
+      // The context bundle went to the model, not just the question.
+      expect(action?.maskedPrompt).toContain('<context>');
+      expect(action?.maskedPrompt).toContain('R-1');
     });
   });
 });
