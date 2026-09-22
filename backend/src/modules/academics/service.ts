@@ -62,7 +62,8 @@ import { FilterQuery } from 'mongoose';
 import { IAttendanceSummary } from '../../models/academic-ops/AttendanceSummary';
 import { IAttendanceAlert } from '../../models/academic-ops/AttendanceAlert';
 import { AuthScope } from '../../shared/rbac/types';
-import { applyAuthScope } from '../../shared/rbac/apply-scope';
+import { applyAuthScope, scopeViaStudents } from '../../shared/rbac/apply-scope';
+import { invalidateAssignedForFaculty } from '../../shared/rbac/assignment-resolvers';
 
 const STUDENT_POPULATE = { path: 'studentId', populate: { path: 'personId' } };
 
@@ -159,9 +160,8 @@ export async function deleteProgramme(collegeId: string, id: string, performedBy
 
 export async function listDepartments(collegeId: string, page: number, limit: number, authScope?: AuthScope) {
   const filter: any = { collegeId };
-  if (authScope?.departmentOnly && authScope.departmentId) {
-    filter._id = authScope.departmentId;
-  }
+  // A department IS the scope axis: department-only sees its own row.
+  if (authScope) applyAuthScope(filter, authScope, { departmentField: '_id' });
   return paginate(Department, filter, page, limit, { code: 1 }, ['hodId']);
 }
 
@@ -451,13 +451,17 @@ export async function getCourseOffering(collegeId: string, id: string) {
 
 export async function createCourseOffering(collegeId: string, data: any, performedBy: string) {
   const doc = await CourseOffering.create({ ...data, collegeId });
+  await invalidateAssignedForFaculty(collegeId, String(doc.facultyId));
   await createAuditLog({ collegeId, entityType: 'CourseOffering', entityId: String(doc._id), entityName: String(doc._id), action: 'create', changes: [], performedBy });
   return doc;
 }
 
 export async function updateCourseOffering(collegeId: string, id: string, data: any, performedBy: string) {
+  const before = await CourseOffering.findOne({ _id: id, collegeId }).select('facultyId').lean();
   const doc = await CourseOffering.findOneAndUpdate({ _id: id, collegeId }, { $set: data }, { new: true });
   if (!doc) throw new AppError(404, 'Course offering not found');
+  await invalidateAssignedForFaculty(collegeId, String(doc.facultyId));
+  if (before && String(before.facultyId) !== String(doc.facultyId)) await invalidateAssignedForFaculty(collegeId, String(before.facultyId));
   await createAuditLog({ collegeId, entityType: 'CourseOffering', entityId: id, entityName: String(doc._id), action: 'update', changes: [], performedBy });
   return doc;
 }
@@ -465,6 +469,7 @@ export async function updateCourseOffering(collegeId: string, id: string, data: 
 export async function deleteCourseOffering(collegeId: string, id: string, performedBy: string) {
   const doc = await CourseOffering.findOneAndDelete({ _id: id, collegeId });
   if (!doc) throw new AppError(404, 'Course offering not found');
+  await invalidateAssignedForFaculty(collegeId, String(doc.facultyId));
   await createAuditLog({ collegeId, entityType: 'CourseOffering', entityId: id, entityName: String(doc._id), action: 'delete', changes: [], performedBy });
   return { deleted: true };
 }
@@ -1991,8 +1996,10 @@ export async function getAttendanceSummaries(
   filters: { studentId?: string; courseOfferingId?: string; semesterId?: string; category?: string },
   page: number,
   limit: number,
+  authScope?: AuthScope,
 ) {
   const filter: FilterQuery<IAttendanceSummary> = { collegeId };
+  await scopeViaStudents(filter, authScope, collegeId, Student);
   if (filters.studentId) filter.studentId = filters.studentId;
   if (filters.courseOfferingId) filter.courseOfferingId = filters.courseOfferingId;
   if (filters.semesterId) filter.semesterId = filters.semesterId;
@@ -2010,8 +2017,10 @@ export async function getAttendanceAlerts(
   filters: { studentId?: string; semesterId?: string; alertType?: string; isRead?: string },
   page: number,
   limit: number,
+  authScope?: AuthScope,
 ) {
   const filter: FilterQuery<IAttendanceAlert> = { collegeId };
+  await scopeViaStudents(filter, authScope, collegeId, Student);
   if (filters.studentId) filter.studentId = filters.studentId;
   if (filters.semesterId) filter.semesterId = filters.semesterId;
   if (filters.alertType) filter.alertType = filters.alertType;
@@ -2067,8 +2076,10 @@ export async function listCondonationRequests(
   filters: { studentId?: string; semesterId?: string; status?: string; courseOfferingId?: string },
   page: number,
   limit: number,
+  authScope?: AuthScope,
 ) {
   const filter: FilterQuery<ICondonationRequest> = { collegeId };
+  await scopeViaStudents(filter, authScope, collegeId, Student);
   if (filters.studentId) filter.studentId = filters.studentId;
   if (filters.semesterId) filter.semesterId = filters.semesterId;
   if (filters.status) filter.status = filters.status;

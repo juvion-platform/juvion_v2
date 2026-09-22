@@ -38,6 +38,8 @@ const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 // MENTORING — W06-L2-034: Assign Mentors
 // ═══════════════════════════════════════════════════════════════════════════
 
+import { invalidateAssignedForFaculty } from '../../shared/rbac/assignment-resolvers';
+
 export async function assignMentor(
   collegeId: string,
   data: {
@@ -56,6 +58,7 @@ export async function assignMentor(
     status: 'active',
     aiSuggested: data.aiSuggested ?? false,
   });
+  await invalidateAssignedForFaculty(collegeId, String(doc.mentorId));
 
   await createAuditLog({
     collegeId, entityType: 'MentorAssignment', entityId: String(doc._id),
@@ -381,6 +384,7 @@ export async function updateMentorAssignment(
 ) {
   const doc = await MentorAssignment.findOne({ _id: id, collegeId });
   if (!doc) throw new AppError(404, 'Mentor assignment not found');
+  const previousMentorId = String(doc.mentorId);
 
   const changes: FieldChange[] = [];
   if (data.status !== undefined && data.status !== doc.status) {
@@ -396,6 +400,8 @@ export async function updateMentorAssignment(
   }
 
   await doc.save();
+  await invalidateAssignedForFaculty(collegeId, previousMentorId);
+  if (String(doc.mentorId) !== previousMentorId) await invalidateAssignedForFaculty(collegeId, String(doc.mentorId));
   if (changes.length > 0) {
     await createAuditLog({
       collegeId, entityType: 'MentorAssignment', entityId: String(doc._id),

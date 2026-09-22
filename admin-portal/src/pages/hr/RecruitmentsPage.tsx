@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useCanSeeClass } from '../../hooks/usePermission';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listRecruitments, createRecruitment, updateRecruitment, deleteRecruitment } from '../../services/hr';
 import { listDepartments } from '../../services/academics';
@@ -22,6 +23,7 @@ const manageLink = "inline-flex items-center gap-0.5 text-xs text-primary-500 ho
 const emptyForm = { position: '', departmentId: '', vacancies: '', qualifications: '', experience: '', salary: '', lastDate: '', status: 'open' };
 
 export default function RecruitmentsPage() {
+  const canSeeComp = useCanSeeClass('hr', 'hr.compensation');
   const qc = useQueryClient();
   const { page, setPage, limit, setLimit, search, setSearch } = useListControls();
   const [form, setForm] = useState(emptyForm);
@@ -52,7 +54,7 @@ export default function RecruitmentsPage() {
     e.preventDefault();
     const payload: any = { ...form, vacancies: Number(form.vacancies) };
     if (!payload.experience) delete payload.experience;
-    if (!payload.salary) delete payload.salary;
+    if (!payload.salary || !canSeeComp) delete payload.salary;
     if (vem.isEdit && vem.entity) updateMut.mutate({ id: vem.entity._id, data: payload });
     else createMut.mutate(payload);
   }
@@ -120,7 +122,7 @@ export default function RecruitmentsPage() {
               <div><label className={lbl}>Vacancies *</label><input required type="number" min={1} value={form.vacancies} onChange={e => setForm(f => ({ ...f, vacancies: e.target.value }))} className={inp} /></div>
               <div><label className={lbl}>Qualifications *</label><input required value={form.qualifications} onChange={e => setForm(f => ({ ...f, qualifications: e.target.value }))} className={inp} /></div>
               <div><label className={lbl}>Experience</label><input value={form.experience} onChange={e => setForm(f => ({ ...f, experience: e.target.value }))} className={inp} /></div>
-              <div><label className={lbl}>Salary</label><input value={form.salary} onChange={e => setForm(f => ({ ...f, salary: e.target.value }))} className={inp} /></div>
+              {canSeeComp && <div><label className={lbl}>Salary</label><input value={form.salary} onChange={e => setForm(f => ({ ...f, salary: e.target.value }))} className={inp} /></div>}
               <div><label className={lbl}>Last Date *</label><input required type="date" value={form.lastDate} onChange={e => setForm(f => ({ ...f, lastDate: e.target.value }))} className={inp} /></div>
               <div><label className={lbl}>Status *</label>
                 <select required value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className={inp}>

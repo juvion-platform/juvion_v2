@@ -146,6 +146,9 @@ router.delete('/emergency-contacts/:id', authorize('campus', 'delete'), ctrl.del
 
 // Lab
 router.get('/labs', authorize('campus', 'read'), ctrl.listLabs);
+// Static /labs/* paths BEFORE /labs/:id so the matcher never casts them as ids.
+router.get('/labs/equipment-due-calibration', authorize('campus', 'read', { subDomain: 'labs' }), ctrl.getEquipmentDueForCalibrationCtrl);
+router.get('/labs/overdue-equipment', authorize('campus', 'read', { subDomain: 'labs' }), ctrl.getOverdueEquipmentCtrl);
 router.get('/labs/:id', authorize('campus', 'read'), ctrl.getLab);
 router.post('/labs', authorize('campus', 'create'), validate(createLabSchema), ctrl.createLab);
 router.put('/labs/:id', authorize('campus', 'update'), validate(updateLabSchema), ctrl.updateLab);
@@ -520,7 +523,6 @@ router.delete('/transport-clearances/:id', authorize('campus', 'delete', { subDo
 router.post('/labs/register-equipment', authorize('campus', 'create', { subDomain: 'labs' }), validate(registerLabEquipmentSchema), ctrl.registerLabEquipmentCtrl);
 router.put('/labs/equipment/:id/status', authorize('campus', 'update', { subDomain: 'labs' }), validate(updateEquipmentStatusSchema), ctrl.updateEquipmentStatusCtrl);
 router.post('/labs/equipment-maintenance', authorize('campus', 'create', { subDomain: 'labs' }), validate(recordEquipmentMaintenanceSchema), ctrl.recordEquipmentMaintenanceCtrl);
-router.get('/labs/equipment-due-calibration', authorize('campus', 'read', { subDomain: 'labs' }), ctrl.getEquipmentDueForCalibrationCtrl);
 router.post('/labs/slot-bookings', authorize('campus', 'create', { subDomain: 'labs' }), validate(requestLabSlotBookingSchema), ctrl.requestLabSlotBookingCtrl);
 router.put('/labs/slot-bookings/:id/approve', authorize('campus', 'update', { subDomain: 'labs' }), ctrl.approveLabSlotBookingCtrl);
 router.put('/labs/slot-bookings/:id/reject', authorize('campus', 'update', { subDomain: 'labs' }), ctrl.rejectLabSlotBookingCtrl);
@@ -528,7 +530,6 @@ router.put('/labs/slot-bookings/:id/complete', authorize('campus', 'update', { s
 router.put('/labs/slot-bookings/:id/cancel', authorize('campus', 'update', { subDomain: 'labs' }), ctrl.cancelLabSlotBookingCtrl);
 router.post('/labs/equipment-issues', authorize('campus', 'create', { subDomain: 'labs' }), validate(issueEquipmentSchema), ctrl.issueEquipmentCtrl);
 router.put('/labs/equipment-issues/:id/return', authorize('campus', 'update', { subDomain: 'labs' }), validate(returnEquipmentSchema), ctrl.returnEquipmentCtrl);
-router.get('/labs/overdue-equipment', authorize('campus', 'read', { subDomain: 'labs' }), ctrl.getOverdueEquipmentCtrl);
 router.post('/labs/incidents', authorize('campus', 'create', { subDomain: 'labs' }), validate(reportLabIncidentSchema), ctrl.reportLabIncidentCtrl);
 router.put('/labs/incidents/:id/investigate', authorize('campus', 'update', { subDomain: 'labs' }), ctrl.investigateLabIncidentCtrl);
 router.put('/labs/incidents/:id/resolve', authorize('campus', 'update', { subDomain: 'labs' }), validate(resolveLabIncidentSchema), ctrl.resolveLabIncidentCtrl);

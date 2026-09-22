@@ -1,4 +1,5 @@
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useCanSeeClass } from '../../hooks/usePermission';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Pencil, Loader2, AlertCircle } from 'lucide-react';
 import { getStaff } from '../../services/people';
@@ -18,6 +19,7 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 export default function StaffDetailPage() {
+  const canSeeIdentity = useCanSeeClass('people', 'people.identity');
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: st, isLoading, error } = useQuery({
@@ -90,7 +92,7 @@ export default function StaffDetailPage() {
         <DetailField label="Phone" value={person.phone} />
         <DetailField label="Alternate Phone" value={person.alternatePhone} />
         <DetailField label="Email" value={person.email} />
-        <DetailField label="Aadhaar" value={person.aadhaar} mono />
+        {canSeeIdentity && <DetailField label="Aadhaar" value={person.aadhaar} mono />}
         <DetailField label="Preferred Language" value={person.preferredLanguage} />
         <DetailBool label="Biometric Enrolled" value={person.biometricEnrolled} />
       </DetailSection>

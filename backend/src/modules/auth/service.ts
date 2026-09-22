@@ -2,7 +2,8 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { User } from '../../models/User';
 import { AppError } from '../../middleware/errorHandler';
-import { resolvePermissions } from '../../shared/rbac/resolve-permissions';
+import { resolvePermissions, resolveSensitivity } from '../../shared/rbac/resolve-permissions';
+import { personaCodesOf } from '../../shared/rbac/persona-registry';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
 const JWT_EXPIRES_IN = '7d';
@@ -32,12 +33,15 @@ export async function login(email: string, password: string, collegeId?: string)
 
   const isSuperAdmin = user.role === 'super_admin';
 
+  const personas = personaCodesOf(user);
   const payload: any = {
     id: String(user._id),
     name: user.name,
     email: user.email,
     role: user.role,
     personaType: user.personaType,
+    personas,
+    tv: user.tokenVersion ?? 0,
   };
 
   if (!isSuperAdmin) {
@@ -54,6 +58,7 @@ export async function login(email: string, password: string, collegeId?: string)
       email: user.email,
       role: user.role,
       personaType: user.personaType,
+      personas,
     },
   };
 
@@ -71,7 +76,8 @@ export async function login(email: string, password: string, collegeId?: string)
   }
 
   const targetCollegeId = isSuperAdmin ? undefined : String(user.collegeId);
-  result.permissions = await resolvePermissions(targetCollegeId, user.role, user.personaType);
+  result.permissions = await resolvePermissions(targetCollegeId, user.role, personas);
+  result.sensitivity = await resolveSensitivity(targetCollegeId, user.role, personas);
 
   return result;
 }
@@ -79,13 +85,21 @@ export async function login(email: string, password: string, collegeId?: string)
 export async function getMe(userId: string) {
   const user = await User.findById(userId).select('-password');
   if (!user) throw new AppError(404, 'User not found');
+  const personas = personaCodesOf(user);
+  const collegeId = user.collegeId ? String(user.collegeId) : undefined;
+  // 010 — permissions ride on /me so a policy edit reaches the browser on its next hydrate.
+  const permissions = await resolvePermissions(user.role === 'super_admin' ? undefined : collegeId, user.role, personas);
+  const sensitivity = await resolveSensitivity(user.role === 'super_admin' ? undefined : collegeId, user.role, personas);
   return {
     id: String(user._id),
     name: user.name,
     email: user.email,
     role: user.role,
     personaType: user.personaType,
+    personas,
     collegeId: String(user.collegeId),
+    permissions,
+    sensitivity,
   };
 }
 
@@ -94,12 +108,15 @@ export async function refreshToken(userId: string) {
   if (!user || !user.isActive) throw new AppError(401, 'User not found or inactive');
 
   const isSuperAdmin = user.role === 'super_admin';
+  const personas = personaCodesOf(user);
   const payload: Record<string, unknown> = {
     id: String(user._id),
     name: user.name,
     email: user.email,
     role: user.role,
     personaType: user.personaType,
+    personas,
+    tv: user.tokenVersion ?? 0,
   };
   if (!isSuperAdmin && user.collegeId) {
     payload.collegeId = String(user.collegeId);
@@ -108,9 +125,10 @@ export async function refreshToken(userId: string) {
   const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 
   const targetCollegeId = isSuperAdmin ? undefined : (user.collegeId ? String(user.collegeId) : undefined);
-  const permissions = await resolvePermissions(targetCollegeId, user.role, user.personaType);
+  const permissions = await resolvePermissions(targetCollegeId, user.role, personas);
+  const sensitivity = await resolveSensitivity(targetCollegeId, user.role, personas);
 
-  return { token, permissions };
+  return { token, permissions, sensitivity };
 }
 
 export async function createUser(collegeId: string, data: { email: string; password: string; name: string; role?: string; personaType?: string; personId?: string }) {
@@ -125,6 +143,7 @@ export async function createUser(collegeId: string, data: { email: string; passw
     name: data.name,
     role: data.role || 'admin',
     personaType: data.personaType || 'L-PRIN',
+    personas: [data.personaType || 'L-PRIN'],
     personId: data.personId || undefined,
   });
 

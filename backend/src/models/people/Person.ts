@@ -62,7 +62,7 @@ export interface IPerson extends Document {
 
 const schema = new Schema<IPerson>({
   collegeId: { type: Schema.Types.ObjectId, required: true, index: true },
-  aadhaar: { type: String, sparse: true },
+  aadhaar: { type: String, sparse: true, sensitive: 'people.identity' },
   phone: { type: String, required: true },
   alternatePhone: String,
   email: String,

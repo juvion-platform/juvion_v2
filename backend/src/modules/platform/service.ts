@@ -1,5 +1,11 @@
 import { Policy as RBACPolicy } from '../../models/platform/Policy';
 import { invalidatePolicies } from '../../shared/rbac/cache';
+import { snapshotPoliciesForCollege, defaultsDiff, applyDefaults } from '../../shared/seed/policies';
+import { loadPolicies, decide } from '../../shared/rbac/engine';
+import { ALL_MODULES, ALL_ACTIONS } from '../../shared/rbac/resolve-permissions';
+import { Persona } from '../../models/platform/Persona';
+import { User } from '../../models/User';
+import { invalidatePersonas, loadPersonas, ancestryFrom } from '../../shared/rbac/persona-registry';
 import { Announcement } from '../../models/communication/Announcement';
 import { Circular } from '../../models/communication/Circular';
 import { Notification } from '../../models/communication/Notification';
@@ -323,6 +329,8 @@ export async function listRbacPolicies(collegeId: string, page = 1, limit = 20, 
       { collegeId: null },
     ],
   };
+  // 010 P2 — a snapshotted college edits its own copy; system rows are a template.
+  if (await RBACPolicy.exists({ collegeId, createdBy: 'snapshot' })) { delete filter.$or; filter.collegeId = collegeId; }
   if (role) filter.role = role;
   if (module) filter.module = module;
 
@@ -407,4 +415,115 @@ export async function deleteRbacPolicy(collegeId: string, id: string, performedB
     performedBy,
   });
   return { message: 'Policy deleted' };
+}
+
+// ═══ 010 — Persona catalog ═══════════════════════════════════════════
+
+
+const collegeOrSystem = (collegeId: string) => ({ $or: [{ collegeId }, { collegeId: null }] });
+
+export async function listPersonas(collegeId: string, includeInactive = false) {
+  const filter: Record<string, unknown> = { ...collegeOrSystem(collegeId) };
+  if (!includeInactive) filter.isActive = true;
+  const docs = await Persona.find(filter).sort({ tier: 1, code: 1 }).lean();
+  // A college with its own snapshot sees only its rows; system rows are the template.
+  const own = docs.filter((d) => d.collegeId);
+  return own.length > 0 ? own : docs;
+}
+
+export async function getPersona(collegeId: string, id: string) {
+  const doc = await Persona.findOne({ _id: id, ...collegeOrSystem(collegeId) });
+  if (!doc) throw new AppError(404, 'Persona not found');
+  return doc;
+}
+
+export async function createPersona(collegeId: string, data: any, performedBy: string) {
+  const code = String(data.code).toUpperCase();
+  const clash = await Persona.findOne({ code, ...collegeOrSystem(collegeId) }).lean();
+  if (clash) throw new AppError(409, `Persona code ${code} already exists`);
+  if (data.parentCode) {
+    const parent = await Persona.findOne({ code: data.parentCode, isActive: true, ...collegeOrSystem(collegeId) }).lean();
+    if (!parent) throw new AppError(400, `Parent persona ${data.parentCode} not found`);
+    data.family = parent.family;
+  }
+  const doc = await Persona.create({ ...data, code, family: data.family ?? code, collegeId, createdBy: performedBy });
+  await invalidatePersonas(collegeId);
+  await createAuditLog({ collegeId, entityType: 'Persona', entityId: String(doc._id), entityName: doc.code, action: 'create', changes: [], performedBy });
+  return doc;
+}
+
+export async function updatePersona(collegeId: string, id: string, data: any, performedBy: string) {
+  const existing = await Persona.findOne({ _id: id, ...collegeOrSystem(collegeId) });
+  if (!existing) throw new AppError(404, 'Persona not found');
+  if (!existing.collegeId) throw new AppError(403, 'System personas cannot be edited. Snapshot the catalog for this college first.');
+  if (data.parentCode) {
+    if (data.parentCode === existing.code) throw new AppError(400, 'A persona cannot be its own parent');
+    const rows = await loadPersonas(collegeId);
+    if (ancestryFrom(rows, data.parentCode).includes(existing.code)) throw new AppError(400, 'Parent would create a cycle');
+    const parent = rows.find((r) => r.code === data.parentCode);
+    if (!parent) throw new AppError(400, `Parent persona ${data.parentCode} not found`);
+    data.family = parent.family;
+  }
+  delete data.code;
+  const doc = await Persona.findOneAndUpdate({ _id: id, collegeId }, { ...data, updatedBy: performedBy }, { new: true });
+  if (!doc) throw new AppError(404, 'Persona not found');
+  await invalidatePersonas(collegeId);
+  await createAuditLog({ collegeId, entityType: 'Persona', entityId: id, entityName: doc.code, action: 'update', changes: [], performedBy });
+  return doc;
+}
+
+export async function deletePersona(collegeId: string, id: string, performedBy: string) {
+  const existing = await Persona.findOne({ _id: id, ...collegeOrSystem(collegeId) });
+  if (!existing) throw new AppError(404, 'Persona not found');
+  if (!existing.collegeId) throw new AppError(403, 'System personas cannot be deleted');
+  const holders = await User.countDocuments({ collegeId, isActive: true, $or: [{ personas: existing.code }, { personaType: existing.code }] });
+  if (holders > 0) throw new AppError(409, `Persona ${existing.code} is held by ${holders} active user(s); reassign them first`);
+  const children = await Persona.countDocuments({ collegeId, parentCode: existing.code });
+  if (children > 0) throw new AppError(409, `Persona ${existing.code} is the parent of ${children} persona(s)`);
+  await Persona.deleteOne({ _id: id, collegeId });
+  await invalidatePersonas(collegeId);
+  await createAuditLog({ collegeId, entityType: 'Persona', entityId: id, entityName: existing.code, action: 'delete', changes: [], performedBy });
+  return { deleted: true };
+}
+
+
+// ═══ 010 P2 — policy snapshot, defaults review, matrix ═══════════════
+
+export async function snapshotPolicies(collegeId: string, performedBy: string) {
+  const copied = await snapshotPoliciesForCollege(collegeId, 'snapshot');
+  await invalidatePolicies(collegeId);
+  await createAuditLog({ collegeId, entityType: 'RBACPolicy', entityId: collegeId, entityName: 'snapshot', action: 'create', changes: [{ field: 'copied', displayName: 'copied', oldValue: null, newValue: copied }], performedBy });
+  return { copied };
+}
+
+export function getDefaultsDiff(collegeId: string) {
+  return defaultsDiff(collegeId);
+}
+
+export async function applyPolicyDefaults(collegeId: string, keys: string[], performedBy: string) {
+  const applied = await applyDefaults(collegeId, keys, performedBy);
+  await invalidatePolicies(collegeId);
+  await createAuditLog({ collegeId, entityType: 'RBACPolicy', entityId: collegeId, entityName: 'apply-defaults', action: 'update', changes: [{ field: 'keys', displayName: 'keys', oldValue: null, newValue: keys }], performedBy });
+  return { applied };
+}
+
+/** Effective allow/deny per persona × module × action, from the persona's default role. */
+export async function policyMatrix(collegeId: string) {
+  const personas = await loadPersonas(collegeId);
+  const cells: Record<string, Record<string, Record<string, { effect: string; scope?: unknown }>>> = {};
+  const byRole = new Map<string, Awaited<ReturnType<typeof loadPolicies>>>();
+  for (const p of personas) {
+    if (!byRole.has(p.defaultRole)) byRole.set(p.defaultRole, await loadPolicies(collegeId, p.defaultRole));
+    const policies = byRole.get(p.defaultRole)!;
+    const chain = ancestryFrom(personas, p.code);
+    cells[p.code] = {};
+    for (const mod of ALL_MODULES) {
+      cells[p.code]![mod] = {};
+      for (const action of ALL_ACTIONS) {
+        const d = decide(policies, [chain], mod, action);
+        cells[p.code]![mod]![action] = d ? { effect: d.effect, scope: d.scope } : { effect: 'none' };
+      }
+    }
+  }
+  return { personas: personas.map((p) => ({ code: p.code, label: p.label })), modules: [...ALL_MODULES], actions: [...ALL_ACTIONS], cells };
 }

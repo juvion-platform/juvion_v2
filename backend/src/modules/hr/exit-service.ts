@@ -1,3 +1,5 @@
+import type { AuthScope } from '../../shared/rbac/types';
+import { scopeViaMembers } from '../../shared/rbac/apply-scope';
 import { SeparationRequest } from '../../models/hr/SeparationRequest';
 import { ExitClearance } from '../../models/hr/ExitClearance';
 import { HandoverRecord } from '../../models/hr/HandoverRecord';
@@ -861,8 +863,10 @@ export async function listSeparationRequests(
   page: number,
   limit: number,
   filter?: { status?: string; separationType?: string; employeeId?: string },
+  authScope?: AuthScope,
 ) {
   const query: Record<string, unknown> = { collegeId };
+  await scopeViaMembers(query, authScope, collegeId, Employee, 'employeeId', 'departmentId');
   if (filter?.status) query.status = filter.status;
   if (filter?.separationType) query.separationType = filter.separationType;
   if (filter?.employeeId) query.employeeId = filter.employeeId;
@@ -954,8 +958,10 @@ export async function listExitClearances(
   page: number,
   limit: number,
   filter?: { overallStatus?: string; employeeId?: string },
+  authScope?: AuthScope,
 ) {
   const query: Record<string, unknown> = { collegeId };
+  await scopeViaMembers(query, authScope, collegeId, Employee, 'employeeId', 'departmentId');
   if (filter?.overallStatus) query.overallStatus = filter.overallStatus;
   if (filter?.employeeId) query.employeeId = filter.employeeId;
   return paginate(ExitClearance, query, page, limit);
@@ -1046,8 +1052,10 @@ export async function listHandoverRecords(
   page: number,
   limit: number,
   filter?: { overallStatus?: string; employeeId?: string },
+  authScope?: AuthScope,
 ) {
   const query: Record<string, unknown> = { collegeId };
+  await scopeViaMembers(query, authScope, collegeId, Employee, 'employeeId', 'departmentId');
   if (filter?.overallStatus) query.overallStatus = filter.overallStatus;
   if (filter?.employeeId) query.employeeId = filter.employeeId;
   return paginate(HandoverRecord, query, page, limit);
@@ -1138,8 +1146,10 @@ export async function listFinalSettlements(
   page: number,
   limit: number,
   filter?: { status?: string; employeeId?: string },
+  authScope?: AuthScope,
 ) {
   const query: Record<string, unknown> = { collegeId };
+  await scopeViaMembers(query, authScope, collegeId, Employee, 'employeeId', 'departmentId');
   if (filter?.status) query.status = filter.status;
   if (filter?.employeeId) query.employeeId = filter.employeeId;
   return paginate(FinalSettlement, query, page, limit);

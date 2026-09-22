@@ -8,6 +8,7 @@
  * controller.
  */
 
+import { scopeNotApplicable } from '../../shared/rbac/apply-scope';
 import { AppError } from '../../middleware/errorHandler';
 import { createAuditLog } from '../../shared/audit';
 import { paginate } from '../../shared/pagination';
@@ -48,6 +49,7 @@ async function audit(p: AuditParams) {
 
 export async function listExamRooms(collegeId: string, page = 1, limit = 50, status?: string) {
   const filter: Record<string, unknown> = { collegeId };
+  scopeNotApplicable(filter); // exam configuration is college-wide
   if (status) filter.status = status;
   return paginate(ExamRoom, filter, page, limit);
 }
@@ -82,6 +84,7 @@ export async function deleteExamRoom(collegeId: string, id: string, performedBy:
 
 export async function listEvaluators(collegeId: string, page = 1, limit = 50, status?: string, kind?: string) {
   const filter: Record<string, unknown> = { collegeId };
+  scopeNotApplicable(filter);
   if (status) filter.status = status;
   if (kind) filter.kind = kind;
   return paginate(Evaluator, filter, page, limit);
@@ -116,7 +119,9 @@ export async function deleteEvaluator(collegeId: string, id: string, performedBy
 // ─── GradeTemplate ────────────────────────────────────────────────
 
 export async function listGradeTemplates(collegeId: string, page = 1, limit = 50) {
-  return paginate(GradeTemplate, { collegeId }, page, limit);
+  const filter: Record<string, unknown> = { collegeId };
+  scopeNotApplicable(filter);
+  return paginate(GradeTemplate, filter, page, limit);
 }
 
 export async function getGradeTemplate(collegeId: string, id: string) {
@@ -148,7 +153,9 @@ export async function deleteGradeTemplate(collegeId: string, id: string, perform
 // ─── ExamCentreTemplate ───────────────────────────────────────────
 
 export async function listExamCentreTemplates(collegeId: string, page = 1, limit = 50) {
-  return paginate(ExamCentreTemplate, { collegeId }, page, limit);
+  const filter: Record<string, unknown> = { collegeId };
+  scopeNotApplicable(filter);
+  return paginate(ExamCentreTemplate, filter, page, limit);
 }
 
 export async function getExamCentreTemplate(collegeId: string, id: string) {
@@ -181,6 +188,7 @@ export async function deleteExamCentreTemplate(collegeId: string, id: string, pe
 
 export async function listQuestionPapers(collegeId: string, page = 1, limit = 50, status?: string) {
   const filter: Record<string, unknown> = { collegeId };
+  scopeNotApplicable(filter);
   if (status) filter.status = status;
   return paginate(QuestionPaperSchema, filter, page, limit);
 }
@@ -247,6 +255,7 @@ export async function deleteSignatureType(collegeId: string, id: string, perform
 
 export async function listMoocSubjects(collegeId: string, page = 1, limit = 50, status?: string) {
   const filter: Record<string, unknown> = { collegeId };
+  scopeNotApplicable(filter);
   if (status) filter.status = status;
   return paginate(MoocSubject, filter, page, limit);
 }

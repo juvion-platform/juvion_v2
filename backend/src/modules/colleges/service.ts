@@ -1,3 +1,5 @@
+import { snapshotPersonasForCollege } from '../../shared/seed/personas';
+import { snapshotPoliciesForCollege } from '../../shared/seed/policies';
 import { College } from '../../models/College';
 import { paginate } from '../../shared/pagination';
 import { createAuditLog } from '../../shared/audit';
@@ -38,6 +40,10 @@ export async function getCollege(id: string) {
 export async function createCollege(data: any, who: string) {
   data.code = data.code.toUpperCase();
   const doc = await College.create(data);
+  // 010 — every college evaluates against its own persona rows; copy the
+  // system catalog now so later template edits never change a live college.
+  await snapshotPersonasForCollege(String(doc._id), who);
+  await snapshotPoliciesForCollege(String(doc._id), 'snapshot');
   await createAuditLog({
     collegeId: String(doc._id),
     entityType: 'College',

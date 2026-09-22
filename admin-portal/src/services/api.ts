@@ -68,7 +68,7 @@ async function runRefresh(): Promise<string> {
   );
   if (!data?.token) throw new Error('No token in refresh response');
   const { useAuthStore } = await import('../stores/authStore');
-  useAuthStore.getState().setToken(data.token, data.permissions);
+  useAuthStore.getState().setToken(data.token, data.permissions, data.sensitivity);
   return data.token as string;
 }
 

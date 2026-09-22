@@ -1,3 +1,4 @@
+import { maskFields } from '../rbac/sensitivity';
 /**
  * The one streaming-chat orchestration. Finance and People both answer a
  * free-text question from a pre-baked context bundle; the only things that
@@ -65,6 +66,8 @@ export interface AgentChatInput {
   actionType: AgentActionType;
   /** Deterministic, unmasked context. Masking happens here, once, with the prompt. */
   buildContext: () => Promise<unknown>;
+  /** 010 P3 — sensitivity classes the caller may not see; stripped from the context before it reaches the model. */
+  hiddenClasses?: readonly string[];
   /** Returns `[system, user]`; prior turns are spliced between them. */
   buildMessages: (maskedContext: unknown, maskedPrompt: string) => LLMMessage[];
   /** Per-surface model override; defaults to `JUVI_CHAT_MODEL`, then the provider default. */
@@ -134,7 +137,7 @@ export async function* runAgentChat(input: AgentChatInput): AsyncGenerator<Agent
 
   // 3. Context + question masked together so a name in the question gets the
   // same token as the same name in the bundle.
-  const { masked, tokenMap } = maskPII({ bundle: await input.buildContext(), prompt });
+  const { masked, tokenMap } = maskPII({ bundle: maskFields(await input.buildContext(), input.hiddenClasses ?? []), prompt });
 
   // 4. [system, ...prior, user]
   const base = input.buildMessages(masked.bundle, String(masked.prompt));

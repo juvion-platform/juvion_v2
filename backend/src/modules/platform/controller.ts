@@ -201,3 +201,68 @@ export async function updateRbacPolicy(req: AuthRequest, res: Response, next: Ne
 export async function deleteRbacPolicy(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await service.deleteRbacPolicy(req.collegeId!, req.params.id as string, req.user?.name || 'System')); } catch (err) { next(err); }
 }
+
+// ─── 010 Personas ─────────────────────────────────────────
+export async function listPersonas(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.listPersonas(req.collegeId!, req.query.includeInactive === 'true')); } catch (err) { next(err); }
+}
+export async function getPersona(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.getPersona(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+export async function createPersona(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await service.createPersona(req.collegeId!, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function updatePersona(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.updatePersona(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (err) { next(err); }
+}
+export async function deletePersona(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.deletePersona(req.collegeId!, req.params.id as string, who(req))); } catch (err) { next(err); }
+}
+
+// ─── 010 Users ────────────────────────────────────────────
+import * as userService from './user-service';
+
+export async function listUsers(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { page, limit, role, persona, includeInactive } = req.query as any;
+    res.json(await userService.listUsers(req.collegeId!, Number(page) || 1, Number(limit) || 20, { role, persona, includeInactive: includeInactive === 'true' }));
+  } catch (err) { next(err); }
+}
+export async function getUser(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await userService.getUser(req.collegeId!, req.params.id as string)); } catch (err) { next(err); }
+}
+export async function createUser(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.status(201).json(await userService.createUser(req.collegeId!, req.body, who(req), req.user!.role)); } catch (err) { next(err); }
+}
+export async function updateUser(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await userService.updateUser(req.collegeId!, req.params.id as string, req.body, who(req), req.user!.role)); } catch (err) { next(err); }
+}
+export async function resetUserPassword(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await userService.resetPassword(req.collegeId!, req.params.id as string, req.body.password, who(req))); } catch (err) { next(err); }
+}
+export async function explainUserAccess(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { module: mod, action } = req.query as { module?: string; action?: string };
+    if (!mod || !action) return res.status(400).json({ error: 'module and action are required' });
+    res.json(await userService.explainAccess(req.collegeId!, req.params.id as string, mod, action));
+  } catch (err) { next(err); }
+}
+
+
+// ─── 010 P2 policy snapshot / matrix ───────────────────────
+export async function policyMatrix(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.policyMatrix(req.collegeId!)); } catch (err) { next(err); }
+}
+export async function policyDefaultsDiff(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.getDefaultsDiff(req.collegeId!)); } catch (err) { next(err); }
+}
+export async function applyPolicyDefaults(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const keys = Array.isArray(req.body?.keys) ? req.body.keys.filter((k: unknown) => typeof k === 'string') : [];
+    if (keys.length === 0) return res.status(400).json({ error: 'keys[] is required' });
+    res.json(await service.applyPolicyDefaults(req.collegeId!, keys, who(req)));
+  } catch (err) { next(err); }
+}
+export async function snapshotPolicies(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await service.snapshotPolicies(req.collegeId!, who(req))); } catch (err) { next(err); }
+}

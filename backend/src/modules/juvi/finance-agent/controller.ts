@@ -99,7 +99,7 @@ export async function chatHandler(
     const userId = getUserId(req);
 
     await streamSse(req, res, (signal) =>
-      service.handleChat(collegeId, userId, body.prompt, body.conversationId, body.context, signal),
+      service.handleChat(collegeId, userId, body.prompt, body.conversationId, body.context, signal, req.authScope),
     );
   } catch (e) {
     next(e);

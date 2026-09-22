@@ -23,6 +23,7 @@ import type {
 } from './import-schemas/types';
 import { validString, validNumber, validEnum } from './import-schemas/validators';
 import { studentImportSchema } from './import-schemas/student';
+import { userImportSchema } from './import-schemas/user';
 
 export type { ImportCommitContext, ImportSchemaField, ImportSchemaDefinition };
 
@@ -534,6 +535,8 @@ const REGISTRY: ImportSchemaDefinition[] = [
   staffImportSchema,
   applicantImportSchema,
   programmeImportSchema,
+  // 010 — portal logins
+  userImportSchema,
   // Future Phase B / C — branches, departments, regulations, batches,
   // subjects (no model yet), fee-structures (nested components — needs
   // schema-driven nesting), fee-transactions.

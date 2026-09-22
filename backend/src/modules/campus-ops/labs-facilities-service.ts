@@ -1,3 +1,4 @@
+import { Types } from 'mongoose';
 // labs-facilities-service — sub-domains: Labs (W08-L2-024..028), Facilities (W08-L2-029..033)
 import { LabEquipment } from '../../models/campus/LabEquipment';
 import { LabSlotBooking } from '../../models/campus/LabSlotBooking';
@@ -989,7 +990,7 @@ export async function recordNoShow(
 /** Get availability of sports equipment (aggregated from Asset) */
 export async function getSportsEquipmentAvailability(collegeId: string) {
   const results = await Asset.aggregate([
-    { $match: { collegeId: { $toObjectId: collegeId }, category: 'sports' } },
+    { $match: { collegeId: new Types.ObjectId(collegeId), category: 'sports' } },
     {
       $group: {
         _id: '$name',
@@ -1129,11 +1130,11 @@ export async function getFacilityUtilization(
   const end = new Date(data.endDate);
 
   const bookingMatch: Record<string, unknown> = {
-    collegeId: { $toObjectId: collegeId },
+    collegeId: new Types.ObjectId(collegeId),
     date: { $gte: start, $lte: end },
   };
   if (data.roomId) {
-    bookingMatch['roomId'] = { $toObjectId: data.roomId };
+    bookingMatch['roomId'] = new Types.ObjectId(data.roomId);
   }
 
   const bookings = await RoomBooking.aggregate([
@@ -1175,12 +1176,12 @@ export async function getFacilityUtilization(
 
   // Peak hours analysis from usage logs
   const usageMatch: Record<string, unknown> = {
-    collegeId: { $toObjectId: collegeId },
+    collegeId: new Types.ObjectId(collegeId),
     createdAt: { $gte: start, $lte: end },
     noShow: false,
   };
   if (data.roomId) {
-    usageMatch['roomId'] = { $toObjectId: data.roomId };
+    usageMatch['roomId'] = new Types.ObjectId(data.roomId);
   }
 
   const peakHours = await FacilityUsageLog.aggregate([

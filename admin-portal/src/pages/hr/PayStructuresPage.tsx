@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useCanSeeClass } from '../../hooks/usePermission';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listPayStructures, createPayStructure, updatePayStructure, deletePayStructure, listEmployees } from '../../services/hr';
 import DataTable from '../../components/ui/DataTable';
@@ -18,6 +19,7 @@ const manageLink = "inline-flex items-center gap-0.5 text-xs text-primary-500 ho
 const emptyForm = { employeeId: '', basicPay: '', hra: '', da: '', otherAllowances: '', pfContribution: '', effectiveFrom: '', effectiveTo: '' };
 
 export default function PayStructuresPage() {
+  const canSeeComp = useCanSeeClass('hr', 'hr.compensation');
   const qc = useQueryClient();
   const { page, setPage, limit, setLimit, search, setSearch } = useListControls();
   const [form, setForm] = useState(emptyForm);
@@ -49,6 +51,7 @@ export default function PayStructuresPage() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const payload: any = { ...form, basicPay: Number(form.basicPay) };
+    if (!canSeeComp) for (const k of ['basicPay', 'hra', 'da', 'pfContribution']) delete payload[k]; // hidden keys 403 server-side
     if (form.hra) payload.hra = Number(form.hra); else delete payload.hra;
     if (form.da) payload.da = Number(form.da); else delete payload.da;
     if (form.otherAllowances) payload.otherAllowances = Number(form.otherAllowances); else delete payload.otherAllowances;
@@ -62,9 +65,9 @@ export default function PayStructuresPage() {
 
   const columns = [
     { key: 'employee', label: 'Employee', render: (r: any) => <span className="font-medium text-navy">{r.employeeId?.personId?.name || r.employeeId?.employeeId || '—'}</span> },
-    { key: 'basicPay', label: 'Basic Pay', render: (r: any) => `₹${Number(r.basicPay).toLocaleString()}` },
-    { key: 'hra', label: 'HRA', render: (r: any) => `₹${Number(r.hra || 0).toLocaleString()}` },
-    { key: 'da', label: 'DA', render: (r: any) => `₹${Number(r.da || 0).toLocaleString()}` },
+    ...(canSeeComp ? [{ key: 'basicPay', label: 'Basic Pay', render: (r: any) => `₹${Number(r.basicPay).toLocaleString()}` }] : []),
+    ...(canSeeComp ? [{ key: 'hra', label: 'HRA', render: (r: any) => `₹${Number(r.hra || 0).toLocaleString()}` }] : []),
+    ...(canSeeComp ? [{ key: 'da', label: 'DA', render: (r: any) => `₹${Number(r.da || 0).toLocaleString()}` }] : []),
     { key: 'effectiveFrom', label: 'Effective From', render: (r: any) => r.effectiveFrom ? new Date(r.effectiveFrom).toLocaleDateString() : '—' },
     { key: 'actions', label: '', render: (r: any) => (
       <div className="flex gap-1">
@@ -115,11 +118,11 @@ export default function PayStructuresPage() {
                   {employees.map((e: any) => <option key={e._id} value={e._id}>{e.personId?.name || e.employeeId || e._id}</option>)}
                 </select>
               </div>
-              <div><label className={lbl}>Basic Pay *</label><input required type="number" min={0} value={form.basicPay} onChange={e => setForm(f => ({ ...f, basicPay: e.target.value }))} className={inp} /></div>
-              <div><label className={lbl}>HRA</label><input type="number" min={0} value={form.hra} onChange={e => setForm(f => ({ ...f, hra: e.target.value }))} className={inp} /></div>
-              <div><label className={lbl}>DA</label><input type="number" min={0} value={form.da} onChange={e => setForm(f => ({ ...f, da: e.target.value }))} className={inp} /></div>
+              {canSeeComp && <div><label className={lbl}>Basic Pay *</label><input required type="number" min={0} value={form.basicPay} onChange={e => setForm(f => ({ ...f, basicPay: e.target.value }))} className={inp} /></div>}
+              {canSeeComp && <div><label className={lbl}>HRA</label><input type="number" min={0} value={form.hra} onChange={e => setForm(f => ({ ...f, hra: e.target.value }))} className={inp} /></div>}
+              {canSeeComp && <div><label className={lbl}>DA</label><input type="number" min={0} value={form.da} onChange={e => setForm(f => ({ ...f, da: e.target.value }))} className={inp} /></div>}
               <div><label className={lbl}>Other Allowances</label><input type="number" min={0} value={form.otherAllowances} onChange={e => setForm(f => ({ ...f, otherAllowances: e.target.value }))} className={inp} /></div>
-              <div><label className={lbl}>PF Contribution</label><input type="number" min={0} value={form.pfContribution} onChange={e => setForm(f => ({ ...f, pfContribution: e.target.value }))} className={inp} /></div>
+              {canSeeComp && <div><label className={lbl}>PF Contribution</label><input type="number" min={0} value={form.pfContribution} onChange={e => setForm(f => ({ ...f, pfContribution: e.target.value }))} className={inp} /></div>}
               <div><label className={lbl}>Effective From *</label><input required type="date" value={form.effectiveFrom} onChange={e => setForm(f => ({ ...f, effectiveFrom: e.target.value }))} className={inp} /></div>
               <div><label className={lbl}>Effective To</label><input type="date" value={form.effectiveTo} onChange={e => setForm(f => ({ ...f, effectiveTo: e.target.value }))} className={inp} /></div>
             </div>

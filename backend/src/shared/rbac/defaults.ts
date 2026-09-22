@@ -22,7 +22,7 @@ export const DEFAULT_POLICIES: Omit<PolicyDoc, '_id'>[] = [
   // ── hod: department-scoped academics + read people/hr/student-dev ──
   { role: 'hod', module: 'academics', action: '*', effect: 'allow', priority: 800, isActive: true, scope: { departmentOnly: true }, description: 'HOD: full academics in own department' },
   { role: 'hod', module: 'people', action: 'read', effect: 'allow', priority: 800, isActive: true, scope: { departmentOnly: true }, description: 'HOD: read people in own department' },
-  { role: 'hod', module: 'hr', action: 'read', effect: 'allow', priority: 800, isActive: true, scope: { departmentOnly: true }, description: 'HOD: read HR in own department' },
+  { role: 'hod', module: 'hr', action: 'read', effect: 'allow', priority: 800, isActive: true, scope: { departmentOnly: true, sensitivity: [] }, description: 'HOD: read HR in own department (no compensation)' },
   { role: 'hod', module: 'student-dev', action: 'read', effect: 'allow', priority: 800, isActive: true, scope: { departmentOnly: true }, description: 'HOD: read student dev in own department' },
   { role: 'hod', module: 'placement', action: 'read', effect: 'allow', priority: 800, isActive: true, description: 'HOD: read placement data' },
 
@@ -30,7 +30,9 @@ export const DEFAULT_POLICIES: Omit<PolicyDoc, '_id'>[] = [
   { role: 'faculty', module: 'academics', action: 'read', effect: 'allow', priority: 700, isActive: true, description: 'Faculty: read academics' },
   { role: 'faculty', module: 'academics', action: 'create', effect: 'allow', priority: 700, isActive: true, scope: { subDomain: 'attendance,marks,lesson-plans,feedback' }, description: 'Faculty: create attendance/marks/lesson-plans' },
   { role: 'faculty', module: 'academics', action: 'update', effect: 'allow', priority: 700, isActive: true, scope: { subDomain: 'attendance,marks,lesson-plans,feedback' }, description: 'Faculty: update attendance/marks/lesson-plans' },
-  { role: 'faculty', module: 'people', action: 'read', effect: 'allow', priority: 700, isActive: true, scope: { departmentOnly: true }, description: 'Faculty: read people in own department' },
+  // 010 P2 — "my students": mentees plus the sections they teach. A college that
+  // prefers department reach overrides this row with `departmentOnly`.
+  { role: 'faculty', module: 'people', action: 'read', effect: 'allow', priority: 700, isActive: true, scope: { assignedVia: ['mentees', 'sections'] }, description: 'Faculty: read own mentees and the students in sections they teach' },
   { role: 'faculty', module: 'student-dev', action: 'read', effect: 'allow', priority: 700, isActive: true, description: 'Faculty: read student dev' },
 
   // ── staff with personaType scoping ──
@@ -50,7 +52,7 @@ export const DEFAULT_POLICIES: Omit<PolicyDoc, '_id'>[] = [
   { role: 'staff', personaType: 'ST-REG', module: 'people', action: '*', effect: 'allow', priority: 750, isActive: true, description: 'Registrar: full people access' },
   { role: 'staff', personaType: 'ST-REG', module: 'academics', action: 'read', effect: 'allow', priority: 750, isActive: true, description: 'Registrar: read academics' },
   // Base staff fallback: read-only
-  { role: 'staff', module: '*', action: 'read', effect: 'allow', priority: 600, isActive: true, description: 'Staff base: read-only fallback' },
+  { role: 'staff', module: '*', action: 'read', effect: 'allow', priority: 600, isActive: true, scope: { sensitivity: [] }, description: 'Staff base: read-only fallback, no sensitive classes' },
 
   // ─── 004-rbac-nl-queries §10.9 — governance NL unlock ──────────
   // HOD + faculty: department-scoped governance read (enables NL queries
@@ -96,6 +98,9 @@ export const DEFAULT_POLICIES: Omit<PolicyDoc, '_id'>[] = [
   { role: 'staff', personaType: 'ST-ADM-TC', module: 'admissions', action: 'create', effect: 'allow', priority: 770, isActive: true, scope: { subDomain: 'inquiries,lead-interactions' }, description: 'Tele-Counsellor: create inquiries + log interactions' },
   { role: 'staff', personaType: 'ST-ADM-TC', module: 'admissions', action: 'update', effect: 'allow', priority: 770, isActive: true, scope: { subDomain: 'inquiries,lead-interactions' }, description: 'Tele-Counsellor: update inquiries + log interactions' },
   { role: 'staff', personaType: 'ST-ADM-TC', module: 'people', action: 'read', effect: 'allow', priority: 770, isActive: true, description: 'Tele-Counsellor: read people' },
+  // Inherits ST-ADM allows through the parent link; explicit denies keep the counsellor below the parent.
+  { role: 'staff', personaType: 'ST-ADM-TC', module: 'admissions', action: 'delete', effect: 'deny', priority: 780, isActive: true, description: 'Tele-Counsellor: cannot delete admissions records' },
+  { role: 'staff', personaType: 'ST-ADM-TC', module: 'admissions', action: 'approve', effect: 'deny', priority: 780, isActive: true, description: 'Tele-Counsellor: cannot approve/convert' },
 
   // Admissions Counsellor — full inquiry + applicant + documents.
   { role: 'staff', personaType: 'ST-ADM-AC', module: 'admissions', action: '*', effect: 'allow', priority: 770, isActive: true, scope: { subDomain: 'inquiries,lead-interactions,applicants,documents' }, description: 'Admissions Counsellor: full inquiry + applicant + documents' },

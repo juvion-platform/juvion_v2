@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-interface User { id: string; name: string; email: string; role: string; personaType: string; }
+interface User { id: string; name: string; email: string; role: string; personaType: string; personas?: string[]; }
 interface CollegeRef { _id: string; name: string; code: string; status: string; }
 
 interface AuthState {
@@ -11,15 +11,24 @@ interface AuthState {
   colleges: CollegeRef[];
   isSuperAdmin: boolean;
   permissions: string[];
+  /** 010 P3 — per module: null = every sensitivity class, list = only those. */
+  sensitivity: Record<string, string[] | null>;
   /** False until the boot-time /auth/me rehydration settles. */
   hydrated: boolean;
-  setAuth: (user: User, token: string, collegeId?: string, colleges?: CollegeRef[], permissions?: string[]) => void;
-  setToken: (token: string, permissions?: string[]) => void;
+  setAuth: (user: User, token: string, collegeId?: string, colleges?: CollegeRef[], permissions?: string[], sensitivity?: Record<string, string[] | null>) => void;
+  setToken: (token: string, permissions?: string[], sensitivity?: Record<string, string[] | null>) => void;
   selectCollege: (collegeId: string, collegeName: string) => void;
   clearCollege: () => void;
   hydrate: () => Promise<void>;
   logout: () => void;
-  hasPermission: (module: string, action: string) => boolean;
+  hasPermission: (module: string, action: string, subDomain?: string) => boolean;
+  canSeeClass: (module: string, cls: string) => boolean;
+}
+
+function storeSensitivity(sensitivity?: Record<string, string[] | null>) {
+  if (sensitivity && Object.keys(sensitivity).length > 0) localStorage.setItem('sensitivity', JSON.stringify(sensitivity));
+  else localStorage.removeItem('sensitivity');
+  return sensitivity || {};
 }
 
 function readStoredUser(): User | null {
@@ -55,8 +64,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   colleges: readStoredJson<CollegeRef[]>('colleges', []),
   isSuperAdmin: localStorage.getItem('isSuperAdmin') === 'true',
   permissions: readStoredJson<string[]>('permissions', []),
+  sensitivity: readStoredJson<Record<string, string[] | null>>('sensitivity', {}),
   hydrated: false,
-  setAuth: (user, token, collegeId?, colleges?, permissions?) => {
+  setAuth: (user, token, collegeId?, colleges?, permissions?, sensitivity?) => {
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(user));
     const isSuperAdmin = user.role === 'super_admin';
@@ -90,14 +100,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       colleges: colleges || [],
       isSuperAdmin,
       permissions: resolvedPermissions,
+      sensitivity: storeSensitivity(sensitivity),
       hydrated: true,
     });
   },
-  setToken: (token, permissions) => {
+  setToken: (token, permissions, sensitivity) => {
     localStorage.setItem('token', token);
     if (permissions && permissions.length > 0) {
       localStorage.setItem('permissions', JSON.stringify(permissions));
-      set({ token, permissions });
+      set({ token, permissions, ...(sensitivity ? { sensitivity: storeSensitivity(sensitivity) } : {}) });
     } else {
       set({ token });
     }
@@ -128,9 +139,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         email: data.email,
         role: data.role,
         personaType: data.personaType,
+        personas: data.personas,
       };
       localStorage.setItem('user', JSON.stringify(user));
-      set({ user, isSuperAdmin: user.role === 'super_admin', hydrated: true });
+      // 010 — /auth/me carries permissions, so a policy edit lands on the next hydrate.
+      const permissions: string[] | undefined = Array.isArray(data.permissions) && data.permissions.length > 0 ? data.permissions : undefined;
+      if (permissions) localStorage.setItem('permissions', JSON.stringify(permissions));
+      const sensitivity = data.sensitivity && typeof data.sensitivity === 'object' ? storeSensitivity(data.sensitivity) : undefined;
+      set({ user, isSuperAdmin: user.role === 'super_admin', hydrated: true, ...(permissions ? { permissions } : {}), ...(sensitivity ? { sensitivity } : {}) });
     } catch {
       // A 401 is handled by the axios interceptor (which logs out). Any other
       // failure (network blip) keeps the cached user rather than blanking the UI.
@@ -145,10 +161,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     localStorage.removeItem('colleges');
     localStorage.removeItem('isSuperAdmin');
     localStorage.removeItem('permissions');
-    set({ user: null, token: null, collegeId: null, collegeName: null, colleges: [], isSuperAdmin: false, permissions: [], hydrated: true });
+    localStorage.removeItem('sensitivity');
+    set({ user: null, token: null, collegeId: null, collegeName: null, colleges: [], isSuperAdmin: false, permissions: [], sensitivity: {}, hydrated: true });
   },
-  hasPermission: (module, action) => {
+  // 010 P3 — undefined/null for a module means unrestricted; a list means only those classes.
+  canSeeClass: (module, cls) => {
+    const allowed = get().sensitivity[module];
+    return allowed == null || allowed.includes(cls);
+  },
+  hasPermission: (module, action, subDomain) => {
     const perms = get().permissions;
-    return perms.includes(`${module}:${action}`) || perms.includes(`${module}:*`) || perms.includes('*:*');
+    if (perms.includes(`${module}:${action}`) || perms.includes(`${module}:*`) || perms.includes('*:*')) return true;
+    // 010 — sub-domain-qualified grants (`academics/exams:create`). With a sub-domain
+    // asked for, only that one counts; without one, any qualified grant opens the module.
+    if (subDomain) return perms.includes(`${module}/${subDomain}:${action}`);
+    const prefix = `${module}/`;
+    const suffix = `:${action}`;
+    return perms.some((p) => p.startsWith(prefix) && p.endsWith(suffix));
   },
 }));

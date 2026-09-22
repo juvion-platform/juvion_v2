@@ -3,8 +3,8 @@ export interface IHealthRecord extends Document { collegeId: Schema.Types.Object
 const schema = new Schema<IHealthRecord>({
   collegeId: { type: Schema.Types.ObjectId, required: true, index: true },
   personId: { type: Schema.Types.ObjectId, ref: 'Person', required: true },
-  bloodGroup: { type: String, enum: ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'] },
-  allergies: [String],
+  bloodGroup: { type: String, enum: ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'], sensitive: 'welfare.medical' },
+  allergies: { type: [String], sensitive: 'welfare.medical' },
   chronicConditions: [String],
   emergencyContact: { type: String, required: true },
   emergencyPhone: { type: String, required: true },

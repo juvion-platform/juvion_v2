@@ -1,3 +1,4 @@
+import { scopeNotApplicable } from '../../shared/rbac/apply-scope';
 import { ActivityBudget } from '../../models/student-dev/ActivityBudget';
 import { BudgetLineItem } from '../../models/student-dev/BudgetLineItem';
 import { Sponsorship } from '../../models/student-dev/Sponsorship';
@@ -26,6 +27,7 @@ export async function listActivityBudgets(
   const filter: any = { collegeId };
   if (status) filter.status = status;
   if (entityType) filter.entityType = entityType;
+  scopeNotApplicable(filter); // college-wide, no department/person axis
   return paginate(ActivityBudget, filter, page, limit, { createdAt: -1 });
 }
 
@@ -328,6 +330,7 @@ export async function listBudgetLineItems(
   limit = 20,
 ) {
   const filter: any = { collegeId, budgetId };
+  scopeNotApplicable(filter); // college-wide, no department/person axis
   return paginate(BudgetLineItem, filter, page, limit, { createdAt: -1 });
 }
 
@@ -391,6 +394,7 @@ export async function listSponsorContacts(
 ) {
   const filter: any = { collegeId };
   if (company) filter.company = company;
+  scopeNotApplicable(filter); // college-wide, no department/person axis
   return paginate(SponsorContact, filter, page, limit, { createdAt: -1 });
 }
 
@@ -456,6 +460,7 @@ export async function listSponsorships(
   const filter: any = { collegeId };
   if (eventType) filter.eventType = eventType;
   if (status) filter.status = status;
+  scopeNotApplicable(filter); // college-wide, no department/person axis
   return paginate(Sponsorship, filter, page, limit, { createdAt: -1 }, [
     { path: 'sponsorContactId' },
   ]);

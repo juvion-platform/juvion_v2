@@ -17,6 +17,12 @@ import { NextFunction, Request, Response } from 'express';
  */
 export interface ListRequestContext {
   search?: string;
+  /**
+   * 010 — set by `authorize()` when the winning policy narrows rows. Detection
+   * only: `paginate()` refuses to run an un-scoped filter on such a request.
+   * The scope itself stays an explicit parameter (`req.authScope`).
+   */
+  scoped?: boolean;
 }
 
 const storage = new AsyncLocalStorage<ListRequestContext>();

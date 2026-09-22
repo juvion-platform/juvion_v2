@@ -2,12 +2,14 @@ import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../../middleware/authenticate';
 import * as svc from './service';
 import * as exitService from './exit-service';
-import { ALL_PERSONAS, L1_L2_PERSONAS, L3_SUB_PERSONAS } from '../../shared/rbac/personas';
+import { loadPersonas } from '../../shared/rbac/persona-registry';
 
 // ─── Strategic Gap 7 — persona catalog ─────────────────────────────
-export async function listPersonas(_req: AuthRequest, res: Response, next: NextFunction) {
+// 010 — reads the persona collection (college snapshot, else system rows).
+export async function listPersonas(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    res.json({ all: ALL_PERSONAS, l1_l2: L1_L2_PERSONAS, l3: L3_SUB_PERSONAS });
+    const all = await loadPersonas(req.collegeId);
+    res.json({ all, l1_l2: all.filter((p) => p.tier < 3), l3: all.filter((p) => p.tier === 3) });
   } catch (e) { next(e); }
 }
 
@@ -38,7 +40,7 @@ const studentQp = (req: AuthRequest) => {
 
 // ─── Dashboard Stats ─────────────────────────────────
 export async function dashboardStats(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await svc.getDashboardStats(req.collegeId!)); } catch (e) { next(e); }
+  try { res.json(await svc.getDashboardStats(req.collegeId!, req.authScope)); } catch (e) { next(e); }
 }
 
 // ─── Persons ─────────────────────────────────────────
@@ -46,16 +48,16 @@ export async function listPersons(req: AuthRequest, res: Response, next: NextFun
   try { const q = qp(req); res.json(await svc.listPersons(req.collegeId!, q.page, q.limit, q.search, req.authScope)); } catch (e) { next(e); }
 }
 export async function getPerson(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await svc.getPerson(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }
+  try { res.json(await svc.getPerson(req.collegeId!, req.params.id as string, req.authScope)); } catch (e) { next(e); }
 }
 export async function createPerson(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.status(201).json(await svc.createPerson(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
 }
 export async function updatePerson(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await svc.updatePerson(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
+  try { res.json(await svc.updatePerson(req.collegeId!, req.params.id as string, req.body, who(req), req.authScope)); } catch (e) { next(e); }
 }
 export async function deletePerson(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await svc.deletePerson(req.collegeId!, req.params.id as string, who(req))); } catch (e) { next(e); }
+  try { res.json(await svc.deletePerson(req.collegeId!, req.params.id as string, who(req), req.authScope)); } catch (e) { next(e); }
 }
 
 // ─── Students ────────────────────────────────────────
@@ -66,16 +68,16 @@ export async function listStudents(req: AuthRequest, res: Response, next: NextFu
   } catch (e) { next(e); }
 }
 export async function getStudent(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await svc.getStudent(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }
+  try { res.json(await svc.getStudent(req.collegeId!, req.params.id as string, req.authScope)); } catch (e) { next(e); }
 }
 export async function createStudent(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.status(201).json(await svc.createStudent(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
 }
 export async function updateStudent(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await svc.updateStudent(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
+  try { res.json(await svc.updateStudent(req.collegeId!, req.params.id as string, req.body, who(req), req.authScope)); } catch (e) { next(e); }
 }
 export async function deleteStudent(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await svc.deleteStudent(req.collegeId!, req.params.id as string, who(req))); } catch (e) { next(e); }
+  try { res.json(await svc.deleteStudent(req.collegeId!, req.params.id as string, who(req), req.authScope)); } catch (e) { next(e); }
 }
 
 // ─── Faculty ─────────────────────────────────────────
@@ -83,16 +85,16 @@ export async function listFaculty(req: AuthRequest, res: Response, next: NextFun
   try { const q = qp(req); res.json(await svc.listFaculty(req.collegeId!, q.page, q.limit, q.status, q.search, req.authScope)); } catch (e) { next(e); }
 }
 export async function getFaculty(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await svc.getFaculty(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }
+  try { res.json(await svc.getFaculty(req.collegeId!, req.params.id as string, req.authScope)); } catch (e) { next(e); }
 }
 export async function createFaculty(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.status(201).json(await svc.createFaculty(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
 }
 export async function updateFaculty(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await svc.updateFaculty(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
+  try { res.json(await svc.updateFaculty(req.collegeId!, req.params.id as string, req.body, who(req), req.authScope)); } catch (e) { next(e); }
 }
 export async function deleteFaculty(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await svc.deleteFaculty(req.collegeId!, req.params.id as string, who(req))); } catch (e) { next(e); }
+  try { res.json(await svc.deleteFaculty(req.collegeId!, req.params.id as string, who(req), req.authScope)); } catch (e) { next(e); }
 }
 
 // ─── Staff ───────────────────────────────────────────
@@ -100,16 +102,16 @@ export async function listStaff(req: AuthRequest, res: Response, next: NextFunct
   try { const q = qp(req); res.json(await svc.listStaff(req.collegeId!, q.page, q.limit, q.status, q.search, req.authScope)); } catch (e) { next(e); }
 }
 export async function getStaff(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await svc.getStaff(req.collegeId!, req.params.id as string)); } catch (e) { next(e); }
+  try { res.json(await svc.getStaff(req.collegeId!, req.params.id as string, req.authScope)); } catch (e) { next(e); }
 }
 export async function createStaff(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.status(201).json(await svc.createStaff(req.collegeId!, req.body, who(req))); } catch (e) { next(e); }
 }
 export async function updateStaff(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await svc.updateStaff(req.collegeId!, req.params.id as string, req.body, who(req))); } catch (e) { next(e); }
+  try { res.json(await svc.updateStaff(req.collegeId!, req.params.id as string, req.body, who(req), req.authScope)); } catch (e) { next(e); }
 }
 export async function deleteStaff(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await svc.deleteStaff(req.collegeId!, req.params.id as string, who(req))); } catch (e) { next(e); }
+  try { res.json(await svc.deleteStaff(req.collegeId!, req.params.id as string, who(req), req.authScope)); } catch (e) { next(e); }
 }
 
 // ─── Parents ─────────────────────────────────────────
@@ -160,7 +162,7 @@ export async function getExitRequestCtrl(req: AuthRequest, res: Response, next: 
 export async function listExitRequestsCtrl(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page = '1', limit = '20', status } = req.query as Record<string, string | undefined>;
-    res.json(await exitService.listExitRequests(req.collegeId!, +page!, +limit!, status));
+    res.json(await exitService.listExitRequests(req.collegeId!, +page!, +limit!, status, req.authScope));
   } catch (e) { next(e); }
 }
 export async function approveExitRequestCtrl(req: AuthRequest, res: Response, next: NextFunction) {
@@ -197,7 +199,7 @@ export async function getClearanceWorkflowCtrl(req: AuthRequest, res: Response, 
 export async function listClearanceWorkflowsCtrl(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page = '1', limit = '20', status } = req.query as Record<string, string | undefined>;
-    res.json(await exitService.listClearanceWorkflows(req.collegeId!, +page!, +limit!, status));
+    res.json(await exitService.listClearanceWorkflows(req.collegeId!, +page!, +limit!, status, req.authScope));
   } catch (e) { next(e); }
 }
 export async function completeClearanceItemCtrl(req: AuthRequest, res: Response, next: NextFunction) {
@@ -255,6 +257,6 @@ export async function getAlumniCtrl(req: AuthRequest, res: Response, next: NextF
 export async function listAlumniCtrl(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page = '1', limit = '20', programmeId } = req.query as Record<string, string | undefined>;
-    res.json(await exitService.listAlumni(req.collegeId!, +page!, +limit!, programmeId));
+    res.json(await exitService.listAlumni(req.collegeId!, +page!, +limit!, programmeId, req.authScope));
   } catch (e) { next(e); }
 }

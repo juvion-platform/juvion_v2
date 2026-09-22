@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useCanSeeClass } from '../../hooks/usePermission';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listPayrolls, createPayroll, updatePayroll, deletePayroll, listEmployees } from '../../services/hr';
 import DataTable from '../../components/ui/DataTable';
@@ -24,6 +25,7 @@ const emptyForm = {
 };
 
 export default function PayrollPage() {
+  const canSeeComp = useCanSeeClass('hr', 'hr.compensation');
   const qc = useQueryClient();
   const { page, setPage, limit, setLimit, search, setSearch } = useListControls();
   const [form, setForm] = useState(emptyForm);
@@ -85,6 +87,7 @@ export default function PayrollPage() {
     if (form.tds) payload.tds = Number(form.tds); else delete payload.tds;
     if (form.otherDeductions) payload.otherDeductions = Number(form.otherDeductions); else delete payload.otherDeductions;
     if (!form.paidDate) delete payload.paidDate;
+    if (!canSeeComp) for (const k of ['basicPay', 'hra', 'da', 'grossPay', 'pf', 'esi', 'tds', 'netPay']) delete payload[k]; // hidden keys 403 server-side
     if (vem.isEdit && vem.entity) updateMut.mutate({ id: vem.entity._id, data: payload });
     else createMut.mutate(payload);
   }
@@ -94,8 +97,8 @@ export default function PayrollPage() {
   const columns = [
     { key: 'employee', label: 'Employee', render: (r: any) => <span className="font-medium text-navy">{r.employeeId?.personId?.name || r.employeeId?.employeeId || '—'}</span> },
     { key: 'period', label: 'Period', render: (r: any) => `${r.month}/${r.year}` },
-    { key: 'grossPay', label: 'Gross', render: (r: any) => `₹${Number(r.grossPay).toLocaleString()}` },
-    { key: 'netPay', label: 'Net', render: (r: any) => `₹${Number(r.netPay).toLocaleString()}` },
+    ...(canSeeComp ? [{ key: 'grossPay', label: 'Gross', render: (r: any) => `₹${Number(r.grossPay).toLocaleString()}` }] : []),
+    ...(canSeeComp ? [{ key: 'netPay', label: 'Net', render: (r: any) => `₹${Number(r.netPay).toLocaleString()}` }] : []),
     { key: 'status', label: 'Status', render: (r: any) => <Badge variant={STATUS_COLOR[r.status] || 'default'}>{r.status}</Badge> },
     { key: 'actions', label: '', render: (r: any) => (
       <div className="flex gap-1">
@@ -148,13 +151,13 @@ export default function PayrollPage() {
               </div>
               <div><label className={lbl}>Month *</label><input required type="number" min={1} max={12} value={form.month} onChange={e => setForm(f => ({ ...f, month: e.target.value }))} className={inp} /></div>
               <div><label className={lbl}>Year *</label><input required type="number" value={form.year} onChange={e => setForm(f => ({ ...f, year: e.target.value }))} className={inp} /></div>
-              <div><label className={lbl}>Basic Pay *</label><input required type="number" min={0} value={form.basicPay} onChange={e => setForm(f => ({ ...f, basicPay: e.target.value }))} className={inp} /></div>
-              <div><label className={lbl}>HRA</label><input type="number" min={0} value={form.hra} onChange={e => setForm(f => ({ ...f, hra: e.target.value }))} className={inp} /></div>
-              <div><label className={lbl}>DA</label><input type="number" min={0} value={form.da} onChange={e => setForm(f => ({ ...f, da: e.target.value }))} className={inp} /></div>
+              {canSeeComp && <div><label className={lbl}>Basic Pay *</label><input required type="number" min={0} value={form.basicPay} onChange={e => setForm(f => ({ ...f, basicPay: e.target.value }))} className={inp} /></div>}
+              {canSeeComp && <div><label className={lbl}>HRA</label><input type="number" min={0} value={form.hra} onChange={e => setForm(f => ({ ...f, hra: e.target.value }))} className={inp} /></div>}
+              {canSeeComp && <div><label className={lbl}>DA</label><input type="number" min={0} value={form.da} onChange={e => setForm(f => ({ ...f, da: e.target.value }))} className={inp} /></div>}
               <div><label className={lbl}>Other Allowances</label><input type="number" min={0} value={form.otherAllowances} onChange={e => setForm(f => ({ ...f, otherAllowances: e.target.value }))} className={inp} /></div>
-              <div><label className={lbl}>PF</label><input type="number" min={0} value={form.pf} onChange={e => setForm(f => ({ ...f, pf: e.target.value }))} className={inp} /></div>
-              <div><label className={lbl}>ESI</label><input type="number" min={0} value={form.esi} onChange={e => setForm(f => ({ ...f, esi: e.target.value }))} className={inp} /></div>
-              <div><label className={lbl}>TDS</label><input type="number" min={0} value={form.tds} onChange={e => setForm(f => ({ ...f, tds: e.target.value }))} className={inp} /></div>
+              {canSeeComp && <div><label className={lbl}>PF</label><input type="number" min={0} value={form.pf} onChange={e => setForm(f => ({ ...f, pf: e.target.value }))} className={inp} /></div>}
+              {canSeeComp && <div><label className={lbl}>ESI</label><input type="number" min={0} value={form.esi} onChange={e => setForm(f => ({ ...f, esi: e.target.value }))} className={inp} /></div>}
+              {canSeeComp && <div><label className={lbl}>TDS</label><input type="number" min={0} value={form.tds} onChange={e => setForm(f => ({ ...f, tds: e.target.value }))} className={inp} /></div>}
               <div><label className={lbl}>Other Deductions</label><input type="number" min={0} value={form.otherDeductions} onChange={e => setForm(f => ({ ...f, otherDeductions: e.target.value }))} className={inp} /></div>
 
               {/* Gross and net are arithmetic on the fields above. Asking an

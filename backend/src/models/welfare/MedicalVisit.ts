@@ -5,7 +5,7 @@ const schema = new Schema<IMedicalVisit>({
   personId: { type: Schema.Types.ObjectId, ref: 'Person', required: true },
   visitDate: { type: Date, default: Date.now },
   complaint: { type: String, required: true },
-  diagnosis: String,
+  diagnosis: { type: String, sensitive: 'welfare.medical' },
   prescription: String,
   referredTo: String,
   attendedBy: { type: String, required: true },

@@ -75,3 +75,79 @@ export async function seedPolicies(opts: SeedPoliciesOptions = {}): Promise<Seed
 
   return { attempted: DEFAULT_POLICIES.length, created, updated };
 }
+
+// ─── 010 P2 — per-college policy snapshot ───────────────────────────────
+
+export const policyKey = (p: { role: string; personaType?: string | null; module: string; action: string }) =>
+  `${p.role}|${p.personaType ?? ''}|${p.module}|${p.action}`;
+
+const COPY_FIELDS = ['role', 'personaType', 'module', 'action', 'effect', 'scope', 'priority', 'description', 'isActive'] as const;
+
+function stripDoc(d: any) {
+  const out: Record<string, unknown> = {};
+  for (const f of COPY_FIELDS) if (d[f] !== undefined) out[f] = d[f];
+  if (out.scope && typeof out.scope === 'object') {
+    const sc: any = { ...(out.scope as object) };
+    delete sc._id;
+    out.scope = sc;
+  }
+  return out;
+}
+
+/**
+ * Copy every active system policy into college-owned rows (skipping keys the
+ * college already has). From then on the engine evaluates the college's rows
+ * only, so later edits to system defaults never change a live college.
+ */
+export async function snapshotPoliciesForCollege(collegeId: string, createdBy = 'snapshot'): Promise<number> {
+  const system = await Policy.find({ collegeId: null, isActive: true }).lean();
+  const existing = new Set((await Policy.find({ collegeId }).lean()).map(policyKey));
+  let copied = 0;
+  for (const p of system) {
+    if (existing.has(policyKey(p))) continue;
+    await Policy.create({ ...stripDoc(p), collegeId, createdBy });
+    copied += 1;
+  }
+  return copied;
+}
+
+export interface DefaultsDiff {
+  mode: 'snapshot' | 'cascade';
+  missing: Record<string, unknown>[];
+  changed: { key: string; college: Record<string, unknown>; system: Record<string, unknown> }[];
+}
+
+/** What the system defaults would change for this college, for an admin to accept row by row. */
+export async function defaultsDiff(collegeId: string): Promise<DefaultsDiff> {
+  const snapshotted = !!(await Policy.exists({ collegeId, createdBy: 'snapshot' }));
+  const system = await Policy.find({ collegeId: null, isActive: true }).lean();
+  const college = new Map((await Policy.find({ collegeId }).lean()).map((p) => [policyKey(p), p]));
+  const missing: Record<string, unknown>[] = [];
+  const changed: DefaultsDiff['changed'] = [];
+  for (const p of system) {
+    const key = policyKey(p);
+    const mine = college.get(key);
+    if (!mine) { missing.push({ key, ...stripDoc(p) }); continue; }
+    const a = JSON.stringify(stripDoc(p)); const b = JSON.stringify(stripDoc(mine));
+    if (a !== b) changed.push({ key, college: { _id: String(mine._id), ...stripDoc(mine) }, system: stripDoc(p) });
+  }
+  return { mode: snapshotted ? 'snapshot' : 'cascade', missing, changed };
+}
+
+/** Apply the selected default rows (by key) onto the college snapshot. */
+export async function applyDefaults(collegeId: string, keys: string[], updatedBy: string): Promise<number> {
+  const wanted = new Set(keys);
+  const system = await Policy.find({ collegeId: null, isActive: true }).lean();
+  let applied = 0;
+  for (const p of system) {
+    const key = policyKey(p);
+    if (!wanted.has(key)) continue;
+    await Policy.updateOne(
+      { collegeId, role: p.role, personaType: p.personaType ?? null, module: p.module, action: p.action },
+      { $set: { ...stripDoc(p), updatedBy }, $setOnInsert: { collegeId, createdBy: 'snapshot' } },
+      { upsert: true },
+    );
+    applied += 1;
+  }
+  return applied;
+}

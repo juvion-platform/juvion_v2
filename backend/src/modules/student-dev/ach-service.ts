@@ -1,3 +1,7 @@
+import { Student } from '../../models/people/Student';
+import type { AuthScope } from '../../shared/rbac/types';
+import { scopeViaStudents } from '../../shared/rbac/apply-scope';
+import { scopeNotApplicable } from '../../shared/rbac/apply-scope';
 import { Achievement } from '../../models/student-dev/Achievement';
 import { Award } from '../../models/student-dev/Award';
 import { AwardInstance } from '../../models/student-dev/AwardInstance';
@@ -237,6 +241,7 @@ export async function detectImplausibility(collegeId: string, achievementId: str
 export async function listAwards(collegeId: string, page: number, limit: number, category?: string) {
   const filter: Record<string, unknown> = { collegeId };
   if (category) filter.category = category;
+  scopeNotApplicable(filter); // college-wide, no department/person axis
   return paginate(Award, filter, page, limit);
 }
 
@@ -298,8 +303,10 @@ export async function listAwardInstances(
   limit: number,
   awardId?: string,
   status?: string,
+  authScope?: AuthScope,
 ) {
   const filter: Record<string, unknown> = { collegeId };
+  await scopeViaStudents(filter, authScope, collegeId, Student);
   if (awardId) filter.awardId = awardId;
   if (status) filter.status = status;
   return paginate(AwardInstance, filter, page, limit);
@@ -385,8 +392,10 @@ export async function listCertificates(
   limit: number,
   studentId?: string,
   type?: string,
+  authScope?: AuthScope,
 ) {
   const filter: Record<string, unknown> = { collegeId };
+  await scopeViaStudents(filter, authScope, collegeId, Student);
   if (studentId) filter.studentId = studentId;
   if (type) filter.type = type;
   return paginate(Certificate, filter, page, limit);

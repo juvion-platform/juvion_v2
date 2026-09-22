@@ -8,11 +8,11 @@ export interface IPayStructure extends Document {
 const schema = new Schema<IPayStructure>({
   collegeId: { type: Schema.Types.ObjectId, required: true, index: true },
   employeeId: { type: Schema.Types.ObjectId, ref: 'Employee', required: true },
-  basicPay: { type: Number, required: true },
-  hra: { type: Number, default: 0 },
-  da: { type: Number, default: 0 },
+  basicPay: { type: Number, sensitive: 'hr.compensation', required: true },
+  hra: { type: Number, sensitive: 'hr.compensation', default: 0 },
+  da: { type: Number, sensitive: 'hr.compensation', default: 0 },
   otherAllowances: { type: Number, default: 0 },
-  pfContribution: { type: Number, default: 0 },
+  pfContribution: { type: Number, sensitive: 'hr.compensation', default: 0 },
   effectiveFrom: { type: Date, required: true },
   effectiveTo: Date,
 }, { timestamps: true });

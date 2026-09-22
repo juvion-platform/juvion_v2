@@ -1,3 +1,5 @@
+import type { AuthScope } from '../../shared/rbac/types';
+import { scopeViaMembers } from '../../shared/rbac/apply-scope';
 import { PayrollDataExtract, IPayrollDataExtract } from '../../models/hr/PayrollDataExtract';
 import { AttendanceMonthlySummary } from '../../models/hr/AttendanceMonthlySummary';
 import { LeaveApplication } from '../../models/hr/LeaveApplication';
@@ -312,8 +314,10 @@ export async function listPayrollDataExtracts(
   page: number,
   limit: number,
   filters: { status?: string; year?: number } = {},
+  authScope?: AuthScope,
 ) {
   const filter: Record<string, unknown> = { collegeId };
+  await scopeViaMembers(filter, authScope, collegeId, Employee, 'employeeId', 'departmentId');
   if (filters.status) filter.status = filters.status;
   if (filters.year) filter.year = filters.year;
   return paginate(PayrollDataExtract, filter, page, limit);

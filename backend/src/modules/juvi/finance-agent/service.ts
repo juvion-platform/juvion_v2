@@ -1,3 +1,5 @@
+import { hiddenClassesFor } from '../../../shared/rbac/sensitivity';
+import type { AuthScope } from '../../../shared/rbac/types';
 /**
  * Task A4 — Finance-agent orchestrator (fee-analytics-ai-native).
  *
@@ -174,10 +176,12 @@ export async function* handleChat(
   conversationId?: string,
   context?: AgentChatContext,
   abortSignal?: AbortSignal,
+  authScope?: AuthScope,
 ): AsyncGenerator<AgentChatChunk> {
   ensureCollegeId(collegeId);
   yield* runAgentChat({
     collegeId, userId, prompt, conversationId, abortSignal,
+    hiddenClasses: hiddenClassesFor(authScope),
     agent: 'finance',
     actionType: 'chat',
     buildContext: () => forChat(collegeId, context),

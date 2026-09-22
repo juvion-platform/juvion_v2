@@ -21,6 +21,7 @@ vi.mock('../../../models/platform/Policy', () => {
 
   return {
     Policy: {
+      exists: vi.fn().mockResolvedValue(null),
       find: findMock,
       countDocuments: countMock,
       findOne: findOneMock,

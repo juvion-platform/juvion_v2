@@ -10,6 +10,11 @@ vi.mock('../engine', async (importOriginal) => {
   };
 });
 
+vi.mock('../persona-registry', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../persona-registry')>();
+  return { ...actual, loadPersonas: vi.fn().mockResolvedValue([]) };
+});
+
 import { loadPolicies } from '../engine';
 import { resolvePermissions } from '../resolve-permissions';
 
@@ -143,5 +148,21 @@ describe('resolvePermissions', () => {
     const facResult = await resolvePermissions('college1', 'faculty', 'F-FAC');
     expect(facResult).toContain('academics:read');
     expect(facResult).not.toContain('academics:update');
+  });
+});
+
+describe('resolvePermissions — 010 sub-domain qualified strings', () => {
+  it('emits module/<sub>:action instead of module:action when the win is sub-domain scoped', async () => {
+    mockedLoadPolicies.mockResolvedValue([
+      { role: 'staff', personaType: 'ST-EXAM', module: 'academics', action: '*', effect: 'allow', priority: 750, isActive: true, scope: { subDomain: 'exams,results' } },
+      { role: 'staff', module: '*', action: 'read', effect: 'allow', priority: 600, isActive: true },
+    ]);
+    const result = await resolvePermissions('c1', 'staff', ['ST-EXAM']);
+    expect(result).toContain('academics/exams:create');
+    expect(result).toContain('academics/results:create');
+    expect(result).not.toContain('academics:create');
+    // read: the exact-persona sub-domain row outranks the wildcard fallback, so read is qualified too
+    expect(result).toContain('academics/exams:read');
+    expect(result).toContain('finance:read');
   });
 });

@@ -6,7 +6,7 @@ interface CreatePolicyOpts {
   action: string;
   effect: 'allow' | 'deny';
   personaType?: string;
-  scope?: { departmentOnly?: boolean; selfOnly?: boolean; subDomain?: string };
+  scope?: { departmentOnly?: boolean; selfOnly?: boolean; subDomain?: string; assignedVia?: string[]; sensitivity?: string[] };
   priority?: number;
   description?: string;
 }

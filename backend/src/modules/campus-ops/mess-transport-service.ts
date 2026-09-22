@@ -1,3 +1,4 @@
+import { Types } from 'mongoose';
 // campus-ops module — mess & transport sub-domain workflow service
 import { MessFacility } from '../../models/campus/MessFacility';
 import { MealTransaction } from '../../models/campus/MealTransaction';
@@ -145,8 +146,8 @@ export async function getMessDailySummary(
   const transactions = await MealTransaction.aggregate([
     {
       $match: {
-        collegeId: { $toObjectId: collegeId },
-        messFacilityId: { $toObjectId: data.messFacilityId },
+        collegeId: new Types.ObjectId(collegeId),
+        messFacilityId: new Types.ObjectId(data.messFacilityId),
         date: { $gte: startOfDay, $lte: endOfDay },
       },
     },
@@ -340,8 +341,8 @@ export async function getQualityTrend(
   const trend = await QualityInspection.aggregate([
     {
       $match: {
-        collegeId: { $toObjectId: collegeId },
-        messFacilityId: { $toObjectId: data.messFacilityId },
+        collegeId: new Types.ObjectId(collegeId),
+        messFacilityId: new Types.ObjectId(data.messFacilityId),
         date: { $gte: since },
       },
     },

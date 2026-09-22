@@ -638,7 +638,7 @@ export async function generatePromotionPIPRecommendations(req: AuthRequest, res:
 export async function listFDPRecords(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, facultyId, verificationStatus } = req.query as any;
-    res.json(await fdpAppraisalService.listFDPRecords(req.collegeId!, Number(page) || 1, Number(limit) || 20, facultyId, verificationStatus));
+    res.json(await fdpAppraisalService.listFDPRecords(req.collegeId!, Number(page) || 1, Number(limit) || 20, facultyId, verificationStatus, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getFDPRecord(req: AuthRequest, res: Response, next: NextFunction) {
@@ -659,7 +659,7 @@ export async function deleteFDPRecord(req: AuthRequest, res: Response, next: Nex
 export async function listFDPComplianceSummaries(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, facultyId, academicYearId } = req.query as any;
-    res.json(await fdpAppraisalService.listFDPComplianceSummaries(req.collegeId!, Number(page) || 1, Number(limit) || 20, facultyId, academicYearId));
+    res.json(await fdpAppraisalService.listFDPComplianceSummaries(req.collegeId!, Number(page) || 1, Number(limit) || 20, facultyId, academicYearId, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getFDPComplianceSummary(req: AuthRequest, res: Response, next: NextFunction) {
@@ -790,7 +790,7 @@ export async function processContractRenewal(req: AuthRequest, res: Response, ne
 export async function listSeparationRequests(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, status } = req.query as any;
-    res.json(await exitService.listSeparationRequests(req.collegeId!, Number(page) || 1, Number(limit) || 20, status));
+    res.json(await exitService.listSeparationRequests(req.collegeId!, Number(page) || 1, Number(limit) || 20, { status }, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getSeparationRequest(req: AuthRequest, res: Response, next: NextFunction) {
@@ -810,7 +810,7 @@ export async function deleteSeparationRequest(req: AuthRequest, res: Response, n
 export async function listExitClearances(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit } = req.query as any;
-    res.json(await exitService.listExitClearances(req.collegeId!, Number(page) || 1, Number(limit) || 20));
+    res.json(await exitService.listExitClearances(req.collegeId!, Number(page) || 1, Number(limit) || 20, undefined, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getExitClearanceCtrl(req: AuthRequest, res: Response, next: NextFunction) {
@@ -830,7 +830,7 @@ export async function deleteExitClearanceCtrl(req: AuthRequest, res: Response, n
 export async function listHandoverRecords(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit } = req.query as any;
-    res.json(await exitService.listHandoverRecords(req.collegeId!, Number(page) || 1, Number(limit) || 20));
+    res.json(await exitService.listHandoverRecords(req.collegeId!, Number(page) || 1, Number(limit) || 20, undefined, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getHandoverRecordCtrl(req: AuthRequest, res: Response, next: NextFunction) {
@@ -850,7 +850,7 @@ export async function deleteHandoverRecordCtrl(req: AuthRequest, res: Response, 
 export async function listFinalSettlements(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit } = req.query as any;
-    res.json(await exitService.listFinalSettlements(req.collegeId!, Number(page) || 1, Number(limit) || 20));
+    res.json(await exitService.listFinalSettlements(req.collegeId!, Number(page) || 1, Number(limit) || 20, undefined, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getFinalSettlement(req: AuthRequest, res: Response, next: NextFunction) {
@@ -914,7 +914,7 @@ export async function detectOverdueCases(req: AuthRequest, res: Response, next: 
 export async function listDisciplinaryCases(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, status } = req.query as any;
-    res.json(await disciplinaryService.listDisciplinaryCases(req.collegeId!, Number(page) || 1, Number(limit) || 20, status));
+    res.json(await disciplinaryService.listDisciplinaryCases(req.collegeId!, Number(page) || 1, Number(limit) || 20, { status }, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getDisciplinaryCase(req: AuthRequest, res: Response, next: NextFunction) {
@@ -932,7 +932,7 @@ export async function deleteDisciplinaryCase(req: AuthRequest, res: Response, ne
 export async function listDisciplinaryOutcomes(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit } = req.query as any;
-    res.json(await disciplinaryService.listDisciplinaryOutcomes(req.collegeId!, Number(page) || 1, Number(limit) || 20));
+    res.json(await disciplinaryService.listDisciplinaryOutcomes(req.collegeId!, Number(page) || 1, Number(limit) || 20, undefined, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getDisciplinaryOutcome(req: AuthRequest, res: Response, next: NextFunction) {
@@ -984,7 +984,7 @@ export async function generateAttendanceComplianceReport(req: AuthRequest, res: 
 export async function listPayrollDataExtracts(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, status } = req.query as any;
-    res.json(await compliancePayrollService.listPayrollDataExtracts(req.collegeId!, Number(page) || 1, Number(limit) || 20, status));
+    res.json(await compliancePayrollService.listPayrollDataExtracts(req.collegeId!, Number(page) || 1, Number(limit) || 20, { status }, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getPayrollDataExtract(req: AuthRequest, res: Response, next: NextFunction) {

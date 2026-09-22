@@ -1,3 +1,4 @@
+import { hiddenClassesFor } from '../../../shared/rbac/sensitivity';
 /**
  * 008 Phase 3 — People agent orchestrator.
  *
@@ -359,6 +360,7 @@ export async function* handleQuery(
     collegeId, userId, prompt, conversationId, abortSignal,
     agent: 'people',
     actionType: 'chat-people',
+    hiddenClasses: hiddenClassesFor(authScope),
     buildContext: () => forPeopleQuery(collegeId, authScope),
     buildMessages: (masked, userPrompt) =>
       buildPeopleQueryMessages({

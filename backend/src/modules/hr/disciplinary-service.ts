@@ -1,3 +1,5 @@
+import type { AuthScope } from '../../shared/rbac/types';
+import { scopeViaMembers } from '../../shared/rbac/apply-scope';
 import { DisciplinaryCase } from '../../models/hr/DisciplinaryCase';
 import { DisciplinaryOutcome } from '../../models/hr/DisciplinaryOutcome';
 import { Employee } from '../../models/hr/Employee';
@@ -752,8 +754,10 @@ export async function listDisciplinaryCases(
   page = 1,
   limit = 20,
   filters?: { status?: string; employeeId?: string },
+  authScope?: AuthScope,
 ) {
   const filter: Record<string, unknown> = { collegeId };
+  await scopeViaMembers(filter, authScope, collegeId, Employee, 'employeeId', 'departmentId');
   if (filters?.status) filter.status = filters.status;
   if (filters?.employeeId) filter.employeeId = filters.employeeId;
   return paginate(DisciplinaryCase, filter, page, limit);
@@ -862,8 +866,10 @@ export async function listDisciplinaryOutcomes(
   page = 1,
   limit = 20,
   filters?: { disciplinaryCaseId?: string; employeeId?: string; status?: string },
+  authScope?: AuthScope,
 ) {
   const filter: Record<string, unknown> = { collegeId };
+  await scopeViaMembers(filter, authScope, collegeId, Employee, 'employeeId', 'departmentId');
   if (filters?.disciplinaryCaseId) filter.disciplinaryCaseId = filters.disciplinaryCaseId;
   if (filters?.employeeId) filter.employeeId = filters.employeeId;
   if (filters?.status) filter.status = filters.status;

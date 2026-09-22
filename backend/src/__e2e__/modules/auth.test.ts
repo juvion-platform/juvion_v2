@@ -93,3 +93,24 @@ describe('POST /api/auth/refresh', () => {
     expect(typeof res.body.token).toBe('string');
   });
 });
+
+// ─── 010 — personas on the session, token version revocation ───────────────
+describe('010 personas + token version', () => {
+  it('login and /me carry personas and permissions', async () => {
+    const login = await api.post('/api/auth/login').send({ email: 'admin@test.com', password: 'test123' }).expect(200);
+    expect(login.body.user.personas).toEqual(['L-ADMIN']);
+    const me = await api.as(login.body.token).get('/api/auth/me').expect(200);
+    expect(me.body.personas).toEqual(['L-ADMIN']);
+    expect(me.body.permissions).toContain('platform:read');
+  });
+
+  it('a token minted before the version bump is rejected', async () => {
+    const { bumpTokenVersion } = await import('../../shared/rbac/token-version');
+    const login = await api.post('/api/auth/login').send({ email: 'admin@test.com', password: 'test123' }).expect(200);
+    await api.as(login.body.token).get('/api/auth/me').expect(200);
+    await bumpTokenVersion(login.body.user.id);
+    await api.as(login.body.token).get('/api/auth/me').expect(401);
+    const again = await api.post('/api/auth/login').send({ email: 'admin@test.com', password: 'test123' }).expect(200);
+    await api.as(again.body.token).get('/api/auth/me').expect(200);
+  });
+});

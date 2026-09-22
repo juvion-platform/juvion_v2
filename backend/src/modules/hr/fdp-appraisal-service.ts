@@ -1,3 +1,7 @@
+import { Faculty } from '../../models/people/Faculty';
+import type { AuthScope } from '../../shared/rbac/types';
+import { scopeViaMembers } from '../../shared/rbac/apply-scope';
+import { scopeNotApplicable } from '../../shared/rbac/apply-scope';
 import { FDPRecord } from '../../models/hr/FDPRecord';
 import { FDPComplianceSummary } from '../../models/hr/FDPComplianceSummary';
 import { AppraisalCycle } from '../../models/hr/AppraisalCycle';
@@ -754,8 +758,10 @@ export async function listFDPRecords(
   limit: number,
   facultyId?: string,
   verificationStatus?: string,
+  authScope?: AuthScope,
 ) {
   const filter: Record<string, unknown> = { collegeId };
+  await scopeViaMembers(filter, authScope, collegeId, Faculty, 'facultyId', 'departmentId');
   if (facultyId) filter.facultyId = facultyId;
   if (verificationStatus) filter.verificationStatus = verificationStatus;
   return paginate(FDPRecord, filter, page, limit);
@@ -821,8 +827,10 @@ export async function listFDPComplianceSummaries(
   limit: number,
   facultyId?: string,
   academicYearId?: string,
+  authScope?: AuthScope,
 ) {
   const filter: Record<string, unknown> = { collegeId };
+  await scopeViaMembers(filter, authScope, collegeId, Faculty, 'facultyId', 'departmentId');
   if (facultyId) filter.facultyId = facultyId;
   if (academicYearId) filter.academicYearId = academicYearId;
   return paginate(FDPComplianceSummary, filter, page, limit);
@@ -890,6 +898,7 @@ export async function listAppraisalCycles(
 ) {
   const filter: Record<string, unknown> = { collegeId };
   if (status) filter.status = status;
+  scopeNotApplicable(filter); // college-wide, no department/person axis
   return paginate(AppraisalCycle, filter, page, limit);
 }
 
