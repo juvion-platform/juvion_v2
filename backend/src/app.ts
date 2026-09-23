@@ -6,6 +6,7 @@ import rateLimit from 'express-rate-limit';
 import { errorHandler } from './middleware/errorHandler';
 import apiRouter from './routes';
 import authRouter from './modules/auth/routes';
+import juviAppRouter from './modules/juvi-app/routes';
 
 // Register workflow definitions
 import './shared/workflow/definitions';
@@ -67,6 +68,7 @@ if (!isE2ETesting) {
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', version: '2.0.0' }));
 app.use('/api/auth', authRouter);
+app.use('/api/juvi-app', juviAppRouter);   // mobile API: own auth + own error envelope
 app.use('/api', apiRouter);
 app.use(errorHandler);
 
