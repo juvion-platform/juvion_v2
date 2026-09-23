@@ -1,5 +1,17 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
+export interface IJuviConfig {
+  enabled: boolean;
+  paused: boolean;
+  pausedMessage?: string;
+  accentColor?: string;
+  supportContact?: { name: string; phone?: string; email?: string };
+  quietHoursDefault: { start: string; end: string };
+  minAppVersion?: { android?: string; ios?: string };
+  timezone: string;
+  featureFlags: { languageRoadmap: boolean };
+}
+
 export interface ICollege extends Document {
   name: string;
   code: string;
@@ -24,7 +36,26 @@ export interface ICollege extends Document {
     weeklyInr: number;
     alertThresholdPct: number;
   };
+  juvi: IJuviConfig;
 }
+
+const juviConfigSchema = new Schema<IJuviConfig>(
+  {
+    enabled: { type: Boolean, default: false },
+    paused: { type: Boolean, default: false },
+    pausedMessage: String,
+    accentColor: { type: String, match: /^#[0-9a-fA-F]{6}$/ },
+    supportContact: { type: new Schema({ name: String, phone: String, email: String }, { _id: false }), default: undefined },
+    quietHoursDefault: {
+      start: { type: String, default: '22:00' },
+      end: { type: String, default: '07:00' },
+    },
+    minAppVersion: { type: new Schema({ android: String, ios: String }, { _id: false }), default: undefined },
+    timezone: { type: String, default: 'Asia/Kolkata' },
+    featureFlags: { languageRoadmap: { type: Boolean, default: false } },
+  },
+  { _id: false },
+);
 
 const collegeSchema = new Schema<ICollege>(
   {
@@ -57,6 +88,7 @@ const collegeSchema = new Schema<ICollege>(
       ),
       default: () => ({}),
     },
+    juvi: { type: juviConfigSchema, default: () => ({}) },
   },
   { timestamps: true },
 );
