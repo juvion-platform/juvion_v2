@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import { mobileErrorHandler, MobileApiError } from './errors';
+import { accountsRouter } from './accounts/routes';
 
 /** Sub-routers register themselves onto v1Router in later tasks. */
 export const v1Router = Router();
+v1Router.use(accountsRouter);
 
 const router = Router();
 router.use('/v1', v1Router);
