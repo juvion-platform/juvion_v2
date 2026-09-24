@@ -43,6 +43,7 @@ import { JuviAction } from '../../models/juvi/JuviAction';
 import { JuviConversation } from '../../models/juvi/JuviConversation';
 import { JuviMessage } from '../../models/juvi/JuviMessage';
 import { JuviPersonaConfig } from '../../models/juvi/JuviPersonaConfig';
+import { provisionIfEnabled } from '../juvi-app/accounts/provisioning-service';
 import { User } from '../../models/User';
 import { createAuditLog } from '../../shared/audit';
 import { WorkflowStepHandlerContext, registerWorkflowStepHandler } from '../../shared/workflow/StepHandlers';
@@ -1542,12 +1543,28 @@ registerWorkflowStepHandler('W01', 'provision_m12', async ({ instance, result, c
     userId: String(user._id),
   });
 
+  // Juvi (PRV-01): when the college has Juvi on, the app's temporary password replaces the
+  // hardcoded default above and is retrievable from the Juvi console instead of this result.
+  const juvi = await provisionIfEnabled({
+    collegeId: String(instance.collegeId),
+    personId,
+    kind: 'student',
+    source: 'workflow',
+    performedBy: completedBy,
+    resetPassword: true,
+  }).catch((err) => {
+    console.warn('[juvi-app] W01 provisioning skipped:', err instanceof Error ? err.message : err);
+    return null;
+  });
+
   const provisioningResult = {
     ...result,
     studentId: String(student._id),
     userId: String(user._id),
     email: user.email,
-    initialPassword: provisionedPassword,
+    initialPassword: juvi ? undefined : provisionedPassword,
+    juviAccountId: juvi ? String(juvi.account._id) : undefined,
+    juviCredentialId: juvi?.credentialId,
     accountStatus: 'completed',
   };
 
