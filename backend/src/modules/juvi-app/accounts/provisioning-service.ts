@@ -27,6 +27,8 @@ export interface ProvisionPersonInput {
   /** Default true. When false an existing User keeps its password and flag. */
   resetPassword?: boolean;
   runId?: string | null;
+  /** Seed/dev only: use this temporary password instead of generating one. */
+  temporaryPassword?: string;
 }
 
 export interface ProvisionPersonResult {
@@ -104,7 +106,7 @@ export async function provisionPerson(input: ProvisionPersonInput): Promise<Prov
   let temporaryPassword: string | undefined;
 
   if (!user) {
-    temporaryPassword = generateTemporaryPassword();
+    temporaryPassword = input.temporaryPassword ?? generateTemporaryPassword();
     user = await User.create({
       collegeId: input.collegeId,
       email: (person.email ?? '').trim().toLowerCase() || placeholderEmail(row.identifier, college.code),
@@ -118,7 +120,7 @@ export async function provisionPerson(input: ProvisionPersonInput): Promise<Prov
     });
     userCreated = true;
   } else if (resetPassword) {
-    temporaryPassword = generateTemporaryPassword();
+    temporaryPassword = input.temporaryPassword ?? generateTemporaryPassword();
     user.password = await bcrypt.hash(temporaryPassword, 10);
     user.mustChangePassword = true;
     user.isActive = true;

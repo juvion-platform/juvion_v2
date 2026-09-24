@@ -108,6 +108,9 @@ import {
 import { User } from './models/User';
 import { College } from './models/College';
 import { seedPolicies } from './shared/seed/policies';
+import { seedChannelTemplates } from './shared/seed/channel-templates';
+import { provisionPerson } from './modules/juvi-app/accounts/provisioning-service';
+import { reconcileCollege } from './modules/juvi-app/spaces/reconcile-service';
 import bcrypt from 'bcryptjs';
 
 const CID = new mongoose.Types.ObjectId('000000000000000000000001');
@@ -3157,6 +3160,24 @@ async function seed() {
   // intact — seedPolicies only touches rows that match its natural key.
   const seedResult = await seedPolicies({ createdBy: 'seed' });
   console.log(`Seeded ${seedResult.attempted} default RBAC policies (created=${seedResult.created} updated=${seedResult.updated})`);
+
+  // ========================================================================
+  // JUVI MOBILE APP — templates, one demo student + faculty, first reconcile
+  // ========================================================================
+  await College.updateOne({ _id: CID }, { $set: {
+    'juvi.enabled': true,
+    'juvi.accentColor': '#0B5FA5',
+    'juvi.supportContact': { name: 'JIT Student Office', phone: '+91-40-2345-6789', email: 'office@jit.edu.in' },
+  } });
+  await seedChannelTemplates(String(CID));
+  const DEMO_TEMP_PASSWORD = 'river-lamp-482';
+  const demoStudent = await Student.findOne({ collegeId: CID, status: 'active', rollNumber: { $exists: true } }).sort({ rollNumber: 1 }).lean();
+  const demoFaculty = await Faculty.findOne({ collegeId: CID, status: 'active' }).sort({ employeeCode: 1 }).lean();
+  if (demoStudent) await provisionPerson({ collegeId: String(CID), personId: String(demoStudent.personId), kind: 'student', source: 'admin', performedBy: 'seed', temporaryPassword: DEMO_TEMP_PASSWORD });
+  if (demoFaculty) await provisionPerson({ collegeId: String(CID), personId: String(demoFaculty.personId), kind: 'faculty', source: 'admin', performedBy: 'seed', temporaryPassword: DEMO_TEMP_PASSWORD });
+  const juviSummary = await reconcileCollege(String(CID));
+  console.log(`Juvi: ${juviSummary.channels.total} channels, ${juviSummary.memberships.added} memberships`);
+  console.log(`Juvi demo sign-in — institution code JIT; student ${demoStudent?.rollNumber ?? '(none)'} / faculty ${demoFaculty?.employeeCode ?? '(none)'}; temporary password ${DEMO_TEMP_PASSWORD}`);
 
   // ========================================================================
   // DONE

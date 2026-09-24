@@ -202,6 +202,17 @@ Two doors onto one engine. `/platform/bulk-imports` serves all five entity types
 - A schema declaring `naturalKeys` gets intra-file duplicate detection; the other four declare none and are unaffected.
 - Commit uses compensating rollback, not transactions — the test harness is not a replica set.
 
+### Juvi mobile app — `backend/src/modules/juvi-app/`
+
+The student/faculty Flutter app (`mobile/`) talks to `/api/juvi-app/v1`, **not** to the ERP routes. Spec: `docs/superpowers/specs/2026-09-23-juvi-foundation-design.md`.
+
+- Own auth: `authenticateMobile` (15-min JWT with `typ: 'mobile'` + per-device `MobileSession` checked in Redis). Mobile routes never use `authorize()`; permission is per channel membership.
+- Own error envelope `{ error: { code, message } }` via `MobileApiError`; controllers call `schema.parse(req.body)` themselves instead of `validate()`.
+- Membership is **reconciled**, not event-driven: `spaces/reconcile-service.ts` runs a college pass every 5 minutes and an account pass on sign-in and Spaces refresh. Strategies are pure functions in `spaces/strategies.ts`.
+- Temporary passwords never leave the server in plaintext: `accounts/credential-store.ts` encrypts them under `JUVI_CREDENTIAL_KEY` for 7 days; the admin console reveals them.
+- The API contract `mobile/api/openapi.json` is generated (`npm run openapi:mobile -w backend`); CI fails on drift. Change a Zod schema → regenerate → commit.
+- Dev seed enables Juvi on JIT and provisions one student and one faculty member with temporary password `river-lamp-482`.
+
 ## Frontend Conventions
 
 ### State Management

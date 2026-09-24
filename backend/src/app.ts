@@ -7,6 +7,7 @@ import { errorHandler } from './middleware/errorHandler';
 import apiRouter from './routes';
 import authRouter from './modules/auth/routes';
 import juviAppRouter from './modules/juvi-app/routes';
+import { juviStartupProblems } from './modules/juvi-app/startup-guard';
 
 // Register workflow definitions
 import './shared/workflow/definitions';
@@ -53,6 +54,12 @@ if (process.env.NODE_ENV === 'production' && (!process.env.JWT_SECRET || process
 // real payment flows.
 if (process.env.NODE_ENV === 'production' && !process.env.PAYMENT_WEBHOOK_SECRET) {
   console.error('FATAL: PAYMENT_WEBHOOK_SECRET must be set in production');
+  process.exit(1);
+}
+
+// Juvi credential-export key: temporary passwords are encrypted at rest with it (spec §9).
+for (const problem of juviStartupProblems(process.env)) {
+  console.error(`FATAL: ${problem}`);
   process.exit(1);
 }
 
