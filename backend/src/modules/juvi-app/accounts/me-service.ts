@@ -129,7 +129,8 @@ export async function advanceOnboarding(ctx: MobileContext, step: number): Promi
   const total = ONBOARDING_STEPS.length;
   const state = () => ({ onboardingStep: account.onboardingStep, onboardingSteps: [...ONBOARDING_STEPS], onboardingComplete: Boolean(account.onboardingCompletedAt) });
 
-  if (account.onboardingCompletedAt && step === total - 1) return state();          // idempotent re-send of the last step
+  // Completed accounts never advance again: any step is a no-op that reports the current state (R12).
+  if (account.onboardingCompletedAt) return state();
   if (step !== account.onboardingStep) {
     throw new MobileApiError(400, 'VALIDATION_FAILED', 'That step is out of order.', { currentStep: account.onboardingStep });
   }

@@ -72,6 +72,13 @@ describe('settings and onboarding', () => {
     expect(acct?.onboardingCompletedAt).toBeInstanceOf(Date);
     // Re-sending the last step is idempotent.
     await mobileClient(app, t).post(`${V1}/me/onboarding/advance`).send({ step: 2 }).expect(200);
+    // R12: once complete, any step is a no-op and nothing is rewritten.
+    const before = (await JuviAccount.findById(s.account._id).lean())!;
+    const r3 = await mobileClient(app, t).post(`${V1}/me/onboarding/advance`).send({ step: 3 }).expect(200);
+    expect(r3.body).toMatchObject({ onboardingStep: 3, onboardingComplete: true });
+    const after = (await JuviAccount.findById(s.account._id).lean())!;
+    expect(after.onboardingStep).toBe(3);
+    expect(after.onboardingCompletedAt?.toISOString()).toBe(before.onboardingCompletedAt?.toISOString());
   });
 });
 
