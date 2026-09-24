@@ -33,12 +33,15 @@ async function candidatePersonIds(collegeId: string, kind: AccountKind, filter: 
       const branches = await Branch.find({ collegeId, departmentId: { $in: filter.departmentIds } }).select('_id').lean();
       q.branchId = { $in: branches.map((b) => b._id) };
     }
-    return (await Student.find(q).select('personId').lean()).map((s) => s.personId as unknown as Types.ObjectId);
+    const students = await Student.find(q).select('personId').lean<{ personId: Types.ObjectId }[]>();
+    return students.map((s) => s.personId);
   }
   const q: Record<string, unknown> = { collegeId, status: 'active' };
   if (filter.departmentIds?.length) q.departmentId = { $in: filter.departmentIds };
-  const rows = kind === 'faculty' ? await Faculty.find(q).select('personId').lean() : await Staff.find(q).select('personId').lean();
-  return rows.map((r) => r.personId as unknown as Types.ObjectId);
+  const rows = kind === 'faculty'
+    ? await Faculty.find(q).select('personId').lean<{ personId: Types.ObjectId }[]>()
+    : await Staff.find(q).select('personId').lean<{ personId: Types.ObjectId }[]>();
+  return rows.map((r) => r.personId);
 }
 
 export async function runProvisioningJob(runId: string): Promise<IJuviProvisioningRun> {
@@ -47,11 +50,10 @@ export async function runProvisioningJob(runId: string): Promise<IJuviProvisioni
   const startedAt = new Date();
   run.status = 'running'; run.startedAt = startedAt;
   run.counts = { scanned: 0, created: 0, existingLinked: 0, skipped: 0, failed: 0 };
-  // Mongoose's HydratedDocument generic re-intersects the schema's `errors` path with
-  // Document['errors'] (`Error.ValidationError`), which `never[]` can't satisfy even
-  // though IJuviProvisioningRun's own declared shape is a plain array; go through the
-  // plain interface to reset it.
-  (run as unknown as IJuviProvisioningRun).errors = [];
+  // The schema path `errors` collides with Mongoose's own `Document.errors`
+  // (`Error.ValidationError`) in its typings, so a plain `run.errors = []`
+  // assignment is rejected; `set()` resets it without a cast.
+  run.set('errors', []);
   run.credentialsExpireAt = new Date(startedAt.getTime() + CREDENTIAL_TTL_DAYS * 86_400_000);
   await run.save();
 
