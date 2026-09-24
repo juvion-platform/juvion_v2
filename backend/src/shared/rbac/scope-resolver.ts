@@ -17,15 +17,17 @@ function cacheKey(userId: string): string {
 }
 
 /**
- * Resolve a user's departmentId and personId by looking up their
- * Faculty or Staff record (linked via User.personId).
+ * Resolve a user's departmentId, personId and studentId by looking up their
+ * Faculty, Staff or Student record (linked via User.personId).
  *
- * Results are cached in Redis for 15 minutes.
+ * Results are cached in Redis for 15 minutes. A cached entry for a student
+ * that predates studentId resolution is treated as a miss so it re-resolves.
  *
  * Role-to-model mapping:
  * - hod, faculty → Faculty model
  * - staff → Staff model
- * - Others (student, parent, admin) → look up User.personId only
+ * - student → Student model (studentId)
+ * - Others (parent, admin) → look up User.personId only
  */
 export async function resolveUserScope(
   userId: string,
