@@ -28,10 +28,18 @@ export function encryptSecret(plain: string): { ciphertext: Buffer; iv: Buffer; 
   return { ciphertext, iv, authTag: cipher.getAuthTag() };
 }
 
-export function decryptSecret(row: { ciphertext: Buffer; iv: Buffer; authTag: Buffer }): string {
-  const decipher = createDecipheriv(ALGO, getCredentialKey(), row.iv);
-  decipher.setAuthTag(row.authTag);
-  return Buffer.concat([decipher.update(row.ciphertext), decipher.final()]).toString('utf8');
+/** Mongo returns `type: Buffer` fields from `.lean()` reads as BSON Binary; normalise to a Node Buffer. */
+function toBuffer(v: unknown): Buffer {
+  if (Buffer.isBuffer(v)) return v;
+  if (v && typeof v === 'object' && 'buffer' in v) return Buffer.from((v as { buffer: Uint8Array }).buffer);
+  if (v instanceof Uint8Array) return Buffer.from(v);
+  throw new TypeError('Encrypted credential field is not binary');
+}
+
+export function decryptSecret(row: { ciphertext: unknown; iv: unknown; authTag: unknown }): string {
+  const decipher = createDecipheriv(ALGO, getCredentialKey(), toBuffer(row.iv));
+  decipher.setAuthTag(toBuffer(row.authTag));
+  return Buffer.concat([decipher.update(toBuffer(row.ciphertext)), decipher.final()]).toString('utf8');
 }
 
 export interface StoreCredentialInput {

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { Binary } from 'bson';
 import { encryptSecret, decryptSecret, getCredentialKey } from '../credential-store';
 
 describe('credential-store crypto', () => {
@@ -31,5 +32,16 @@ describe('credential-store crypto', () => {
   it('falls back to a deterministic dev key when unset outside production', () => {
     expect(getCredentialKey()).toHaveLength(32);
     expect(getCredentialKey().equals(getCredentialKey())).toBe(true);
+  });
+
+  it('decrypts fields read back as BSON Binary (what a lean Mongo read returns), and still decrypts plain Buffers', () => {
+    const enc = encryptSecret('cedar-otter-019');
+    const wrapped = {
+      ciphertext: new Binary(enc.ciphertext),
+      iv: new Binary(enc.iv),
+      authTag: new Binary(enc.authTag),
+    };
+    expect(decryptSecret(wrapped)).toBe('cedar-otter-019');
+    expect(decryptSecret(enc)).toBe('cedar-otter-019');
   });
 });
