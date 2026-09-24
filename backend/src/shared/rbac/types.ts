@@ -24,6 +24,8 @@ export interface AuthScope {
   selfOnly: boolean;
   userId: string;
   personId?: string;
+  /** Resolved for role 'student'; used by applyAuthScope when selfField is 'studentId'. */
+  studentId?: string;
   subDomain?: string[];
   resolvedPermissions: string[];
 }

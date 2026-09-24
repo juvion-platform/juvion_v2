@@ -1,6 +1,7 @@
 import redis from '../../config/redis';
 import { Faculty } from '../../models/people/Faculty';
 import { Staff } from '../../models/people/Staff';
+import { Student } from '../../models/people/Student';
 import { User } from '../../models/User';
 
 const SCOPE_CACHE_TTL = 900; // 15 minutes
@@ -8,6 +9,7 @@ const SCOPE_CACHE_TTL = 900; // 15 minutes
 interface UserScopeData {
   departmentId?: string;
   personId?: string;
+  studentId?: string;
 }
 
 function cacheKey(userId: string): string {
@@ -33,7 +35,15 @@ export async function resolveUserScope(
   // Check cache first
   try {
     const cached = await redis.get(cacheKey(userId));
-    if (cached) return JSON.parse(cached);
+    if (cached) {
+      const parsedCache = JSON.parse(cached) as UserScopeData;
+      // A cache entry written before studentId resolution existed lacks the
+      // field for student-role users. Treat that as a miss so it re-resolves
+      // and rewrites the cache; other roles are unaffected.
+      if (!(role === 'student' && parsedCache.studentId === undefined)) {
+        return parsedCache;
+      }
+    }
   } catch (_e) {
     // Cache miss — proceed to DB
   }
@@ -58,6 +68,9 @@ export async function resolveUserScope(
         if (staff?.departmentId) {
           scope.departmentId = String(staff.departmentId);
         }
+      } else if (role === 'student') {
+        const student = await Student.findOne({ personId, collegeId }).select('_id').lean();
+        if (student) scope.studentId = String(student._id);
       }
     }
   } catch (_e) {
