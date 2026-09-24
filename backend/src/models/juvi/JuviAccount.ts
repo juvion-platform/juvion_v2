@@ -46,6 +46,9 @@ export interface IJuviAccount extends Document {
   provisionedBy: string;
 }
 
+/** Shape of a JuviAccount read with `.lean()`: fields only, no Document methods. */
+export type LeanJuviAccount = Omit<IJuviAccount, keyof Document> & { _id: Types.ObjectId };
+
 const transitionSchema = new Schema<IAccountTransition>(
   {
     from: { type: String, enum: ACCOUNT_STATUSES, default: null },

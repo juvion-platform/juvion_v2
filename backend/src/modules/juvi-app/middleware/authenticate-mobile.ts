@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import redis from '../../../config/redis';
-import { JuviAccount, IJuviAccount, AccountKind } from '../../../models/juvi/JuviAccount';
+import { JuviAccount, AccountKind, LeanJuviAccount } from '../../../models/juvi/JuviAccount';
 import { verifyAccessToken, getSessionState, touchSession } from '../accounts/session-service';
 import { getJuviConfig, isVersionBelow } from '../config/institution-config';
 import { MobileApiError } from '../errors';
@@ -15,7 +15,8 @@ export interface MobileContext {
   studentId?: string;
   facultyId?: string;
   staffId?: string;
-  account: IJuviAccount;
+  /** A lean read of the JuviAccount: fields only, no Document methods. */
+  account: LeanJuviAccount;
 }
 
 export interface MobileRequest extends Request { mobile?: MobileContext }
@@ -68,7 +69,7 @@ export async function authenticateMobile(req: MobileRequest, _res: Response, nex
       studentId: account.studentId ? String(account.studentId) : undefined,
       facultyId: account.facultyId ? String(account.facultyId) : undefined,
       staffId: account.staffId ? String(account.staffId) : undefined,
-      account: account as unknown as IJuviAccount,
+      account: account as LeanJuviAccount,
     };
 
     // Activity markers, at most once a minute, never blocking the request.
