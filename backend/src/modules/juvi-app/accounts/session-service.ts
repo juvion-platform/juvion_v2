@@ -86,9 +86,10 @@ export async function createSession(input: {
 }
 
 /**
- * Rotate on refresh. The old hash is swapped atomically; a second presentation
- * of the same refresh token therefore misses, and if the session is still
- * active that is a replay: the whole session is revoked (spec §8).
+ * Rotate on refresh. The old hash is swapped atomically and remembered as
+ * `previousRefreshTokenHash`. A later presentation of that old token is a
+ * replay of a rotated token — the session is revoked (spec §8). The device id
+ * never decides a revocation: it only has to match for a rotation to succeed.
  */
 export async function rotateSession(
   refreshToken: string,
@@ -97,19 +98,38 @@ export async function rotateSession(
 ): Promise<{ session: IMobileSession; tokens: SessionTokens }> {
   const oldHash = hashRefreshToken(refreshToken);
   const next = newRefreshToken();
+  const now = new Date();
   const session = await MobileSession.findOneAndUpdate(
-    { refreshTokenHash: oldHash, deviceId, revokedAt: null, refreshExpiresAt: { $gt: new Date() } },
-    { $set: { refreshTokenHash: hashRefreshToken(next), refreshExpiresAt: refreshExpiry(), lastActiveAt: new Date() } },
+    { refreshTokenHash: oldHash, deviceId, revokedAt: null, refreshExpiresAt: { $gt: now } },
+    { $set: { refreshTokenHash: hashRefreshToken(next), previousRefreshTokenHash: oldHash, refreshExpiresAt: refreshExpiry(), lastActiveAt: now } },
     { new: true },
   );
-  if (!session) {
-    // Was this token already rotated on a live session? Then someone replayed it.
-    const live = await MobileSession.findOne({ deviceId, revokedAt: null }).select('_id').lean();
-    if (live) await revokeSession(String(live._id), 'token_reuse');
-    throw new MobileApiError(401, 'SESSION_INVALIDATED', 'Please sign in again.', { reason: live ? 'token_reuse' : 'expired' });
+  if (session) {
+    await cacheState(String(session._id), 'active', ACTIVE_CACHE_SECONDS);
+    return { session, tokens: tokensFor(session, ctx.role, ctx.kind, next) };
   }
-  await cacheState(String(session._id), 'active', ACTIVE_CACHE_SECONDS);
-  return { session, tokens: tokensFor(session, ctx.role, ctx.kind, next) };
+
+  // (a) The presented token is the previous token of a live session: replay of a rotated token.
+  const replayed = await MobileSession.findOne({ previousRefreshTokenHash: oldHash, revokedAt: null }).select('_id').lean();
+  if (replayed) {
+    await revokeSession(String(replayed._id), 'token_reuse');
+    throw new MobileApiError(401, 'SESSION_INVALIDATED', 'Please sign in again.', { reason: 'token_reuse' });
+  }
+
+  // (b)/(c) The presented token is the current token of a live session, but the primary query missed:
+  // either it has expired, or it came from a different device id.
+  const current = await MobileSession.findOne({ refreshTokenHash: oldHash, revokedAt: null }).select('_id deviceId refreshExpiresAt').lean();
+  if (current) {
+    if (current.refreshExpiresAt <= now) {
+      await revokeSession(String(current._id), 'expired');
+      throw new MobileApiError(401, 'SESSION_INVALIDATED', 'Please sign in again.', { reason: 'expired' });
+    }
+    // Device mismatch: refuse without revoking; a legitimate device still holds a valid token.
+    throw new MobileApiError(401, 'SESSION_INVALIDATED', 'Please sign in again.', { reason: 'invalid' });
+  }
+
+  // (d) Nobody knows this token: nothing to revoke.
+  throw new MobileApiError(401, 'SESSION_INVALIDATED', 'Please sign in again.', { reason: 'expired' });
 }
 
 export async function revokeSession(sessionId: string, reason: RevokeReason): Promise<void> {

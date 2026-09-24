@@ -37,6 +37,12 @@ describe('juvi-app models', () => {
     expect(bad.validateSync()?.errors.platform).toBeDefined();
   });
 
+  it('MobileSession.previousRefreshTokenHash is optional', () => {
+    const doc = new MobileSession({ collegeId: oid(), accountId: oid(), userId: oid(), deviceId: 'd1', deviceName: 'Pixel', platform: 'android', appVersion: '1.0.0', osVersion: '14', refreshTokenHash: 'h', refreshExpiresAt: new Date() });
+    expect(doc.validateSync()).toBeUndefined();
+    expect(MobileSession.schema.path('previousRefreshTokenHash')).toBeDefined();
+  });
+
   it('Channel carries the full type enum but Channel.type defaults to official', () => {
     const doc = new Channel({ collegeId: oid(), templateCode: 'course', scopeType: 'course_offering', scopeId: oid(), name: 'CS201', about: 'x', postingRule: 'publishers_only', replyRule: 'allowed', defaultPriority: 'routine' });
     expect(doc.validateSync()).toBeUndefined();

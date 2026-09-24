@@ -23,6 +23,8 @@ export interface IMobileSession extends Document {
   lastActiveAt: Date;
   revokedAt?: Date;
   revokedReason?: RevokeReason;
+  /** Hash of the refresh token this session held before its last rotation; a replay of it is theft. */
+  previousRefreshTokenHash?: string;
   pushToken?: string;
   createdAt: Date;
 }
@@ -39,6 +41,7 @@ const schema = new Schema<IMobileSession>(
     osVersion: { type: String, required: true },
     refreshTokenHash: { type: String, required: true },
     refreshExpiresAt: { type: Date, required: true },
+    previousRefreshTokenHash: { type: String },
     lastActiveAt: { type: Date, default: Date.now },
     revokedAt: Date,
     revokedReason: { type: String, enum: REVOKE_REASONS },
@@ -50,5 +53,6 @@ const schema = new Schema<IMobileSession>(
 schema.index({ refreshTokenHash: 1 }, { unique: true });
 schema.index({ collegeId: 1, accountId: 1 });
 schema.index({ accountId: 1, deviceId: 1 });
+schema.index({ previousRefreshTokenHash: 1 }, { sparse: true });
 
 export const MobileSession = model<IMobileSession>('MobileSession', schema);
