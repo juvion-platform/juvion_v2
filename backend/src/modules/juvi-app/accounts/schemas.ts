@@ -63,3 +63,24 @@ export const deviceRowSchema = z.object({
   appVersion: z.string(), lastActiveAt: z.string(), isCurrent: z.boolean(),
 });
 export const devicesResponseSchema = z.object({ items: z.array(deviceRowSchema) });
+
+export const meResponseSchema = z.object({
+  account: accountSummarySchema,
+  person: z.object({ name: z.string(), firstName: z.string(), photoUrl: z.string().nullable() }),
+  student: z.object({
+    rollNumber: z.string().nullable(), programme: z.string().nullable(), branch: z.string().nullable(),
+    batch: z.string().nullable(), section: z.string().nullable(), department: z.string().nullable(),
+    hostel: z.string().nullable(), isLateralEntry: z.boolean(),
+  }).nullable(),
+  faculty: z.object({
+    employeeCode: z.string(), designation: z.string(), department: z.string().nullable(), isHod: z.boolean(),
+  }).nullable(),
+  settings: settingsSchema,
+  institution: z.object({
+    name: z.string(), code: z.string(), logoUrl: z.string().nullable(), accentColor: z.string().nullable(),
+    supportContact: z.object({ name: z.string(), phone: z.string().optional(), email: z.string().optional() }).nullable(),
+    timezone: z.string(),
+  }),
+  asOf: z.string(),
+});
+export type MeResponse = z.infer<typeof meResponseSchema>;
