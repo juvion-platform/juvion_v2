@@ -430,10 +430,21 @@ Cooldown key: `juvi:login-fail:{collegeId}:{sha256(identifier.lower())}`,
 - **Refresh token**: 32 random bytes, base64url. Stored as SHA-256 in
   `MobileSession.refreshTokenHash`. 90-day TTL, extended on each rotation.
 - `POST /auth/refresh { refreshToken, deviceId }` rotates: new access + new
-  refresh, old hash replaced atomically (`findOneAndUpdate` on the old hash).
-  A miss on the hash where the session exists and is active means an old token
-  was replayed: the session is revoked with `token_reuse` and 401
-  `SESSION_INVALIDATED { reason: 'token_reuse' }` is returned.
+  refresh, old hash replaced atomically (`findOneAndUpdate` on the old hash),
+  and the replaced hash is kept as `MobileSession.previousRefreshTokenHash`.
+  Replay is detected by token lineage, not by device. When the atomic rotation
+  misses, in order: (a) the token matches an active session's
+  `previousRefreshTokenHash` → it is a replayed predecessor; that session is
+  revoked with `token_reuse` and 401 `SESSION_INVALIDATED { reason:
+  'token_reuse' }` is returned; (b) the token is an active session's current
+  hash but the session's refresh TTL has passed → revoked with `expired`, 401
+  `{ reason: 'expired' }`; (c) the token is an active session's current hash
+  presented from a different `deviceId` → 401 `{ reason: 'invalid' }` with no
+  revocation, since the legitimate device still holds a valid token; (d) no
+  session knows the token → 401 `{ reason: 'expired' }`, nothing to revoke.
+  The device id only has to match for a rotation to succeed; it never decides
+  a revocation. (Ruling R7 during implementation; the device-keyed rule it
+  replaces could revoke a healthy session on an unrelated stale token.)
 
 ### Mobile middleware (`modules/juvi-app/middleware/authenticate-mobile.ts`)
 
