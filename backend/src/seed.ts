@@ -104,6 +104,9 @@ import {
   JuviPersonaConfig, JuviKnowledgeBase, JuviConversation,
   JuviMessage, JuviAction, JuviInsight, JuviFeedback, JuviUsageMetric,
   JuviNoticeCard, AckRecord, StudyRecommendation,
+  // Juvi mobile app
+  JuviAccount, MobileSession, ChannelTemplate, Channel, ChannelMembership,
+  JuviProvisioningRun, JuviProvisionedCredential,
 } from './models';
 import { User } from './models/User';
 import { College } from './models/College';
@@ -277,6 +280,14 @@ async function seed() {
     JuviInsight.deleteMany({ collegeId: CID }),
     JuviFeedback.deleteMany({ collegeId: CID }),
     JuviUsageMetric.deleteMany({ collegeId: CID }),
+    // Juvi mobile app
+    JuviAccount.deleteMany({ collegeId: CID }),
+    MobileSession.deleteMany({ collegeId: CID }),
+    ChannelTemplate.deleteMany({ collegeId: CID }),
+    Channel.deleteMany({ collegeId: CID }),
+    ChannelMembership.deleteMany({ collegeId: CID }),
+    JuviProvisioningRun.deleteMany({ collegeId: CID }),
+    JuviProvisionedCredential.deleteMany({ collegeId: CID }),
     // W01 Admissions workflow
     Inquiry.deleteMany({ collegeId: CID }),
     SeatInventory.deleteMany({ collegeId: CID }),
