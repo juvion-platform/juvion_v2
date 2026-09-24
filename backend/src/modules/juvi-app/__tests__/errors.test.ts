@@ -18,6 +18,13 @@ describe('mobile error envelope', () => {
     expect(res.body).toEqual({ error: { code: 'COOLDOWN', message: 'Wait', retryAfterSeconds: 540 } });
   });
 
+  it('a detail.message or detail.code never overrides the envelope code and message', () => {
+    const res = mockRes();
+    mobileErrorHandler(new MobileApiError(503, 'INSTITUTION_PAUSED', 'Top', { message: 'From detail', code: 'INTERNAL', extra: 1 }), {} as any, res, vi.fn());
+    expect(res.statusCode).toBe(503);
+    expect(res.body).toEqual({ error: { code: 'INSTITUTION_PAUSED', message: 'Top', extra: 1 } });
+  });
+
   it('maps ZodError to VALIDATION_FAILED with paths but never values', () => {
     const res = mockRes();
     const err = (() => { try { z.object({ password: z.string().min(8) }).parse({ password: 'short' }); } catch (e) { return e as ZodError; } })()!;

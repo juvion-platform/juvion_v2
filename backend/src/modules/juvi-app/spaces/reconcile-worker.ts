@@ -30,11 +30,25 @@ async function processor(job: Job): Promise<unknown> {
   return reconcileAllEnabledColleges();
 }
 
-/** Registers the queue and a repeatable sweep every `intervalMinutes` (env JUVI_RECONCILE_INTERVAL_MINUTES, default 5). */
+/** Stable id of the sweep schedule: re-registering (e.g. with a new interval) replaces it, never duplicates it. */
+export const SWEEP_SCHEDULER_ID = 'juvi-reconcile-sweep';
+
+/**
+ * Registers the queue and a repeatable sweep every `intervalMinutes` (env JUVI_RECONCILE_INTERVAL_MINUTES, default 5).
+ * Spec §14: reconcile retries 3 times with 30 s exponential backoff.
+ */
 export async function registerJuviReconcileQueue(intervalMinutes = Number.parseInt(process.env.JUVI_RECONCILE_INTERVAL_MINUTES ?? '5', 10) || 5): Promise<void> {
   registerQueue({ name: QUEUE_NAMES.JUVI_RECONCILE, processor, concurrency: 1 });
-  await getQueue(QUEUE_NAMES.JUVI_RECONCILE).add('sweep', {}, {
-    repeat: { every: intervalMinutes * 60_000 }, removeOnComplete: true, removeOnFail: true,
+  const queue = getQueue(QUEUE_NAMES.JUVI_RECONCILE);
+  // Drop any sweep schedule registered under another key (the earlier `add(..., { repeat })` form
+  // keyed it by interval, so a changed interval left the old one running).
+  for (const s of await queue.getJobSchedulers()) {
+    if (s.name === 'sweep' && s.key !== SWEEP_SCHEDULER_ID) await queue.removeJobScheduler(s.key);
+  }
+  await queue.upsertJobScheduler(SWEEP_SCHEDULER_ID, { every: intervalMinutes * 60_000 }, {
+    name: 'sweep',
+    data: {},
+    opts: { attempts: 3, backoff: { type: 'exponential', delay: 30_000 }, removeOnComplete: true, removeOnFail: true },
   });
 }
 

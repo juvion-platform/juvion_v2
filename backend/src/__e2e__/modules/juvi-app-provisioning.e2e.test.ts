@@ -71,6 +71,19 @@ describe('provisionPerson', () => {
     expect(user?.mustChangePassword).toBe(false);
   });
 
+  it('refuses a password reset for a disabled ERP login and never re-enables it', async () => {
+    const s = await createTestStudent(fx.collegeId);
+    await User.updateOne({ collegeId: fx.collegeId, _id: s.user._id }, { $set: { isActive: false } });
+    await expect(
+      provisionPerson({ collegeId: fx.collegeId, personId: String(s.person._id), kind: 'student', source: 'bulk', performedBy: 'admin' }),
+    ).rejects.toMatchObject({ statusCode: 403, code: 'ACCOUNT_DEACTIVATED', message: 'ERP login is disabled for this person' });
+    const user = await User.findOne({ collegeId: fx.collegeId, _id: s.user._id }).lean();
+    expect(user?.isActive).toBe(false);
+    expect(await bcrypt.compare('test123', user!.password)).toBe(true);
+    expect(await JuviAccount.countDocuments({ collegeId: fx.collegeId, personId: s.person._id })).toBe(0);
+    expect(await JuviProvisionedCredential.countDocuments({ collegeId: fx.collegeId })).toBe(0);
+  });
+
   it('assigns hod role when the faculty heads a department', async () => {
     const f = await createTestFaculty(fx.collegeId, { departmentId: String(fx.cse._id) });
     await User.deleteOne({ _id: f.user._id });

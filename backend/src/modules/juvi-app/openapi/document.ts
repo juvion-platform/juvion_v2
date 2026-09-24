@@ -26,7 +26,9 @@ interface RouteDef {
 
 const json = (schema: z.ZodTypeAny) => ({ content: { 'application/json': { schema } } });
 
-export function buildOpenApiDocument(): Record<string, unknown> {
+export type OpenApiDocument = ReturnType<OpenApiGeneratorV31['generateDocument']>;
+
+export function buildOpenApiDocument(): OpenApiDocument {
   const registry = new OpenAPIRegistry();
   const bearerAuth = registry.registerComponent('securitySchemes', 'bearerAuth', { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' });
 
@@ -101,7 +103,7 @@ export function buildOpenApiDocument(): Record<string, unknown> {
     openapi: '3.1.0',
     info: { title: 'Juvi Mobile API', version: '1.0.0', description: 'Contract for the Juvi Flutter app. Generated from the backend Zod schemas; do not edit by hand.' },
     servers: [{ url: '/api/juvi-app/v1' }],
-  }) as unknown as Record<string, unknown>;
+  });
 }
 
 /** JSON with recursively sorted object keys and two-space indentation, so diffs are meaningful. */

@@ -34,7 +34,8 @@ const STATUS_TO_CODE: Record<number, MobileErrorCode> = {
 export function mobileErrorHandler(err: unknown, _req: Request, res: Response, _next: NextFunction): void {
   if (err instanceof MobileApiError) {
     const detail = (err.detail && typeof err.detail === 'object') ? (err.detail as Record<string, unknown>) : {};
-    res.status(err.statusCode).json({ error: { code: err.code, message: err.message, ...detail } });
+    // `detail` goes first so a detail key can never override the envelope's code or message.
+    res.status(err.statusCode).json({ error: { ...detail, code: err.code, message: err.message } });
     return;
   }
   if (err instanceof ZodError) {

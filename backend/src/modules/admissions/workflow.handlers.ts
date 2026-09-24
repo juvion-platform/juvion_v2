@@ -43,7 +43,8 @@ import { JuviAction } from '../../models/juvi/JuviAction';
 import { JuviConversation } from '../../models/juvi/JuviConversation';
 import { JuviMessage } from '../../models/juvi/JuviMessage';
 import { JuviPersonaConfig } from '../../models/juvi/JuviPersonaConfig';
-import { provisionIfEnabled } from '../juvi-app/accounts/provisioning-service';
+import { provisionIfEnabled, deactivateAccount } from '../juvi-app/accounts/provisioning-service';
+import { JuviAccount } from '../../models/juvi/JuviAccount';
 import { User } from '../../models/User';
 import { createAuditLog } from '../../shared/audit';
 import { WorkflowStepHandlerContext, registerWorkflowStepHandler } from '../../shared/workflow/StepHandlers';
@@ -1987,7 +1988,7 @@ registerWorkflowStepHandler('W01', 'cancel_m08', async ({ instance, result }) =>
   };
 });
 
-registerWorkflowStepHandler('W01', 'cancel_m12', async ({ instance, result }) => {
+registerWorkflowStepHandler('W01', 'cancel_m12', async ({ instance, result, completedBy }) => {
   const cancellation = await ensureCancellationLinked(instance);
   const personId = getIdString(instance.metadata?.personId);
   if (!personId) return;
@@ -1997,6 +1998,17 @@ registerWorkflowStepHandler('W01', 'cancel_m12', async ({ instance, result }) =>
     user.isActive = false;
     await user.save();
   }
+
+  // Juvi (spec §9 Deprovisioning): a cancelled admission loses its app account, sessions and
+  // channel memberships too. Never fails the ERP step.
+  await JuviAccount.findOne({ collegeId: instance.collegeId, personId })
+    .select('_id status')
+    .lean()
+    .then(async (account) => {
+      if (!account || account.status === 'deactivated') return;
+      await deactivateAccount(String(instance.collegeId), String(account._id), 'workflow', completedBy ?? 'system');
+    })
+    .catch((err) => console.warn('[juvi-app] cancel_m12 deactivate failed', err));
 
   if (cancellation) {
     await updateCancellationReversal(cancellation, 'M12', 'completed');

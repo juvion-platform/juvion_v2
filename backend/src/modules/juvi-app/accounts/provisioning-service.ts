@@ -120,10 +120,13 @@ export async function provisionPerson(input: ProvisionPersonInput): Promise<Prov
     });
     userCreated = true;
   } else if (resetPassword) {
+    // Never re-open an ERP login an admin disabled (the User is shared with the ERP web login).
+    if (user.isActive === false) {
+      throw new MobileApiError(403, 'ACCOUNT_DEACTIVATED', 'ERP login is disabled for this person');
+    }
     temporaryPassword = input.temporaryPassword ?? generateTemporaryPassword();
     user.password = await bcrypt.hash(temporaryPassword, 10);
     user.mustChangePassword = true;
-    user.isActive = true;
     await user.save();
   }
 

@@ -2,7 +2,7 @@ import { Types } from 'mongoose';
 import redis from '../../../config/redis';
 import { Channel } from '../../../models/juvi/Channel';
 import { ChannelMembership, MembershipRole } from '../../../models/juvi/ChannelMembership';
-import { ChannelTemplate, IChannelTemplate, TemplateCode, ChannelScopeType } from '../../../models/juvi/ChannelTemplate';
+import { ChannelTemplate, LeanChannelTemplate, TemplateCode, ChannelScopeType } from '../../../models/juvi/ChannelTemplate';
 import { JuviAccount, ELIGIBLE_STATUSES } from '../../../models/juvi/JuviAccount';
 import { seedChannelTemplates } from '../../../shared/seed/channel-templates';
 import { loadCollegeGraph, loadAccountGraph, CollegeGraph } from './graph-loader';
@@ -25,15 +25,15 @@ const lockKey = (cid: string) => `juvi:reconcile-lock:${cid}`;
 const lastKey = (cid: string) => `juvi:reconcile-last:${cid}`;
 const scopeKey = (scopeType: string, scopeId: unknown) => `${scopeType}:${scopeId ? String(scopeId) : ''}`;
 
-async function loadTemplates(collegeId: string): Promise<Map<TemplateCode, IChannelTemplate>> {
+async function loadTemplates(collegeId: string): Promise<Map<TemplateCode, LeanChannelTemplate>> {
   await seedChannelTemplates(collegeId);
-  const rows = await ChannelTemplate.find({ collegeId, isEnabled: true }).lean();
-  return new Map(rows.map((t) => [t.code, t as unknown as IChannelTemplate]));
+  const rows = await ChannelTemplate.find({ collegeId, isEnabled: true }).lean<LeanChannelTemplate[]>();
+  return new Map(rows.map((t) => [t.code, t]));
 }
 
 interface DesiredChannel { code: TemplateCode; scopeType: ChannelScopeType; scopeId: string | null; semesterId?: string; vars: Record<string, string> }
 
-function desiredChannels(g: CollegeGraph, templates: Map<TemplateCode, IChannelTemplate>): DesiredChannel[] {
+function desiredChannels(g: CollegeGraph, templates: Map<TemplateCode, LeanChannelTemplate>): DesiredChannel[] {
   const out: DesiredChannel[] = [];
   if (templates.has('college')) out.push({ code: 'college', scopeType: 'college', scopeId: null, vars: { 'college.name': g.names.college } });
   if (templates.has('department')) for (const id of g.scopes.departmentIds) out.push({ code: 'department', scopeType: 'department', scopeId: id, vars: { 'department.name': g.names.departments.get(id) ?? '' } });
@@ -44,7 +44,7 @@ function desiredChannels(g: CollegeGraph, templates: Map<TemplateCode, IChannelT
 }
 
 export async function ensureChannels(
-  collegeId: string, g: CollegeGraph, templates: Map<TemplateCode, IChannelTemplate>,
+  collegeId: string, g: CollegeGraph, templates: Map<TemplateCode, LeanChannelTemplate>,
 ): Promise<{ created: number; archived: number; unarchived: number }> {
   const existing = await Channel.find({ collegeId }).select('_id scopeType scopeId status').lean();
   const byKey = new Map(existing.map((c) => [scopeKey(c.scopeType, c.scopeId), c]));

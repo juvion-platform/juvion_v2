@@ -5,6 +5,7 @@ import { seedBase, BaseFixtures } from '../setup/seed-base';
 import { enableJuvi, provisionTestStudent, mobileClient, TEST_DEVICE } from '../factories/juvi.factory';
 import { MobileSession } from '../../models/juvi/MobileSession';
 import { deactivateAccount } from '../../modules/juvi-app/accounts/provisioning-service';
+import { User } from '../../models/User';
 
 let app: Express; let fx: BaseFixtures;
 const V1 = '/api/juvi-app/v1';
@@ -53,6 +54,14 @@ describe('POST /auth/sign-in', () => {
     expect(right.body.error).toMatchObject({ code: 'ACCOUNT_DEACTIVATED', supportContact: { name: 'Exam Office' } });
   });
 
+  it('503 INSTITUTION_PAUSED with the pause message when the institution is paused', async () => {
+    const s = await provisionTestStudent(fx);
+    await enableJuvi(fx.collegeId, { paused: true, pausedMessage: 'Back after exams.' });
+    const res = await signIn(s.student.rollNumber, s.tempPassword).expect(503);
+    expect(res.body.error).toEqual({ code: 'INSTITUTION_PAUSED', message: 'Back after exams.' });
+    expect(await MobileSession.countDocuments({ collegeId: fx.collegeId, accountId: s.account._id })).toBe(0);
+  });
+
   it('refuses an identifier from another college with the generic 401', async () => {
     const s = await provisionTestStudent(fx);
     const res = await signIn(s.student.rollNumber, s.tempPassword, TEST_DEVICE, '000000000000000000000099').expect(401);
@@ -85,6 +94,20 @@ describe('refresh, sign-out, change-password', () => {
     expect(replay.body.error).toMatchObject({ code: 'SESSION_INVALIDATED', reason: 'token_reuse' });
     // The whole session is gone: the rotated token is dead too.
     await mobileClient(app).post(`${V1}/auth/refresh`).send({ refreshToken: rotated.body.refreshToken, deviceId: TEST_DEVICE.id }).expect(401);
+  });
+
+  it('refuses refresh with 403 ACCOUNT_DEACTIVATED once the ERP login is disabled, without rotating the token', async () => {
+    const s = await provisionTestStudent(fx);
+    const first = (await signIn(s.student.rollNumber, s.tempPassword)).body;
+    await User.updateOne({ collegeId: fx.collegeId, _id: s.account.userId }, { $set: { isActive: false } });
+
+    const res = await mobileClient(app).post(`${V1}/auth/refresh`).send({ refreshToken: first.refreshToken, deviceId: TEST_DEVICE.id }).expect(403);
+    expect(res.body.error).toMatchObject({ code: 'ACCOUNT_DEACTIVATED', message: 'This account is no longer active at your institution.', supportContact: { name: 'Exam Office' } });
+
+    // Refused before rotation: the session and the token the client holds are untouched.
+    const session = await MobileSession.findOne({ collegeId: fx.collegeId, accountId: s.account._id }).lean();
+    expect(session?.revokedAt).toBeFalsy();
+    expect(session?.previousRefreshTokenHash).toBeFalsy();
   });
 
   it('sign-out invalidates the next request', async () => {

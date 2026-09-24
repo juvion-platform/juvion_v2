@@ -44,4 +44,7 @@ const schema = new Schema<IChannelTemplate>(
 
 schema.index({ collegeId: 1, code: 1 }, { unique: true });
 
+/** A lean read of a ChannelTemplate: fields only, no Document methods. */
+export type LeanChannelTemplate = Omit<IChannelTemplate, keyof Document> & { _id: Types.ObjectId };
+
 export const ChannelTemplate = model<IChannelTemplate>('ChannelTemplate', schema);

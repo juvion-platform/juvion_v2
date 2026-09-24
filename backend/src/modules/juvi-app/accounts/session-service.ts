@@ -86,6 +86,19 @@ export async function createSession(input: {
 }
 
 /**
+ * Read-only: the live session a refresh token would rotate, or null. Lets refresh refuse a
+ * deactivated user before the token is swapped, so the client keeps the token it holds.
+ */
+export async function findRotatableSession(
+  refreshToken: string,
+  deviceId: string,
+): Promise<{ _id: IMobileSession['_id']; userId: IMobileSession['userId']; collegeId: IMobileSession['collegeId'] } | null> {
+  return MobileSession.findOne({
+    refreshTokenHash: hashRefreshToken(refreshToken), deviceId, revokedAt: null, refreshExpiresAt: { $gt: new Date() },
+  }).select('_id userId collegeId').lean<{ _id: IMobileSession['_id']; userId: IMobileSession['userId']; collegeId: IMobileSession['collegeId'] }>();
+}
+
+/**
  * Rotate on refresh. The old hash is swapped atomically and remembered as
  * `previousRefreshTokenHash`. A later presentation of that old token is a
  * replay of a rotated token — the session is revoked (spec §8). The device id

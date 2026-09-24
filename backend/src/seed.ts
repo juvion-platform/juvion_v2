@@ -1,6 +1,7 @@
 // @ts-nocheck
 import mongoose from 'mongoose';
 import { connectDB } from './config/db';
+import redis from './config/redis';
 import {
   // People
   Person, Student, Faculty, Staff, Parent,
@@ -3187,12 +3188,14 @@ async function seed() {
   if (demoStudent) await provisionPerson({ collegeId: String(CID), personId: String(demoStudent.personId), kind: 'student', source: 'admin', performedBy: 'seed', temporaryPassword: DEMO_TEMP_PASSWORD });
   if (demoFaculty) await provisionPerson({ collegeId: String(CID), personId: String(demoFaculty.personId), kind: 'faculty', source: 'admin', performedBy: 'seed', temporaryPassword: DEMO_TEMP_PASSWORD });
   const juviSummary = await reconcileCollege(String(CID));
-  console.log(`Juvi: ${juviSummary.channels.total} channels, ${juviSummary.memberships.added} memberships`);
+  console.log(`Juvi: ${juviSummary.channels.total} channels, ${juviSummary.memberships.added} memberships${juviSummary.skipped ? ' (skipped: another reconcile holds the lock)' : ''}`);
   console.log(`Juvi demo sign-in — institution code JIT; student ${demoStudent?.rollNumber ?? '(none)'} / faculty ${demoFaculty?.employeeCode ?? '(none)'}; temporary password ${DEMO_TEMP_PASSWORD}`);
 
   // ========================================================================
   // DONE
   // ========================================================================
+  // The Juvi reconcile opened the lazily-connected Redis client; close it so the process exits.
+  await redis.quit().catch(() => undefined);
   console.log('\nSeed complete! All 150 models seeded with realistic data.');
   await mongoose.disconnect();
 }

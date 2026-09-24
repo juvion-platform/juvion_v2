@@ -1,5 +1,6 @@
 import redis from '../../../config/redis';
-import { College, IJuviConfig } from '../../../models/College';
+import { Types } from 'mongoose';
+import { College, ICollege, IJuviConfig } from '../../../models/College';
 
 const CACHE_TTL_SECONDS = 60;
 const key = (collegeId: string) => `juvi:cfg:${collegeId}`;
@@ -12,8 +13,11 @@ export interface JuviConfigView extends IJuviConfig {
   collegeStatus: string;
 }
 
-function toView(doc: any): JuviConfigView {
-  const j: IJuviConfig = doc.juvi ?? {};
+/** The lean projection both readers select: `name code logo status juvi`. */
+type CollegeConfigLean = Pick<ICollege, 'name' | 'code' | 'logo' | 'status'> & { _id: Types.ObjectId; juvi?: Partial<IJuviConfig> };
+
+function toView(doc: CollegeConfigLean): JuviConfigView {
+  const j: Partial<IJuviConfig> = doc.juvi ?? {};
   return {
     collegeId: String(doc._id),
     name: doc.name,
@@ -38,7 +42,7 @@ export async function getJuviConfig(collegeId: string): Promise<JuviConfigView |
     if (cached) return JSON.parse(cached) as JuviConfigView;
   } catch { /* Redis down: fall through to Mongo */ }
 
-  const doc = await College.findById(collegeId).select('name code logo status juvi').lean();
+  const doc = await College.findById(collegeId).select('name code logo status juvi').lean<CollegeConfigLean>();
   if (!doc) return null;
   const view = toView(doc);
   try { await redis.set(key(collegeId), JSON.stringify(view), 'EX', CACHE_TTL_SECONDS); } catch { /* non-fatal */ }
@@ -56,7 +60,7 @@ export async function isJuviEnabled(collegeId: string): Promise<boolean> {
 
 /** Public S01 lookup. Unknown, inactive and Juvi-disabled colleges all return null. */
 export async function lookupInstitutionByCode(code: string): Promise<JuviConfigView | null> {
-  const doc = await College.findOne({ code: code.trim().toUpperCase() }).select('name code logo status juvi').lean();
+  const doc = await College.findOne({ code: code.trim().toUpperCase() }).select('name code logo status juvi').lean<CollegeConfigLean>();
   if (!doc) return null;
   const view = toView(doc);
   if (view.collegeStatus !== 'active' || !view.enabled) return null;

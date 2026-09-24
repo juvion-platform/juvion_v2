@@ -7,13 +7,14 @@ import { MobileContext } from '../middleware/authenticate-mobile';
 import { getJuviConfig } from '../config/institution-config';
 import { resolveIdentifierToUser } from './identifier-resolver';
 import { getCooldown, recordFailure, clearFailures } from './cooldown';
-import { createSession, rotateSession, revokeSession, revokeOtherSessions, signAccessToken, SessionTokens } from './session-service';
+import { createSession, findRotatableSession, rotateSession, revokeSession, revokeOtherSessions, signAccessToken, SessionTokens } from './session-service';
 import { SignInInput, AccountSummary, signInResponseSchema } from './schemas';
 import { ONBOARDING_STEPS } from './onboarding';
 
 /** bcrypt work happens even when no user matched, so timing does not reveal existence. */
 const DUMMY_HASH = bcrypt.hashSync('juvi-dummy-password-for-timing', 10);
 const invalidCredentials = () => new MobileApiError(401, 'INVALID_CREDENTIALS', 'That identifier or password is not right.');
+const DEACTIVATED_MESSAGE = 'This account is no longer active at your institution.';
 
 export function accountSummary(account: IJuviAccount, user: { mustChangePassword?: boolean }): AccountSummary {
   return {
@@ -43,6 +44,9 @@ export async function signIn(input: SignInInput): Promise<z.infer<typeof signInR
   if (!cfg.enabled) {
     throw new MobileApiError(503, 'INSTITUTION_PAUSED', 'Juvi is not available for your institution right now.', { message: 'Juvi is not available for your institution right now.' });
   }
+  if (cfg.paused) {
+    throw new MobileApiError(503, 'INSTITUTION_PAUSED', cfg.pausedMessage ?? 'Juvi is paused.', { message: cfg.pausedMessage ?? 'Juvi is paused.' });
+  }
 
   const user = await resolveIdentifierToUser(input.collegeId, input.identifier);
   const account = user ? await JuviAccount.findOne({ collegeId: input.collegeId, userId: user._id }) : null;
@@ -54,7 +58,7 @@ export async function signIn(input: SignInInput): Promise<z.infer<typeof signInR
     throw invalidCredentials();
   }
   if (account.status === 'deactivated' || !user.isActive) {
-    throw new MobileApiError(403, 'ACCOUNT_DEACTIVATED', 'This account is no longer active at your institution.', { supportContact: cfg.supportContact ?? null });
+    throw new MobileApiError(403, 'ACCOUNT_DEACTIVATED', DEACTIVATED_MESSAGE, { supportContact: cfg.supportContact ?? null });
   }
 
   await clearFailures(input.collegeId, input.identifier);
@@ -69,11 +73,23 @@ export async function refresh(input: { refreshToken: string; deviceId: string })
   // rotateSession needs role/kind for the token it signs, but those are authoritative on the
   // account and user, not on the caller. Rotate first (validates + swaps the hash), then re-sign
   // the access token with the real values.
+  // A disabled ERP login is refused BEFORE rotation, so the client keeps its token and gets the
+  // deactivation reason rather than losing the old token with no new one (review M6 shape).
+  const live = await findRotatableSession(input.refreshToken, input.deviceId);
+  if (live) {
+    const owner = await User.findOne({ _id: live.userId, collegeId: live.collegeId }).select('isActive').lean();
+    if (owner && owner.isActive === false) {
+      const cfg = await getJuviConfig(String(live.collegeId));
+      throw new MobileApiError(403, 'ACCOUNT_DEACTIVATED', DEACTIVATED_MESSAGE, { supportContact: cfg?.supportContact ?? null });
+    }
+  }
   const { session, tokens } = await rotateSession(input.refreshToken, input.deviceId, { role: 'pending', kind: 'student' });
   // Ruling R10: every read of an ERP/Juvi document by id is scoped by collegeId.
   const account = await JuviAccount.findOne({ _id: session.accountId, collegeId: session.collegeId }).select('kind').lean();
-  const user = await User.findOne({ _id: session.userId, collegeId: session.collegeId }).select('role').lean();
+  const user = await User.findOne({ _id: session.userId, collegeId: session.collegeId }).select('role isActive').lean();
   if (!account || !user) throw new MobileApiError(401, 'SESSION_INVALIDATED', 'Please sign in again.', { reason: 'invalid' });
+  // Race backstop: deactivated between the pre-check and the rotation.
+  if (user.isActive === false) throw new MobileApiError(403, 'ACCOUNT_DEACTIVATED', DEACTIVATED_MESSAGE);
   return {
     ...tokens,
     accessToken: signAccessToken({ sub: String(session.userId), sid: String(session._id), aid: String(session.accountId), cid: String(session.collegeId), role: user.role, kind: account.kind }),

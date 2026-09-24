@@ -34,8 +34,14 @@ export interface CollegeGraph extends ErpGraph {
 const s = (v: unknown) => String(v);
 const ADMIN_ROLES = new Set(['admin', 'principal', 'super_admin']);
 
+/** Lean projection of the active offerings the loaders read. */
+interface OfferingLean {
+  _id: Types.ObjectId; semesterId: Types.ObjectId; sectionId: Types.ObjectId; facultyId: Types.ObjectId;
+  coFacultyIds?: Types.ObjectId[]; courseId: Types.ObjectId;
+}
+
 /** College-wide metadata used by both loaders. Hundreds of documents at most. */
-async function loadMetadata(collegeId: string, g: ErpGraph): Promise<{ activeSemesterIds: string[]; endedSemesterIds: string[]; offeringDocs: any[]; blockDocs: any[] }> {
+async function loadMetadata(collegeId: string, g: ErpGraph): Promise<{ activeSemesterIds: string[]; endedSemesterIds: string[]; offeringDocs: OfferingLean[] }> {
   const [branches, departments, sections, semesters, blocks] = await Promise.all([
     Branch.find({ collegeId }).select('_id departmentId').lean(),
     Department.find({ collegeId, isActive: true }).select('_id hodId').lean(),
@@ -52,7 +58,7 @@ async function loadMetadata(collegeId: string, g: ErpGraph): Promise<{ activeSem
   const endedSemesterIds = semesters.filter((x) => x.status === 'completed').map((x) => s(x._id));
 
   const offeringDocs = await CourseOffering.find({ collegeId, status: 'active', semesterId: { $in: activeSemesterIds } })
-    .select('_id semesterId sectionId facultyId coFacultyIds courseId').lean();
+    .select('_id semesterId sectionId facultyId coFacultyIds courseId').lean<OfferingLean[]>();
   const counts = await Enrollment.aggregate<{ _id: Types.ObjectId; n: number }>([
     { $match: { collegeId: new Types.ObjectId(collegeId), status: 'enrolled', courseOfferingId: { $in: offeringDocs.map((o) => o._id) } } },
     { $group: { _id: '$courseOfferingId', n: { $sum: 1 } } },
@@ -65,7 +71,7 @@ async function loadMetadata(collegeId: string, g: ErpGraph): Promise<{ activeSem
       enrollmentCount: countBy.get(s(o._id)) ?? 0,
     });
   }
-  return { activeSemesterIds, endedSemesterIds, offeringDocs, blockDocs: blocks };
+  return { activeSemesterIds, endedSemesterIds, offeringDocs };
 }
 
 async function buildAccountNodes(collegeId: string, accounts: IJuviAccount[]): Promise<AccountNode[]> {

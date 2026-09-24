@@ -15,6 +15,10 @@ import './modules/admissions/workflow.handlers';
 
 const app = express();
 
+// IP-keyed rate limiters read req.ip; behind nginx that is the proxy unless the hops are trusted.
+// Unset keeps the old behaviour (trust none).
+app.set('trust proxy', process.env.TRUST_PROXY_HOPS ? Number(process.env.TRUST_PROXY_HOPS) : false);
+
 app.use(helmet());
 
 // CORS: support multiple allowed origins via comma-separated ALLOWED_ORIGINS env var
