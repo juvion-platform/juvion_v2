@@ -608,8 +608,10 @@ matching Appendix D.
 `reconcileAccount(accountId)`: compute the account's expected memberships by
 inverse queries (its Section, Batch, Department via Branch, Enrollments,
 HostelAllocation; for faculty, its offerings and department), diff against
-existing rows, apply. Runs on sign-in and when `GET /spaces` is called with
-`lastReconciledAt` older than 60 s. Also sets `lastReconciledAt`.
+existing rows, apply. Runs when `GET /spaces` is called with
+`lastReconciledAt` unset or older than 60 s (so a fresh account is reconciled
+on its first Spaces load; sign-in itself does not reconcile — Ruling R23).
+Also sets `lastReconciledAt`.
 
 Scheduling: a BullMQ repeatable job `juvi_reconcile` every
 `JUVI_RECONCILE_INTERVAL_MINUTES` (default 5) enumerates colleges with
@@ -659,7 +661,7 @@ middleware on everything except `/institutions/:code`, `/auth/sign-in` and
 ```json
 { "account": { "id", "kind", "status", "onboardingStep", "onboardingSteps": ["identity","spaces","notifications"],
                "onboardingComplete", "mustChangePassword" },
-  "person":  { "firstName", "lastName", "photoUrl" },
+  "person":  { "name", "firstName", "photoUrl" },   // Person holds a single `name`; no lastName exists to derive (Ruling R24)
   "student": { "rollNumber", "programme", "branch", "batch", "section", "department", "hostel", "isLateralEntry" },
   "faculty": { "employeeCode", "designation", "department", "isHod" },
   "settings": { "quietHours": { "start", "end" }, "tiers": { "important", "routine" }, "language" },

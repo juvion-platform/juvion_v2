@@ -208,7 +208,7 @@ The student/faculty Flutter app (`mobile/`) talks to `/api/juvi-app/v1`, **not**
 
 - Own auth: `authenticateMobile` (15-min JWT with `typ: 'mobile'` + per-device `MobileSession` checked in Redis). Mobile routes never use `authorize()`; permission is per channel membership.
 - Own error envelope `{ error: { code, message } }` via `MobileApiError`; controllers call `schema.parse(req.body)` themselves instead of `validate()`.
-- Membership is **reconciled**, not event-driven: `spaces/reconcile-service.ts` runs a college pass every 5 minutes and an account pass on sign-in and Spaces refresh. Strategies are pure functions in `spaces/strategies.ts`.
+- Membership is **reconciled**, not event-driven: `spaces/reconcile-service.ts` runs a college pass every 5 minutes and an account pass on the Spaces load whenever the account's last reconcile is older than 60 seconds (a fresh account is reconciled on its first Spaces load; sign-in itself does not reconcile). Strategies are pure functions in `spaces/strategies.ts`.
 - Temporary passwords never leave the server in plaintext: `accounts/credential-store.ts` encrypts them under `JUVI_CREDENTIAL_KEY` for 7 days; the admin console reveals them.
 - The API contract `mobile/api/openapi.json` is generated (`npm run openapi:mobile -w backend`); CI fails on drift. Change a Zod schema → regenerate → commit.
 - Dev seed enables Juvi on JIT and provisions one student and one faculty member with temporary password `river-lamp-482`.
