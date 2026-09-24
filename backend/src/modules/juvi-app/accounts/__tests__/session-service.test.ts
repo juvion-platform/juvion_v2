@@ -6,7 +6,7 @@ const sessionMock = vi.hoisted(() => ({ findById: vi.fn(), updateOne: vi.fn(), u
 vi.mock('../../../../config/redis', () => ({ default: redisMock }));
 vi.mock('../../../../models/juvi/MobileSession', () => ({ MobileSession: sessionMock }));
 
-import { signAccessToken, verifyAccessToken, hashRefreshToken, newRefreshToken, getSessionState, revokeSession } from '../session-service';
+import { signAccessToken, verifyAccessToken, hashRefreshToken, newRefreshToken, getSessionState, revokeSession, rotateSession } from '../session-service';
 import { MobileApiError } from '../../errors';
 
 const claims = { sub: 'u1', sid: 's1', aid: 'a1', cid: 'c1', role: 'student', kind: 'student' as const };
@@ -79,5 +79,68 @@ describe('session state cache', () => {
     redisMock.get.mockRejectedValue(new Error('down'));
     sessionMock.findById.mockReturnValue({ select: () => ({ lean: () => Promise.resolve({ _id: 's1', revokedAt: null }) }) });
     expect(await getSessionState('s1')).toEqual({ state: 'active' });
+  });
+});
+
+describe('rotateSession reuse detection', () => {
+  it('replay of a previous token', async () => {
+    const oldToken = newRefreshToken();
+    sessionMock.findOneAndUpdate.mockResolvedValue(null);
+    sessionMock.findOne.mockReturnValueOnce({ select: () => ({ lean: () => Promise.resolve({ _id: 's1' }) }) });
+    sessionMock.updateOne.mockResolvedValue({ modifiedCount: 1 });
+    try {
+      await rotateSession(oldToken, 'd1', { role: 'student', kind: 'student' });
+      throw new Error('no throw');
+    } catch (e) {
+      expect((e as MobileApiError).code).toBe('SESSION_INVALIDATED');
+      expect(((e as MobileApiError).detail as Record<string, unknown>)?.reason).toBe('token_reuse');
+      expect(sessionMock.updateOne).toHaveBeenCalledWith({ _id: 's1', revokedAt: null }, { $set: { revokedAt: expect.any(Date), revokedReason: 'token_reuse' } });
+    }
+  });
+
+  it('expired current token', async () => {
+    const oldToken = newRefreshToken();
+    sessionMock.findOneAndUpdate.mockResolvedValue(null);
+    sessionMock.findOne.mockReturnValueOnce({ select: () => ({ lean: () => Promise.resolve(null) }) });
+    sessionMock.findOne.mockReturnValueOnce({ select: () => ({ lean: () => Promise.resolve({ _id: 's2', deviceId: 'd1', refreshExpiresAt: new Date(Date.now() - 1000) }) }) });
+    sessionMock.updateOne.mockResolvedValue({ modifiedCount: 1 });
+    try {
+      await rotateSession(oldToken, 'd1', { role: 'student', kind: 'student' });
+      throw new Error('no throw');
+    } catch (e) {
+      expect((e as MobileApiError).code).toBe('SESSION_INVALIDATED');
+      expect(((e as MobileApiError).detail as Record<string, unknown>)?.reason).toBe('expired');
+      expect(sessionMock.updateOne).toHaveBeenCalledWith({ _id: 's2', revokedAt: null }, { $set: { revokedAt: expect.any(Date), revokedReason: 'expired' } });
+    }
+  });
+
+  it('device mismatch', async () => {
+    const oldToken = newRefreshToken();
+    sessionMock.findOneAndUpdate.mockResolvedValue(null);
+    sessionMock.findOne.mockReturnValueOnce({ select: () => ({ lean: () => Promise.resolve(null) }) });
+    sessionMock.findOne.mockReturnValueOnce({ select: () => ({ lean: () => Promise.resolve({ _id: 's3', deviceId: 'other', refreshExpiresAt: new Date(Date.now() + 86_400_000) }) }) });
+    try {
+      await rotateSession(oldToken, 'd1', { role: 'student', kind: 'student' });
+      throw new Error('no throw');
+    } catch (e) {
+      expect((e as MobileApiError).code).toBe('SESSION_INVALIDATED');
+      expect(((e as MobileApiError).detail as Record<string, unknown>)?.reason).toBe('invalid');
+      expect(sessionMock.updateOne).not.toHaveBeenCalled();
+    }
+  });
+
+  it('unknown token', async () => {
+    const oldToken = newRefreshToken();
+    sessionMock.findOneAndUpdate.mockResolvedValue(null);
+    sessionMock.findOne.mockReturnValueOnce({ select: () => ({ lean: () => Promise.resolve(null) }) });
+    sessionMock.findOne.mockReturnValueOnce({ select: () => ({ lean: () => Promise.resolve(null) }) });
+    try {
+      await rotateSession(oldToken, 'd1', { role: 'student', kind: 'student' });
+      throw new Error('no throw');
+    } catch (e) {
+      expect((e as MobileApiError).code).toBe('SESSION_INVALIDATED');
+      expect(((e as MobileApiError).detail as Record<string, unknown>)?.reason).toBe('expired');
+      expect(sessionMock.updateOne).not.toHaveBeenCalled();
+    }
   });
 });
