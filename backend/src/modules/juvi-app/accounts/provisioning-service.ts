@@ -64,7 +64,7 @@ async function loadKindRow(collegeId: string, personId: string, kind: AccountKin
     const s = await Student.findOne({ collegeId, personId }).select('_id rollNumber batchId branchId').lean();
     if (!s) throw new MobileApiError(404, 'NOT_FOUND', 'Person has no student record');
     const section = await Section.findOne({ collegeId, studentIds: s._id }).select('_id').lean();
-    const branch = s.branchId ? await Branch.findById(s.branchId).select('departmentId').lean() : null;
+    const branch = s.branchId ? await Branch.findOne({ _id: s.branchId, collegeId }).select('departmentId').lean() : null;
     return {
       entityId: asObjectId(s._id), identifier: s.rollNumber ?? String(s._id), sectionId: asObjectId(section?._id), batchId: asObjectId(s.batchId),
       departmentId: asObjectId(branch?.departmentId), role: 'student', personaType: 'L-STU',

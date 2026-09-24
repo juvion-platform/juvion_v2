@@ -32,6 +32,8 @@ describe('provisionPerson', () => {
     expect(r.userCreated).toBe(true);
     expect(r.account.status).toBe('onboarding');
     expect(String(r.account.studentId)).toBe(String(student._id));
+    const credRow = await JuviProvisionedCredential.findOne({ accountId: r.account._id }).lean();
+    expect(String(credRow?.departmentId)).toBe(String(fx.cse._id));
     const user = await User.findById(r.account.userId).lean();
     expect(user?.email).toBe('24jit9001@no-email.jit-test.juvion.invalid');
     expect(user?.role).toBe('student');
