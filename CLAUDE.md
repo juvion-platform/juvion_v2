@@ -214,6 +214,7 @@ The student/faculty Flutter app (`mobile/`) talks to `/api/juvi-app/v1`, **not**
 - Temporary passwords never leave the server in plaintext: `accounts/credential-store.ts` encrypts them under `JUVI_CREDENTIAL_KEY` for 7 days; the admin console reveals them.
 - The API contract `mobile/api/openapi.json` is generated (`npm run openapi:mobile -w backend`); CI fails on drift. Change a Zod schema → regenerate → commit.
 - Dev seed enables Juvi on JIT and provisions one student and one faculty member with temporary password `river-lamp-482`.
+- Flutter app lives in `mobile/` (not an npm workspace). `flutter test` and `flutter analyze` from `mobile/`; CI is `.github/workflows/mobile.yml`. Run `flutter test --exclude-tags golden` day-to-day (goldens are platform-sensitive; see `mobile/README.md`). Regenerate the Dart client with `mobile/tool/gen_api.sh` after any contract change. Gotcha: the generated client casts nullable-object fields (`type: ["object", "null"]`, e.g. `Me.student`, `Config.minAppVersion`/`supportContact`, `InstitutionLookup.minAppVersion`) to non-nullable `Map`s, so `/me`, `/me/photo`, `/institutions/{code}` and `/config` bypass it and call a raw `Dio` directly (see `mobile/README.md`'s toolchain notes) — never mock those fields as non-null to work around it.
 
 ## Frontend Conventions
 
