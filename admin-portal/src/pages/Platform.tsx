@@ -17,6 +17,7 @@ import RbacPoliciesPage from './platform/RbacPolicies';
 import BulkImportsPage from './platform/BulkImportsPage';
 import SchemaConfigPage from './platform/SchemaConfigPage';
 import IntegrationsPage from './platform/IntegrationsPage';
+import JuviAdminPage from './platform/JuviAdminPage';
 
 function PlatformHome() {
   const navigate = useNavigate();
@@ -144,6 +145,11 @@ function PlatformHome() {
           <div className="font-semibold text-navy-dark text-sm">Integrations</div>
           <p className="text-xs text-gray-500 mt-1">ERPNext / Frappe HR bridge — personnel-side HR</p>
         </button>
+        <button onClick={() => navigate('/platform/juvi')} className="bg-white rounded-xl border p-5 text-left hover:shadow-lg transition-all border-sky-200 hover:border-sky-400">
+          <div className="inline-flex p-2.5 rounded-lg mb-3 bg-sky-50 text-sky-600"><Smartphone size={22} /></div>
+          <div className="font-semibold text-navy-dark text-sm">Juvi mobile app</div>
+          <p className="text-xs text-gray-500 mt-1">Provisioning, credentials, branding, pause switch</p>
+        </button>
       </div>
     </div>
   );
@@ -175,6 +181,7 @@ export default function Platform() {
         <Route path="bulk-imports" element={<BulkImportsPage />} />
         <Route path="config" element={<SchemaConfigPage />} />
         <Route path="integrations" element={<IntegrationsPage />} />
+        <Route path="juvi/*" element={<JuviAdminPage />} />
       </Routes>
     </SubPageWrapper>
   );
