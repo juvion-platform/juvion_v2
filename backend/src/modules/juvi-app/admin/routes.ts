@@ -5,6 +5,7 @@ import { validate } from '../../../middleware/validate';
 import { errorHandler, AppError } from '../../../middleware/errorHandler';
 import { settingsUpdateSchema } from './schemas';
 import * as settingsCtrl from './settings-controller';
+import * as provisioningCtrl from './provisioning-controller';
 
 /**
  * ERP-side administration of Juvi. ERP auth chain, ERP error shape.
@@ -16,6 +17,13 @@ adminRouter.use(authenticate);
 adminRouter.get('/settings', authorize('platform', 'read'), settingsCtrl.getSettings);
 adminRouter.put('/settings', authorize('platform', 'update'), validate(settingsUpdateSchema), settingsCtrl.updateSettings);
 
-// Tasks 2–4 add provisioning, accounts and channels routes above this line.
+adminRouter.post('/provisioning/runs', authorize('platform', 'create'), provisioningCtrl.createRun);
+adminRouter.get('/provisioning/runs', authorize('platform', 'read'), provisioningCtrl.listRuns);
+adminRouter.get('/provisioning/runs/:id', authorize('platform', 'read'), provisioningCtrl.getRun);
+adminRouter.get('/provisioning/runs/:id/credential-groups', authorize('platform', 'read'), provisioningCtrl.credentialGroups);
+// Reveals secrets: 'create', matching the spec's rule that anything exposing a credential needs the higher permission.
+adminRouter.get('/provisioning/runs/:id/credentials.csv', authorize('platform', 'create'), provisioningCtrl.credentialsCsv);
+
+// Tasks 3–4 add accounts and channels routes above this line.
 adminRouter.use((_req, _res, next) => next(new AppError(404, 'Not found')));
 adminRouter.use(errorHandler);
