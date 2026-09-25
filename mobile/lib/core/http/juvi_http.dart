@@ -52,6 +52,18 @@ class _AuthInterceptor extends QueuedInterceptorsWrapper {
   final Future<String> Function() deviceId;
   final void Function(ApiFailure)? onFatal;
 
+  /// The access token a refresh most recently confirmed dead (refresh()
+  /// returned null for it). QueuedInterceptorsWrapper runs onError one at a
+  /// time, so by the time a second queued request carrying the same stale
+  /// token gets its turn, the first refresh has already run to completion and
+  /// already failed — there is no in-flight future left to await, so the
+  /// outcome has to be remembered instead of re-derived. Cleared on the next
+  /// successful refresh.
+  String? _deadToken;
+
+  static String? _tokenOf(String? authHeader) =>
+      authHeader != null && authHeader.startsWith('Bearer ') ? authHeader.substring(7) : null;
+
   @override
   Future<void> onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
     final token = await accessToken();
@@ -66,20 +78,40 @@ class _AuthInterceptor extends QueuedInterceptorsWrapper {
   Future<void> onError(DioException err, ErrorInterceptorHandler handler) async {
     var failure = ApiFailure.fromDio(err);
     var resolvedErr = err;
+    var suppressOnFatal = false;
 
+    // Guards a request that re-enters this interceptor carrying a
+    // RequestOptions we've already retried once. The replay below runs on a
+    // bare Dio (see its comment), so it can't loop back into this onError by
+    // itself; this defends against re-entry from *outside* this interceptor —
+    // e.g. a caller (a sync/retry queue) resubmitting the same RequestOptions
+    // through `_dio` after we've already retried it — so a persistently
+    // expired token still can't trigger more than one refresh for a single
+    // logical request.
     if (failure.code == ApiErrorCode.tokenExpired && err.requestOptions.extra['retried'] != true) {
       final priorAuth = err.requestOptions.headers['Authorization'] as String?;
-      final currentToken = await accessToken();
+      final priorToken = _tokenOf(priorAuth);
 
       String? newAccessToken;
-      if (currentToken != null && priorAuth != 'Bearer $currentToken') {
-        // Another request already refreshed while this one was queued behind it
-        // (QueuedInterceptorsWrapper runs onError one at a time) — reuse that
-        // token instead of refreshing a second time.
-        newAccessToken = currentToken;
+
+      if (priorToken != null && priorToken == _deadToken) {
+        // Another queued request already ran refresh() for this exact token
+        // and it came back null. Don't refresh again for a token already
+        // known dead, and don't notify onFatal a second time for it — the
+        // request that first discovered it dead already did.
+        suppressOnFatal = true;
       } else {
-        final tokens = await refresh();
-        newAccessToken = tokens?.accessToken;
+        final currentToken = await accessToken();
+        if (currentToken != null && priorAuth != 'Bearer $currentToken') {
+          // Another request already refreshed while this one was queued behind
+          // it (QueuedInterceptorsWrapper runs onError one at a time) — reuse
+          // that token instead of refreshing a second time.
+          newAccessToken = currentToken;
+        } else {
+          final tokens = await refresh();
+          newAccessToken = tokens?.accessToken;
+          _deadToken = newAccessToken == null ? priorToken : null;
+        }
       }
 
       if (newAccessToken != null) {
@@ -87,9 +119,11 @@ class _AuthInterceptor extends QueuedInterceptorsWrapper {
           ..headers['Authorization'] = 'Bearer $newAccessToken'
           ..extra['retried'] = true;
         try {
-          // Replay on a bare Dio that shares `_dio`'s transport but carries
-          // none of its interceptors. QueuedInterceptorsWrapper's error queue
-          // only advances when this onError call resolves (calls
+          // Replay on a bare Dio that shares `_dio`'s transport (adapter) but
+          // carries none of its interceptors or other config — buildDio never
+          // sets a custom Transformer, so the default one this fresh Dio gets
+          // is equivalent. QueuedInterceptorsWrapper's error queue only
+          // advances when this onError call resolves (calls
           // handler.resolve/reject); calling `_dio.fetch(opts)` here would
           // reenter that same queue, and if the replay itself errors, its
           // onError task would queue behind this still-running one — which is
@@ -113,7 +147,7 @@ class _AuthInterceptor extends QueuedInterceptorsWrapper {
       }
     }
 
-    if (_fatalCodes.contains(failure.code)) onFatal?.call(failure);
+    if (!suppressOnFatal && _fatalCodes.contains(failure.code)) onFatal?.call(failure);
     handler.reject(
       DioException(
         requestOptions: resolvedErr.requestOptions,

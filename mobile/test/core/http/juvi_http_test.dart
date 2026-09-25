@@ -11,11 +11,13 @@ void main() {
   String? token;
   var refreshes = 0;
   ApiFailure? fatal;
+  var fatalCalls = 0;
 
   setUp(() {
     token = 'old';
     refreshes = 0;
     fatal = null;
+    fatalCalls = 0;
     dio = buildDio(
       baseUrl: 'https://api.test/v1',
       accessToken: () async => token,
@@ -27,7 +29,10 @@ void main() {
       deviceId: () async => 'dev-1',
       appVersion: '1.0.0',
       platform: 'android',
-      onFatal: (f) => fatal = f,
+      onFatal: (f) {
+        fatal = f;
+        fatalCalls++;
+      },
     );
     adapter = DioAdapter(dio: dio);
   });
@@ -149,5 +154,55 @@ void main() {
     expect(results[0].data, {'ok': '/a'});
     expect(results[1].data, {'ok': '/b'});
     expect(refreshes, 1);
+  });
+
+  test('two concurrent requests that both hit TOKEN_EXPIRED with a dead refresh share one refresh and one onFatal',
+      () async {
+    // Unlike the successful-refresh case, a failed refresh doesn't change the
+    // access token — so the second queued request can't tell "already
+    // refreshed" apart from "haven't tried yet" just by comparing tokens. The
+    // interceptor has to remember that this exact token is confirmed dead so
+    // it doesn't call refresh() (or onFatal) again for it.
+    dio = buildDio(
+      baseUrl: 'https://api.test/v1',
+      accessToken: () async => token,
+      refresh: () async {
+        refreshes++;
+        return null;
+      },
+      deviceId: () async => 'dev-1',
+      appVersion: '1.0.0',
+      platform: 'android',
+      onFatal: (f) {
+        fatal = f;
+        fatalCalls++;
+      },
+    );
+    adapter = DioAdapter(dio: dio);
+    for (final path in ['/a', '/b']) {
+      adapter.onGet(
+        path,
+        (s) => s.reply(401, {
+          'error': {'code': 'TOKEN_EXPIRED', 'message': 'x'},
+        }),
+        headers: {'Authorization': 'Bearer old'},
+      );
+    }
+
+    final futures = [
+      dio.get<Map<String, dynamic>>('/a'),
+      dio.get<Map<String, dynamic>>('/b'),
+    ];
+
+    for (final f in futures) {
+      await expectLater(
+        f,
+        throwsA(isA<DioException>().having((e) => ApiFailure.of(e).code, 'code', ApiErrorCode.sessionInvalidated)),
+      );
+    }
+
+    expect(refreshes, 1);
+    expect(fatalCalls, 1);
+    expect(fatal?.code, ApiErrorCode.sessionInvalidated);
   });
 }
