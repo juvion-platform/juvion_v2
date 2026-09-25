@@ -44,4 +44,9 @@ describe('admin settings', () => {
     const res = await api.get(`${A}/settings`).expect(401);
     expect(res.body).toEqual({ error: 'No token provided' });
   });
+
+  it('renders the ERP 404 shape for an unmatched admin path', async () => {
+    const res = await api.as(fx.admin.token).get(`${A}/nope`).expect(404);
+    expect(res.body).toEqual({ error: 'Not found' });
+  });
 });
