@@ -8,19 +8,19 @@ part of 'connectivity_provider.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// True when any network interface is up. The offline banner and [SyncLifecycle]
+/// True when any network interface is up. The offline banner and `SyncLifecycle`
 /// (`lib/core/sync/sync_lifecycle.dart`) both watch this rather than polling.
 
 @ProviderFor(isOnline)
 final isOnlineProvider = IsOnlineProvider._();
 
-/// True when any network interface is up. The offline banner and [SyncLifecycle]
+/// True when any network interface is up. The offline banner and `SyncLifecycle`
 /// (`lib/core/sync/sync_lifecycle.dart`) both watch this rather than polling.
 
 final class IsOnlineProvider
     extends $FunctionalProvider<AsyncValue<bool>, bool, Stream<bool>>
     with $FutureModifier<bool>, $StreamProvider<bool> {
-  /// True when any network interface is up. The offline banner and [SyncLifecycle]
+  /// True when any network interface is up. The offline banner and `SyncLifecycle`
   /// (`lib/core/sync/sync_lifecycle.dart`) both watch this rather than polling.
   IsOnlineProvider._()
     : super(

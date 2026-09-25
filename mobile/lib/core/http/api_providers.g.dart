@@ -122,17 +122,63 @@ final class AppVersionProvider
 
 String _$appVersionHash() => r'59b58cc8214f60571dfe517b1f68cfc1aed29718';
 
-/// No interceptors: used only for the refresh call itself.
+/// No interceptors, no Bearer token: used for calls made before a session exists
+/// (institution lookup, sign-in, refresh). `lib/core/repos/auth_repository.dart`'s
+/// `lookupInstitution` also reads this directly (see its doc comment for why).
+
+@ProviderFor(bareDio)
+final bareDioProvider = BareDioProvider._();
+
+/// No interceptors, no Bearer token: used for calls made before a session exists
+/// (institution lookup, sign-in, refresh). `lib/core/repos/auth_repository.dart`'s
+/// `lookupInstitution` also reads this directly (see its doc comment for why).
+
+final class BareDioProvider extends $FunctionalProvider<Dio, Dio, Dio>
+    with $Provider<Dio> {
+  /// No interceptors, no Bearer token: used for calls made before a session exists
+  /// (institution lookup, sign-in, refresh). `lib/core/repos/auth_repository.dart`'s
+  /// `lookupInstitution` also reads this directly (see its doc comment for why).
+  BareDioProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'bareDioProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$bareDioHash();
+
+  @$internal
+  @override
+  $ProviderElement<Dio> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  Dio create(Ref ref) {
+    return bareDio(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(Dio value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<Dio>(value),
+    );
+  }
+}
+
+String _$bareDioHash() => r'605273bcdd5e9a12245f3843a29b7e1df1c2de7f';
 
 @ProviderFor(bareMobileApi)
 final bareMobileApiProvider = BareMobileApiProvider._();
 
-/// No interceptors: used only for the refresh call itself.
-
 final class BareMobileApiProvider
     extends $FunctionalProvider<wire.MobileApi, wire.MobileApi, wire.MobileApi>
     with $Provider<wire.MobileApi> {
-  /// No interceptors: used only for the refresh call itself.
   BareMobileApiProvider._()
     : super(
         from: null,
@@ -166,7 +212,7 @@ final class BareMobileApiProvider
   }
 }
 
-String _$bareMobileApiHash() => r'6135f6609d4d378d2f38a886db0f9d4294569c8a';
+String _$bareMobileApiHash() => r'59fe59e966cf5c2d2a0167bc63b891c8d5efcab4';
 
 @ProviderFor(dio)
 final dioProvider = DioProvider._();

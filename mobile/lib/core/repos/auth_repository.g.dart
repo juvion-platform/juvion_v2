@@ -48,7 +48,7 @@ final class AuthRepositoryProvider
   }
 }
 
-String _$authRepositoryHash() => r'be44e27175c05657d84cfe6d18747d73e0f460c9';
+String _$authRepositoryHash() => r'f6611b5e9768dae90e90312dca8271feba3edd84';
 
 @ProviderFor(deviceInfo)
 final deviceInfoProvider = DeviceInfoProvider._();

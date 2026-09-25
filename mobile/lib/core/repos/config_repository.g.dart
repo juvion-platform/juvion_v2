@@ -46,7 +46,7 @@ final class ConfigRepositoryProvider
   }
 }
 
-String _$configRepositoryHash() => r'ec53e3895c10d34a658202366d4fbecef7bc1425';
+String _$configRepositoryHash() => r'506ba3525aaac5deae0e42da4497bb6b9151b4a7';
 
 /// Cached-then-network config; the theme reads the accent from here.
 

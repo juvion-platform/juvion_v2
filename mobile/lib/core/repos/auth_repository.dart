@@ -27,16 +27,27 @@ abstract class AuthRepository {
 }
 
 class ApiAuthRepository implements AuthRepository {
-  ApiAuthRepository(this._api, this._bare, this._dio);
+  ApiAuthRepository(this._api, this._bare, this._dio, this._bareDio);
   final wire.MobileApi _api;
   final wire.MobileApi _bare;
   final Dio _dio;
+  final Dio _bareDio;
 
+  /// Fetches `/institutions/{code}` on the bare, unauthenticated Dio rather than
+  /// through `wire.MobileApi.lookupInstitution()`: the generated `wire.InstitutionLookup`
+  /// declares `minAppVersion` non-nullable and unconditionally casts it to
+  /// `Map<String, dynamic>`, even though the contract marks it `type: ["object", "null"]`
+  /// — the same generator gap `fetchAccount` documents below for `Me.student`/`Me.faculty`.
+  /// The real server sends `minAppVersion: null` whenever it doesn't gate on app version,
+  /// which is the common case, so `wire.InstitutionLookup.fromJson` throws on that payload
+  /// and the field never reaches `InstitutionIdentity.fromJson` at all. Parsing the raw
+  /// body with our own (correctly nullable, and unaware of `minAppVersion` — it isn't one
+  /// of `InstitutionIdentity`'s fields) model avoids that crash entirely.
   @override
   Future<InstitutionIdentity> lookupInstitution(String code) async {
     try {
-      final r = await _bare.lookupInstitution(code: code.trim().toUpperCase());
-      return InstitutionIdentity.fromJson(r.data!.toJson());
+      final response = await _bareDio.get<Map<String, dynamic>>('/institutions/${code.trim().toUpperCase()}');
+      return InstitutionIdentity.fromJson(response.data!);
     } catch (e) {
       throw ApiFailure.of(e);
     }
@@ -110,7 +121,7 @@ class ApiAuthRepository implements AuthRepository {
 
 @Riverpod(keepAlive: true)
 AuthRepository authRepository(Ref ref) =>
-    ApiAuthRepository(ref.read(mobileApiProvider), ref.read(bareMobileApiProvider), ref.read(dioProvider));
+    ApiAuthRepository(ref.read(mobileApiProvider), ref.read(bareMobileApiProvider), ref.read(dioProvider), ref.read(bareDioProvider));
 
 @Riverpod(keepAlive: true)
 Future<DeviceInfo> deviceInfo(Ref ref) async => DeviceInfo(

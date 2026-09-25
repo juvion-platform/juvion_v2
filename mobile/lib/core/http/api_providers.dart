@@ -19,9 +19,14 @@ Future<AppDatabase> appDatabase(Ref ref) async => AppDatabase.openEncrypted(awai
 @Riverpod(keepAlive: true)
 Future<String> appVersion(Ref ref) async => (await PackageInfo.fromPlatform()).version;
 
-/// No interceptors: used only for the refresh call itself.
+/// No interceptors, no Bearer token: used for calls made before a session exists
+/// (institution lookup, sign-in, refresh). `lib/core/repos/auth_repository.dart`'s
+/// `lookupInstitution` also reads this directly (see its doc comment for why).
 @Riverpod(keepAlive: true)
-wire.MobileApi bareMobileApi(Ref ref) => wire.JuviApi(basePathOverride: AppEnv.apiBaseUrl).getMobileApi();
+Dio bareDio(Ref ref) => Dio(BaseOptions(baseUrl: AppEnv.apiBaseUrl));
+
+@Riverpod(keepAlive: true)
+wire.MobileApi bareMobileApi(Ref ref) => wire.JuviApi(dio: ref.read(bareDioProvider), basePathOverride: AppEnv.apiBaseUrl).getMobileApi();
 
 @Riverpod(keepAlive: true)
 Dio dio(Ref ref) {
