@@ -59,14 +59,17 @@ describe('student import schema', () => {
   // entity types keep the behaviour they had before this branch. Student is
   // the only schema that upserts, so it is the only one where two rows
   // claiming one identity destroys data rather than merely duplicating it.
-  it('is the only entity type that opts into whole-file duplicate detection', () => {
+  // 010 P2 — `user` (keyed by email) is the second schema with natural keys.
+  it('student and user are the only entity types that opt into whole-file duplicate detection', () => {
     expect(def!.naturalKeys).toBeTypeOf('function');
-    const others = listImportEntityTypes().filter((d) => d.entityType !== 'student');
+    const withKeys = ['student', 'user'];
+    const others = listImportEntityTypes().filter((d) => !withKeys.includes(d.entityType));
     expect(others.map((d) => d.entityType).sort())
       .toEqual(['applicant', 'faculty', 'programme', 'staff']);
     for (const other of others) {
       expect(other.naturalKeys, `${other.entityType} must not opt in`).toBeUndefined();
     }
+    expect(listImportEntityTypes().find((d) => d.entityType === 'user')!.naturalKeys).toBeTypeOf('function');
   });
 
   it('rejects a blank required field', () => {

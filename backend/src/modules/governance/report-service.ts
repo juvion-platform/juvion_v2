@@ -1,3 +1,5 @@
+import { maskFields, hiddenClassesFor } from '../../shared/rbac/sensitivity';
+import { scopeNotApplicable } from '../../shared/rbac/apply-scope';
 /**
  * report-service — orchestrates ReportDefinition execution and
  * persists ReportRun history. Strategic Gap 4 Phase A.
@@ -70,6 +72,7 @@ export function getDefinition(code: string) {
 export async function listRuns(collegeId: string, page = 1, limit = 20, definitionCode?: string) {
   const filter: Record<string, unknown> = { collegeId };
   if (definitionCode) filter.definitionCode = definitionCode;
+  scopeNotApplicable(filter); // college-wide, no department/person axis
   return paginate(ReportRun, filter, page, limit, { createdAt: -1 });
 }
 
@@ -122,7 +125,8 @@ export async function runReport(
   const started = Date.now();
   try {
     const out = await def.run({ collegeId, authScope }, parameters);
-    const truncated = (out.rows || []).slice(0, ROW_CAP);
+    // 010 P3 — the same mask the JSON layer applies, for rows that leave through the report engine.
+    const truncated = maskFields((out.rows || []).slice(0, ROW_CAP), hiddenClassesFor(authScope));
 
     runDoc.status = 'success';
     runDoc.result = truncated;

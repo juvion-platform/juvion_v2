@@ -1,3 +1,5 @@
+// 010 — global Mongoose plugin; must load before any model module.
+import './shared/rbac/scope-plugin';
 import 'dotenv/config';
 import { connectDB } from './config/db';
 import app from './app';

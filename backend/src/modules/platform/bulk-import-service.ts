@@ -50,6 +50,7 @@ import {
   getImportSchema,
   serializeSchema,
   type ImportSchemaDefinition,
+  listImportEntityTypes,
 } from './bulk-import-registry';
 import type {
   ImportRowAction, ImportCommitContext, ImportRowPinPreview,
@@ -837,6 +838,5 @@ export function listEntityTypeDefinitions() {
   // so the response is plain JSON-safe.
   // Inline-imported registry to avoid a `require()` call in a TS file.
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { listImportEntityTypes } = require('./bulk-import-registry') as typeof import('./bulk-import-registry');
   return listImportEntityTypes().map(serializeSchema);
 }

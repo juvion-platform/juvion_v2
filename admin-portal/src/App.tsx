@@ -4,6 +4,7 @@ import { useAuthStore } from './stores/authStore';
 import DashboardLayout from './layouts/DashboardLayout';
 import ErrorBoundary from './components/ErrorBoundary';
 import SessionWatcher from './components/SessionWatcher';
+import RequirePermission from './components/RequirePermission';
 
 const Login = lazy(() => import('./pages/Login'));
 const CollegeSelector = lazy(() => import('./pages/CollegeSelector'));
@@ -83,6 +84,11 @@ function renderLazyPage(node: React.ReactNode) {
   return <RouteBoundary>{node}</RouteBoundary>;
 }
 
+/** 010 — hub routes need `<module>:read`; the sidebar hides them, this stops the URL. */
+function gated(module: string, node: React.ReactNode) {
+  return <RequirePermission module={module}>{renderLazyPage(node)}</RequirePermission>;
+}
+
 export default function App() {
   return (
     <>
@@ -103,19 +109,19 @@ export default function App() {
           }
         >
           <Route path="/" element={renderLazyPage(<Dashboard />)} />
-          <Route path="/admissions/*" element={renderLazyPage(<Admissions />)} />
-          <Route path="/people/*" element={renderLazyPage(<People />)} />
-          <Route path="/academics/*" element={renderLazyPage(<Academics />)} />
-          <Route path="/finance/*" element={renderLazyPage(<Finance />)} />
-          <Route path="/hr/*" element={renderLazyPage(<HR />)} />
-          <Route path="/welfare/*" element={renderLazyPage(<Welfare />)} />
-          <Route path="/placement/*" element={renderLazyPage(<Placement />)} />
-          <Route path="/campus/*" element={renderLazyPage(<CampusOps />)} />
-          <Route path="/student-dev/*" element={renderLazyPage(<StudentDev />)} />
-          <Route path="/compliance/*" element={renderLazyPage(<Compliance />)} />
-          <Route path="/governance/*" element={renderLazyPage(<Governance />)} />
-          <Route path="/platform/*" element={renderLazyPage(<Platform />)} />
-          <Route path="/juvi/*" element={renderLazyPage(<Juvi />)} />
+          <Route path="/admissions/*" element={gated('admissions', <Admissions />)} />
+          <Route path="/people/*" element={gated('people', <People />)} />
+          <Route path="/academics/*" element={gated('academics', <Academics />)} />
+          <Route path="/finance/*" element={gated('finance', <Finance />)} />
+          <Route path="/hr/*" element={gated('hr', <HR />)} />
+          <Route path="/welfare/*" element={gated('welfare', <Welfare />)} />
+          <Route path="/placement/*" element={gated('placement', <Placement />)} />
+          <Route path="/campus/*" element={gated('campus', <CampusOps />)} />
+          <Route path="/student-dev/*" element={gated('student-dev', <StudentDev />)} />
+          <Route path="/compliance/*" element={gated('compliance', <Compliance />)} />
+          <Route path="/governance/*" element={gated('governance', <Governance />)} />
+          <Route path="/platform/*" element={gated('platform', <Platform />)} />
+          <Route path="/juvi/*" element={gated('juvi', <Juvi />)} />
           <Route path="/master-data/*" element={renderLazyPage(<MasterData />)} />
           <Route path="/search" element={renderLazyPage(<SearchResults />)} />
           {/* Show an explicit 404 rather than silently bouncing typos to the

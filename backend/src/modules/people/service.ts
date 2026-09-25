@@ -13,7 +13,7 @@ import { provisionIfEnabled } from '../juvi-app/accounts/provisioning-service';
 import * as feePinService from '../finance/fee-pin-service';
 import { resolveStudentYearOfStudy } from '../finance/resolve-year-of-study';
 import { AuthScope } from '../../shared/rbac/types';
-import { applyAuthScope } from '../../shared/rbac/apply-scope';
+import { applyAuthScope, findOneScoped } from '../../shared/rbac/apply-scope';
 import { ALL_PERSONAS } from '../../shared/rbac/personas';
 import {
   getFacultyProfileCompleteness,
@@ -27,9 +27,16 @@ import {
 const toOid = (id: string) => new mongoose.Types.ObjectId(id);
 
 // ─── Dashboard Stats ─────────────────────────────────
-export async function getDashboardStats(collegeId: string) {
+export async function getDashboardStats(collegeId: string, authScope?: AuthScope) {
+  // 010 — an HOD's tiles count their department, not the college.
+  const studentBase: Record<string, unknown> = { collegeId };
+  const employeeBase: Record<string, unknown> = { collegeId };
+  if (authScope) {
+    applyAuthScope(studentBase, authScope, { selfField: 'personId', departmentField: 'branchId' });
+    applyAuthScope(employeeBase, authScope, { selfField: 'personId' });
+  }
   const onboardingNeedsAttentionFilter = {
-    collegeId,
+    ...studentBase,
     onboardingStatus: { $in: ['not_started', 'in_progress'] },
     $or: [
       { feeResponsibleParentId: { $exists: false } },
@@ -44,19 +51,19 @@ export async function getDashboardStats(collegeId: string) {
 
   const [persons, students, activeStudents, faculty, activeFaculty, staff, activeStaff, parents, organizations, onboardingInProgress, onboardingCompleted, onboardingNeedsAttention, missingFeeResponsibleGuardians] = await Promise.all([
     Person.countDocuments({ collegeId }),
-    Student.countDocuments({ collegeId }),
-    Student.countDocuments({ collegeId, status: 'active' }),
-    Faculty.countDocuments({ collegeId }),
-    Faculty.countDocuments({ collegeId, status: 'active' }),
-    Staff.countDocuments({ collegeId }),
-    Staff.countDocuments({ collegeId, status: 'active' }),
+    Student.countDocuments(studentBase),
+    Student.countDocuments({ ...studentBase, status: 'active' }),
+    Faculty.countDocuments(employeeBase),
+    Faculty.countDocuments({ ...employeeBase, status: 'active' }),
+    Staff.countDocuments(employeeBase),
+    Staff.countDocuments({ ...employeeBase, status: 'active' }),
     Parent.countDocuments({ collegeId }),
     Organization.countDocuments({ collegeId }),
-    Student.countDocuments({ collegeId, onboardingStatus: 'in_progress' }),
-    Student.countDocuments({ collegeId, onboardingStatus: 'completed' }),
+    Student.countDocuments({ ...studentBase, onboardingStatus: 'in_progress' }),
+    Student.countDocuments({ ...studentBase, onboardingStatus: 'completed' }),
     Student.countDocuments(onboardingNeedsAttentionFilter),
     Student.countDocuments({
-      collegeId,
+      ...studentBase,
       status: { $in: ['active', 'prospective'] },
       $or: [
         { feeResponsibleParentId: { $exists: false } },
@@ -217,8 +224,8 @@ export async function listPersons(collegeId: string, page: number, limit: number
   return { items, total, page, pages: Math.ceil(total / limit) };
 }
 
-export async function getPerson(collegeId: string, id: string) {
-  const doc = await Person.findOne({ _id: id, collegeId }).lean();
+export async function getPerson(collegeId: string, id: string, authScope?: AuthScope) {
+  const doc = await findOneScoped(Person, id, collegeId, authScope).lean();
   if (!doc) throw new AppError(404, 'Person not found');
   return doc;
 }
@@ -229,14 +236,18 @@ export async function createPerson(collegeId: string, data: any, performedBy: st
   return doc;
 }
 
-export async function updatePerson(collegeId: string, id: string, data: any, performedBy: string) {
+export async function updatePerson(collegeId: string, id: string, data: any, performedBy: string, authScope?: AuthScope) {
+  const existing = await findOneScoped(Person, id, collegeId, authScope).select('_id').lean();
+  if (!existing) throw new AppError(404, 'Person not found');
   const doc = await Person.findOneAndUpdate({ _id: id, collegeId }, { $set: data }, { new: true });
   if (!doc) throw new AppError(404, 'Person not found');
   await createAuditLog({ collegeId, entityType: 'Person', entityId: id, entityName: doc.name, action: 'update', changes: [], performedBy });
   return doc;
 }
 
-export async function deletePerson(collegeId: string, id: string, performedBy: string) {
+export async function deletePerson(collegeId: string, id: string, performedBy: string, authScope?: AuthScope) {
+  const scoped = await findOneScoped(Person, id, collegeId, authScope).select('_id').lean();
+  if (!scoped) throw new AppError(404, 'Person not found');
   const doc = await Person.findOneAndDelete({ _id: id, collegeId });
   if (!doc) throw new AppError(404, 'Person not found');
   await createAuditLog({ collegeId, entityType: 'Person', entityId: id, entityName: doc.name, action: 'delete', changes: [], performedBy });
@@ -304,8 +315,8 @@ export async function listStudents(collegeId: string, page: number, limit: numbe
   };
 }
 
-export async function getStudent(collegeId: string, id: string): Promise<any> {
-  const doc = await Student.findOne({ _id: id, collegeId })
+export async function getStudent(collegeId: string, id: string, authScope?: AuthScope): Promise<any> {
+  const doc = await findOneScoped(Student, id, collegeId, authScope, { selfField: 'personId', departmentField: 'branchId' })
     .populate('personId')
     .populate('regulationId')
     .populate('programmeId')
@@ -435,8 +446,8 @@ export async function createStudent(collegeId: string, data: any, performedBy: s
   return { ...studentObj, person: person.toObject(), feePin };
 }
 
-export async function updateStudent(collegeId: string, id: string, data: any, performedBy: string): Promise<any> {
-  const student = await Student.findOne({ _id: id, collegeId });
+export async function updateStudent(collegeId: string, id: string, data: any, performedBy: string, authScope?: AuthScope): Promise<any> {
+  const student = await findOneScoped(Student, id, collegeId, authScope, { selfField: 'personId', departmentField: 'branchId' });
   if (!student) throw new AppError(404, 'Student not found');
 
   // T11 rebind guard: programmeId changes MUST go through
@@ -642,7 +653,9 @@ async function resolveYearOfStudyForStalePinCheck(
   );
 }
 
-export async function deleteStudent(collegeId: string, id: string, performedBy: string) {
+export async function deleteStudent(collegeId: string, id: string, performedBy: string, authScope?: AuthScope) {
+  const scoped = await findOneScoped(Student, id, collegeId, authScope, { selfField: 'personId', departmentField: 'branchId' }).select('_id').lean();
+  if (!scoped) throw new AppError(404, 'Student not found');
   const doc = await Student.findOneAndDelete({ _id: id, collegeId });
   if (!doc) throw new AppError(404, 'Student not found');
   await createAuditLog({ collegeId, entityType: 'Student', entityId: id, entityName: 'Student', action: 'delete', changes: [], performedBy });
@@ -679,8 +692,8 @@ export async function listFaculty(collegeId: string, page: number, limit: number
   };
 }
 
-export async function getFaculty(collegeId: string, id: string): Promise<any> {
-  const doc = await Faculty.findOne({ _id: id, collegeId }).populate('personId').populate('departmentId').lean();
+export async function getFaculty(collegeId: string, id: string, authScope?: AuthScope): Promise<any> {
+  const doc = await findOneScoped(Faculty, id, collegeId, authScope, { selfField: 'personId' }).populate('personId').populate('departmentId').lean();
   if (!doc) throw new AppError(404, 'Faculty not found');
   return { ...doc, profileCompleteness: getFacultyProfileCompleteness(doc) };
 }
@@ -715,8 +728,8 @@ export async function createFaculty(collegeId: string, data: any, performedBy: s
   return { ...doc.toObject(), person: person.toObject() };
 }
 
-export async function updateFaculty(collegeId: string, id: string, data: any, performedBy: string) {
-  const fac = await Faculty.findOne({ _id: id, collegeId });
+export async function updateFaculty(collegeId: string, id: string, data: any, performedBy: string, authScope?: AuthScope) {
+  const fac = await findOneScoped(Faculty, id, collegeId, authScope, { selfField: 'personId' });
   if (!fac) throw new AppError(404, 'Faculty not found');
 
   const personFields: any = {};
@@ -746,7 +759,9 @@ export async function updateFaculty(collegeId: string, id: string, data: any, pe
   return doc;
 }
 
-export async function deleteFaculty(collegeId: string, id: string, performedBy: string) {
+export async function deleteFaculty(collegeId: string, id: string, performedBy: string, authScope?: AuthScope) {
+  const scoped = await findOneScoped(Faculty, id, collegeId, authScope, { selfField: 'personId' }).select('_id').lean();
+  if (!scoped) throw new AppError(404, 'Faculty not found');
   const doc = await Faculty.findOneAndDelete({ _id: id, collegeId });
   if (!doc) throw new AppError(404, 'Faculty not found');
   await createAuditLog({ collegeId, entityType: 'Faculty', entityId: id, entityName: 'Faculty', action: 'delete', changes: [], performedBy });
@@ -783,8 +798,8 @@ export async function listStaff(collegeId: string, page: number, limit: number, 
   };
 }
 
-export async function getStaff(collegeId: string, id: string): Promise<any> {
-  const doc = await Staff.findOne({ _id: id, collegeId }).populate('personId').populate('departmentId').lean();
+export async function getStaff(collegeId: string, id: string, authScope?: AuthScope): Promise<any> {
+  const doc = await findOneScoped(Staff, id, collegeId, authScope, { selfField: 'personId' }).populate('personId').populate('departmentId').lean();
   if (!doc) throw new AppError(404, 'Staff not found');
   return { ...doc, profileCompleteness: getStaffProfileCompleteness(doc) };
 }
@@ -805,8 +820,8 @@ export async function createStaff(collegeId: string, data: any, performedBy: str
   return { ...doc.toObject(), person: person.toObject() };
 }
 
-export async function updateStaff(collegeId: string, id: string, data: any, performedBy: string) {
-  const s = await Staff.findOne({ _id: id, collegeId });
+export async function updateStaff(collegeId: string, id: string, data: any, performedBy: string, authScope?: AuthScope) {
+  const s = await findOneScoped(Staff, id, collegeId, authScope, { selfField: 'personId' });
   if (!s) throw new AppError(404, 'Staff not found');
 
   const personFields: any = {};
@@ -825,7 +840,9 @@ export async function updateStaff(collegeId: string, id: string, data: any, perf
   return doc;
 }
 
-export async function deleteStaff(collegeId: string, id: string, performedBy: string) {
+export async function deleteStaff(collegeId: string, id: string, performedBy: string, authScope?: AuthScope) {
+  const scoped = await findOneScoped(Staff, id, collegeId, authScope, { selfField: 'personId' }).select('_id').lean();
+  if (!scoped) throw new AppError(404, 'Staff not found');
   const doc = await Staff.findOneAndDelete({ _id: id, collegeId });
   if (!doc) throw new AppError(404, 'Staff not found');
   await createAuditLog({ collegeId, entityType: 'Staff', entityId: id, entityName: 'Staff', action: 'delete', changes: [], performedBy });

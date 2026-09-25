@@ -1,0 +1,59 @@
+{
+  "admissions": [
+    "applicants",
+    "documents",
+    "inquiries",
+    "lead-interactions"
+  ],
+  "people": [],
+  "academics": [
+    "attendance",
+    "course-offerings",
+    "exams",
+    "feedback",
+    "internal-assessments",
+    "lesson-plans",
+    "marks",
+    "results"
+  ],
+  "finance": [],
+  "hr": [],
+  "welfare": [
+    "grievance",
+    "hostel",
+    "mess"
+  ],
+  "placement": [
+    "registration"
+  ],
+  "campus": [
+    "facilities",
+    "gate-pass",
+    "hostel",
+    "hostel-allocation",
+    "labs",
+    "library",
+    "maintenance",
+    "mess",
+    "security",
+    "transport",
+    "transport-allocation",
+    "visitors"
+  ],
+  "student-dev": [
+    "membership",
+    "registration"
+  ],
+  "compliance": [
+    "faculty-documents",
+    "naac",
+    "obe",
+    "publications",
+    "research"
+  ],
+  "governance": [],
+  "platform": [
+    "communication"
+  ],
+  "juvi": []
+}

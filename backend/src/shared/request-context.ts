@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { NextFunction, Request, Response } from 'express';
+import type { AuthScope } from './rbac/types';
 
 /**
  * Request-scoped context for cross-cutting list concerns.
@@ -11,12 +12,24 @@ import { NextFunction, Request, Response } from 'express';
  * every controller AND every service for a concern none of them care about.
  * ALS gives all list endpoints uniform search with one middleware.
  *
- * Only additive, request-scoped, read-only hints belong here — never
- * `collegeId` or anything security-relevant. Tenancy stays an explicit
- * parameter so it can never be silently inherited from an ambient context.
+ * Only additive, request-scoped hints belong here — never `collegeId`.
+ * Tenancy stays an explicit parameter so it can never be silently inherited
+ * from an ambient context. The one security-relevant entry, `authScope`, is
+ * allowed because it can only ever NARROW a query (see scope-plugin.ts): a
+ * missing store means no narrowing, exactly what a forgotten parameter means.
  */
 export interface ListRequestContext {
   search?: string;
+  /**
+   * 010 — set by `authorize()` when the winning policy narrows rows. Detection
+   * only: `paginate()` refuses to run an un-scoped filter on such a request.
+   * The scope itself stays an explicit parameter (`req.authScope`).
+   */
+  scoped?: boolean;
+  /** 010 — the narrowing scope itself, for the by-id backstop in `shared/rbac/scope-plugin.ts`. */
+  authScope?: AuthScope;
+  /** Per-request cache of resolved member ids for the plugin's `via` lookups. */
+  viaIds?: Record<string, string[]>;
 }
 
 const storage = new AsyncLocalStorage<ListRequestContext>();

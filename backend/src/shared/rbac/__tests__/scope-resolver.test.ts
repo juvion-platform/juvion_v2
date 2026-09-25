@@ -15,6 +15,9 @@ vi.mock('../../../models/people/Faculty', () => ({
 vi.mock('../../../models/people/Staff', () => ({
   Staff: { findOne: vi.fn() },
 }));
+vi.mock('../../../models/academic-structure/Branch', () => ({
+  Branch: { find: vi.fn(() => ({ select: () => ({ lean: async () => [{ _id: 'br-1' }, { _id: 'br-2' }] }) })) },
+}));
 
 import redis from '../../../config/redis';
 import { User } from '../../../models/User';
@@ -56,12 +59,12 @@ describe('resolveUserScope', () => {
 
     const result = await resolveUserScope('u1', 'college1', 'faculty');
 
-    expect(result).toEqual({ personId: 'person1', departmentId: 'dept1' });
+    expect(result).toEqual({ personId: 'person1', departmentId: 'dept1', branchIds: ['br-1', 'br-2'] });
     expect(mockUser.findById).toHaveBeenCalledWith('u1');
     expect(mockFaculty.findOne).toHaveBeenCalledWith({ personId: 'person1', collegeId: 'college1' });
     expect(mockRedis.set).toHaveBeenCalledWith(
       'user:scope:u1',
-      JSON.stringify({ personId: 'person1', departmentId: 'dept1' }),
+      JSON.stringify({ personId: 'person1', departmentId: 'dept1', branchIds: ['br-1', 'br-2'] }),
       'EX',
       900,
     );
@@ -81,7 +84,7 @@ describe('resolveUserScope', () => {
 
     const result = await resolveUserScope('u2', 'college1', 'staff');
 
-    expect(result).toEqual({ personId: 'person2', departmentId: 'dept2' });
+    expect(result).toEqual({ personId: 'person2', departmentId: 'dept2', branchIds: ['br-1', 'br-2'] });
     expect(mockStaff.findOne).toHaveBeenCalledWith({ personId: 'person2', collegeId: 'college1' });
     expect(mockFaculty.findOne).not.toHaveBeenCalled();
   });
@@ -100,7 +103,7 @@ describe('resolveUserScope', () => {
 
     const result = await resolveUserScope('u3', 'college1', 'hod');
 
-    expect(result).toEqual({ personId: 'person3', departmentId: 'dept3' });
+    expect(result).toEqual({ personId: 'person3', departmentId: 'dept3', branchIds: ['br-1', 'br-2'] });
     expect(mockFaculty.findOne).toHaveBeenCalledWith({ personId: 'person3', collegeId: 'college1' });
   });
 

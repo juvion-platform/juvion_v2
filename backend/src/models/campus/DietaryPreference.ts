@@ -4,7 +4,7 @@ const schema = new Schema<IDietaryPreference>({
   collegeId: { type: Schema.Types.ObjectId, required: true, index: true },
   studentId: { type: Schema.Types.ObjectId, ref: 'Student', required: true },
   dietType: { type: String, enum: ['veg', 'non_veg', 'egg', 'vegan', 'jain'], required: true },
-  allergies: [String],
+  allergies: { type: [String], sensitive: 'welfare.medical' },
   medicalDiet: String,
   notes: String,
 }, { timestamps: true });

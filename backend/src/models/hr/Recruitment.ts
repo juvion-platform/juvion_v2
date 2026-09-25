@@ -16,7 +16,7 @@ const schema = new Schema<IRecruitment>({
   vacancies: { type: Number, required: true },
   qualifications: { type: String, required: true },
   experience: String,
-  salary: String,
+  salary: { type: String, sensitive: 'hr.compensation' },
   postedDate: { type: Date, default: Date.now },
   lastDate: { type: Date, required: true },
   status: { type: String, enum: ['open', 'closed', 'on_hold', 'filled'], default: 'open' },

@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { isSubDomain } from '../../shared/rbac/sub-domains';
+import { SENSITIVITY_CLASSES } from '../../shared/rbac/sensitivity';
 
 // ═══ Announcement ══════════════════════════════════════════
 
@@ -131,13 +133,28 @@ export const createRbacPolicySchema = z.object({
     departmentOnly: z.boolean().optional(),
     selfOnly: z.boolean().optional(),
     subDomain: z.string().optional(),
+    assignedVia: z.array(z.enum(['mentees', 'sections', 'courses'])).optional(),
+    sensitivity: z.array(z.enum(SENSITIVITY_CLASSES)).optional(),
   }).optional(),
   priority: z.number().int().min(1).max(999),
   description: z.string().optional(),
   isActive: z.boolean().optional(),
+}).superRefine((p, ctx) => {
+  // 010 S3 — sub-domains must come from the registry; a typo used to silently deny or allow.
+  const subs = p.scope?.subDomain?.split(',').map((s) => s.trim()).filter(Boolean) ?? [];
+  if (subs.length === 0) return;
+  if (p.module === '*') {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['scope', 'subDomain'], message: 'Sub-domains need a specific module' });
+    return;
+  }
+  for (const sub of subs) {
+    if (!isSubDomain(p.module, sub)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['scope', 'subDomain'], message: `Unknown sub-domain "${sub}" for module ${p.module}` });
+    }
+  }
 });
 
-export const updateRbacPolicySchema = createRbacPolicySchema.partial();
+export const updateRbacPolicySchema = createRbacPolicySchema.innerType().partial();
 
 // ═══ 002-ai-assisted-config ══════════════════════════════════════════
 
@@ -170,3 +187,38 @@ export const upsertConfigEntryBodySchema = z.object({
 export const commitImportJobSchema = z.object({
   selectedRowNumbers: z.array(z.number().int().positive()).min(1).optional(),
 }).strict();
+
+// ═══ 010 — Persona catalog ═══════════════════════════════════════════
+
+const PERSONA_MODULES = ['admissions', 'academics', 'finance', 'people', 'hr', 'campus', 'welfare', 'placement', 'student-dev', 'compliance', 'governance', 'platform'] as const;
+const PERSONA_ROLES = ['super_admin', 'admin', 'principal', 'hod', 'faculty', 'staff', 'student', 'parent'] as const;
+
+export const createPersonaSchema = z.object({
+  code: z.string().regex(/^[A-Za-z0-9-]{2,40}$/, 'Code: letters, digits and dashes only'),
+  label: z.string().min(1).max(80),
+  description: z.string().max(500).optional(),
+  parentCode: z.string().optional().nullable(),
+  primaryModule: z.enum(PERSONA_MODULES),
+  defaultRole: z.enum(PERSONA_ROLES),
+  tier: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
+  dashboardWidgets: z.array(z.string()).optional(),
+  permissionsHint: z.string().max(300).optional(),
+  isActive: z.boolean().optional(),
+}).strict();
+
+export const updatePersonaSchema = createPersonaSchema.omit({ code: true }).partial().strict();
+
+// ═══ 010 — Users ═════════════════════════════════════════════════════
+
+export const createUserSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8).max(128),
+  name: z.string().min(1).max(120),
+  personas: z.array(z.string().min(2)).min(1),
+  personId: z.string().regex(/^[0-9a-fA-F]{24}$/).optional().nullable(),
+  isActive: z.boolean().optional(),
+}).strict();
+
+export const updateUserSchema = createUserSchema.omit({ password: true }).partial().strict();
+
+export const resetPasswordSchema = z.object({ password: z.string().min(8).max(128) }).strict();

@@ -611,6 +611,7 @@ export async function listAttendanceSummaries(req: AuthRequest, res: Response, n
       { studentId, courseOfferingId, semesterId, category },
       +(page || '1'),
       +(limit || '20'),
+      req.authScope,
     );
     res.json(result);
   } catch (e) { next(e); }
@@ -624,6 +625,7 @@ export async function listAttendanceAlerts(req: AuthRequest, res: Response, next
       { studentId, semesterId, alertType, isRead },
       +(page || '1'),
       +(limit || '20'),
+      req.authScope,
     );
     res.json(result);
   } catch (e) { next(e); }
@@ -646,6 +648,7 @@ export async function listCondonationRequests(req: AuthRequest, res: Response, n
       { studentId, semesterId, status, courseOfferingId },
       +(page || '1'),
       +(limit || '20'),
+      req.authScope,
     );
     res.json(result);
   } catch (e) { next(e); }
@@ -1155,6 +1158,7 @@ export async function computeAttendanceSummaryCtrl(req: AuthRequest, res: Respon
 export async function checkAttendanceThresholdCtrl(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { studentId, courseOfferingId, threshold } = req.query as any;
+    if (!studentId || !courseOfferingId) return res.status(400).json({ error: 'studentId and courseOfferingId are required' });
     res.json(await deliveryService.checkAttendanceThreshold(req.collegeId!, studentId, courseOfferingId, threshold ? +threshold : undefined));
   } catch (e) { next(e); }
 }

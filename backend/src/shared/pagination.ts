@@ -1,6 +1,8 @@
 import { Model, FilterQuery, Types } from 'mongoose';
 import { PaginatedResult } from './types';
 import { getListContext } from './request-context';
+import { isScopeApplied } from './rbac/apply-scope';
+import { AppError } from '../middleware/errorHandler';
 
 /** Never match a user's free-text search against these, whatever the schema says. */
 const SEARCH_FIELD_DENYLIST = new Set([
@@ -77,7 +79,13 @@ export async function paginate<T>(
   populate?: string | string[] | Record<string, unknown>[],
   options: PaginateOptions = {},
 ): Promise<PaginatedResult<T>> {
-  const search = options.search ?? getListContext().search;
+  const ctx = getListContext();
+  // 010 — a scoped request whose filter never went through applyAuthScope
+  // would leak the whole college. Fail loudly so the missing call is found.
+  if (ctx.scoped && !isScopeApplied(filter)) {
+    throw new AppError(500, `Row scope not applied to ${model.modelName} query`);
+  }
+  const search = options.search ?? ctx.search;
 
   let effectiveFilter = filter;
   if (search) {

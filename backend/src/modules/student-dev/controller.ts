@@ -467,6 +467,9 @@ export async function logProgrammeHoursCtrl(req: AuthRequest, res: Response, nex
 export async function getEventCalendarCtrl(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { startDate, endDate } = req.query as any;
+    if (!startDate || !endDate || Number.isNaN(Date.parse(startDate)) || Number.isNaN(Date.parse(endDate))) {
+      return res.status(400).json({ error: 'startDate and endDate (ISO dates) are required' });
+    }
     res.json(await evtService.getEventCalendar(req.collegeId!, { startDate, endDate }));
   } catch (err) { next(err); }
 }
@@ -515,7 +518,7 @@ export async function deleteAwardCtrl(req: AuthRequest, res: Response, next: Nex
 export async function listAwardInstancesCtrl(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, awardId, status } = req.query as any;
-    res.json(await achService.listAwardInstances(req.collegeId!, Number(page) || 1, Number(limit) || 20, awardId, status));
+    res.json(await achService.listAwardInstances(req.collegeId!, Number(page) || 1, Number(limit) || 20, awardId, status, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getAwardInstanceCtrl(req: AuthRequest, res: Response, next: NextFunction) {
@@ -533,7 +536,7 @@ export async function conferAwardCtrl(req: AuthRequest, res: Response, next: Nex
 export async function listCertificatesCtrl(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { page, limit, studentId, type } = req.query as any;
-    res.json(await achService.listCertificates(req.collegeId!, Number(page) || 1, Number(limit) || 20, studentId, type));
+    res.json(await achService.listCertificates(req.collegeId!, Number(page) || 1, Number(limit) || 20, studentId, type, req.authScope));
   } catch (err) { next(err); }
 }
 export async function getCertificateCtrl(req: AuthRequest, res: Response, next: NextFunction) {

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useCanSeeClass } from '../../hooks/usePermission';
+import { useAuthStore } from '../../stores/authStore';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Pencil, Save, X, Loader2, AlertCircle } from 'lucide-react';
@@ -83,6 +85,7 @@ function rowToForm(row: any): ParentForm {
 
 function formToPayload(form: ParentForm): any {
   const payload: any = { ...form };
+  if (!useAuthStore.getState().canSeeClass('people', 'people.identity')) delete payload.aadhaar; // server would 403 on a hidden key
 
   const address: any = {};
   (['line1', 'line2', 'city', 'state', 'pincode'] as const).forEach((k) => {
@@ -108,6 +111,7 @@ function formToPayload(form: ParentForm): any {
 }
 
 export default function ParentDetailPage() {
+  const canSeeIdentity = useCanSeeClass('people', 'people.identity');
   const { id } = useParams<{ id: string }>();
   const qc = useQueryClient();
   const [editMode, setEditMode] = useState(false);
@@ -264,7 +268,7 @@ export default function ParentDetailPage() {
               <div><label className={lbl}>Email</label><input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} className={inp} /></div>
               <div><label className={lbl}>Gender</label><select value={form.gender} onChange={e => setForm(f => ({ ...f, gender: e.target.value }))} className={inp}><option value="">Select…</option>{GENDERS.map(g => <option key={g} value={g}>{g}</option>)}</select></div>
               <div><label className={lbl}>Date of Birth</label><input type="date" value={form.dob} onChange={e => setForm(f => ({ ...f, dob: e.target.value }))} className={inp} /></div>
-              <div><label className={lbl}>Aadhaar</label><input value={form.aadhaar} onChange={e => setForm(f => ({ ...f, aadhaar: e.target.value }))} className={inp} /></div>
+              {canSeeIdentity && <div><label className={lbl}>Aadhaar</label><input value={form.aadhaar} onChange={e => setForm(f => ({ ...f, aadhaar: e.target.value }))} className={inp} /></div>}
               <div><label className={lbl}>Preferred Language</label><input value={form.preferredLanguage} onChange={e => setForm(f => ({ ...f, preferredLanguage: e.target.value }))} className={inp} /></div>
               <label className="flex items-center gap-2 text-sm font-medium text-gray-700 pt-7">
                 <input type="checkbox" checked={form.biometricEnrolled} onChange={e => setForm(f => ({ ...f, biometricEnrolled: e.target.checked }))} className="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
@@ -336,7 +340,7 @@ export default function ParentDetailPage() {
             <DetailField label="Phone" value={person.phone} />
             <DetailField label="Alternate Phone" value={person.alternatePhone} />
             <DetailField label="Email" value={person.email} />
-            <DetailField label="Aadhaar" value={person.aadhaar} mono />
+            {canSeeIdentity && <DetailField label="Aadhaar" value={person.aadhaar} mono />}
             <DetailField label="Preferred Language" value={person.preferredLanguage} />
             <DetailBool label="Biometric Enrolled" value={person.biometricEnrolled} />
           </DetailSection>

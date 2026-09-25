@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useCanSeeClass } from '../../hooks/usePermission';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listMedicalVisits, createMedicalVisit, updateMedicalVisit, deleteMedicalVisit } from '../../services/welfare';
 import { listPersons } from '../../services/people';
@@ -19,6 +20,7 @@ const manageLink = "inline-flex items-center gap-0.5 text-xs text-primary-500 ho
 const emptyForm = { personId: '', visitDate: '', complaint: '', diagnosis: '', prescription: '', referredTo: '', attendedBy: '', followUpDate: '' };
 
 export default function MedicalVisitsPage() {
+  const canSeeMedical = useCanSeeClass('welfare', 'welfare.medical');
   const qc = useQueryClient();
   const { page, setPage, limit, setLimit, search, setSearch } = useListControls();
   const [form, setForm] = useState(emptyForm);
@@ -50,7 +52,7 @@ export default function MedicalVisitsPage() {
     e.preventDefault();
     const payload: any = { ...form };
     if (!payload.visitDate) delete payload.visitDate;
-    if (!payload.diagnosis) delete payload.diagnosis;
+    if (!payload.diagnosis || !canSeeMedical) delete payload.diagnosis;
     if (!payload.prescription) delete payload.prescription;
     if (!payload.referredTo) delete payload.referredTo;
     if (!payload.followUpDate) delete payload.followUpDate;
@@ -64,7 +66,7 @@ export default function MedicalVisitsPage() {
     { key: 'personId', label: 'Person', render: (r: any) => <span className="font-medium text-navy">{r.personId?.name || '\u2014'}</span> },
     { key: 'visitDate', label: 'Date', render: (r: any) => r.visitDate ? new Date(r.visitDate).toLocaleDateString() : '\u2014' },
     { key: 'complaint', label: 'Complaint' },
-    { key: 'diagnosis', label: 'Diagnosis', render: (r: any) => r.diagnosis || '\u2014' },
+    ...(canSeeMedical ? [{ key: 'diagnosis', label: 'Diagnosis', render: (r: any) => r.diagnosis || '\u2014' }] : []),
     { key: 'attendedBy', label: 'Attended By' },
     { key: 'followUpDate', label: 'Follow-up', render: (r: any) => r.followUpDate ? new Date(r.followUpDate).toLocaleDateString() : '\u2014' },
     { key: 'actions', label: '', render: (r: any) => (
@@ -117,7 +119,7 @@ export default function MedicalVisitsPage() {
               </div>
               <div><label className={lbl}>Visit Date</label><input type="date" value={form.visitDate} onChange={e => setForm(f => ({ ...f, visitDate: e.target.value }))} className={inp} /></div>
               <div className="col-span-2"><label className={lbl}>Complaint *</label><input required value={form.complaint} onChange={e => setForm(f => ({ ...f, complaint: e.target.value }))} className={inp} /></div>
-              <div><label className={lbl}>Diagnosis</label><input value={form.diagnosis} onChange={e => setForm(f => ({ ...f, diagnosis: e.target.value }))} className={inp} /></div>
+              {canSeeMedical && <div><label className={lbl}>Diagnosis</label><input value={form.diagnosis} onChange={e => setForm(f => ({ ...f, diagnosis: e.target.value }))} className={inp} /></div>}
               <div><label className={lbl}>Prescription</label><input value={form.prescription} onChange={e => setForm(f => ({ ...f, prescription: e.target.value }))} className={inp} /></div>
               <div><label className={lbl}>Referred To</label><input value={form.referredTo} onChange={e => setForm(f => ({ ...f, referredTo: e.target.value }))} className={inp} /></div>
               <div><label className={lbl}>Attended By *</label><input required value={form.attendedBy} onChange={e => setForm(f => ({ ...f, attendedBy: e.target.value }))} className={inp} /></div>

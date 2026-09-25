@@ -111,7 +111,8 @@ import {
 } from './models';
 import { User } from './models/User';
 import { College } from './models/College';
-import { seedPolicies } from './shared/seed/policies';
+import { seedPolicies, snapshotPoliciesForCollege } from './shared/seed/policies';
+import { seedPersonas, snapshotPersonasForCollege } from './shared/seed/personas';
 import { seedChannelTemplates } from './shared/seed/channel-templates';
 import { provisionPerson } from './modules/juvi-app/accounts/provisioning-service';
 import { reconcileCollege } from './modules/juvi-app/spaces/reconcile-service';
@@ -546,7 +547,8 @@ async function seed() {
     password: adminPwd,
     name: 'Super Admin',
     role: 'super_admin',
-    personaType: 'L-PRIN',
+    personaType: 'L-SADM',
+    personas: ['L-SADM'],
   });
   console.log('Superadmin created (super@juvion.dev / admin123)');
 
@@ -557,7 +559,8 @@ async function seed() {
     password: adminPwd,
     name: 'JIT Admin',
     role: 'admin',
-    personaType: 'L-PRIN',
+    personaType: 'L-ADM',
+    personas: ['L-ADM'],
   });
   console.log('JIT college admin created (admin@jit.edu.in / admin123)');
 
@@ -719,6 +722,20 @@ async function seed() {
     { collegeId: CID, personId: persons[24]._id, employeeCode: 'STF004', designation: 'Security Head', staffType: 'security', status: 'active' },
   ]);
   console.log('Staff created');
+
+  // --- 010: one login per persona, linked to the person records above (all admin123) ---
+  const personaUsers = [
+    { email: 'principal@jit.edu.in', name: 'Dr. Srinivas Rao', personas: ['L-PRIN'], role: 'principal', personId: persons[24]._id },
+    { email: 'hod.cse@jit.edu.in', name: 'Dr. Ramesh Iyer', personas: ['F-HOD', 'F-FAC'], role: 'hod', personId: persons[10]._id },
+    { email: 'faculty.cse@jit.edu.in', name: 'Dr. Lakshmi Prasad', personas: ['F-FAC'], role: 'faculty', personId: persons[13]._id },
+    { email: 'accounts@jit.edu.in', name: 'Padma Latha', personas: ['ST-ACC'], role: 'staff', personId: persons[17]._id },
+    { email: 'exam@jit.edu.in', name: 'Ravi Teja', personas: ['ST-EXAM'], role: 'staff', personId: persons[16]._id },
+    { email: 'warden@jit.edu.in', name: 'Mahesh Yadav', personas: ['ST-WARDEN'], role: 'staff', personId: persons[18]._id },
+    { email: 'registrar@jit.edu.in', name: 'Registrar', personas: ['ST-REG'], role: 'staff' },
+    { email: 'admissions@jit.edu.in', name: 'Admissions Counsellor', personas: ['ST-ADM-AC'], role: 'staff' },
+  ];
+  await User.create(personaUsers.map((u) => ({ collegeId: CID, password: adminPwd, personaType: u.personas[0], isActive: true, ...u })));
+  console.log(`Persona users created (${personaUsers.length}, password admin123)`);
 
   // --- Parents (5) ---
   const parents = await Parent.create([
@@ -3171,6 +3188,11 @@ async function seed() {
   // college-specific policy overrides via the admin UI, those rows stay
   // intact — seedPolicies only touches rows that match its natural key.
   const seedResult = await seedPolicies({ createdBy: 'seed' });
+  const personaResult = await seedPersonas({ createdBy: 'seed' });
+  const personaCopies = await snapshotPersonasForCollege(String(CID), 'seed');
+  const policyCopies = await snapshotPoliciesForCollege(String(CID), 'snapshot');
+  console.log(`Policies: ${policyCopies} copied to JIT (snapshot mode)`);
+  console.log(`Personas: ${personaResult.created} created, ${personaResult.updated} updated; ${personaCopies} copied to JIT`);
   console.log(`Seeded ${seedResult.attempted} default RBAC policies (created=${seedResult.created} updated=${seedResult.updated})`);
 
   // ========================================================================

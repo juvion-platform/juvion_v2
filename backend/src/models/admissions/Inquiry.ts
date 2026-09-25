@@ -170,7 +170,7 @@ const schema = new Schema<IInquiry>({
   // Conversion
   convertedToApplicantId: { type: Schema.Types.ObjectId, ref: 'Applicant' },
   // W01 intake enhancements
-  aadhaarNumber: String,
+  aadhaarNumber: { type: String, sensitive: 'people.identity' },
   languagePreference: String,
 
   // ─── Strategic Gap 5 — CRM depth (Phase A) ───────────────────────

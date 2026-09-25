@@ -11,6 +11,8 @@ export interface IPolicy extends Document {
     departmentOnly?: boolean;
     selfOnly?: boolean;
     subDomain?: string;
+    assignedVia?: string[];
+    sensitivity?: string[];
   };
   priority: number;
   description?: string;
@@ -31,6 +33,8 @@ const policySchema = new Schema<IPolicy>(
       departmentOnly: { type: Boolean },
       selfOnly: { type: Boolean },
       subDomain: { type: String },
+      assignedVia: { type: [String], default: undefined },
+      sensitivity: { type: [String], default: undefined },
     },
     priority: { type: Number, required: true, default: 500 },
     description: { type: String },

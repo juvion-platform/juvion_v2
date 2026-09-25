@@ -1,3 +1,4 @@
+import { scopeNotApplicable } from '../../shared/rbac/apply-scope';
 import { Fest } from '../../models/student-dev/Fest';
 import { Competition } from '../../models/student-dev/Competition';
 import { Workshop } from '../../models/student-dev/Workshop';
@@ -21,6 +22,7 @@ export async function listFests(
 ) {
   const filter: Record<string, unknown> = { collegeId };
   if (status) filter.status = status;
+  scopeNotApplicable(filter); // college-wide, no department/person axis
   return paginate(Fest, filter, page, limit);
 }
 
@@ -303,6 +305,7 @@ export async function listCompetitions(
   const filter: Record<string, unknown> = { collegeId };
   if (status) filter.status = status;
   if (parentType) filter.parentType = parentType;
+  scopeNotApplicable(filter); // college-wide, no department/person axis
   return paginate(Competition, filter, page, limit);
 }
 
@@ -535,6 +538,7 @@ export async function listWorkshops(
 ) {
   const filter: Record<string, unknown> = { collegeId };
   if (status) filter.status = status;
+  scopeNotApplicable(filter); // college-wide, no department/person axis
   return paginate(Workshop, filter, page, limit);
 }
 
@@ -715,6 +719,7 @@ export async function listSDProgrammes(
 ) {
   const filter: Record<string, unknown> = { collegeId };
   if (type) filter.type = type;
+  scopeNotApplicable(filter); // college-wide, no department/person axis
   return paginate(SDProgramme, filter, page, limit);
 }
 

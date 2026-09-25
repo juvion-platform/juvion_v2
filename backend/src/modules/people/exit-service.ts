@@ -1,3 +1,6 @@
+import type { AuthScope } from '../../shared/rbac/types';
+import { scopeViaStudents } from '../../shared/rbac/apply-scope';
+import { scopeNotApplicable } from '../../shared/rbac/apply-scope';
 import mongoose from 'mongoose';
 import { Student } from '../../models/people/Student';
 import { ExitRequest } from '../../models/people/ExitRequest';
@@ -95,8 +98,9 @@ export async function getExitRequest(collegeId: string, id: string) {
   return doc;
 }
 
-export async function listExitRequests(collegeId: string, page: number, limit: number, status?: string) {
+export async function listExitRequests(collegeId: string, page: number, limit: number, status?: string, authScope?: AuthScope) {
   const filter: Record<string, unknown> = { collegeId };
+  await scopeViaStudents(filter, authScope, collegeId, Student);
   if (status) filter.status = status;
   return paginate(ExitRequest, filter, page, limit);
 }
@@ -334,8 +338,9 @@ export async function getClearanceWorkflow(collegeId: string, id: string) {
   return { ...workflow.toObject(), items };
 }
 
-export async function listClearanceWorkflows(collegeId: string, page: number, limit: number, status?: string) {
+export async function listClearanceWorkflows(collegeId: string, page: number, limit: number, status?: string, authScope?: AuthScope) {
   const filter: Record<string, unknown> = { collegeId };
+  await scopeViaStudents(filter, authScope, collegeId, Student);
   if (status) filter.status = status;
   return paginate(ClearanceWorkflow, filter, page, limit);
 }
@@ -431,6 +436,7 @@ export async function listPendingClearanceItems(
   limit: number,
 ) {
   const filter = { collegeId, assigneeRole, status: { $in: ['pending', 'in_progress'] } };
+  scopeNotApplicable(filter); // college-wide, no department/person axis
   return paginate(ClearanceItem, filter, page, limit);
 }
 
@@ -494,6 +500,7 @@ export async function logEscalation(
 export async function listDocumentTemplates(collegeId: string, page: number, limit: number, type?: string) {
   const filter: Record<string, unknown> = { collegeId };
   if (type) filter.type = type;
+  scopeNotApplicable(filter); // college-wide, no department/person axis
   return paginate(DocumentTemplate, filter, page, limit);
 }
 
@@ -690,8 +697,9 @@ export async function getAlumni(collegeId: string, id: string) {
   return doc;
 }
 
-export async function listAlumni(collegeId: string, page: number, limit: number, programmeId?: string) {
+export async function listAlumni(collegeId: string, page: number, limit: number, programmeId?: string, authScope?: AuthScope) {
   const filter: Record<string, unknown> = { collegeId };
+  await scopeViaStudents(filter, authScope, collegeId, Student);
   if (programmeId) filter.programmeId = programmeId;
   return paginate(Alumni, filter, page, limit);
 }

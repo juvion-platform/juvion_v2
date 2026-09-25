@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useCanSeeClass } from '../../hooks/usePermission';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Pencil, Loader2, AlertCircle, AlertTriangle } from 'lucide-react';
@@ -85,6 +86,7 @@ const DETAIL_TABS: ReadonlyArray<DetailTab> = [
 ];
 
 export default function StudentDetailPage() {
+  const canSeeIdentity = useCanSeeClass('people', 'people.identity');
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   // Tab state lives in the URL (?tab=finance) so a specific tab can be
@@ -298,7 +300,7 @@ export default function StudentDetailPage() {
             <DetailField label="Phone" value={person.phone} />
             <DetailField label="Alternate Phone" value={person.alternatePhone} />
             <DetailField label="Email" value={person.email} />
-            <DetailField label="Aadhaar" value={person.aadhaar} mono />
+            {canSeeIdentity && <DetailField label="Aadhaar" value={person.aadhaar} mono />}
             <DetailField label="Preferred Language" value={person.preferredLanguage} />
             <DetailBool label="Biometric Enrolled" value={person.biometricEnrolled} />
           </DetailSection>

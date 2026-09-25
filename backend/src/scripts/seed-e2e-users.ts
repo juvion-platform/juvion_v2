@@ -40,6 +40,7 @@ import { User } from '../models/User';
 import { College } from '../models/College';
 import { AcademicYear } from '../models/academic-structure/AcademicYear';
 import { seedPolicies } from '../shared/seed/policies';
+import { seedPersonas } from '../shared/seed/personas';
 
 dotenv.config();
 
@@ -221,6 +222,7 @@ async function main() {
     // Without them every authenticated request 403s and the e2e suite fails
     // on the post-login fetches (admissions, governance, platform, etc.).
     const policyResult = await seedPolicies({ createdBy: 'seed-e2e' });
+    await seedPersonas({ createdBy: 'seed-e2e' });
     // eslint-disable-next-line no-console
     console.log(
       `[seed-e2e-users] done · users created=${userResult.created} updated=${userResult.updated} total=${userResult.total} · policies attempted=${policyResult.attempted} created=${policyResult.created} updated=${policyResult.updated}`,

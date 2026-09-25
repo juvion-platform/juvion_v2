@@ -1,7 +1,7 @@
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getPlatformStats } from '../services/platform';
-import { Megaphone, FileText, Bell, ClipboardList, MessageSquare, Mail, Smartphone, MessageCircle, Shield, Upload, Settings, Plug } from 'lucide-react';
+import { Megaphone, FileText, Bell, ClipboardList, MessageSquare, Mail, Smartphone, MessageCircle, Shield, Upload, Settings, Plug, Users, IdCard } from 'lucide-react';
 import Breadcrumbs from '../components/ui/Breadcrumbs';
 import { StatBannerSkeleton } from '../components/ui/Skeleton';
 
@@ -18,6 +18,8 @@ import BulkImportsPage from './platform/BulkImportsPage';
 import SchemaConfigPage from './platform/SchemaConfigPage';
 import IntegrationsPage from './platform/IntegrationsPage';
 import JuviAdminPage from './platform/JuviAdminPage';
+import PersonasPage from './platform/PersonasPage';
+import UsersPage from './platform/UsersPage';
 
 function PlatformHome() {
   const navigate = useNavigate();
@@ -125,6 +127,16 @@ function PlatformHome() {
       {/* Administration */}
       <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3 mt-8">Administration</h3>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <button onClick={() => navigate('users')} className="bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all border-blue-200 hover:border-blue-400">
+          <div className="inline-flex p-2.5 rounded-lg mb-3 bg-blue-50 text-blue-600"><Users size={22} /></div>
+          <div className="font-semibold text-navy-dark text-sm">Users</div>
+          <p className="text-xs text-gray-500 mt-1">Logins, personas, linked people</p>
+        </button>
+        <button onClick={() => navigate('personas')} className="bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all border-indigo-200 hover:border-indigo-400">
+          <div className="inline-flex p-2.5 rounded-lg mb-3 bg-indigo-50 text-indigo-600"><IdCard size={22} /></div>
+          <div className="font-semibold text-navy-dark text-sm">Personas</div>
+          <p className="text-xs text-gray-500 mt-1">Designations this college recognises</p>
+        </button>
         <button onClick={() => navigate('rbac-policies')} className="bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all border-gray-200 hover:border-gray-400">
           <div className="inline-flex p-2.5 rounded-lg mb-3 bg-purple-50 text-purple-600"><Shield size={22} /></div>
           <div className="font-semibold text-navy-dark text-sm">RBAC Policies</div>
@@ -178,6 +190,8 @@ export default function Platform() {
         <Route path="sms-logs" element={<SMSLogsPage />} />
         <Route path="whatsapp-logs" element={<WhatsAppLogsPage />} />
         <Route path="rbac-policies" element={<RbacPoliciesPage />} />
+        <Route path="users" element={<UsersPage />} />
+        <Route path="personas" element={<PersonasPage />} />
         <Route path="bulk-imports" element={<BulkImportsPage />} />
         <Route path="config" element={<SchemaConfigPage />} />
         <Route path="integrations" element={<IntegrationsPage />} />

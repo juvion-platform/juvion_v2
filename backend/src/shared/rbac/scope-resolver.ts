@@ -3,11 +3,13 @@ import { Faculty } from '../../models/people/Faculty';
 import { Staff } from '../../models/people/Staff';
 import { Student } from '../../models/people/Student';
 import { User } from '../../models/User';
+import { Branch } from '../../models/academic-structure/Branch';
 
 const SCOPE_CACHE_TTL = 900; // 15 minutes
 
 interface UserScopeData {
   departmentId?: string;
+  branchIds?: string[];
   personId?: string;
   studentId?: string;
 }
@@ -74,6 +76,10 @@ export async function resolveUserScope(
         const student = await Student.findOne({ personId, collegeId }).select('_id').lean();
         if (student) scope.studentId = String(student._id);
       }
+    }
+    if (scope.departmentId) {
+      const branches = await Branch.find({ collegeId, departmentId: scope.departmentId }).select('_id').lean();
+      scope.branchIds = branches.map((b) => String(b._id));
     }
   } catch (_e) {
     // Non-fatal: proceed without department/person resolution

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useCanSeeClass } from '../../hooks/usePermission';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listHealthRecords, createHealthRecord, updateHealthRecord, deleteHealthRecord } from '../../services/welfare';
 import { listPersons } from '../../services/people';
@@ -21,6 +22,7 @@ const manageLink = "inline-flex items-center gap-0.5 text-xs text-primary-500 ho
 const emptyForm = { personId: '', bloodGroup: '', allergies: '', chronicConditions: '', emergencyContact: '', emergencyPhone: '', insuranceId: '' };
 
 export default function HealthRecordsPage() {
+  const canSeeMedical = useCanSeeClass('welfare', 'welfare.medical');
   const qc = useQueryClient();
   const { page, setPage, limit, setLimit, search, setSearch } = useListControls();
   const [form, setForm] = useState(emptyForm);
@@ -55,6 +57,7 @@ export default function HealthRecordsPage() {
       chronicConditions: form.chronicConditions ? form.chronicConditions.split(',').map(s => s.trim()).filter(Boolean) : [],
     };
     if (!payload.bloodGroup) delete payload.bloodGroup;
+    if (!canSeeMedical) { delete payload.bloodGroup; delete payload.allergies; } // hidden keys 403 server-side
     if (!payload.insuranceId) delete payload.insuranceId;
     if (vem.isEdit && vem.entity) updateMut.mutate({ id: vem.entity._id, data: payload });
     else createMut.mutate(payload);
@@ -64,8 +67,8 @@ export default function HealthRecordsPage() {
 
   const columns = [
     { key: 'personId', label: 'Person', render: (r: any) => <span className="font-medium text-navy">{r.personId?.name || '\u2014'}</span> },
-    { key: 'bloodGroup', label: 'Blood Group', render: (r: any) => r.bloodGroup ? <Badge variant="info">{r.bloodGroup}</Badge> : '\u2014' },
-    { key: 'allergies', label: 'Allergies', render: (r: any) => (r.allergies || []).join(', ') || '\u2014' },
+    ...(canSeeMedical ? [{ key: 'bloodGroup', label: 'Blood Group', render: (r: any) => r.bloodGroup ? <Badge variant="info">{r.bloodGroup}</Badge> : '\u2014' }] : []),
+    ...(canSeeMedical ? [{ key: 'allergies', label: 'Allergies', render: (r: any) => (r.allergies || []).join(', ') || '\u2014' }] : []),
     { key: 'emergencyContact', label: 'Emergency Contact' },
     { key: 'emergencyPhone', label: 'Emergency Phone' },
     { key: 'actions', label: '', render: (r: any) => (
@@ -116,15 +119,15 @@ export default function HealthRecordsPage() {
                   {persons.map((p: any) => <option key={p._id} value={p._id}>{p.name || p._id}</option>)}
                 </select>
               </div>
-              <div><label className={lbl}>Blood Group</label>
+              {canSeeMedical && <div><label className={lbl}>Blood Group</label>
                 <select value={form.bloodGroup} onChange={e => setForm(f => ({ ...f, bloodGroup: e.target.value }))} className={inp}>
                   <option value="">Select...</option>
                   {BLOOD_GROUPS.map(bg => <option key={bg} value={bg}>{bg}</option>)}
                 </select>
-              </div>
+              </div>}
               <div><label className={lbl}>Emergency Contact *</label><input required value={form.emergencyContact} onChange={e => setForm(f => ({ ...f, emergencyContact: e.target.value }))} className={inp} /></div>
               <div><label className={lbl}>Emergency Phone *</label><input required value={form.emergencyPhone} onChange={e => setForm(f => ({ ...f, emergencyPhone: e.target.value }))} className={inp} /></div>
-              <div className="col-span-2"><label className={lbl}>Allergies (comma-separated)</label><input value={form.allergies} onChange={e => setForm(f => ({ ...f, allergies: e.target.value }))} className={inp} placeholder="e.g. Peanuts, Penicillin" /></div>
+              {canSeeMedical && <div className="col-span-2"><label className={lbl}>Allergies (comma-separated)</label><input value={form.allergies} onChange={e => setForm(f => ({ ...f, allergies: e.target.value }))} className={inp} placeholder="e.g. Peanuts, Penicillin" /></div>}
               <div className="col-span-2"><label className={lbl}>Chronic Conditions (comma-separated)</label><input value={form.chronicConditions} onChange={e => setForm(f => ({ ...f, chronicConditions: e.target.value }))} className={inp} placeholder="e.g. Asthma, Diabetes" /></div>
               <div><label className={lbl}>Insurance ID</label><input value={form.insuranceId} onChange={e => setForm(f => ({ ...f, insuranceId: e.target.value }))} className={inp} /></div>
             </div>

@@ -15,6 +15,8 @@ import {
   createSMSLogSchema, updateSMSLogSchema,
   createWhatsAppLogSchema, updateWhatsAppLogSchema,
   createRbacPolicySchema, updateRbacPolicySchema,
+  createPersonaSchema, updatePersonaSchema,
+  createUserSchema, updateUserSchema, resetPasswordSchema,
   commitImportJobSchema,
 } from './validation';
 
@@ -82,10 +84,30 @@ router.delete('/whatsapp-logs/:id', authorize('platform', 'delete', { subDomain:
 
 // RBAC Policies (admin/principal only via authorize)
 router.get('/rbac-policies', authorize('platform', 'read'), ctrl.listRbacPolicies);
+// 010 P2 — static paths before /:id
+router.get('/rbac-policies/matrix', authorize('platform', 'read'), ctrl.policyMatrix);
+router.get('/rbac-policies/defaults-diff', authorize('platform', 'read'), ctrl.policyDefaultsDiff);
+router.post('/rbac-policies/apply-defaults', authorize('platform', 'update'), ctrl.applyPolicyDefaults);
+router.post('/rbac-policies/snapshot', authorize('platform', 'create'), ctrl.snapshotPolicies);
 router.get('/rbac-policies/:id', authorize('platform', 'read'), ctrl.getRbacPolicy);
 router.post('/rbac-policies', authorize('platform', 'create'), validate(createRbacPolicySchema), ctrl.createRbacPolicy);
 router.put('/rbac-policies/:id', authorize('platform', 'update'), validate(updateRbacPolicySchema), ctrl.updateRbacPolicy);
 router.delete('/rbac-policies/:id', authorize('platform', 'delete'), ctrl.deleteRbacPolicy);
+
+// 010 — Persona catalog (college-owned rows; system rows are read-only templates)
+router.get('/personas', authorize('platform', 'read'), ctrl.listPersonas);
+router.get('/personas/:id', authorize('platform', 'read'), ctrl.getPersona);
+router.post('/personas', authorize('platform', 'create'), validate(createPersonaSchema), ctrl.createPersona);
+router.put('/personas/:id', authorize('platform', 'update'), validate(updatePersonaSchema), ctrl.updatePersona);
+router.delete('/personas/:id', authorize('platform', 'delete'), ctrl.deletePersona);
+
+// 010 — User provisioning (college-scoped)
+router.get('/users', authorize('platform', 'read'), ctrl.listUsers);
+router.get('/users/:id', authorize('platform', 'read'), ctrl.getUser);
+router.get('/users/:id/explain', authorize('platform', 'read'), ctrl.explainUserAccess);
+router.post('/users', authorize('platform', 'create'), validate(createUserSchema), ctrl.createUser);
+router.put('/users/:id', authorize('platform', 'update'), validate(updateUserSchema), ctrl.updateUser);
+router.post('/users/:id/reset-password', authorize('platform', 'update'), validate(resetPasswordSchema), ctrl.resetUserPassword);
 
 // ─── Bulk Imports (Strategic Gap 2 — BULKIMP sub-domain) ─────────────
 // Schema-driven CSV import surface. Static endpoint-types path BEFORE

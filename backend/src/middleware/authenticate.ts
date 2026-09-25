@@ -1,14 +1,15 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { AuthScope } from '../shared/rbac/types';
+import { getTokenVersion } from '../shared/rbac/token-version';
 
 export interface AuthRequest extends Request {
   collegeId?: string;
-  user?: { id: string; name: string; email: string; role: string; personaType: string };
+  user?: { id: string; name: string; email: string; role: string; personaType: string; personas?: string[]; tv?: number };
   authScope?: AuthScope;
 }
 
-export function authenticate(req: AuthRequest, res: Response, next: NextFunction) {
+export async function authenticate(req: AuthRequest, res: Response, next: NextFunction) {
   // Dev bypass: skip JWT when NODE_ENV=development and no token provided
   if (process.env.NODE_ENV === 'development') {
     const token = req.headers.authorization?.replace('Bearer ', '');
@@ -17,7 +18,7 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
       // (e.g. SituationDismissal, AgentAction) can cast it without
       // throwing in dev. Sentinel value '...099' makes dev users easy
       // to spot in audit logs.
-      req.user = { id: '000000000000000000000099', name: 'Dev Admin', email: 'admin@juvion.dev', role: 'super_admin', personaType: 'L-PRIN' };
+      req.user = { id: '000000000000000000000099', name: 'Dev Admin', email: 'admin@juvion.dev', role: 'super_admin', personaType: 'L-PRIN', personas: ['L-PRIN'] };
       req.collegeId = (req.headers['x-college-id'] as string) || process.env.DEV_COLLEGE_ID || '000000000000000000000001';
       return next();
     }
@@ -33,6 +34,13 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
       return res.status(401).json({ error: 'Invalid token' });
     }
     req.user = decoded;
+    if (!decoded.personas) decoded.personas = [decoded.personaType];
+
+    // 010 — a token minted before the user's last persona/role change is stale.
+    if (typeof decoded.tv === 'number') {
+      const current = await getTokenVersion(decoded.id);
+      if (decoded.tv < current) return res.status(401).json({ error: 'Session expired, please sign in again' });
+    }
 
     // Only super_admin can use x-college-id header to scope into another college
     const headerCollegeId = req.headers['x-college-id'] as string;

@@ -29,7 +29,8 @@ describe('student self scope', () => {
   it('applyAuthScope with selfField studentId but no studentId matches nothing', () => {
     const filter: Record<string, unknown> = {};
     applyAuthScope(filter, { departmentOnly: false, selfOnly: true, userId: 'u1', personId: 'p1', resolvedPermissions: [] }, { selfField: 'studentId' });
-    expect(filter.studentId).toBe('000000000000000000000000');
+    expect(filter.studentId).toBeUndefined();
+    expect(filter._id).toEqual({ $in: [] });
   });
 
   it('other selfFields keep the personId behaviour', () => {

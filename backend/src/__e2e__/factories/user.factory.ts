@@ -8,6 +8,7 @@ interface CreateUserOpts {
   collegeId?: string;
   role: string;
   personaType: string;
+  personas?: string[];
   name: string;
   email: string;
   password?: string;
@@ -33,6 +34,7 @@ export async function createTestUser(opts: CreateUserOpts): Promise<TestUser> {
     name: opts.name,
     role: opts.role,
     personaType: opts.personaType,
+    personas: opts.personas ?? [opts.personaType],
     personId: opts.personId,
     isActive: true,
   });
@@ -43,6 +45,8 @@ export async function createTestUser(opts: CreateUserOpts): Promise<TestUser> {
     email: user.email,
     role: user.role,
     personaType: user.personaType,
+    personas: user.personas,
+    tv: user.tokenVersion,
     collegeId: opts.collegeId,
   });
 
@@ -58,6 +62,8 @@ export function createAuthToken(payload: {
   email: string;
   role: string;
   personaType: string;
+  personas?: string[];
+  tv?: number;
   collegeId?: string;
 }): string {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: '1h' });

@@ -1,3 +1,4 @@
+import { scopeNotApplicable } from '../../shared/rbac/apply-scope';
 import { Portfolio } from '../../models/student-dev/Portfolio';
 import { PortfolioEntry } from '../../models/student-dev/PortfolioEntry';
 import { ClubMembership } from '../../models/student-dev/ClubMembership';
@@ -367,7 +368,9 @@ export async function listPortfolioEntries(
   page: number,
   limit: number,
 ) {
-  return paginate(PortfolioEntry, { collegeId, portfolioId }, page, limit, { displayOrder: 1, createdAt: -1 });
+  const filter: Record<string, unknown> = { collegeId, portfolioId };
+  scopeNotApplicable(filter); // entries hang off a portfolio the caller already reached
+  return paginate(PortfolioEntry, filter, page, limit, { displayOrder: 1, createdAt: -1 });
 }
 
 // 6. Get Portfolio Entry
