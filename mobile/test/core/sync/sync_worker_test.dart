@@ -36,7 +36,9 @@ void main() {
     final r = await w.drain();
     expect(r, const DrainResult(sent: 0, deferred: 2, dropped: 0));
     expect((await db.pendingActions()).length, 2);
-    expect((await db.pendingActions()).first.attempts, 1);
+    // R60: an offline failure doesn't count against the retry budget — only a
+    // non-offline failure does — so ten connectivity blips can never drop this action.
+    expect((await db.pendingActions()).first.attempts, 0);
     verifyNever(() => spaces.setMuted('c2', false));
   });
 

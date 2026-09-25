@@ -21,11 +21,22 @@ class SyncLifecycle extends ConsumerStatefulWidget {
 class _SyncLifecycleState extends ConsumerState<SyncLifecycle> with WidgetsBindingObserver {
   bool _wasOnline = true;
 
+  // I1: the real re-entrancy guard. A fresh `SyncWorker` is built on every trigger, so a
+  // guard field on `SyncWorker` itself would never protect anything (it never outlives a
+  // single `drain()` call) — reconnect and resume can fire within moments of each other,
+  // so every trigger below awaits this same in-flight future instead of starting a
+  // second, overlapping drain.
+  Future<void>? _inFlight;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     ref.read(analyticsProvider).track('app.opened');
+    // I2: also drain at launch, not just on reconnect/resume — an action queued in a
+    // previous session (e.g. the app was killed while offline) should go out as soon as
+    // possible rather than waiting for the next connectivity change or resume.
+    unawaited(_drain());
     ref.listenManual<AsyncValue<bool>>(isOnlineProvider, (_, next) {
       final online = next.value ?? true;
       if (online && !_wasOnline) unawaited(_drain());
@@ -41,7 +52,9 @@ class _SyncLifecycleState extends ConsumerState<SyncLifecycle> with WidgetsBindi
     }
   }
 
-  Future<void> _drain() async {
+  Future<void> _drain() => _inFlight ??= _runDrain().whenComplete(() => _inFlight = null);
+
+  Future<void> _runDrain() async {
     try {
       final db = await ref.read(appDatabaseProvider.future);
       final me = await ref.read(meRepositoryProvider.future);

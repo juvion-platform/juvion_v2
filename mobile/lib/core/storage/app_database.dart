@@ -125,6 +125,17 @@ class AppDatabase extends _$AppDatabase {
     );
   }
 
+  /// R60: an offline failure doesn't count against an action's retry budget — only a
+  /// non-offline failure does (ten connectivity blips must not drop a queued action).
+  /// Records the last error like [recordAttempt] but leaves `attempts` untouched.
+  Future<void> recordOfflineFailure(String id, String error) async {
+    final row = await (select(pendingActionRows)..where((t) => t.id.equals(id))).getSingleOrNull();
+    if (row == null) return;
+    await (update(pendingActionRows)..where((t) => t.id.equals(id))).write(
+      PendingActionRowsCompanion(lastError: Value(error)),
+    );
+  }
+
   Future<void> removeAction(String id) => (delete(pendingActionRows)..where((t) => t.id.equals(id))).go();
 
   Future<void> wipe() async {

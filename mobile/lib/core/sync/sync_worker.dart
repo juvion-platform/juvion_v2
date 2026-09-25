@@ -26,49 +26,51 @@ class DrainResult {
 }
 
 /// Replays queued writes FIFO. Offline stops the drain (the remaining queue, including
-/// the item that just failed, is left in place for the next attempt); a non-offline
-/// failure counts an attempt and moves on to the next item; ten attempts or a 4xx that
-/// is not a cooldown drops the action (spec §11).
+/// the item that just failed, is left in place for the next attempt, and — per R60 —
+/// that item's attempt count is NOT incremented, since connectivity blips must not burn
+/// down its retry budget); a non-offline failure counts an attempt and moves on to the
+/// next item; ten attempts or a 4xx that is not a cooldown drops the action (spec §11).
+///
+/// This class is not re-entrant-safe on its own: calling [drain] again on the same
+/// instance while a previous call is still running would read and process the queue a
+/// second time concurrently. Serializing calls (e.g. so a reconnect and an app-resume
+/// firing together only run one drain) is the caller's job — see `SyncLifecycle`
+/// (`lib/core/sync/sync_lifecycle.dart`), which holds the in-flight `Future` itself
+/// rather than relying on a guard here.
 class SyncWorker {
   SyncWorker(this._db, this._me, this._spaces);
   final AppDatabase _db;
   final MeRepository _me;
   final SpacesRepository _spaces;
   static const maxAttempts = 10;
-  bool _running = false;
 
   Future<DrainResult> drain() async {
-    if (_running) return const DrainResult(sent: 0, deferred: 0, dropped: 0);
-    _running = true;
     var sent = 0;
     var deferred = 0;
     var dropped = 0;
-    try {
-      final actions = await _db.pendingActions();
-      for (var i = 0; i < actions.length; i++) {
-        final a = actions[i];
-        try {
-          await _apply(a);
+    final actions = await _db.pendingActions();
+    for (var i = 0; i < actions.length; i++) {
+      final a = actions[i];
+      try {
+        await _apply(a);
+        await _db.removeAction(a.id);
+        sent++;
+      } on ApiFailure catch (f) {
+        if (f.isOffline) {
+          // R60: record the error for diagnostics, but not as a counted attempt.
+          deferred = actions.length - i;
+          await _db.recordOfflineFailure(a.id, 'offline');
+          break;
+        }
+        final permanent = (f.status ?? 500) >= 400 && (f.status ?? 500) < 500 && f.code != ApiErrorCode.cooldown;
+        if (permanent || a.attempts + 1 >= maxAttempts) {
           await _db.removeAction(a.id);
-          sent++;
-        } on ApiFailure catch (f) {
-          if (f.isOffline) {
-            deferred = actions.length - i;
-            await _db.recordAttempt(a.id, 'offline');
-            break;
-          }
-          final permanent = (f.status ?? 500) >= 400 && (f.status ?? 500) < 500 && f.code != ApiErrorCode.cooldown;
-          if (permanent || a.attempts + 1 >= maxAttempts) {
-            await _db.removeAction(a.id);
-            dropped++;
-          } else {
-            await _db.recordAttempt(a.id, f.message);
-            deferred++;
-          }
+          dropped++;
+        } else {
+          await _db.recordAttempt(a.id, f.message);
+          deferred++;
         }
       }
-    } finally {
-      _running = false;
     }
     return DrainResult(sent: sent, deferred: deferred, dropped: dropped);
   }
