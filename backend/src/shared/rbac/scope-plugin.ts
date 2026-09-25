@@ -8,7 +8,7 @@
  * filter did not go through `applyAuthScope`, using the model's own axis:
  *
  *   Student                     → branch of the department / own person / assigned
- *   Faculty, Staff, Employee    → departmentId / own person
+ *   Faculty, Staff, Employee    → departmentId / own person (own record always)
  *   Department                  → its own _id
  *   anything with studentId     → students the caller may see
  *   anything with facultyId     → faculty in the caller's department
@@ -20,7 +20,7 @@
  */
 import mongoose, { Model, Schema } from 'mongoose';
 import { getListContext } from '../request-context';
-import { applyAuthScope, isScopeApplied, ScopeFieldOptions } from './apply-scope';
+import { applyAuthScope, isScopeApplied, OWN_RECORD, ScopeFieldOptions } from './apply-scope';
 import type { AuthScope } from './types';
 
 type Axis =
@@ -62,7 +62,7 @@ export async function narrowByIdFilter(model: Model<any>, filter: Record<string,
   if (isScopeApplied(filter) || !('_id' in filter)) return;
   const axis = axisFor(model.modelName, model.schema);
   if (!axis) return;
-  if (axis.kind === 'direct') { applyAuthScope(filter, authScope, axis.opts); return; }
+  if (axis.kind === 'direct') { applyAuthScope(filter, authScope, { ownField: OWN_RECORD[model.modelName], ...axis.opts }); return; }
   const ids = await viaIds(authScope, filter.collegeId, axis.member, axis.memberDept);
   const own = filter[axis.field];
   filter[axis.field] = own === undefined ? { $in: ids } : own; // never widen a caller's own restriction

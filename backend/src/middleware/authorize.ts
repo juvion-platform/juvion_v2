@@ -64,6 +64,7 @@ export function authorize<M extends RbacModule>(module: M, action: RbacAction | 
         selfOnly: policy.scope?.selfOnly ?? false,
         userId,
         personId: userScope.personId,
+        studentId: userScope.studentId,
         subDomain: policy.scope?.subDomain ? policy.scope.subDomain.split(',').map((s) => s.trim()) : undefined,
         assignedVia: policy.scope?.assignedVia?.length ? policy.scope.assignedVia : undefined,
         sensitivity: policy.scope?.sensitivity,

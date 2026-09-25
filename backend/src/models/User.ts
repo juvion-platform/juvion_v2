@@ -11,6 +11,8 @@ export interface IUser extends Document {
   personas: string[];
   personId?: mongoose.Types.ObjectId;
   isActive: boolean;
+  mustChangePassword: boolean;
+  passwordChangedAt?: Date;
   /** 010 — bumped on persona/role/deactivation changes; JWTs carry it as `tv`. */
   tokenVersion: number;
 }
@@ -26,6 +28,8 @@ const userSchema = new Schema<IUser>(
     personas: { type: [String], default: [] },
     personId: { type: Schema.Types.ObjectId, ref: 'Person' },
     isActive: { type: Boolean, default: true },
+    mustChangePassword: { type: Boolean, default: false },
+    passwordChangedAt: { type: Date },
     tokenVersion: { type: Number, default: 0 },
   },
   { timestamps: true },

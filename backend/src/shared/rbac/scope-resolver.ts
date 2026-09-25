@@ -1,6 +1,7 @@
 import redis from '../../config/redis';
 import { Faculty } from '../../models/people/Faculty';
 import { Staff } from '../../models/people/Staff';
+import { Student } from '../../models/people/Student';
 import { User } from '../../models/User';
 import { Branch } from '../../models/academic-structure/Branch';
 
@@ -10,6 +11,7 @@ interface UserScopeData {
   departmentId?: string;
   branchIds?: string[];
   personId?: string;
+  studentId?: string;
 }
 
 function cacheKey(userId: string): string {
@@ -17,15 +19,17 @@ function cacheKey(userId: string): string {
 }
 
 /**
- * Resolve a user's departmentId and personId by looking up their
- * Faculty or Staff record (linked via User.personId).
+ * Resolve a user's departmentId, personId and studentId by looking up their
+ * Faculty, Staff or Student record (linked via User.personId).
  *
- * Results are cached in Redis for 15 minutes.
+ * Results are cached in Redis for 15 minutes. A cached entry for a student
+ * that predates studentId resolution is treated as a miss so it re-resolves.
  *
  * Role-to-model mapping:
  * - hod, faculty → Faculty model
  * - staff → Staff model
- * - Others (student, parent, admin) → look up User.personId only
+ * - student → Student model (studentId)
+ * - Others (parent, admin) → look up User.personId only
  */
 export async function resolveUserScope(
   userId: string,
@@ -35,7 +39,15 @@ export async function resolveUserScope(
   // Check cache first
   try {
     const cached = await redis.get(cacheKey(userId));
-    if (cached) return JSON.parse(cached);
+    if (cached) {
+      const parsedCache = JSON.parse(cached) as UserScopeData;
+      // A cache entry written before studentId resolution existed lacks the
+      // field for student-role users. Treat that as a miss so it re-resolves
+      // and rewrites the cache; other roles are unaffected.
+      if (!(role === 'student' && parsedCache.studentId === undefined)) {
+        return parsedCache;
+      }
+    }
   } catch (_e) {
     // Cache miss — proceed to DB
   }
@@ -60,6 +72,9 @@ export async function resolveUserScope(
         if (staff?.departmentId) {
           scope.departmentId = String(staff.departmentId);
         }
+      } else if (role === 'student') {
+        const student = await Student.findOne({ personId, collegeId }).select('_id').lean();
+        if (student) scope.studentId = String(student._id);
       }
     }
     if (scope.departmentId) {

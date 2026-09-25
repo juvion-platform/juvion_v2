@@ -43,6 +43,8 @@ import { JuviAction } from '../../models/juvi/JuviAction';
 import { JuviConversation } from '../../models/juvi/JuviConversation';
 import { JuviMessage } from '../../models/juvi/JuviMessage';
 import { JuviPersonaConfig } from '../../models/juvi/JuviPersonaConfig';
+import { provisionIfEnabled, deactivateAccount } from '../juvi-app/accounts/provisioning-service';
+import { JuviAccount } from '../../models/juvi/JuviAccount';
 import { User } from '../../models/User';
 import { createAuditLog } from '../../shared/audit';
 import { WorkflowStepHandlerContext, registerWorkflowStepHandler } from '../../shared/workflow/StepHandlers';
@@ -1542,12 +1544,28 @@ registerWorkflowStepHandler('W01', 'provision_m12', async ({ instance, result, c
     userId: String(user._id),
   });
 
+  // Juvi (PRV-01): when the college has Juvi on, the app's temporary password replaces the
+  // hardcoded default above and is retrievable from the Juvi console instead of this result.
+  const juvi = await provisionIfEnabled({
+    collegeId: String(instance.collegeId),
+    personId,
+    kind: 'student',
+    source: 'workflow',
+    performedBy: completedBy,
+    resetPassword: true,
+  }).catch((err) => {
+    console.warn('[juvi-app] W01 provisioning skipped:', err instanceof Error ? err.message : err);
+    return null;
+  });
+
   const provisioningResult = {
     ...result,
     studentId: String(student._id),
     userId: String(user._id),
     email: user.email,
-    initialPassword: provisionedPassword,
+    initialPassword: juvi ? undefined : provisionedPassword,
+    juviAccountId: juvi ? String(juvi.account._id) : undefined,
+    juviCredentialId: juvi?.credentialId,
     accountStatus: 'completed',
   };
 
@@ -1970,7 +1988,7 @@ registerWorkflowStepHandler('W01', 'cancel_m08', async ({ instance, result }) =>
   };
 });
 
-registerWorkflowStepHandler('W01', 'cancel_m12', async ({ instance, result }) => {
+registerWorkflowStepHandler('W01', 'cancel_m12', async ({ instance, result, completedBy }) => {
   const cancellation = await ensureCancellationLinked(instance);
   const personId = getIdString(instance.metadata?.personId);
   if (!personId) return;
@@ -1980,6 +1998,17 @@ registerWorkflowStepHandler('W01', 'cancel_m12', async ({ instance, result }) =>
     user.isActive = false;
     await user.save();
   }
+
+  // Juvi (spec §9 Deprovisioning): a cancelled admission loses its app account, sessions and
+  // channel memberships too. Never fails the ERP step.
+  await JuviAccount.findOne({ collegeId: instance.collegeId, personId })
+    .select('_id status')
+    .lean()
+    .then(async (account) => {
+      if (!account || account.status === 'deactivated') return;
+      await deactivateAccount(String(instance.collegeId), String(account._id), 'workflow', completedBy ?? 'system');
+    })
+    .catch((err) => console.warn('[juvi-app] cancel_m12 deactivate failed', err));
 
   if (cancellation) {
     await updateCancellationReversal(cancellation, 'M12', 'completed');

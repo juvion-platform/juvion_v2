@@ -407,6 +407,13 @@ export { JuviNoticeCard } from './juvi/JuviNoticeCard';
 export { JuviPersonaConfig } from './juvi/JuviPersonaConfig';
 export { JuviUsageMetric } from './juvi/JuviUsageMetric';
 export { StudyRecommendation } from './juvi/StudyRecommendation';
+export { JuviAccount } from './juvi/JuviAccount';
+export { MobileSession } from './juvi/MobileSession';
+export { ChannelTemplate } from './juvi/ChannelTemplate';
+export { Channel } from './juvi/Channel';
+export { ChannelMembership } from './juvi/ChannelMembership';
+export { JuviProvisioningRun } from './juvi/JuviProvisioningRun';
+export { JuviProvisionedCredential } from './juvi/JuviProvisionedCredential';
 
 // === Workflow ===
 export { ClearanceWorkflow } from './workflow/ClearanceWorkflow';

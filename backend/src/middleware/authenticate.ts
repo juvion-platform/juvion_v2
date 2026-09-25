@@ -29,6 +29,10 @@ export async function authenticate(req: AuthRequest, res: Response, next: NextFu
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev-secret') as any;
+    // Juvi mobile tokens share JWT_SECRET but are never valid on ERP routes.
+    if ((decoded as { typ?: string }).typ === 'mobile') {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
     req.user = decoded;
     if (!decoded.personas) decoded.personas = [decoded.personaType];
 
