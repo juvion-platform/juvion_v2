@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { RefreshCw, Save } from 'lucide-react';
 import { getJuviSettings, updateJuviSettings, reconcileNow, type JuviSettings, type JuviSettingsPatch } from '../../../services/juvi-app';
@@ -29,7 +29,7 @@ function diff(form: Form, base: Form): JuviSettingsPatch {
   if (form.enabled !== base.enabled) p.enabled = form.enabled;
   if (form.paused !== base.paused) p.paused = form.paused;
   if (form.pausedMessage !== base.pausedMessage) p.pausedMessage = form.pausedMessage;
-  if (form.accentColor !== base.accentColor && form.accentColor) p.accentColor = form.accentColor;
+  if (form.accentColor !== base.accentColor) p.accentColor = form.accentColor === '' ? null : form.accentColor;
   if (form.contactName !== base.contactName || form.contactPhone !== base.contactPhone || form.contactEmail !== base.contactEmail) {
     p.supportContact = { name: form.contactName, ...(form.contactPhone ? { phone: form.contactPhone } : {}), ...(form.contactEmail ? { email: form.contactEmail } : {}) };
   }
@@ -53,26 +53,46 @@ function validate(form: Form): Record<string, string> {
 export default function SettingsTab() {
   const qc = useQueryClient();
   const canUpdate = useAuthStore((s) => s.hasPermission('platform', 'update'));
-  const { data, isLoading } = useQuery({ queryKey: ['juvi-admin-settings'], queryFn: getJuviSettings });
+  const { data, isLoading, isError } = useQuery({ queryKey: ['juvi-admin-settings'], queryFn: getJuviSettings });
   const [form, setForm] = useState<Form | null>(null);
   const [base, setBase] = useState<Form | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const reconcileTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => { if (data) { const f = toForm(data.juvi); setForm(f); setBase(f); } }, [data]);
+  // Seed the form only on first load — a background refetch (e.g. after the
+  // reconcile timer invalidates the query) must never clobber in-progress edits.
+  useEffect(() => { if (data && form === null) { const f = toForm(data.juvi); setForm(f); setBase(f); } }, [data, form]);
+
+  useEffect(() => () => { if (reconcileTimer.current) clearTimeout(reconcileTimer.current); }, []);
 
   const save = useMutation({
     mutationFn: (patch: JuviSettingsPatch) => updateJuviSettings(patch),
-    onSuccess: (view) => { qc.setQueryData(['juvi-admin-settings'], view); toast.success('Juvi settings saved'); },
+    // The global MutationCache in main.tsx would otherwise toast this mutation
+    // a second time on top of the messages below.
+    meta: { silent: true, silentError: true },
+    onSuccess: (view) => {
+      qc.setQueryData(['juvi-admin-settings'], view);
+      const f = toForm(view.juvi);
+      setForm(f);
+      setBase(f);
+      toast.success('Juvi settings saved');
+    },
     onError: () => toast.error('Could not save settings'),
   });
   const reconcile = useMutation({
     mutationFn: () => reconcileNow(),
-    onSuccess: () => { toast.success('Reconcile queued'); setTimeout(() => qc.invalidateQueries({ queryKey: ['juvi-admin-settings'] }), 3000); },
+    meta: { silent: true, silentError: true },
+    onSuccess: () => {
+      toast.success('Reconcile queued');
+      reconcileTimer.current = setTimeout(() => qc.invalidateQueries({ queryKey: ['juvi-admin-settings'] }), 3000);
+    },
     onError: () => toast.error('Could not queue a reconcile'),
   });
 
+  if (isError) return <div className="text-sm text-red-600">Could not load Juvi settings.</div>;
   if (isLoading || !form || !base) return <div className="text-sm text-gray-500">Loading settings…</div>;
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm({ ...form, [k]: v });
+  const fieldsDisabled = !canUpdate || save.isPending;
 
   const onSave = () => {
     const e = validate(form); setErrors(e);
@@ -89,17 +109,17 @@ export default function SettingsTab() {
         <fieldset className="space-y-3">
           <legend className="font-semibold text-navy text-sm mb-2">Availability</legend>
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={form.enabled} onChange={(e) => set('enabled', e.target.checked)} disabled={!canUpdate} />
+            <input type="checkbox" checked={form.enabled} onChange={(e) => set('enabled', e.target.checked)} disabled={fieldsDisabled} />
             Enable Juvi for this college
           </label>
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={form.paused} onChange={(e) => set('paused', e.target.checked)} disabled={!canUpdate} />
+            <input type="checkbox" checked={form.paused} onChange={(e) => set('paused', e.target.checked)} disabled={fieldsDisabled} />
             Pause Juvi (every app user sees a full-screen notice)
           </label>
           {form.paused && (
             <div>
               <label htmlFor="pausedMessage" className={lbl}>Message shown to users</label>
-              <textarea id="pausedMessage" className={inp} rows={2} value={form.pausedMessage} onChange={(e) => set('pausedMessage', e.target.value)} disabled={!canUpdate} />
+              <textarea id="pausedMessage" className={inp} rows={2} value={form.pausedMessage} onChange={(e) => set('pausedMessage', e.target.value)} disabled={fieldsDisabled} />
               {errors.pausedMessage && <p className="text-xs text-red-600 mt-1">{errors.pausedMessage}</p>}
             </div>
           )}
@@ -109,24 +129,24 @@ export default function SettingsTab() {
           <legend className="font-semibold text-navy text-sm mb-2">Branding and contact</legend>
           <div>
             <label htmlFor="accentColor" className={lbl}>Accent colour</label>
-            <input id="accentColor" className={inp} placeholder="#0B5FA5" value={form.accentColor} onChange={(e) => set('accentColor', e.target.value)} disabled={!canUpdate} />
+            <input id="accentColor" className={inp} placeholder="#0B5FA5" value={form.accentColor} onChange={(e) => set('accentColor', e.target.value)} disabled={fieldsDisabled} />
             {errors.accentColor && <p className="text-xs text-red-600 mt-1">{errors.accentColor}</p>}
           </div>
           <div>
             <label htmlFor="timezone" className={lbl}>Timezone</label>
-            <input id="timezone" className={inp} value={form.timezone} onChange={(e) => set('timezone', e.target.value)} disabled={!canUpdate} />
+            <input id="timezone" className={inp} value={form.timezone} onChange={(e) => set('timezone', e.target.value)} disabled={fieldsDisabled} />
           </div>
           <div>
             <label htmlFor="contactName" className={lbl}>Support contact name</label>
-            <input id="contactName" className={inp} value={form.contactName} onChange={(e) => set('contactName', e.target.value)} disabled={!canUpdate} />
+            <input id="contactName" className={inp} value={form.contactName} onChange={(e) => set('contactName', e.target.value)} disabled={fieldsDisabled} />
           </div>
           <div>
             <label htmlFor="contactPhone" className={lbl}>Support phone</label>
-            <input id="contactPhone" className={inp} value={form.contactPhone} onChange={(e) => set('contactPhone', e.target.value)} disabled={!canUpdate} />
+            <input id="contactPhone" className={inp} value={form.contactPhone} onChange={(e) => set('contactPhone', e.target.value)} disabled={fieldsDisabled} />
           </div>
           <div className="sm:col-span-2">
             <label htmlFor="contactEmail" className={lbl}>Support email</label>
-            <input id="contactEmail" className={inp} value={form.contactEmail} onChange={(e) => set('contactEmail', e.target.value)} disabled={!canUpdate} />
+            <input id="contactEmail" className={inp} value={form.contactEmail} onChange={(e) => set('contactEmail', e.target.value)} disabled={fieldsDisabled} />
             {errors.contactEmail && <p className="text-xs text-red-600 mt-1">{errors.contactEmail}</p>}
           </div>
         </fieldset>
@@ -135,20 +155,20 @@ export default function SettingsTab() {
           <legend className="font-semibold text-navy text-sm mb-2">Defaults and versions</legend>
           <div>
             <label htmlFor="quietStart" className={lbl}>Quiet hours start</label>
-            <input id="quietStart" className={inp} value={form.quietStart} onChange={(e) => set('quietStart', e.target.value)} disabled={!canUpdate} />
+            <input id="quietStart" className={inp} value={form.quietStart} onChange={(e) => set('quietStart', e.target.value)} disabled={fieldsDisabled} />
           </div>
           <div>
             <label htmlFor="quietEnd" className={lbl}>Quiet hours end</label>
-            <input id="quietEnd" className={inp} value={form.quietEnd} onChange={(e) => set('quietEnd', e.target.value)} disabled={!canUpdate} />
+            <input id="quietEnd" className={inp} value={form.quietEnd} onChange={(e) => set('quietEnd', e.target.value)} disabled={fieldsDisabled} />
             {errors.quiet && <p className="text-xs text-red-600 mt-1">{errors.quiet}</p>}
           </div>
           <div>
             <label htmlFor="minAndroid" className={lbl}>Minimum app version (Android)</label>
-            <input id="minAndroid" className={inp} placeholder="1.0.0" value={form.minAndroid} onChange={(e) => set('minAndroid', e.target.value)} disabled={!canUpdate} />
+            <input id="minAndroid" className={inp} placeholder="1.0.0" value={form.minAndroid} onChange={(e) => set('minAndroid', e.target.value)} disabled={fieldsDisabled} />
           </div>
           <div>
             <label htmlFor="minIos" className={lbl}>Minimum app version (iOS)</label>
-            <input id="minIos" className={inp} placeholder="1.0.0" value={form.minIos} onChange={(e) => set('minIos', e.target.value)} disabled={!canUpdate} />
+            <input id="minIos" className={inp} placeholder="1.0.0" value={form.minIos} onChange={(e) => set('minIos', e.target.value)} disabled={fieldsDisabled} />
           </div>
         </fieldset>
 

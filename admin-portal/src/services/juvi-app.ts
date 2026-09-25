@@ -23,7 +23,7 @@ export interface ReconcileSummary {
   memberships: { added: number; removed: number; roleChanged: number }; errors: number;
 }
 export interface AdminSettingsView { juvi: JuviSettings; college: { name: string; code: string }; lastReconcile: ReconcileSummary | null }
-export type JuviSettingsPatch = Partial<JuviSettings>;
+export type JuviSettingsPatch = Partial<Omit<JuviSettings, 'accentColor'>> & { accentColor?: string | null };
 
 export interface ProvisioningRun {
   _id: string; status: RunStatus;

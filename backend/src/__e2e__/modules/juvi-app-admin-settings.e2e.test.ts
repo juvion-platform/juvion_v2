@@ -38,6 +38,9 @@ describe('admin settings', () => {
     await api.as(fx.admin.token).put(`${A}/settings`).send({ quietHoursDefault: { start: '25:00', end: '07:00' } }).expect(400);
     const res = await api.as(fx.admin.token).put(`${A}/settings`).send({ paused: true, pausedMessage: 'Maintenance until Monday' }).expect(200);
     expect(res.body.juvi).toMatchObject({ paused: true, pausedMessage: 'Maintenance until Monday' });
+
+    const cleared = await api.as(fx.admin.token).put(`${A}/settings`).send({ accentColor: null }).expect(200);
+    expect(cleared.body.juvi.accentColor ?? null).toBeNull();
   });
 
   it('is unreachable without a token and renders the ERP error shape', async () => {

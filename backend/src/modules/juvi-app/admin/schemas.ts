@@ -8,7 +8,7 @@ export const settingsUpdateSchema = z.object({
   enabled: z.boolean().optional(),
   paused: z.boolean().optional(),
   pausedMessage: z.string().trim().max(300).optional(),
-  accentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a hex colour like #0B5FA5').optional(),
+  accentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a hex colour like #0B5FA5').nullable().optional(),
   supportContact: z.object({ name: z.string().trim().min(1).max(80), phone: z.string().trim().max(30).optional(), email: z.string().trim().email().optional() }).optional(),
   quietHoursDefault: z.object({ start: z.string().regex(HHMM), end: z.string().regex(HHMM) }).optional(),
   minAppVersion: z.object({ android: version.optional(), ios: version.optional() }).optional(),

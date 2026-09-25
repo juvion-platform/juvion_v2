@@ -64,4 +64,14 @@ describe('SettingsTab', () => {
     await screen.findByLabelText(/enable juvi for this college/i);
     expect(screen.getByRole('button', { name: /^save settings$/i })).toBeDisabled();
   });
+
+  it('clears the accent colour by sending null', async () => {
+    (getJuviSettings as Mock).mockResolvedValue({ ...VIEW, juvi: { ...VIEW.juvi, accentColor: '#0B5FA5' } });
+    renderWithProviders(<SettingsTab />);
+    const accent = await screen.findByLabelText(/accent colour/i);
+    expect(accent).toHaveValue('#0B5FA5');
+    fireEvent.change(accent, { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: /^save settings$/i }));
+    await waitFor(() => expect(updateJuviSettings).toHaveBeenCalledWith({ accentColor: null }));
+  });
 });
