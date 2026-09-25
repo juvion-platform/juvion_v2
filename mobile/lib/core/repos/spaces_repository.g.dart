@@ -170,3 +170,55 @@ final class ChannelFamily extends $Family
   @override
   String toString() => r'channelProvider';
 }
+
+/// Channel ids with a mute toggle currently in flight — a plain mutable `Set` cached for
+/// the container's lifetime, so `toggleMute` can guard against a second tap on the same
+/// row before the first request resolves.
+
+@ProviderFor(muteInFlight)
+final muteInFlightProvider = MuteInFlightProvider._();
+
+/// Channel ids with a mute toggle currently in flight — a plain mutable `Set` cached for
+/// the container's lifetime, so `toggleMute` can guard against a second tap on the same
+/// row before the first request resolves.
+
+final class MuteInFlightProvider
+    extends $FunctionalProvider<Set<String>, Set<String>, Set<String>>
+    with $Provider<Set<String>> {
+  /// Channel ids with a mute toggle currently in flight — a plain mutable `Set` cached for
+  /// the container's lifetime, so `toggleMute` can guard against a second tap on the same
+  /// row before the first request resolves.
+  MuteInFlightProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'muteInFlightProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$muteInFlightHash();
+
+  @$internal
+  @override
+  $ProviderElement<Set<String>> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  Set<String> create(Ref ref) {
+    return muteInFlight(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(Set<String> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<Set<String>>(value),
+    );
+  }
+}
+
+String _$muteInFlightHash() => r'31a4d8a70b99944285aee0a1c6d7399d407122ce';

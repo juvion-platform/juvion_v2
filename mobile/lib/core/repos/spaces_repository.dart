@@ -109,28 +109,55 @@ Stream<Cached<ChannelDetail>> channel(Ref ref, String id) async* {
   }
 }
 
-/// Optimistic mute toggle; queues the write when offline (spec §11 pending actions) and
-/// rewrites the cached list so the row flips immediately.
-Future<void> toggleMute(WidgetRef ref, SpaceChannel c) async {
-  final db = await ref.read(appDatabaseProvider.future);
-  final repo = await ref.read(spacesRepositoryProvider.future);
-  final muted = !c.muted;
-  final doc = await db.readDoc('spaces');
-  if (doc != null) {
-    final groups = (doc.json['groups'] as List).map((g) {
-      final group = Map<String, dynamic>.from(g as Map);
-      group['channels'] = (group['channels'] as List).map((x) {
-        final ch = Map<String, dynamic>.from(x as Map);
-        return ch['id'] == c.id ? {...ch, 'muted': muted} : ch;
-      }).toList();
-      return group;
+/// Rewrites `muted` for [channelId] inside a decoded `spaces` cache document's `groups`,
+/// leaving every other group and channel untouched.
+List<Map<String, dynamic>> _withMuted(Map<String, dynamic> json, String channelId, bool muted) {
+  return (json['groups'] as List).map((g) {
+    final group = Map<String, dynamic>.from(g as Map);
+    group['channels'] = (group['channels'] as List).map((x) {
+      final ch = Map<String, dynamic>.from(x as Map);
+      return ch['id'] == channelId ? {...ch, 'muted': muted} : ch;
     }).toList();
-    await db.writeDoc('spaces', {...doc.json, 'groups': groups}, doc.asOf);
-  }
+    return group;
+  }).toList();
+}
+
+/// Channel ids with a mute toggle currently in flight — a plain mutable `Set` cached for
+/// the container's lifetime, so `toggleMute` can guard against a second tap on the same
+/// row before the first request resolves.
+@Riverpod(keepAlive: true)
+Set<String> muteInFlight(Ref ref) => <String>{};
+
+/// Optimistic mute toggle; queues the write when offline (spec §11 pending actions) and
+/// rewrites the cached list so the row flips immediately. On a non-offline failure (403,
+/// 500, ...) the pre-toggle cache document is written back unchanged (same `asOf`) and
+/// the failure is rethrown so the caller can tell the user; on an offline failure the
+/// optimistic state is kept and the write is queued, same as before. A second toggle of
+/// the same channel while the first is still in flight is a no-op.
+Future<void> toggleMute(WidgetRef ref, SpaceChannel c) async {
+  final inFlight = ref.read(muteInFlightProvider);
+  if (!inFlight.add(c.id)) return;
   try {
-    await repo.setMuted(c.id, muted);
-  } on ApiFailure catch (f) {
-    if (f.isOffline) await db.enqueueAction(PendingAction.create(muted ? 'channel.mute' : 'channel.unmute', {'channelId': c.id}));
+    final db = await ref.read(appDatabaseProvider.future);
+    final repo = await ref.read(spacesRepositoryProvider.future);
+    final muted = !c.muted;
+    final previousDoc = await db.readDoc('spaces');
+    if (previousDoc != null) {
+      await db.writeDoc('spaces', {...previousDoc.json, 'groups': _withMuted(previousDoc.json, c.id, muted)}, previousDoc.asOf);
+    }
+    try {
+      await repo.setMuted(c.id, muted);
+    } on ApiFailure catch (f) {
+      if (f.isOffline) {
+        await db.enqueueAction(PendingAction.create(muted ? 'channel.mute' : 'channel.unmute', {'channelId': c.id}));
+      } else {
+        if (previousDoc != null) await db.writeDoc('spaces', previousDoc.json, previousDoc.asOf);
+        ref.invalidate(spacesProvider);
+        rethrow;
+      }
+    }
+    ref.invalidate(spacesProvider);
+  } finally {
+    inFlight.remove(c.id);
   }
-  ref.invalidate(spacesProvider);
 }

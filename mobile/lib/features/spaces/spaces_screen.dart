@@ -33,7 +33,7 @@ class SpacesScreen extends ConsumerWidget {
               title: Text(c.muted ? l.channelUnmute : l.channelMute),
               onTap: () {
                 Navigator.pop(sheetContext);
-                unawaited(toggleMute(ref, c));
+                unawaited(_toggleMuteAndNotify(context, ref, c));
               },
             ),
             ListTile(
@@ -77,5 +77,17 @@ class SpacesScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+}
+
+/// `toggleMute` restores the pre-toggle cache and rethrows on a non-offline failure (the
+/// offline case is handled silently — it queues instead); this is the one place that
+/// calls it (the row's long-press gesture and its semantics custom action both open this
+/// same sheet), so it's the one place that needs to tell the user something went wrong.
+Future<void> _toggleMuteAndNotify(BuildContext context, WidgetRef ref, SpaceChannel c) async {
+  try {
+    await toggleMute(ref, c);
+  } on ApiFailure catch (f) {
+    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(f.message)));
   }
 }
