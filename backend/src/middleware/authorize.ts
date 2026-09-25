@@ -57,6 +57,7 @@ export function authorize(module: string, action: string, opts?: RbacOptions) {
         selfOnly: policy.scope?.selfOnly ?? false,
         userId,
         personId: userScope.personId,
+        studentId: userScope.studentId,
         subDomain: policy.scope?.subDomain ? policy.scope.subDomain.split(',').map((s) => s.trim()) : undefined,
         resolvedPermissions: [],
       };

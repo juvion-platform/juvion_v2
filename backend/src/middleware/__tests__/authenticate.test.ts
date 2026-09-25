@@ -10,6 +10,7 @@
  *   - JWT path: super_admin with x-college-id → header wins
  *   - JWT path: non-super_admin with x-college-id → token wins
  *   - JWT path: missing collegeId for non-superadmin → 400
+ *   - JWT path: Juvi mobile token (typ: 'mobile') → 401
  *   - Production (NODE_ENV !== 'development') without token → 401
  */
 
@@ -211,6 +212,23 @@ describe('authenticate — JWT path', () => {
     const next = vi.fn();
     authenticate(req, res as never, next);
     expect(res.statusCode).toBe(400);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('mobile token (typ: mobile) → 401 even for a super_admin role with x-college-id', () => {
+    const token = jwt.sign(
+      { sub: 'a1', typ: 'mobile', cid: 'c1', role: 'super_admin' },
+      'test-secret',
+    );
+    const req = makeReq({
+      headers: { authorization: `Bearer ${token}`, 'x-college-id': 'c1' },
+    });
+    const res = makeRes();
+    const next = vi.fn();
+    authenticate(req, res as never, next);
+    expect(res.statusCode).toBe(401);
+    expect(res.body).toEqual({ error: 'Invalid token' });
+    expect(req.user).toBeUndefined();
     expect(next).not.toHaveBeenCalled();
   });
 

@@ -9,6 +9,7 @@ import { AcademicYear } from '../../models/academic-structure/AcademicYear';
 import { paginate } from '../../shared/pagination';
 import { createAuditLog } from '../../shared/audit';
 import { AppError } from '../../middleware/errorHandler';
+import { provisionIfEnabled } from '../juvi-app/accounts/provisioning-service';
 import * as feePinService from '../finance/fee-pin-service';
 import { resolveStudentYearOfStudy } from '../finance/resolve-year-of-study';
 import { AuthScope } from '../../shared/rbac/types';
@@ -707,6 +708,10 @@ export async function createFaculty(collegeId: string, data: any, performedBy: s
   }
   const doc = await Faculty.create(fields);
   await createAuditLog({ collegeId, entityType: 'Faculty', entityId: String(doc._id), entityName: data.name, action: 'create', changes: [], performedBy });
+  // Juvi (PRV-01): a hired faculty member gets an app account when the college has Juvi on.
+  // Never let Juvi provisioning fail faculty creation.
+  await provisionIfEnabled({ collegeId, personId: String(person._id), kind: 'faculty', source: 'workflow', performedBy })
+    .catch((err) => console.warn('[juvi-app] faculty provisioning skipped:', err instanceof Error ? err.message : err));
   return { ...doc.toObject(), person: person.toObject() };
 }
 
