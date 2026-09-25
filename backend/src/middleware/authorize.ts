@@ -78,14 +78,16 @@ export function authorize<M extends RbacModule>(module: M, action: RbacAction | 
           if (key) return res.status(403).json({ error: `Field "${key}" is not permitted for this role` });
         }
         const json = res.json.bind(res);
-        res.json = ((body: unknown) => json(maskFields(body, hidden))) as typeof res.json;
+        // Services often hand Mongoose documents to res.json; serialise first so
+        // the walker sees plain objects (express stringifies anyway).
+        res.json = ((body: unknown) => json(maskFields(body === undefined ? body : JSON.parse(JSON.stringify(body)), hidden))) as typeof res.json;
       }
       if (authScope.assignedVia) {
         authScope.assigned = await resolveAssigned(collegeId || '', userScope.personId, authScope.assignedVia);
       }
 
       req.authScope = authScope;
-      if (scopeNarrows(authScope)) getListContext().scoped = true;
+      if (scopeNarrows(authScope)) { const ctx = getListContext(); ctx.scoped = true; ctx.authScope = authScope; }
       next();
     } catch (err) {
       next(err);

@@ -45,3 +45,13 @@
 - `finance.bank` is declared but no schema carries a bank field yet (VendorPayment.bankReference is a reference, not an account number).
 - Aggregates that fold a masked field into a total (payroll sums) are not masked; treat those endpoints as `hr` sub-domain decisions.
 - Non-incremental `tsc` on this backend takes ~65 s and >2 GB heap on the base commit too; the default `npm run typecheck` relies on the incremental cache and can OOM after a large diff (`NODE_OPTIONS=--max-old-space-size=4096` fixes it).
+
+# Post-review item 3 (2026-09-22): scoped by-id lookups everywhere
+
+- [x] `shared/rbac/scope-plugin.ts` — global Mongoose plugin (registered first in `server.ts` / `app.ts`, and via vitest `setupFiles` for e2e) that narrows any by-id findOne / findOneAndUpdate / findOneAndDelete / updateOne / deleteOne on a scoped request whose filter did not go through `applyAuthScope`, using the model's axis (Student / Faculty / Staff / Employee / Department directly; `studentId` / `facultyId` / `employeeId` links via the members the caller may see). Axis-less models stay college-wide. Never widens; explicit `findOneScoped` calls are skipped.
+- [x] `request-context.ts` now carries `authScope` (narrowing only; rule in the file header updated) and a per-request cache of member ids.
+- [x] Field masks now serialise Mongoose documents before walking (services often pass documents to `res.json`; the walker only touched plain objects, so compensation fields leaked on by-id reads).
+- [x] Tests: unit `scope-plugin.test.ts`; e2e `rbac-byid.test.ts` (payroll via Employee, certificate via Student, Department update); route-walk snapshot refreshed.
+
+Deviation: the plugin infers a model's axis from its field names. A model with a `studentId` that is not a row-ownership link would be over-narrowed (404 for scoped users). The name list is the same one the list-function classification used; add a `DIRECT` entry to override.
+Environment note: the unit suite spawns in-memory Mongo under /tmp (3.8 GB tmpfs); stale `mongo-mem-*` dirs from crashed runs fill it and surface as "No space left on device" test failures. `rm -rf /tmp/mongo-mem-*` fixes it.

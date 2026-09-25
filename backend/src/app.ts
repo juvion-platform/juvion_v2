@@ -1,3 +1,5 @@
+// 010 — must be registered before any schema is compiled (global Mongoose plugin).
+import './shared/rbac/scope-plugin';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
