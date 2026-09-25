@@ -53,7 +53,7 @@ export interface TemplateRow {
   code: string; name: string; namePattern: string; scopeType: string; replyRule: string; defaultPriority: string; archiveRule: string; isEnabled: boolean;
 }
 
-const clean = <T extends Record<string, unknown>>(o: T): Partial<T> =>
+const clean = <T extends object>(o: T): Partial<T> =>
   Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined && v !== '')) as Partial<T>;
 
 export const getJuviSettings = (): Promise<AdminSettingsView> => api.get(`${BASE}/settings`).then((r) => r.data);
@@ -77,7 +77,7 @@ export async function downloadCredentialsCsv(runId: string, group: { key: Creden
 }
 
 export const listAccounts = (q: AccountsQuery): Promise<Paginated<AccountRow>> =>
-  api.get(`${BASE}/accounts`, { params: clean(q as unknown as Record<string, unknown>) }).then((r) => r.data);
+  api.get(`${BASE}/accounts`, { params: clean(q) }).then((r) => r.data);
 export const deactivateAccount = (id: string): Promise<{ status: AccountStatus }> => api.post(`${BASE}/accounts/${id}/deactivate`).then((r) => r.data);
 export const resetAccountPassword = (id: string): Promise<{ credentialId: string; expiresAt: string }> => api.post(`${BASE}/accounts/${id}/reset-password`).then((r) => r.data);
 export const revealAccountCredential = (id: string): Promise<{ identifier: string; password: string; expiresAt: string }> =>
