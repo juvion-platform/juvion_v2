@@ -30,7 +30,6 @@ dependencies:
   path_provider: ^2.1.6
   riverpod_annotation: ^4.0.7
   shared_preferences: ^2.5.5
-  sqlcipher_flutter_libs: ^0.7.0+eol
   url_launcher: ^6.3.2
 
 dev_dependencies:
@@ -50,3 +49,14 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   generate: true
+
+# SQLCipher support for package:sqlite3's native-assets build hook, replacing the
+# (now end-of-life) sqlcipher_flutter_libs plugin. See the "Custom SQLite builds" /
+# "Default binaries" sections of https://pub.dev/packages/sqlite3 (doc/hook.md in the
+# sqlite3-3.5.2 source, ~/.pub-cache/hosted/pub.dev/sqlite3-3.5.2/doc/hook.md): setting
+# `source: sqlcipher` selects the prebuilt SQLCipher community-edition binary for every
+# supported platform instead of plain SQLite.
+hooks:
+  user_defines:
+    sqlite3:
+      source: sqlcipher
