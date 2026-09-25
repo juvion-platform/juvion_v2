@@ -73,17 +73,46 @@ void main() {
     expect(c.read(sessionControllerProvider), const SessionState.signedIn(account));
   });
 
+  test('restore with tokens but no cached account fetches it from the server', () async {
+    // e.g. an iOS reinstall: the keychain survives, the on-device database does not.
+    mem['juvi.access'] = 'a'; mem['juvi.refresh'] = 'r';
+    when(() => auth.fetchAccount()).thenAnswer((_) async => account);
+    final s = c.read(sessionControllerProvider.notifier);
+    await s.restore();
+    expect(c.read(sessionControllerProvider), const SessionState.signedIn(account));
+    expect((await db.readDoc('account'))!.json['id'], 'a1');
+  });
+
+  test('restore with tokens but no cached account, offline, signs out without wiping the tokens', () async {
+    mem['juvi.access'] = 'a'; mem['juvi.refresh'] = 'r';
+    when(() => auth.fetchAccount()).thenAnswer((_) async => throw const ApiFailure(ApiErrorCode.offline, "You're offline."));
+    final s = c.read(sessionControllerProvider.notifier);
+    await s.restore();
+    expect(c.read(sessionControllerProvider), const SessionState.signedOut(reason: 'restore'));
+    expect(mem['juvi.access'], 'a');
+  });
+
   test('handleFailure maps fatal codes to states and wipes on sign-out-class failures', () async {
     mem['juvi.access'] = 'a';
-    final s = c.read(sessionControllerProvider.notifier)
-      ..handleFailure(const ApiFailure(ApiErrorCode.institutionPaused, 'Back Monday', detail: {'message': 'Back Monday'}));
+    final s = c.read(sessionControllerProvider.notifier);
+    await s.handleFailure(const ApiFailure(ApiErrorCode.institutionPaused, 'Back Monday', detail: {'message': 'Back Monday'}));
     expect(c.read(sessionControllerProvider), const SessionState.paused('Back Monday'));
-    s.handleFailure(const ApiFailure(ApiErrorCode.updateRequired, 'x', detail: {'minVersion': '1.2.0', 'storeUrl': 'https://play'}));
+    await s.handleFailure(const ApiFailure(ApiErrorCode.updateRequired, 'x', detail: {'minVersion': '1.2.0', 'storeUrl': 'https://play'}));
     expect(c.read(sessionControllerProvider), const SessionState.updateRequired(minVersion: '1.2.0', storeUrl: 'https://play'));
-    s.handleFailure(const ApiFailure(ApiErrorCode.sessionInvalidated, 'x', detail: {'reason': 'password_changed'}));
-    await Future<void>.delayed(Duration.zero);
+    await s.handleFailure(const ApiFailure(ApiErrorCode.sessionInvalidated, 'x', detail: {'reason': 'password_changed'}));
     expect(c.read(sessionControllerProvider), const SessionState.signedOut(reason: 'password_changed'));
     expect(mem['juvi.access'], isNull);
+  });
+
+  test('accountDeactivated then sessionInvalidated keeps the deactivated state', () async {
+    mem['juvi.access'] = 'a';
+    final s = c.read(sessionControllerProvider.notifier);
+    await s.handleFailure(const ApiFailure(ApiErrorCode.accountDeactivated, 'x', detail: {
+      'supportContact': {'name': 'Help Desk'},
+    }));
+    expect(c.read(sessionControllerProvider), const SessionState.deactivated(supportContact: SupportContact(name: 'Help Desk')));
+    await s.handleFailure(const ApiFailure(ApiErrorCode.sessionInvalidated, 'x', detail: {'reason': 'password_changed'}));
+    expect(c.read(sessionControllerProvider), const SessionState.deactivated(supportContact: SupportContact(name: 'Help Desk')));
   });
 
   test('refreshTokens rotates and persists; a null refresh wipes', () async {

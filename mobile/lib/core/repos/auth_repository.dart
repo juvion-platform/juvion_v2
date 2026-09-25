@@ -22,6 +22,7 @@ abstract class AuthRepository {
   Future<Tokens?> refresh(String refreshToken, String deviceId);
   Future<void> signOut();
   Future<void> changePassword(String currentPassword, String newPassword);
+  Future<AccountSummary> fetchAccount();
 }
 
 class ApiAuthRepository implements AuthRepository {
@@ -82,6 +83,17 @@ class ApiAuthRepository implements AuthRepository {
   Future<void> changePassword(String currentPassword, String newPassword) async {
     try {
       await _api.changePassword(changePasswordRequest: wire.ChangePasswordRequest.fromJson({'currentPassword': currentPassword, 'newPassword': newPassword}));
+    } catch (e) {
+      throw ApiFailure.of(e);
+    }
+  }
+
+  @override
+  Future<AccountSummary> fetchAccount() async {
+    try {
+      final r = await _api.getMe();
+      final json = r.data!.toJson();
+      return AccountSummary.fromJson(Map<String, dynamic>.from(json['account'] as Map));
     } catch (e) {
       throw ApiFailure.of(e);
     }
