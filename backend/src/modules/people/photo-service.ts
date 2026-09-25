@@ -35,7 +35,7 @@
  * strings are ignored on read.
  */
 
-import sharp from 'sharp';
+import sharp, { type FormatEnum } from 'sharp';
 import { Model } from 'mongoose';
 
 import { Person } from '../../models/people/Person';
@@ -391,7 +391,7 @@ async function loadEntityScoped(
  * "not an image at all" case to keep the error message consistent.
  */
 async function validateImageBuffer(buffer: Buffer): Promise<ValidatedImage> {
-  let format: keyof sharp.FormatEnum | undefined;
+  let format: keyof FormatEnum | undefined;
   let width: number | undefined;
   let height: number | undefined;
   try {
@@ -428,7 +428,7 @@ async function validateImageBuffer(buffer: Buffer): Promise<ValidatedImage> {
 }
 
 function isSupportedFormat(
-  format: keyof sharp.FormatEnum,
+  format: keyof FormatEnum,
 ): format is SharpFormat {
   return format === 'jpeg' || format === 'png' || format === 'webp';
 }
