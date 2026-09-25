@@ -3,10 +3,14 @@ import SettingsTab from '../../components/platform/juvi/SettingsTab';
 import ProvisioningTab from '../../components/platform/juvi/ProvisioningTab';   // Task 7
 import ChannelsTab from '../../components/platform/juvi/ChannelsTab';           // Task 8
 
+// Absolute paths: this page is mounted at `path="juvi/*"` (Platform.tsx), so a relative
+// NavLink target resolves against whatever the wildcard captured (the current URL), not
+// against this page's own base — e.g. `to: 'settings'` from `/platform/juvi/settings` would
+// resolve to `/platform/juvi/settings/settings`. Absolute targets sidestep that entirely.
 const TABS = [
-  { to: '', label: 'Provisioning', end: true },
-  { to: 'settings', label: 'Settings', end: false },
-  { to: 'channels', label: 'Channels', end: false },
+  { to: '/platform/juvi', label: 'Provisioning', end: true },
+  { to: '/platform/juvi/settings', label: 'Settings', end: false },
+  { to: '/platform/juvi/channels', label: 'Channels', end: false },
 ];
 
 export default function JuviAdminPage() {
