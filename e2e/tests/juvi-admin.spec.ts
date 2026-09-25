@@ -38,37 +38,17 @@ test.describe('Platform — Juvi mobile app', () => {
     await expect(page.getByText('{{college.name}}')).toBeVisible({ timeout: 10_000 });
   });
 
-  test('registrar has read-only access to Juvi settings', async ({ page, loginAs }) => {
-    // Neither of the brief's two anticipated shapes holds here, and both were
-    // checked against the live stack (not assumed) before landing on this body:
-    //
-    //  1. The Platform hub does not redirect a registrar, and the "Juvi mobile
-    //     app" card itself is not permission-gated in PlatformHome
-    //     (admin-portal/src/pages/Platform.tsx) — it renders for every
-    //     college-scoped user. So the primary test's `toHaveCount(0)` on the
-    //     card fails outright (confirmed: card renders for the registrar too).
-    //  2. The documented fallback ("no Save settings button") also does not
-    //     hold: DEFAULT_POLICIES (backend/src/shared/rbac/defaults.ts) grants
-    //     every `staff` role a `{ module: '*', action: 'read' }` fallback
-    //     policy, so a registrar's GET /api/juvi-app/admin/settings succeeds
-    //     (confirmed via the live API) and SettingsTab renders normally — the
-    //     Save settings button is present, just `disabled`, because
-    //     `canUpdate = hasPermission('platform', 'update')` is false (no
-    //     `platform:update`/`create` policy exists for ST-REG). Asserting
-    //     "no button" would therefore be false and, worse, would not actually
-    //     exercise the permission boundary that exists.
-    //
-    // What's actually true and worth asserting: the registrar can SEE the
-    // Juvi settings screen (read-only fallback) but every control on it is
-    // disabled — no write capability. That is the real RBAC contract here.
+  test('registrar has no platform administration access', async ({ page, loginAs }) => {
     await loginAs('registrar');
+
     await page.goto('/platform');
-    await expect(page.getByRole('heading', { name: /platform/i }).first()).toBeVisible();
+    await expect(page).toHaveURL(/\/$/);
 
     await page.goto('/platform/juvi/settings');
-    await expect(page.getByRole('heading', { name: /^juvi mobile app$/i })).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByLabel(/enable juvi for this college/i)).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByLabel(/enable juvi for this college/i)).toBeDisabled();
-    await expect(page.getByRole('button', { name: /^save settings$/i })).toBeDisabled();
+    await expect(page).toHaveURL(/\/$/);
+
+    await expect(
+      page.getByRole('heading', { name: /^juvi mobile app$/i }),
+    ).toHaveCount(0);
   });
 });
