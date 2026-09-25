@@ -346,4 +346,55 @@ class AppLocalizationsEn extends AppLocalizations {
   String channelMemberCountArchived(int count) {
     return '$count members · Archived';
   }
+
+  @override
+  String get onboardingContinue => 'Continue';
+
+  @override
+  String get onboardingFinish => 'Finish';
+
+  @override
+  String onboardingStepOfTotal(int step, int total) {
+    return 'Step $step of $total';
+  }
+
+  @override
+  String get onboardingStepNeedsConnection => 'This step needs a connection.';
+
+  @override
+  String get onboardingUnknownStepBody =>
+      'One more thing from your college is on its way. Continue for now.';
+
+  @override
+  String get onboardingIdentityTitle => 'Your college has set you up';
+
+  @override
+  String onboardingIdentityBody(String institution) {
+    return 'Here\'s what $institution has on record. Nothing to fill in.';
+  }
+
+  @override
+  String get onboardingAddPhoto => 'Add a photo (optional)';
+
+  @override
+  String get onboardingSpacesTitle => 'Your spaces';
+
+  @override
+  String get onboardingSpacesBodyStudent =>
+      'One space for the college, your department, your batch and each course. They come from your registrations, so nothing to set up.';
+
+  @override
+  String get onboardingSpacesBodyLateral =>
+      'You\'re joining the batch mid-way, so your spaces match the courses you\'re registered for now. First-year spaces aren\'t included.';
+
+  @override
+  String get onboardingSpacesBodyFaculty =>
+      'One space per course you teach, plus your department and the college.';
+
+  @override
+  String get onboardingSpacesOffline =>
+      'Spaces will appear once you are online.';
+
+  @override
+  String get onboardingNotificationsTitle => 'Stay informed, not overwhelmed';
 }

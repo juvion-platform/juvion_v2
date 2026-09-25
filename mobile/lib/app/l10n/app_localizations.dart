@@ -705,6 +705,90 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count} members · Archived'**
   String channelMemberCountArchived(int count);
+
+  /// Onboarding: advances to the next step.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get onboardingContinue;
+
+  /// Onboarding: the Continue button's label on the last step.
+  ///
+  /// In en, this message translates to:
+  /// **'Finish'**
+  String get onboardingFinish;
+
+  /// Accessible semantic label for the onboarding progress dots.
+  ///
+  /// In en, this message translates to:
+  /// **'Step {step} of {total}'**
+  String onboardingStepOfTotal(int step, int total);
+
+  /// Shown when advancing an onboarding step fails because the device is offline.
+  ///
+  /// In en, this message translates to:
+  /// **'This step needs a connection.'**
+  String get onboardingStepNeedsConnection;
+
+  /// Generic continue card shown for a server-sent onboarding step name the app doesn't recognise yet.
+  ///
+  /// In en, this message translates to:
+  /// **'One more thing from your college is on its way. Continue for now.'**
+  String get onboardingUnknownStepBody;
+
+  /// Onboarding identity step heading.
+  ///
+  /// In en, this message translates to:
+  /// **'Your college has set you up'**
+  String get onboardingIdentityTitle;
+
+  /// Onboarding identity step body.
+  ///
+  /// In en, this message translates to:
+  /// **'Here\'s what {institution} has on record. Nothing to fill in.'**
+  String onboardingIdentityBody(String institution);
+
+  /// Onboarding identity step: optional photo upload prompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a photo (optional)'**
+  String get onboardingAddPhoto;
+
+  /// Onboarding spaces step heading.
+  ///
+  /// In en, this message translates to:
+  /// **'Your spaces'**
+  String get onboardingSpacesTitle;
+
+  /// Onboarding spaces step body for a regular student.
+  ///
+  /// In en, this message translates to:
+  /// **'One space for the college, your department, your batch and each course. They come from your registrations, so nothing to set up.'**
+  String get onboardingSpacesBodyStudent;
+
+  /// Onboarding spaces step body for a lateral-entry student.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re joining the batch mid-way, so your spaces match the courses you\'re registered for now. First-year spaces aren\'t included.'**
+  String get onboardingSpacesBodyLateral;
+
+  /// Onboarding spaces step body for faculty.
+  ///
+  /// In en, this message translates to:
+  /// **'One space per course you teach, plus your department and the college.'**
+  String get onboardingSpacesBodyFaculty;
+
+  /// Onboarding spaces step: shown instead of the space list when the initial load fails.
+  ///
+  /// In en, this message translates to:
+  /// **'Spaces will appear once you are online.'**
+  String get onboardingSpacesOffline;
+
+  /// Onboarding notifications step heading.
+  ///
+  /// In en, this message translates to:
+  /// **'Stay informed, not overwhelmed'**
+  String get onboardingNotificationsTitle;
 }
 
 class _AppLocalizationsDelegate
