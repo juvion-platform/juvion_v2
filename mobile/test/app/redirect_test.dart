@@ -25,11 +25,24 @@ void main() {
       expect(redirect(SessionState.signedIn(acct(step: 1, complete: false)), '/today'), '/onboarding/1');
       expect(redirect(SessionState.signedIn(acct(step: 1, complete: false)), '/onboarding/1'), isNull);
     });
+    test('R54: onboarding step navigation — back is fine, ahead (or malformed) pins to the current step', () {
+      final signedIn = SessionState.signedIn(acct(complete: false));
+      expect(redirect(signedIn, '/onboarding/2'), isNull); // back-navigation
+      expect(redirect(signedIn, '/onboarding/3'), isNull); // current step
+      expect(redirect(signedIn, '/onboarding/5'), '/onboarding/3'); // skip-ahead
+      expect(redirect(signedIn, '/onboarding/abc'), '/onboarding/3'); // malformed step
+    });
     test('complete accounts leave gates for their home tab and keep app routes', () {
       expect(redirect(SessionState.signedIn(acct()), '/sign-in'), '/today');
       expect(redirect(SessionState.signedIn(acct(kind: 'faculty')), '/splash'), '/teaching');
       expect(redirect(SessionState.signedIn(acct()), '/spaces/abc'), isNull);
       expect(redirect(SessionState.signedIn(acct()), '/me/settings'), isNull);
+    });
+    test("I1: the wrong kind is bounced off the other kind's home tab", () {
+      expect(redirect(SessionState.signedIn(acct(kind: 'faculty')), '/today'), '/teaching');
+      expect(redirect(SessionState.signedIn(acct()), '/teaching'), '/today');
+      expect(redirect(SessionState.signedIn(acct()), '/today'), isNull);
+      expect(redirect(SessionState.signedIn(acct(kind: 'faculty')), '/teaching'), isNull);
     });
     test('system states are full-screen', () {
       expect(redirect(const SessionState.deactivated(), '/today'), '/deactivated');

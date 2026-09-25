@@ -12,6 +12,8 @@ class ThemePreference extends _$ThemePreference {
   @override
   ThemeMode build() {
     unawaited(SharedPreferences.getInstance().then((p) {
+      // R55: the notifier may have been disposed by the time this async gap resolves.
+      if (!ref.mounted) return;
       final v = p.getString(_key);
       if (v != null) state = ThemeMode.values.byName(v);
     }));

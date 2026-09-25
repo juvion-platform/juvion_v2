@@ -18,6 +18,8 @@ ThemeData buildTheme({required Brightness brightness, Color? accent}) {
     // R42: Flutter 3.44's ThemeData.cardTheme takes CardThemeData, not CardTheme.
     cardTheme: CardThemeData(elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: BorderSide(color: scheme.outlineVariant))),
     filledButtonTheme: FilledButtonThemeData(style: FilledButton.styleFrom(minimumSize: const Size(44, 48))),
+    outlinedButtonTheme: OutlinedButtonThemeData(style: OutlinedButton.styleFrom(minimumSize: const Size(44, 48))),
+    textButtonTheme: TextButtonThemeData(style: TextButton.styleFrom(minimumSize: const Size(44, 48))),
     listTileTheme: const ListTileThemeData(minVerticalPadding: 12),
   );
 }
