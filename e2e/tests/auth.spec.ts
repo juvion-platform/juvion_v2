@@ -45,7 +45,7 @@ test.describe('Authentication', () => {
     await expect(page.getByLabel('Email')).toBeVisible();
 
     await page.getByLabel('Email').fill(TEST_USERS.principal.email);
-    await page.getByLabel('Password').fill('this-is-definitely-not-the-password');
+    await page.getByLabel('Password', { exact: true }).fill('this-is-definitely-not-the-password');
 
     // Wait for the login API response so the assertion below isn't
     // racing the network. This is the single most-common cause of

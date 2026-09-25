@@ -26,7 +26,7 @@ export const test = base.extend<AuthFixtures>({
       const user = TEST_USERS[role];
       await page.goto('/login');
       await page.getByLabel('Email').fill(user.email);
-      await page.getByLabel('Password').fill(user.password);
+      await page.getByLabel('Password', { exact: true }).fill(user.password);
       await page.getByRole('button', { name: /^sign in$/i }).click();
       // Wait for the post-login redirect. Each role lands somewhere
       // different — see `test-users.ts` for the source of truth.
