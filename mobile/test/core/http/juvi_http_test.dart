@@ -156,6 +156,40 @@ void main() {
     expect(refreshes, 1);
   });
 
+  test('a refresh that throws (e.g. offline) surfaces that failure and does not touch the session', () async {
+    // ApiAuthRepository.refresh() rethrows an offline ApiFailure instead of
+    // returning null, because "the session is gone" and "we couldn't reach the
+    // server to find out" are different outcomes: only the former should wipe
+    // the session and fire onFatal. The RefreshFn contract only documents a
+    // `Tokens?` return, so a `refresh()` that *throws* has to be handled by
+    // whatever dio does when an onError callback's Future rejects instead of
+    // completing — this pins that behaviour down.
+    dio = buildDio(
+      baseUrl: 'https://api.test/v1',
+      accessToken: () async => 'old',
+      refresh: () async => throw const ApiFailure(ApiErrorCode.offline, "You're offline."),
+      deviceId: () async => 'd',
+      appVersion: '1',
+      platform: 'ios',
+      onFatal: (f) {
+        fatal = f;
+        fatalCalls++;
+      },
+    );
+    adapter = DioAdapter(dio: dio)
+      ..onGet(
+        '/me',
+        (s) => s.reply(401, {
+          'error': {'code': 'TOKEN_EXPIRED', 'message': 'x'},
+        }),
+      );
+    await expectLater(
+      dio.get<void>('/me'),
+      throwsA(isA<DioException>().having((e) => ApiFailure.of(e).code, 'code', ApiErrorCode.offline)),
+    );
+    expect(fatalCalls, 0);
+  });
+
   test('two concurrent requests that both hit TOKEN_EXPIRED with a dead refresh share one refresh and one onFatal',
       () async {
     // Unlike the successful-refresh case, a failed refresh doesn't change the
