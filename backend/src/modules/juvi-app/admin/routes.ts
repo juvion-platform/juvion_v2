@@ -7,6 +7,7 @@ import { settingsUpdateSchema } from './schemas';
 import * as settingsCtrl from './settings-controller';
 import * as provisioningCtrl from './provisioning-controller';
 import * as accountsCtrl from './accounts-controller';
+import * as channelsCtrl from './channels-controller';
 
 /**
  * ERP-side administration of Juvi. ERP auth chain, ERP error shape.
@@ -30,6 +31,9 @@ adminRouter.post('/accounts/:id/deactivate', authorize('platform', 'update'), ac
 adminRouter.post('/accounts/:id/reset-password', authorize('platform', 'update'), accountsCtrl.resetPassword);
 adminRouter.post('/accounts/:id/reveal-credential', authorize('platform', 'create'), accountsCtrl.revealCredential);
 
-// Task 4 adds channels routes above this line.
+adminRouter.get('/channels', authorize('platform', 'read'), channelsCtrl.listChannels);
+adminRouter.get('/templates', authorize('platform', 'read'), channelsCtrl.listTemplates);
+adminRouter.post('/reconcile', authorize('platform', 'update'), channelsCtrl.reconcileNow);
+
 adminRouter.use((_req, _res, next) => next(new AppError(404, 'Not found')));
 adminRouter.use(errorHandler);
