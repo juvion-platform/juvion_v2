@@ -44,4 +44,28 @@ void main() {
     expect(await store.deviceId(), id);
     expect(await store.databaseKey(), key);
   });
+
+  // I2: prefs restored onto a new phone without their Keystore key throw on read; that
+  // must mean "signed out", with the session entries cleared, never a crash at launch.
+  test('a store that throws on read yields no tokens and clears the session entries', () async {
+    await store.writeTokens(const Tokens(accessToken: 'a', refreshToken: 'r'));
+    await store.writeCollegeId('c1');
+    when(() => storage.read(key: any(named: 'key'))).thenThrow(Exception('BadPaddingException'));
+    expect(await store.readTokens(), isNull);
+    expect(await store.readCollegeId(), isNull);
+    expect(mem.containsKey('juvi.access'), isFalse);
+    expect(mem.containsKey('juvi.refresh'), isFalse);
+    expect(mem.containsKey('juvi.college_id'), isFalse);
+  });
+
+  test('an unreadable database key is replaced by a new one', () async {
+    when(() => storage.read(key: any(named: 'key'))).thenThrow(Exception('BadPaddingException'));
+    expect(await store.databaseKey(), matches(RegExp(r'^[0-9a-f]{64}$')));
+  });
+
+  test('a store that throws on read and on delete still yields no tokens', () async {
+    when(() => storage.read(key: any(named: 'key'))).thenThrow(Exception('read'));
+    when(() => storage.delete(key: any(named: 'key'))).thenThrow(Exception('delete'));
+    expect(await store.readTokens(), isNull);
+  });
 }

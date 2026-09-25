@@ -1,7 +1,10 @@
 import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:juvi/core/http/api_failure.dart';
 import 'package:juvi/core/http/api_providers.dart';
 import 'package:juvi/core/models/models.dart';
+import 'package:juvi/core/session/session_controller.dart';
+import 'package:juvi/core/session/session_state.dart';
 import 'package:juvi/core/storage/app_database.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -51,11 +54,18 @@ class ApiConfigRepository implements ConfigRepository {
 Future<ConfigRepository> configRepository(Ref ref) async => ApiConfigRepository(ref.read(dioProvider), await ref.read(appDatabaseProvider.future));
 
 /// Cached-then-network config; the theme reads the accent from here.
+///
+/// `/config` needs a session, so it is only fetched while signed in; otherwise the cached
+/// doc (if any) is all there is. Watching the signed-in account id re-runs this on sign-in,
+/// sign-out and account switch — so a new account never keeps the previous one's accent —
+/// but not on every same-account `updateAccount`.
 @Riverpod(keepAlive: true)
 Stream<Cached<AppConfigData>> appConfig(Ref ref) async* {
+  final accountId = ref.watch(sessionControllerProvider.select((s) => s is SignedIn ? s.account.id : null));
   final repo = await ref.read(configRepositoryProvider.future);
   final c = await repo.cached();
   if (c != null) yield c;
+  if (accountId == null) return;
   try {
     yield await repo.refresh();
   } on ApiFailure catch (f) {

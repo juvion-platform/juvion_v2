@@ -1,3 +1,7 @@
+import 'dart:io';
+
+import 'package:drift/drift.dart' show QueryExecutor;
+import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:juvi/core/storage/app_database.dart';
 import 'package:juvi/core/sync/pending_action.dart';
@@ -52,5 +56,94 @@ void main() {
     // apply (see pubspec.yaml `hooks.user_defines.sqlite3.source: sqlcipher`).
     when(() => raw.select(any())).thenReturn(ResultSet(const [], null, const []));
     expect(() => assertSqlCipherLinked(raw), throwsA(isA<StateError>()));
+  });
+
+  // I2: a file restored from a backup without its key (or corrupt) must be replaced by a
+  // fresh cache, not crash every launch; SQLCipher missing must still fail closed (R50).
+  group('openRecovering', () {
+    late Directory dir;
+    late File file;
+    setUp(() {
+      dir = Directory.systemTemp.createTempSync('juvi_db_test');
+      file = File('${dir.path}/juvi.db');
+    });
+    tearDown(() => dir.deleteSync(recursive: true));
+
+    Future<void> deleteFile() async {
+      if (file.existsSync()) await file.delete();
+    }
+
+    test('an unreadable file is deleted and a working database opened in its place', () async {
+      file.writeAsBytesSync(List.generate(4096, (i) => (i * 37) % 251));
+      var deletes = 0;
+      final recovered = await openRecovering(
+        () => AppDatabase(NativeDatabase.createInBackground(file)),
+        () async {
+          deletes++;
+          await deleteFile();
+        },
+      );
+      addTearDown(recovered.close);
+      expect(deletes, 1);
+      await recovered.writeDoc('me', {'a': 1}, DateTime.utc(2026));
+      expect((await recovered.readDoc('me'))!.json, {'a': 1});
+    });
+
+    test('a file encrypted under a different key is replaced (backup restored without its key)', () async {
+      QueryExecutor keyed(String key) => NativeDatabase.createInBackground(
+            file,
+            setup: (raw) {
+              raw.execute("PRAGMA key = '$key';");
+              assertSqlCipherLinked(raw);
+            },
+          );
+      final old = AppDatabase(keyed('old-key'));
+      await old.writeDoc('me', {'a': 1}, DateTime.utc(2026));
+      await old.close();
+      var deletes = 0;
+      final recovered = await openRecovering(() => AppDatabase(keyed('new-key')), () async {
+        deletes++;
+        await deleteFile();
+      });
+      addTearDown(recovered.close);
+      expect(deletes, 1);
+      expect(await recovered.readDoc('me'), isNull);
+      await recovered.writeDoc('me', {'a': 2}, DateTime.utc(2026));
+      expect((await recovered.readDoc('me'))!.json, {'a': 2});
+    });
+
+    test('a readable file is opened as-is', () async {
+      final first = AppDatabase(NativeDatabase(file));
+      await first.writeDoc('me', {'a': 1}, DateTime.utc(2026));
+      await first.close();
+      var deletes = 0;
+      final reopened = await openRecovering(() => AppDatabase(NativeDatabase(file)), () async => deletes++);
+      addTearDown(reopened.close);
+      expect(deletes, 0);
+      expect((await reopened.readDoc('me'))!.json, {'a': 1});
+    });
+
+    test('SQLCipher not linked is rethrown and nothing is deleted', () async {
+      var deletes = 0;
+      await expectLater(
+        openRecovering(
+          // The host build links SQLCipher too (pubspec's sqlite3 hook), so the
+          // not-linked case is simulated with the error assertSqlCipherLinked throws.
+          () => AppDatabase(NativeDatabase.createInBackground(
+                file,
+                setup: (_) => throw StateError('SQLCipher is not linked; refusing to open an unencrypted database'),
+              )),
+          () async => deletes++,
+        ),
+        throwsA(predicate((e) => e.toString().contains('SQLCipher is not linked'))),
+      );
+      expect(deletes, 0);
+    });
+
+    test('isUnreadableDatabaseError tells a wrong key from a missing SQLCipher', () {
+      expect(isUnreadableDatabaseError(Exception('file is not a database')), isTrue);
+      expect(isUnreadableDatabaseError(StateError('SQLCipher is not linked; refusing')), isFalse);
+      expect(isUnreadableDatabaseError(Exception('disk I/O error')), isFalse);
+    });
   });
 }

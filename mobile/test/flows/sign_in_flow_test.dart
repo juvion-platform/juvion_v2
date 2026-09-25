@@ -1,4 +1,5 @@
-import 'package:dio/dio.dart';
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -8,6 +9,7 @@ import 'package:juvi/app/app.dart';
 import 'package:juvi/core/analytics/analytics.dart';
 import 'package:juvi/core/connectivity/connectivity_provider.dart';
 import 'package:juvi/core/http/api_providers.dart';
+import 'package:juvi/core/http/juvi_http.dart';
 import 'package:juvi/core/session/session_controller.dart';
 import 'package:juvi/core/storage/app_database.dart';
 import 'package:juvi/core/storage/secure_store.dart';
@@ -44,7 +46,21 @@ void main() {
     // `bareMobileApiProvider` (the generated client, used for everything else). See
     // mobile/README.md's "generated-client gap" note for why those three calls bypass
     // the generated client.
-    final dio = Dio(BaseOptions(baseUrl: 'https://api.test/v1'));
+    //
+    // The Dio is the real `buildDio`, so requests carry the Bearer token from the secure
+    // store once there is one and a fatal failure reaches `handleFailure` exactly as in
+    // the app — which is what lets the `/config` mock below reject unauthenticated calls.
+    final store = SecureStore(storage);
+    late final ProviderContainer container;
+    final dio = buildDio(
+      baseUrl: 'https://api.test/v1',
+      accessToken: () async => (await store.readTokens())?.accessToken,
+      refresh: () async => null,
+      deviceId: store.deviceId,
+      appVersion: '1.0.0',
+      platform: 'android',
+      onFatal: (f) => unawaited(container.read(sessionControllerProvider.notifier).handleFailure(f)),
+    );
     final adapter = DioAdapter(dio: dio);
     var step = 0;
     var mustChange = true;
@@ -102,8 +118,18 @@ void main() {
         data: Matchers.any,
       )
       ..onGet('/me', (s) => s.replyCallback(200, (_) => {...meJson, 'account': account()}))
+      // I1: the contract's reply to `/config` without a Bearer token. http_mock_adapter
+      // answers with the LAST registered mock that matches, so this one only answers
+      // requests the authenticated mock below does not match.
       ..onGet(
         '/config',
+        (s) => s.reply(401, {
+          'error': {'code': 'SESSION_INVALIDATED', 'message': 'Please sign in again.', 'reason': 'missing'},
+        }),
+      )
+      ..onGet(
+        '/config',
+        headers: {'Authorization': Matchers.pattern('^Bearer .+')},
         (s) => s.reply(200, {
           'name': 'JIT College',
           'code': 'JIT',
@@ -130,10 +156,10 @@ void main() {
     final api = JuviApi(dio: dio, basePathOverride: 'https://api.test/v1').getMobileApi();
     final db = AppDatabase.memory();
     addTearDown(db.close);
-    final container = ProviderContainer(
+    container = ProviderContainer(
       retry: (_, _) => null,
       overrides: [
-        secureStoreProvider.overrideWithValue(SecureStore(storage)),
+        secureStoreProvider.overrideWithValue(store),
         appDatabaseProvider.overrideWith((_) async => db),
         appVersionProvider.overrideWith((_) async => '1.0.0'),
         dioProvider.overrideWithValue(dio),
@@ -152,7 +178,8 @@ void main() {
     await t.pumpWidget(UncontrolledProviderScope(container: container, child: const JuviApp()));
     await t.pumpAndSettle();
 
-    // S01
+    // S01 — a first launch must not be told its (non-existent) session ended.
+    expect(find.text('Please sign in again.'), findsNothing);
     await t.enterText(find.bySemanticsLabel('Institution code'), 'JIT');
     await t.pump(const Duration(milliseconds: 600));
     expect(find.text('JIT College'), findsOneWidget);

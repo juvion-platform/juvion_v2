@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:juvi/core/env.dart';
 import 'package:juvi/core/http/juvi_http.dart';
@@ -21,9 +23,14 @@ Future<String> appVersion(Ref ref) async => (await PackageInfo.fromPlatform()).v
 
 /// No interceptors, no Bearer token: used for calls made before a session exists
 /// (institution lookup, sign-in, refresh). `lib/core/repos/auth_repository.dart`'s
-/// `lookupInstitution` also reads this directly (see its doc comment for why).
+/// `lookupInstitution` also reads this directly (see its doc comment for why). Same
+/// timeouts and version/platform headers as [dio], so a black-holed refresh times out.
 @Riverpod(keepAlive: true)
-Dio bareDio(Ref ref) => Dio(BaseOptions(baseUrl: AppEnv.apiBaseUrl));
+Dio bareDio(Ref ref) => Dio(juviBaseOptions(
+      baseUrl: AppEnv.apiBaseUrl,
+      appVersion: ref.read(appVersionProvider).value ?? '0.0.0',
+      platform: AppEnv.platform,
+    ));
 
 @Riverpod(keepAlive: true)
 wire.MobileApi bareMobileApi(Ref ref) => wire.JuviApi(dio: ref.read(bareDioProvider), basePathOverride: AppEnv.apiBaseUrl).getMobileApi();
@@ -38,7 +45,7 @@ Dio dio(Ref ref) {
     deviceId: store.deviceId,
     appVersion: ref.read(appVersionProvider).value ?? '0.0.0',
     platform: AppEnv.platform,
-    onFatal: (f) => ref.read(sessionControllerProvider.notifier).handleFailure(f),
+    onFatal: (f) => unawaited(ref.read(sessionControllerProvider.notifier).handleFailure(f)),
   );
 }
 

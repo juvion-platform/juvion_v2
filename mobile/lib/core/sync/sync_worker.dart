@@ -31,6 +31,12 @@ class DrainResult {
 /// down its retry budget); a non-offline failure counts an attempt and moves on to the
 /// next item; ten attempts or a 4xx that is not a cooldown drops the action (spec §11).
 ///
+/// The queue is re-read, not iterated from a snapshot: an action whose row is gone by the
+/// time its turn comes (a sign-out wiped the queue mid-drain) is skipped, so it can never
+/// go out under the next account's token; and actions enqueued mid-drain are picked up by
+/// a further pass. Each action is tried at most once per drain, and at most [maxPasses]
+/// passes run, so a drain always ends.
+///
 /// This class is not re-entrant-safe on its own: calling [drain] again on the same
 /// instance while a previous call is still running would read and process the queue a
 /// second time concurrently. Serializing calls (e.g. so a reconnect and an app-resume
@@ -43,34 +49,44 @@ class SyncWorker {
   final MeRepository _me;
   final SpacesRepository _spaces;
   static const maxAttempts = 10;
+  static const maxPasses = 5;
 
   Future<DrainResult> drain() async {
     var sent = 0;
     var deferred = 0;
     var dropped = 0;
-    final actions = await _db.pendingActions();
-    for (var i = 0; i < actions.length; i++) {
-      final a = actions[i];
-      try {
-        await _apply(a);
-        await _db.removeAction(a.id);
-        sent++;
-      } on ApiFailure catch (f) {
-        if (f.isOffline) {
-          // R60: record the error for diagnostics, but not as a counted attempt.
-          deferred = actions.length - i;
-          await _db.recordOfflineFailure(a.id, 'offline');
-          break;
-        }
-        final permanent = (f.status ?? 500) >= 400 && (f.status ?? 500) < 500 && f.code != ApiErrorCode.cooldown;
-        if (permanent || a.attempts + 1 >= maxAttempts) {
+    final tried = <String>{};
+    for (var pass = 0; pass < maxPasses; pass++) {
+      final actions = (await _db.pendingActions()).where((a) => !tried.contains(a.id)).toList();
+      if (actions.isEmpty) break;
+      var wentOffline = false;
+      for (var i = 0; i < actions.length; i++) {
+        final a = actions[i];
+        tried.add(a.id);
+        if (!await _db.hasAction(a.id)) continue;
+        try {
+          await _apply(a);
           await _db.removeAction(a.id);
-          dropped++;
-        } else {
-          await _db.recordAttempt(a.id, f.message);
-          deferred++;
+          sent++;
+        } on ApiFailure catch (f) {
+          if (f.isOffline) {
+            // R60: record the error for diagnostics, but not as a counted attempt.
+            deferred += actions.length - i;
+            await _db.recordOfflineFailure(a.id, 'offline');
+            wentOffline = true;
+            break;
+          }
+          final permanent = (f.status ?? 500) >= 400 && (f.status ?? 500) < 500 && f.code != ApiErrorCode.cooldown;
+          if (permanent || a.attempts + 1 >= maxAttempts) {
+            await _db.removeAction(a.id);
+            dropped++;
+          } else {
+            await _db.recordAttempt(a.id, f.message);
+            deferred++;
+          }
         }
       }
+      if (wentOffline) break;
     }
     return DrainResult(sent: sent, deferred: deferred, dropped: dropped);
   }

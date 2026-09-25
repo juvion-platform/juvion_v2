@@ -11,6 +11,15 @@ const Set<ApiErrorCode> _fatalCodes = {
   ApiErrorCode.updateRequired,
 };
 
+/// Timeouts and the `X-Juvi-*` version/platform headers every Juvi request carries —
+/// shared by [buildDio] and the unauthenticated `bareDio`.
+BaseOptions juviBaseOptions({required String baseUrl, required String appVersion, required String platform}) => BaseOptions(
+      baseUrl: baseUrl,
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 20),
+      headers: {'X-Juvi-App-Version': appVersion, 'X-Juvi-Platform': platform},
+    );
+
 /// Dio configured for the Juvi mobile API: headers, one refresh per expiry, ApiFailure errors.
 Dio buildDio({
   required String baseUrl,
@@ -21,12 +30,7 @@ Dio buildDio({
   required String platform,
   void Function(ApiFailure failure)? onFatal,
 }) {
-  final dio = Dio(BaseOptions(
-    baseUrl: baseUrl,
-    connectTimeout: const Duration(seconds: 10),
-    receiveTimeout: const Duration(seconds: 20),
-    headers: {'X-Juvi-App-Version': appVersion, 'X-Juvi-Platform': platform},
-  ));
+  final dio = Dio(juviBaseOptions(baseUrl: baseUrl, appVersion: appVersion, platform: platform));
   dio.interceptors
       .add(_AuthInterceptor(dio, accessToken: accessToken, refresh: refresh, deviceId: deviceId, onFatal: onFatal));
   return dio;

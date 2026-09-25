@@ -125,4 +125,53 @@ void main() {
     expect(await s.refreshTokens(), isNull);
     expect(mem['juvi.access'], isNull);
   });
+
+  // I2: restore() runs before runApp; nothing it hits may throw out of it.
+  group('restore never throws', () {
+    ProviderContainer containerWith(_Storage storage, {bool dbFails = false}) {
+      final container = ProviderContainer(retry: (_, _) => null, overrides: [
+        authRepositoryProvider.overrideWithValue(auth),
+        secureStoreProvider.overrideWithValue(SecureStore(storage)),
+        appDatabaseProvider.overrideWith((_) async => dbFails ? throw Exception('file is not a database') : db),
+        appVersionProvider.overrideWith((_) async => '1.0.0'),
+      ]);
+      addTearDown(container.dispose);
+      return container;
+    }
+
+    test('an unreadable secure store ends signed out', () async {
+      final storage = _Storage();
+      when(() => storage.read(key: any(named: 'key'))).thenThrow(Exception('BadPaddingException'));
+      when(() => storage.delete(key: any(named: 'key'))).thenAnswer((_) async {});
+      final container = containerWith(storage);
+      await container.read(sessionControllerProvider.notifier).restore();
+      expect(container.read(sessionControllerProvider), const SessionState.signedOut());
+    });
+
+    test('a database that cannot open ends signed out', () async {
+      final storage = _Storage();
+      when(() => storage.read(key: any(named: 'key'))).thenAnswer((i) async => {'juvi.access': 'a', 'juvi.refresh': 'r'}[i.namedArguments[#key]]);
+      final container = containerWith(storage, dbFails: true);
+      await container.read(sessionControllerProvider.notifier).restore();
+      expect(container.read(sessionControllerProvider), const SessionState.signedOut(reason: 'restore'));
+    });
+  });
+
+  // T4: handleFailure runs unawaited from the interceptor; a storage error in the wipe
+  // must not escape as an uncaught zone error, and the rest of the wipe still runs.
+  test('handleFailure completes and signs out when the secure store cannot delete', () async {
+    final storage = _Storage();
+    when(() => storage.delete(key: any(named: 'key'))).thenThrow(Exception('keystore'));
+    final container = ProviderContainer(retry: (_, _) => null, overrides: [
+      secureStoreProvider.overrideWithValue(SecureStore(storage)),
+      appDatabaseProvider.overrideWith((_) async => db),
+    ]);
+    addTearDown(container.dispose);
+    await db.writeDoc('me', {'a': 1}, DateTime.utc(2026));
+    await container.read(sessionControllerProvider.notifier).handleFailure(
+          const ApiFailure(ApiErrorCode.sessionInvalidated, 'x', status: 401, detail: {'reason': 'missing'}),
+        );
+    expect(container.read(sessionControllerProvider), const SessionState.signedOut(reason: 'missing'));
+    expect(await db.readDoc('me'), isNull);
+  });
 }

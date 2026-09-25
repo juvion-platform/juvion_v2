@@ -49,11 +49,21 @@ final class ConfigRepositoryProvider
 String _$configRepositoryHash() => r'506ba3525aaac5deae0e42da4497bb6b9151b4a7';
 
 /// Cached-then-network config; the theme reads the accent from here.
+///
+/// `/config` needs a session, so it is only fetched while signed in; otherwise the cached
+/// doc (if any) is all there is. Watching the signed-in account id re-runs this on sign-in,
+/// sign-out and account switch — so a new account never keeps the previous one's accent —
+/// but not on every same-account `updateAccount`.
 
 @ProviderFor(appConfig)
 final appConfigProvider = AppConfigProvider._();
 
 /// Cached-then-network config; the theme reads the accent from here.
+///
+/// `/config` needs a session, so it is only fetched while signed in; otherwise the cached
+/// doc (if any) is all there is. Watching the signed-in account id re-runs this on sign-in,
+/// sign-out and account switch — so a new account never keeps the previous one's accent —
+/// but not on every same-account `updateAccount`.
 
 final class AppConfigProvider
     extends
@@ -66,6 +76,11 @@ final class AppConfigProvider
         $FutureModifier<Cached<AppConfigData>>,
         $StreamProvider<Cached<AppConfigData>> {
   /// Cached-then-network config; the theme reads the accent from here.
+  ///
+  /// `/config` needs a session, so it is only fetched while signed in; otherwise the cached
+  /// doc (if any) is all there is. Watching the signed-in account id re-runs this on sign-in,
+  /// sign-out and account switch — so a new account never keeps the previous one's accent —
+  /// but not on every same-account `updateAccount`.
   AppConfigProvider._()
     : super(
         from: null,
@@ -92,4 +107,4 @@ final class AppConfigProvider
   }
 }
 
-String _$appConfigHash() => r'4667c40a2df4a4a7d59e5fde5a56a2c8122e8859';
+String _$appConfigHash() => r'f42f8ee2fb5778f232b827f513cf2e569afe0ee3';

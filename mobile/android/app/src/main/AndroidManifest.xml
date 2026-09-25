@@ -1,8 +1,16 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Release builds need this; the Flutter template only grants it in the debug and profile manifests. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="juvi"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules">
+        <!-- allowBackup="false": the encrypted cache and flutter_secure_storage's prefs are
+             useless without their Keystore key, which never leaves the device; restoring
+             them onto another phone only yields unreadable storage. Nothing here is worth
+             backing up (the server holds the data). -->
         <activity
             android:name=".MainActivity"
             android:exported="true"

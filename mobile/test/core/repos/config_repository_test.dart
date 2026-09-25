@@ -1,9 +1,47 @@
 import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http_mock_adapter/http_mock_adapter.dart';
 import 'package:juvi/core/http/api_failure.dart';
+import 'package:juvi/core/http/api_providers.dart';
+import 'package:juvi/core/models/models.dart';
 import 'package:juvi/core/repos/config_repository.dart';
+import 'package:juvi/core/session/session_controller.dart';
+import 'package:juvi/core/session/session_state.dart';
 import 'package:juvi/core/storage/app_database.dart';
+
+const Map<String, dynamic> _configJson = {
+  'name': 'JIT College',
+  'code': 'JIT',
+  'logoUrl': null,
+  'accentColor': '#0B5FA5',
+  'supportContact': null,
+  'quietHoursDefault': {'start': '22:00', 'end': '07:00'},
+  'timezone': 'Asia/Kolkata',
+  'featureFlags': {'languageRoadmap': false},
+  'minAppVersion': null,
+  'onboardingSteps': ['identity', 'spaces', 'notifications'],
+};
+
+const _account = AccountSummary(
+  id: 'a',
+  kind: 'student',
+  status: 'active',
+  onboardingStep: 3,
+  onboardingSteps: ['identity', 'spaces', 'notifications'],
+  onboardingComplete: true,
+  mustChangePassword: false,
+);
+
+class _Session extends SessionController {
+  _Session(this._initial);
+  final SessionState _initial;
+  @override
+  SessionState build() => _initial;
+  // A test hook mirroring the controller's own state transitions, not a property.
+  // ignore: use_setters_to_change_properties
+  void set(SessionState s) => state = s;
+}
 
 void main() {
   late Dio dio;
@@ -100,6 +138,58 @@ void main() {
         repo.refresh(),
         throwsA(isA<ApiFailure>().having((f) => f.code, 'code', ApiErrorCode.internal)),
       );
+    });
+  });
+
+  group('appConfigProvider', () {
+    late List<String> requested;
+    late _Session session;
+
+    ProviderContainer containerFor(SessionState initial) {
+      requested = [];
+      dio.interceptors.add(InterceptorsWrapper(onRequest: (o, h) {
+        requested.add(o.path);
+        h.next(o);
+      }));
+      adapter.onGet('/config', (s) => s.reply(200, _configJson));
+      session = _Session(initial);
+      final c = ProviderContainer(
+        retry: (_, _) => null,
+        overrides: [
+          dioProvider.overrideWithValue(dio),
+          appDatabaseProvider.overrideWith((_) async => db),
+          sessionControllerProvider.overrideWith(() => session),
+        ],
+      );
+      addTearDown(c.dispose);
+      return c;
+    }
+
+    // I1: `/config` needs a session; fetching it signed out gets a 401
+    // SESSION_INVALIDATED, which the auth interceptor turns into a wipe and a
+    // "Please sign in again." for a first-time user.
+    test('while signed out, no /config request is made', () async {
+      containerFor(const SessionState.signedOut()).listen(appConfigProvider, (_, _) {});
+      await pumpEventQueue();
+      expect(requested, isEmpty);
+    });
+
+    test('while signed out, the cached doc is still served', () async {
+      await db.writeDoc('config', _configJson, DateTime.utc(2026));
+      final c = containerFor(const SessionState.signedOut())..listen(appConfigProvider, (_, _) {});
+      await pumpEventQueue();
+      expect(c.read(appConfigProvider).value?.data.accentColor, '#0B5FA5');
+      expect(requested, isEmpty);
+    });
+
+    test('signing in fetches /config', () async {
+      final c = containerFor(const SessionState.signedOut())..listen(appConfigProvider, (_, _) {});
+      await pumpEventQueue();
+      expect(requested, isEmpty);
+      session.set(const SessionState.signedIn(_account));
+      await pumpEventQueue();
+      expect(requested, ['/config']);
+      expect(c.read(appConfigProvider).value?.data.name, 'JIT College');
     });
   });
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:juvi/app/l10n/l10n.dart';
 import 'package:juvi/core/models/models.dart';
 import 'package:juvi/core/repos/me_repository.dart';
@@ -64,5 +65,29 @@ void main() {
     await t.tap(find.text('Finish'));
     await t.pumpAndSettle();
     expect(session.updated?.onboardingComplete, isTrue);
+  });
+
+  // Minor (e): `go()` leaves one route, so system back at step > 0 used to exit the app.
+  testWidgets('system back at step 1 goes to step 0', (t) async {
+    final router = GoRouter(
+      initialLocation: '/onboarding/1',
+      routes: [GoRoute(path: '/onboarding/:step', builder: (_, s) => OnboardingScreen(step: int.parse(s.pathParameters['step']!)))],
+    );
+    addTearDown(router.dispose);
+    await t.pumpWidget(ProviderScope(
+      overrides: [
+        meProvider.overrideWith((_) async* { yield Cached(Me.fromJson(meJson), DateTime.now()); }),
+        spacesProvider.overrideWith((_) async* { yield Cached(SpacesData.fromJson(spacesJson), DateTime.now()); }),
+        meRepositoryProvider.overrideWith((_) async => _Repo()),
+        sessionControllerProvider.overrideWith(_Session.new),
+      ],
+      child: MaterialApp.router(localizationsDelegates: AppLocalizations.localizationsDelegates, supportedLocales: AppLocalizations.supportedLocales, routerConfig: router),
+    ));
+    await t.pumpAndSettle();
+    expect(find.text('Your spaces'), findsOneWidget);
+    await t.binding.handlePopRoute();
+    await t.pumpAndSettle();
+    expect(router.state.uri.toString(), '/onboarding/0');
+    expect(find.text('Your college has set you up'), findsOneWidget);
   });
 }

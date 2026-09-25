@@ -24,8 +24,19 @@ class SessionController extends _$SessionController {
   @override
   SessionState build() => const SessionState.loading();
 
-  /// Called once at bootstrap. Never signs the user out for being offline.
+  /// Called once at bootstrap, before `runApp`, so it never throws: storage that cannot
+  /// be read (e.g. restored from a backup without its key) or a cache that cannot open
+  /// ends signed out instead of leaving the app with no first frame. Never signs the user
+  /// out for being offline.
   Future<void> restore() async {
+    try {
+      await _restore();
+    } on Object {
+      if (state is SessionLoading) state = const SessionState.signedOut(reason: 'restore');
+    }
+  }
+
+  Future<void> _restore() async {
     final store = ref.read(secureStoreProvider);
     final tokens = await store.readTokens();
     if (tokens == null) {
@@ -127,9 +138,19 @@ class SessionController extends _$SessionController {
     state = SessionState.signedIn(account);
   }
 
+  /// Best effort, each part on its own: a storage error must not stop the rest of the
+  /// wipe, nor escape as an uncaught error from the interceptor's `onFatal`.
   Future<void> _wipe() async {
-    await ref.read(secureStoreProvider).wipeAll();
-    final db = await ref.read(appDatabaseProvider.future);
-    await db.wipe();
+    try {
+      await ref.read(secureStoreProvider).wipeAll();
+    } on Object {
+      // Tokens that cannot be deleted cannot be read either (see SecureStore).
+    }
+    try {
+      final db = await ref.read(appDatabaseProvider.future);
+      await db.wipe();
+    } on Object {
+      // The cache is disposable; an unopenable one holds nothing to leak.
+    }
   }
 }

@@ -124,20 +124,23 @@ String _$appVersionHash() => r'59b58cc8214f60571dfe517b1f68cfc1aed29718';
 
 /// No interceptors, no Bearer token: used for calls made before a session exists
 /// (institution lookup, sign-in, refresh). `lib/core/repos/auth_repository.dart`'s
-/// `lookupInstitution` also reads this directly (see its doc comment for why).
+/// `lookupInstitution` also reads this directly (see its doc comment for why). Same
+/// timeouts and version/platform headers as [dio], so a black-holed refresh times out.
 
 @ProviderFor(bareDio)
 final bareDioProvider = BareDioProvider._();
 
 /// No interceptors, no Bearer token: used for calls made before a session exists
 /// (institution lookup, sign-in, refresh). `lib/core/repos/auth_repository.dart`'s
-/// `lookupInstitution` also reads this directly (see its doc comment for why).
+/// `lookupInstitution` also reads this directly (see its doc comment for why). Same
+/// timeouts and version/platform headers as [dio], so a black-holed refresh times out.
 
 final class BareDioProvider extends $FunctionalProvider<Dio, Dio, Dio>
     with $Provider<Dio> {
   /// No interceptors, no Bearer token: used for calls made before a session exists
   /// (institution lookup, sign-in, refresh). `lib/core/repos/auth_repository.dart`'s
-  /// `lookupInstitution` also reads this directly (see its doc comment for why).
+  /// `lookupInstitution` also reads this directly (see its doc comment for why). Same
+  /// timeouts and version/platform headers as [dio], so a black-holed refresh times out.
   BareDioProvider._()
     : super(
         from: null,
@@ -171,7 +174,7 @@ final class BareDioProvider extends $FunctionalProvider<Dio, Dio, Dio>
   }
 }
 
-String _$bareDioHash() => r'605273bcdd5e9a12245f3843a29b7e1df1c2de7f';
+String _$bareDioHash() => r'7677c047a8377dbdf1bd1c2f913ac1d86fdf84ef';
 
 @ProviderFor(bareMobileApi)
 final bareMobileApiProvider = BareMobileApiProvider._();
@@ -252,7 +255,7 @@ final class DioProvider extends $FunctionalProvider<Dio, Dio, Dio>
   }
 }
 
-String _$dioHash() => r'196f205b268a5114d6230031861d307f586f12cf';
+String _$dioHash() => r'e6c6e8e493edf97c0a91bd7b86d99a91de47a60f';
 
 @ProviderFor(mobileApi)
 final mobileApiProvider = MobileApiProvider._();

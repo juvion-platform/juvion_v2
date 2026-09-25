@@ -34,20 +34,14 @@ class DevicesScreen extends ConsumerWidget {
                     : IconButton(
                         icon: const Icon(Icons.logout),
                         tooltip: l.deviceSignOutTooltip,
-                        onPressed: () async {
-                          await (await ref.read(meRepositoryProvider.future)).revokeDevice(d.sessionId);
-                          ref.invalidate(devicesProvider);
-                        },
+                        onPressed: () => _runAndNotify(context, ref, (repo) => repo.revokeDevice(d.sessionId)),
                       ),
               ),
             if (rows.length > 1)
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: OutlinedButton(
-                  onPressed: () async {
-                    await (await ref.read(meRepositoryProvider.future)).revokeOtherDevices();
-                    ref.invalidate(devicesProvider);
-                  },
+                  onPressed: () => _runAndNotify(context, ref, (repo) => repo.revokeOtherDevices()),
                   child: Text(l.deviceSignOutOthers),
                 ),
               ),
@@ -55,5 +49,15 @@ class DevicesScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+}
+
+/// Revoking is online-only: a failure (offline included) is shown rather than dropped.
+Future<void> _runAndNotify(BuildContext context, WidgetRef ref, Future<Object?> Function(MeRepository repo) action) async {
+  try {
+    await action(await ref.read(meRepositoryProvider.future));
+    ref.invalidate(devicesProvider);
+  } on ApiFailure catch (f) {
+    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(f.message)));
   }
 }

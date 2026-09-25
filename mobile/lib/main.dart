@@ -14,7 +14,8 @@ Future<void> main() async {
   // not the "0.0.0" fallback, so this resolves before restore() (which can make
   // a network call on a cache miss) and before runApp.
   await container.read(appVersionProvider.future);
-  // Cached state renders before any network round-trip (spec §11).
+  // Cached state renders before any network round-trip (spec §11). restore() never
+  // throws (unreadable storage or cache ends signed out), so runApp is always reached.
   await container.read(sessionControllerProvider.notifier).restore();
   runApp(UncontrolledProviderScope(container: container, child: const JuviApp()));
 }

@@ -59,4 +59,37 @@ void main() {
     expect(r, const DrainResult(sent: 0, deferred: 0, dropped: 1));
     expect(await db.pendingActions(), isEmpty);
   });
+
+  // I4: a sign-out wipes the queue while a drain is mid-flight; the rest of the old
+  // account's queue must not go out (under whatever token is in the store by then).
+  test('an action deleted mid-drain is not sent', () async {
+    await db.enqueueAction(PendingAction.create('channel.mute', {'channelId': 'c1'}));
+    await Future<void>.delayed(const Duration(milliseconds: 2));
+    await db.enqueueAction(PendingAction.create('settings.patch', {'tiers': {'routine': false}}));
+    when(() => spaces.setMuted('c1', true)).thenAnswer((_) async => db.wipe());
+    final r = await w.drain();
+    expect(r, const DrainResult(sent: 1, deferred: 0, dropped: 0));
+    verifyNever(() => me.updateSettings(any()));
+  });
+
+  test('an action enqueued mid-drain is sent in the same drain', () async {
+    await db.enqueueAction(PendingAction.create('channel.mute', {'channelId': 'c1'}));
+    when(() => spaces.setMuted('c1', true)).thenAnswer((_) async {
+      await Future<void>.delayed(const Duration(milliseconds: 2));
+      await db.enqueueAction(PendingAction.create('channel.read', {'channelId': 'c1'}));
+    });
+    when(() => spaces.markRead('c1')).thenAnswer((_) async {});
+    final r = await w.drain();
+    expect(r, const DrainResult(sent: 2, deferred: 0, dropped: 0));
+    expect(await db.pendingActions(), isEmpty);
+    verify(() => spaces.markRead('c1')).called(1);
+  });
+
+  test('a failing action is tried once per drain even across passes', () async {
+    await db.enqueueAction(PendingAction.create('channel.read', {'channelId': 'flaky'}));
+    when(() => spaces.markRead('flaky')).thenThrow(const ApiFailure(ApiErrorCode.internal, 'boom', status: 500));
+    final r = await w.drain();
+    expect(r, const DrainResult(sent: 0, deferred: 1, dropped: 0));
+    verify(() => spaces.markRead('flaky')).called(1);
+  });
 }

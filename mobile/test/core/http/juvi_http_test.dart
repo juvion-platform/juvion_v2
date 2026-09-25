@@ -239,4 +239,13 @@ void main() {
     expect(fatalCalls, 1);
     expect(fatal?.code, ApiErrorCode.sessionInvalidated);
   });
+
+  test('juviBaseOptions carries the timeouts and version/platform headers (shared with bareDio)', () {
+    final o = juviBaseOptions(baseUrl: 'https://api.test/v1', appVersion: '1.2.3', platform: 'ios');
+    expect(o.connectTimeout, const Duration(seconds: 10));
+    expect(o.receiveTimeout, const Duration(seconds: 20));
+    expect(o.headers['X-Juvi-App-Version'], '1.2.3');
+    expect(o.headers['X-Juvi-Platform'], 'ios');
+    expect(dio.options.connectTimeout, o.connectTimeout);
+  });
 }

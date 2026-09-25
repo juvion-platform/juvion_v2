@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:juvi/app/l10n/l10n.dart';
+import 'package:juvi/core/http/api_failure.dart';
 import 'package:juvi/core/repos/me_repository.dart';
 import 'package:juvi/features/me/theme_preference.dart';
 import 'package:juvi/shared/widgets/section_header.dart';
@@ -15,7 +16,8 @@ class SettingsScreen extends ConsumerWidget {
     final picked = await showTimePicker(context: context, initialTime: TimeOfDay(hour: parts[0], minute: parts[1]));
     if (picked == null) return;
     final v = '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
-    await ref.read(settingsControllerProvider.notifier).patch({
+    if (!context.mounted) return;
+    await _patchAndNotify(context, ref.read(settingsControllerProvider.notifier), {
       'quietHours': {...quiet, key: v},
     });
   }
@@ -38,17 +40,17 @@ class SettingsScreen extends ConsumerWidget {
             title: Text(l.settingsTierImportant),
             subtitle: Text(l.settingsTierImportantDesc),
             value: settings.tiers.important,
-            onChanged: (v) => ctrl.patch({
+            onChanged: (v) => unawaited(_patchAndNotify(context, ctrl, {
               'tiers': {'important': v},
-            }),
+            })),
           ),
           SwitchListTile(
             title: Text(l.settingsTierRoutine),
             subtitle: Text(l.settingsTierRoutineDesc),
             value: settings.tiers.routine,
-            onChanged: (v) => ctrl.patch({
+            onChanged: (v) => unawaited(_patchAndNotify(context, ctrl, {
               'tiers': {'routine': v},
-            }),
+            })),
           ),
           SectionHeader(l.settingsQuietHoursSection),
           ListTile(title: Text(l.settingsQuietStart), trailing: Text(settings.quietHours.start), onTap: () => _pickTime(context, ref, 'start', settings.quietHours.start, quiet)),
@@ -71,5 +73,15 @@ class SettingsScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+}
+
+/// Offline changes are queued by the controller; any other failure reverts the switch and
+/// is shown here rather than disappearing silently.
+Future<void> _patchAndNotify(BuildContext context, SettingsController ctrl, Map<String, dynamic> patch) async {
+  try {
+    await ctrl.patch(patch);
+  } on ApiFailure catch (f) {
+    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(f.message)));
   }
 }

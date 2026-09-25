@@ -43,12 +43,16 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     try {
       final repo = await ref.read(meRepositoryProvider.future);
       final next = await repo.advanceOnboarding(widget.step);
-      await ref.read(sessionControllerProvider.notifier).updateAccount(account.copyWith(
-            onboardingStep: next.onboardingStep,
-            onboardingSteps: next.onboardingSteps,
-            onboardingComplete: next.onboardingComplete,
-            status: next.onboardingComplete ? 'active' : account.status,
-          ));
+      await ref
+          .read(sessionControllerProvider.notifier)
+          .updateAccount(
+            account.copyWith(
+              onboardingStep: next.onboardingStep,
+              onboardingSteps: next.onboardingSteps,
+              onboardingComplete: next.onboardingComplete,
+              status: next.onboardingComplete ? 'active' : account.status,
+            ),
+          );
       ref.read(analyticsProvider).track('onboarding.step_completed', {'step': widget.step});
       if (next.onboardingComplete) ref.read(analyticsProvider).track('onboarding.completed');
       // GoRouter.maybeOf keeps the screen testable without a router; in the app the
@@ -81,46 +85,62 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     if (name == 'spaces') ref.watch(spacesProvider);
     final me = ref.watch(meProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        leading: widget.step > 0 ? BackButton(onPressed: () => GoRouter.maybeOf(context)?.go('/onboarding/${widget.step - 1}')) : null,
-        title: Semantics(
-          label: l.onboardingStepOfTotal(widget.step + 1, steps.length),
-          child: ExcludeSemantics(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                for (var i = 0; i < steps.length; i++)
-                  Container(
-                    width: 8,
-                    height: 8,
-                    margin: const EdgeInsets.symmetric(horizontal: 3),
-                    decoration: BoxDecoration(shape: BoxShape.circle, color: i <= widget.step ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.outlineVariant),
-                  ),
-              ],
+    // `go()` leaves a single route, so without this system back at step > 0 would exit
+    // the app; it goes to the previous step instead, like the app-bar back button.
+    return PopScope(
+      canPop: widget.step == 0,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) GoRouter.maybeOf(context)?.go('/onboarding/${widget.step - 1}');
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: widget.step > 0 ? BackButton(onPressed: () => GoRouter.maybeOf(context)?.go('/onboarding/${widget.step - 1}')) : null,
+          title: Semantics(
+            label: l.onboardingStepOfTotal(widget.step + 1, steps.length),
+            child: ExcludeSemantics(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (var i = 0; i < steps.length; i++)
+                    Container(
+                      width: 8,
+                      height: 8,
+                      margin: const EdgeInsets.symmetric(horizontal: 3),
+                      decoration: BoxDecoration(shape: BoxShape.circle, color: i <= widget.step ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.outlineVariant),
+                    ),
+                ],
+              ),
             ),
           ),
+          centerTitle: true,
         ),
-        centerTitle: true,
-      ),
-      body: me.when(
-        loading: () => const SkeletonList(),
-        error: (e, _) => FailureView(ApiFailure.of(e), onRetry: () => ref.invalidate(meProvider)),
-        data: (c) => Column(children: [
-          Expanded(
-            child: switch (name) {
-              'identity' => IdentityStep(c.data),
-              'spaces' => SpacesStep(c.data),
-              'notifications' => NotificationsStep(c.data),
-              _ => Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(l.onboardingUnknownStepBody))),
-            },
+        body: me.when(
+          loading: () => const SkeletonList(),
+          error: (e, _) => FailureView(ApiFailure.of(e), onRetry: () => ref.invalidate(meProvider)),
+          data: (c) => Column(
+            children: [
+              Expanded(
+                child: switch (name) {
+                  'identity' => IdentityStep(c.data),
+                  'spaces' => SpacesStep(c.data),
+                  'notifications' => NotificationsStep(c.data),
+                  _ => Center(
+                    child: Padding(padding: const EdgeInsets.all(24), child: Text(l.onboardingUnknownStepBody)),
+                  ),
+                },
+              ),
+              if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                ),
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: FilledButton(onPressed: _busy ? null : () => _advance(account), child: Text(isLast ? l.onboardingFinish : l.onboardingContinue)),
+              ),
+            ],
           ),
-          if (_error != null) Padding(padding: const EdgeInsets.symmetric(horizontal: 24), child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error))),
-          Padding(
-            padding: const EdgeInsets.all(24),
-            child: FilledButton(onPressed: _busy ? null : () => _advance(account), child: Text(isLast ? l.onboardingFinish : l.onboardingContinue)),
-          ),
-        ]),
+        ),
       ),
     );
   }

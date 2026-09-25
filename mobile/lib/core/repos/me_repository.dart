@@ -137,7 +137,8 @@ class SettingsController extends _$SettingsController {
   Future<void> patch(Map<String, dynamic> p) async {
     final repo = await ref.read(meRepositoryProvider.future);
     final current = state.value;
-    if (current != null) state = AsyncData(_merge(current, p));
+    final optimistic = current == null ? null : _merge(current, p);
+    if (optimistic != null) state = AsyncData(optimistic);
     ref.read(analyticsProvider).track('settings.changed', {'key': p.keys.join(',')});
     try {
       state = AsyncData(await repo.updateSettings(p));
@@ -145,6 +146,12 @@ class SettingsController extends _$SettingsController {
       if (f.isOffline) {
         final db = await ref.read(appDatabaseProvider.future);
         await db.enqueueAction(PendingAction.create('settings.patch', p));
+        // Like `toggleMute`: write the optimistic value into the cached `me` doc, so the
+        // rebuild after `invalidate` below reads it back instead of the old settings.
+        final doc = await db.readDoc('me');
+        if (doc != null && optimistic != null) {
+          await db.writeDoc('me', {...doc.json, 'settings': optimistic.toJson()}, doc.asOf);
+        }
       } else {
         state = AsyncData(current);
         rethrow;

@@ -4,6 +4,9 @@
 set -euo pipefail
 MOBILE="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$MOBILE"
+# Fails on any object-or-null response field the generated client cannot parse and that
+# is not already parsed via raw Dio (R57/R61); see the script for the allowlist.
+node tool/check_nullable_objects.js api/openapi.json
 rm -rf packages/juvi_api
 npx --yes @openapitools/openapi-generator-cli generate \
   -i api/openapi.json \

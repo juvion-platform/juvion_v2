@@ -6,7 +6,7 @@ import 'package:drift/native.dart';
 import 'package:juvi/core/sync/pending_action.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:sqlite3/common.dart' show CommonDatabase;
+import 'package:sqlite3/common.dart' show CommonDatabase, SqliteException;
 
 part 'app_database.g.dart';
 
@@ -59,27 +59,72 @@ void assertSqlCipherLinked(CommonDatabase raw) {
   }
 }
 
+/// True when [error] says the database file cannot be read with the key we have — it
+/// was restored from a backup without its Keystore key, or is corrupt (SQLITE_NOTADB).
+/// A missing SQLCipher library is never "unreadable": that must keep failing closed (R50).
+/// Matched on the message as well as the type because errors from the background isolate
+/// arrive wrapped (drift's remote exception delegates `toString` to the cause).
+bool isUnreadableDatabaseError(Object error) {
+  final text = error.toString();
+  if (text.contains('SQLCipher is not linked')) return false;
+  if (error is SqliteException && error.resultCode == 26) return true;
+  return text.contains('file is not a database');
+}
+
+/// Opens the database from [open] and forces the connection, so a key or corruption
+/// failure surfaces here rather than on some later query. When the file is unreadable
+/// ([isUnreadableDatabaseError]) it is removed with [deleteFiles] and opened afresh: the
+/// cache is disposable and refetches online. Any other error (including SQLCipher not
+/// being linked) is rethrown.
+Future<AppDatabase> openRecovering(AppDatabase Function() open, Future<void> Function() deleteFiles) async {
+  final db = open();
+  try {
+    await db.customSelect('SELECT count(*) FROM sqlite_master').get();
+    return db;
+  } on Object catch (e) {
+    try {
+      await db.close();
+    } on Object {
+      // The connection never opened; nothing to close.
+    }
+    if (!isUnreadableDatabaseError(e)) rethrow;
+  }
+  await deleteFiles();
+  final fresh = open();
+  await fresh.customSelect('SELECT count(*) FROM sqlite_master').get();
+  return fresh;
+}
+
 @DriftDatabase(tables: [KvCache, PendingActionRows])
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
   AppDatabase.memory() : super(NativeDatabase.memory());
 
   /// SQLCipher-encrypted file database. `key` comes from SecureStore.databaseKey().
+  /// A file the key cannot open (see [openRecovering]) is replaced by an empty one.
   static Future<AppDatabase> openEncrypted(String key) async {
     final dir = await getApplicationSupportDirectory();
     final file = File(p.join(dir.path, 'juvi.db'));
-    return AppDatabase(NativeDatabase.createInBackground(
-      file,
-      setup: (raw) {
-        raw.execute("PRAGMA key = '$key';");
-        // Fails closed (every build mode, see assertSqlCipherLinked's doc) if the
-        // SQLCipher hook didn't apply. Runs on the background isolate
-        // `createInBackground` spins up, so it can only be observed by actually running
-        // the app on device/emulator, not from host unit tests (which use
-        // `AppDatabase.memory()` instead of `openEncrypted`).
-        assertSqlCipherLinked(raw);
+    return openRecovering(
+      () => AppDatabase(NativeDatabase.createInBackground(
+        file,
+        setup: (raw) {
+          raw.execute("PRAGMA key = '$key';");
+          // Fails closed (every build mode, see assertSqlCipherLinked's doc) if the
+          // SQLCipher hook didn't apply. Runs on the background isolate
+          // `createInBackground` spins up, so it can only be observed by actually running
+          // the app on device/emulator, not from host unit tests (which use
+          // `AppDatabase.memory()` instead of `openEncrypted`).
+          assertSqlCipherLinked(raw);
+        },
+      )),
+      () async {
+        for (final suffix in const ['', '-wal', '-shm', '-journal']) {
+          final f = File('${file.path}$suffix');
+          if (f.existsSync()) await f.delete();
+        }
       },
-    ));
+    );
   }
 
   @override
@@ -135,6 +180,9 @@ class AppDatabase extends _$AppDatabase {
       PendingActionRowsCompanion(lastError: Value(error)),
     );
   }
+
+  Future<bool> hasAction(String id) async =>
+      await (select(pendingActionRows)..where((t) => t.id.equals(id))).getSingleOrNull() != null;
 
   Future<void> removeAction(String id) => (delete(pendingActionRows)..where((t) => t.id.equals(id))).go();
 
