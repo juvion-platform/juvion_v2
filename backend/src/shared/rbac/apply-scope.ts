@@ -31,7 +31,17 @@ export interface ScopeFieldOptions {
    * (and therefore, when assigned is the only narrowing, yields zero rows).
    */
   assignedField?: { studentIds?: string; sectionIds?: string; courseOfferingIds?: string };
+
+  /**
+   * Field holding the caller's own `personId` on a person-keyed record. When
+   * anything narrows the caller, their own record is one more alternative, so
+   * an assigned-only faculty member can still open their own profile.
+   */
+  ownField?: string;
 }
+
+/** Person-keyed models and the field that makes a record the caller's own. */
+export const OWN_RECORD: Record<string, string> = { Person: '_id', Faculty: 'personId', Staff: 'personId', Employee: 'personId' };
 
 /** Non-enumerable marker so `paginate()` can tell a scoped filter from a forgotten one. */
 const SCOPE_APPLIED = Symbol('rbac.scopeApplied');
@@ -95,7 +105,10 @@ export function applyAuthScope(
   // Self scoping: student/parent sees only their own records
   if (authScope.selfOnly) {
     const field = opts?.selfField ?? 'createdBy';
-    if (opts?.selfField) clauses.push(authScope.personId ? { [field]: oid(authScope.personId) } : { _id: NOTHING });
+    if (opts?.selfField === 'studentId') {
+      // #94 — Student._id-keyed records. A missing studentId matches nothing, never falls back to personId.
+      clauses.push(authScope.studentId ? { [field]: oid(authScope.studentId) } : { _id: NOTHING });
+    } else if (opts?.selfField) clauses.push(authScope.personId ? { [field]: oid(authScope.personId) } : { _id: NOTHING });
     else clauses.push({ [field]: authScope.userId });
   }
 
@@ -109,6 +122,8 @@ export function applyAuthScope(
     if (map.courseOfferingIds) or.push({ [map.courseOfferingIds]: { $in: ids.courseOfferingIds.map(oid) } });
     clauses.push(or.length === 0 ? { _id: NOTHING } : or.length === 1 ? or[0]! : { $or: or });
   }
+
+  if (clauses.length && opts?.ownField && authScope.personId) clauses.push({ [opts.ownField]: oid(authScope.personId) });
 
   const single = clauses[0];
   if (clauses.length === 1 && single && !Object.keys(single).some((k) => k in filter)) Object.assign(filter, single);
@@ -134,7 +149,7 @@ export function findOneScoped<T>(
   opts?: ScopeFieldOptions,
 ) {
   const filter: Record<string, unknown> = { _id: id, collegeId };
-  if (authScope) applyAuthScope(filter, authScope, opts);
+  if (authScope) applyAuthScope(filter, authScope, { ownField: OWN_RECORD[model.modelName], ...opts });
   return model.findOne(filter as FilterQuery<T>);
 }
 

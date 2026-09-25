@@ -1,6 +1,7 @@
 // @ts-nocheck
 import mongoose from 'mongoose';
 import { connectDB } from './config/db';
+import redis from './config/redis';
 import {
   // People
   Person, Student, Faculty, Staff, Parent,
@@ -104,11 +105,17 @@ import {
   JuviPersonaConfig, JuviKnowledgeBase, JuviConversation,
   JuviMessage, JuviAction, JuviInsight, JuviFeedback, JuviUsageMetric,
   JuviNoticeCard, AckRecord, StudyRecommendation,
+  // Juvi mobile app
+  JuviAccount, MobileSession, ChannelTemplate, Channel, ChannelMembership,
+  JuviProvisioningRun, JuviProvisionedCredential,
 } from './models';
 import { User } from './models/User';
 import { College } from './models/College';
 import { seedPolicies, snapshotPoliciesForCollege } from './shared/seed/policies';
 import { seedPersonas, snapshotPersonasForCollege } from './shared/seed/personas';
+import { seedChannelTemplates } from './shared/seed/channel-templates';
+import { provisionPerson } from './modules/juvi-app/accounts/provisioning-service';
+import { reconcileCollege } from './modules/juvi-app/spaces/reconcile-service';
 import bcrypt from 'bcryptjs';
 
 const CID = new mongoose.Types.ObjectId('000000000000000000000001');
@@ -275,6 +282,14 @@ async function seed() {
     JuviInsight.deleteMany({ collegeId: CID }),
     JuviFeedback.deleteMany({ collegeId: CID }),
     JuviUsageMetric.deleteMany({ collegeId: CID }),
+    // Juvi mobile app
+    JuviAccount.deleteMany({ collegeId: CID }),
+    MobileSession.deleteMany({ collegeId: CID }),
+    ChannelTemplate.deleteMany({ collegeId: CID }),
+    Channel.deleteMany({ collegeId: CID }),
+    ChannelMembership.deleteMany({ collegeId: CID }),
+    JuviProvisioningRun.deleteMany({ collegeId: CID }),
+    JuviProvisionedCredential.deleteMany({ collegeId: CID }),
     // W01 Admissions workflow
     Inquiry.deleteMany({ collegeId: CID }),
     SeatInventory.deleteMany({ collegeId: CID }),
@@ -3181,8 +3196,28 @@ async function seed() {
   console.log(`Seeded ${seedResult.attempted} default RBAC policies (created=${seedResult.created} updated=${seedResult.updated})`);
 
   // ========================================================================
+  // JUVI MOBILE APP — templates, one demo student + faculty, first reconcile
+  // ========================================================================
+  await College.updateOne({ _id: CID }, { $set: {
+    'juvi.enabled': true,
+    'juvi.accentColor': '#0B5FA5',
+    'juvi.supportContact': { name: 'JIT Student Office', phone: '+91-40-2345-6789', email: 'office@jit.edu.in' },
+  } });
+  await seedChannelTemplates(String(CID));
+  const DEMO_TEMP_PASSWORD = 'river-lamp-482';
+  const demoStudent = await Student.findOne({ collegeId: CID, status: 'active', rollNumber: { $exists: true } }).sort({ rollNumber: 1 }).lean();
+  const demoFaculty = await Faculty.findOne({ collegeId: CID, status: 'active' }).sort({ employeeCode: 1 }).lean();
+  if (demoStudent) await provisionPerson({ collegeId: String(CID), personId: String(demoStudent.personId), kind: 'student', source: 'admin', performedBy: 'seed', temporaryPassword: DEMO_TEMP_PASSWORD });
+  if (demoFaculty) await provisionPerson({ collegeId: String(CID), personId: String(demoFaculty.personId), kind: 'faculty', source: 'admin', performedBy: 'seed', temporaryPassword: DEMO_TEMP_PASSWORD });
+  const juviSummary = await reconcileCollege(String(CID));
+  console.log(`Juvi: ${juviSummary.channels.total} channels, ${juviSummary.memberships.added} memberships${juviSummary.skipped ? ' (skipped: another reconcile holds the lock)' : ''}`);
+  console.log(`Juvi demo sign-in — institution code JIT; student ${demoStudent?.rollNumber ?? '(none)'} / faculty ${demoFaculty?.employeeCode ?? '(none)'}; temporary password ${DEMO_TEMP_PASSWORD}`);
+
+  // ========================================================================
   // DONE
   // ========================================================================
+  // The Juvi reconcile opened the lazily-connected Redis client; close it so the process exits.
+  await redis.quit().catch(() => undefined);
   console.log('\nSeed complete! All 150 models seeded with realistic data.');
   await mongoose.disconnect();
 }

@@ -18,16 +18,16 @@ import RbacPoliciesPage from './platform/RbacPolicies';
 import BulkImportsPage from './platform/BulkImportsPage';
 import SchemaConfigPage from './platform/SchemaConfigPage';
 import IntegrationsPage from './platform/IntegrationsPage';
+import JuviAdminPage from './platform/JuviAdminPage';
 import PersonasPage from './platform/PersonasPage';
 import UsersPage from './platform/UsersPage';
 
 function PlatformHome() {
   const navigate = useNavigate();
   const { data: stats } = useQuery({ queryKey: ['platform-stats'], queryFn: getPlatformStats });
-  const user = useAuthStore((s) => s.user);
   const isSuperAdmin = useAuthStore((s) => s.isSuperAdmin);
-  const permissions = useAuthStore((s) => s.permissions);
-  const canManagePlatform = isSuperAdmin || user?.role === 'admin' || (user?.role === 'principal' && (permissions.includes('platform:*') || permissions.includes('*:*')));
+  const hasPermission = useAuthStore((s) => s.hasPermission);
+  const canManagePlatform = isSuperAdmin || hasPermission('platform', '*') || hasPermission('platform', 'update') || hasPermission('platform', 'create');
 
   return (
     <div>
@@ -163,6 +163,11 @@ function PlatformHome() {
               <div className="font-semibold text-navy-dark text-sm">Integrations</div>
               <p className="text-xs text-gray-500 mt-1">ERPNext / Frappe HR bridge — personnel-side HR</p>
             </button>
+            <button onClick={() => navigate('juvi')} className="bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all border-sky-200 hover:border-sky-400">
+              <div className="inline-flex p-2.5 rounded-lg mb-3 bg-sky-50 text-sky-600"><Smartphone size={22} /></div>
+              <div className="font-semibold text-navy-dark text-sm">Juvi mobile app</div>
+              <p className="text-xs text-gray-500 mt-1">Provisioning, credentials, branding, pause switch</p>
+            </button>
           </div>
         </>
       )}
@@ -180,10 +185,9 @@ function SubPageWrapper({ children }: { children: React.ReactNode }) {
 }
 
 export default function Platform() {
-  const user = useAuthStore((s) => s.user);
   const isSuperAdmin = useAuthStore((s) => s.isSuperAdmin);
-  const permissions = useAuthStore((s) => s.permissions);
-  const canManagePlatform = isSuperAdmin || user?.role === 'admin' || (user?.role === 'principal' && (permissions.includes('platform:*') || permissions.includes('*:*')));
+  const hasPermission = useAuthStore((s) => s.hasPermission);
+  const canManagePlatform = isSuperAdmin || hasPermission('platform', '*') || hasPermission('platform', 'update') || hasPermission('platform', 'create');
 
   return (
     <SubPageWrapper>
@@ -203,6 +207,7 @@ export default function Platform() {
         <Route path="bulk-imports" element={canManagePlatform ? <BulkImportsPage /> : <Navigate to="/platform" replace />} />
         <Route path="config" element={canManagePlatform ? <SchemaConfigPage /> : <Navigate to="/platform" replace />} />
         <Route path="integrations" element={canManagePlatform ? <IntegrationsPage /> : <Navigate to="/platform" replace />} />
+        <Route path="juvi/*" element={canManagePlatform ? <JuviAdminPage /> : <Navigate to="/platform" replace />} />
       </Routes>
     </SubPageWrapper>
   );

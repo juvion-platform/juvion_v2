@@ -19,6 +19,7 @@ import { Certificate } from '../../models/student-dev/Certificate';
 let api: TestApi;
 let fx: BaseFixtures;
 let hodToken: string;
+let facToken: string;
 const ids: Record<string, string> = {};
 
 beforeAll(async () => {
@@ -36,6 +37,14 @@ beforeAll(async () => {
     const student = await createTestStudent(fx.collegeId, { branchId: String(tag === 'cse' ? fx.cseBranch._id : fx.eceBranch._id), programmeId: String(fx.btech._id), batchId: String(fx.batch._id) });
     const cert = await Certificate.create({ collegeId: fx.collegeId, type: 'participation', studentId: student.student._id, sourceType: 'event', sourceId: new Types.ObjectId() });
     ids[`cert-${tag}`] = String(cert._id);
+  }
+
+  // Default F-FAC people:read is assigned-only (mentees + sections): no department reach.
+  for (const tag of ['own', 'peer']) {
+    const fp = await Person.create({ collegeId: fx.collegeId, name: `Prof ${tag}`, phone: `90000007${tag === 'own' ? '91' : '92'}` });
+    const f = await Faculty.create({ collegeId: fx.collegeId, personId: fp._id, employeeCode: `FAC-${tag}`, designation: 'Professor', departmentId: fx.cse._id, contractType: 'regular', status: 'active' });
+    ids[`fac-${tag}`] = String(f._id);
+    if (tag === 'own') facToken = (await createTestUser({ collegeId: fx.collegeId, role: 'faculty', personaType: 'F-FAC', name: 'Fac', email: 'fac@byid.test', personId: String(fp._id) })).token;
   }
   process.env.RBAC_ENFORCE = 'true';
 });
@@ -56,5 +65,9 @@ describe('by-id backstop', () => {
   it('department update: own department only', async () => {
     await api.as(hodToken).put(`/api/academics/departments/${fx.cse._id}`).send({ name: 'CSE (renamed)' }).expect(200);
     await api.as(hodToken).put(`/api/academics/departments/${fx.ece._id}`).send({ name: 'nope' }).expect(404);
+  });
+  it('faculty (assigned-only): own record readable, a department peer 404', async () => {
+    await api.as(facToken).get(`/api/people/faculty/${ids['fac-own']}`).expect(200);
+    await api.as(facToken).get(`/api/people/faculty/${ids['fac-peer']}`).expect(404);
   });
 });

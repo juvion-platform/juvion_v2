@@ -8,12 +8,18 @@ import rateLimit from 'express-rate-limit';
 import { errorHandler } from './middleware/errorHandler';
 import apiRouter from './routes';
 import authRouter from './modules/auth/routes';
+import juviAppRouter from './modules/juvi-app/routes';
+import { juviStartupProblems } from './modules/juvi-app/startup-guard';
 
 // Register workflow definitions
 import './shared/workflow/definitions';
 import './modules/admissions/workflow.handlers';
 
 const app = express();
+
+// IP-keyed rate limiters read req.ip; behind nginx that is the proxy unless the hops are trusted.
+// Unset keeps the old behaviour (trust none).
+app.set('trust proxy', process.env.TRUST_PROXY_HOPS ? Number(process.env.TRUST_PROXY_HOPS) : false);
 
 app.use(helmet());
 
@@ -57,6 +63,12 @@ if (process.env.NODE_ENV === 'production' && !process.env.PAYMENT_WEBHOOK_SECRET
   process.exit(1);
 }
 
+// Juvi credential-export key: temporary passwords are encrypted at rest with it (spec §9).
+for (const problem of juviStartupProblems(process.env)) {
+  console.error(`FATAL: ${problem}`);
+  process.exit(1);
+}
+
 // Global rate limit: 100 requests per minute per IP.
 // E2E_TESTING bypass keeps the Playwright suite (and other automated
 // load) from tripping the limit. Production NEVER sets this.
@@ -70,6 +82,7 @@ if (!isE2ETesting) {
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', version: '2.0.0' }));
 app.use('/api/auth', authRouter);
+app.use('/api/juvi-app', juviAppRouter);   // mobile API: own auth + own error envelope
 app.use('/api', apiRouter);
 app.use(errorHandler);
 

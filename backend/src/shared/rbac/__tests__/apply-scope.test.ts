@@ -30,11 +30,12 @@ describe('applyAuthScope', () => {
     expect(filter.departmentId).toBeUndefined();
   });
 
-  it('adds selfOnly filter using the specified selfField', () => {
+  it('selfField studentId with no resolved studentId fails closed to the sentinel, never falls back to personId', () => {
     const filter: Record<string, unknown> = { collegeId: 'c1' };
     const scope: AuthScope = { ...baseScope, selfOnly: true, personId: 'person1' };
     applyAuthScope(filter, scope, { selfField: 'studentId' });
-    expect(filter.studentId).toBe('person1');
+    expect(filter.studentId).toBeUndefined();
+    expect(filter._id).toEqual({ $in: [] });
   });
 
   it('defaults selfField to createdBy using userId', () => {
