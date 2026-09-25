@@ -1,0 +1,17 @@
+targets:
+  $default:
+    builders:
+      json_serializable:
+        options:
+          # Me.toJson()/Settings.toJson()/InstitutionInfo.toJson() nest other freezed
+          # models (StudentCard, FacultyCard, QuietHours, Tiers, SupportContact). Without
+          # this, json_serializable's generated toJson leaves those fields as raw model
+          # instances instead of maps (jsonEncode still works via its own toJson
+          # fallback, but a caller that inspects toJson()'s result directly, like
+          # core/repos/me_repository.dart's SettingsController and
+          # test/core/repos/me_repository_test.dart, needs a real Map). Project-wide via
+          # build.yaml rather than a per-constructor @JsonSerializable(explicitToJson:
+          # true) (see the freezed README's "What about @JsonSerializable annotation?"),
+          # since the per-constructor form trips the analyzer's invalid_annotation_target
+          # check and this gap is systemic, not specific to the Me models.
+          explicit_to_json: true

@@ -148,4 +148,163 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get signedOutGeneric => 'Please sign in again.';
+
+  @override
+  String get todayAttentionSection => 'Attention';
+
+  @override
+  String get todayTimelineSection => 'Timeline';
+
+  @override
+  String get todayGlanceSection => 'At a glance';
+
+  @override
+  String get todayGlancePlaceholder => 'Attendance and dues appear here soon';
+
+  @override
+  String get teachingAcknowledgementsSection => 'My acknowledgements';
+
+  @override
+  String get teachingTodaySection => 'Teaching today';
+
+  @override
+  String get teachingDepartmentSection => 'Department';
+
+  @override
+  String get teachingCollegeSection => 'College';
+
+  @override
+  String get facultyHod => 'Head of department';
+
+  @override
+  String studentSectionLabel(String section) {
+    return 'Section $section';
+  }
+
+  @override
+  String get meChangePhoto => 'Change profile photo';
+
+  @override
+  String get meReportIssue => 'Something wrong? Tell the office';
+
+  @override
+  String get meSomethingWrongTitle => 'Something wrong with your details?';
+
+  @override
+  String get meSomethingWrongBody =>
+      'Juvi shows what your college records hold. The office can correct them.';
+
+  @override
+  String get meSettingsSectionTitle => 'Settings';
+
+  @override
+  String get settingsTitle => 'Notifications and quiet hours';
+
+  @override
+  String get devicesTitle => 'Devices';
+
+  @override
+  String get changePasswordTitle => 'Change password';
+
+  @override
+  String get meAboutSection => 'About';
+
+  @override
+  String meAppVersion(String version) {
+    return 'Juvi $version';
+  }
+
+  @override
+  String get meDataPrivacyNote =>
+      'Your data stays with your institution. Juvi never shares it with third parties.';
+
+  @override
+  String get meSignOut => 'Sign out';
+
+  @override
+  String get settingsTiersSection => 'Notification tiers';
+
+  @override
+  String get settingsTierUrgent => 'Urgent';
+
+  @override
+  String get settingsTierUrgentDesc =>
+      'Exam changes, campus closures. Always delivered; cannot be turned off.';
+
+  @override
+  String get settingsTierImportant => 'Important';
+
+  @override
+  String get settingsTierImportantDesc =>
+      'Notices needing acknowledgement, department posts, mentions.';
+
+  @override
+  String get settingsTierRoutine => 'Routine';
+
+  @override
+  String get settingsTierRoutineDesc =>
+      'Course posts and replies. Badge and digest only, no sound.';
+
+  @override
+  String get settingsQuietHoursSection => 'Quiet hours';
+
+  @override
+  String get settingsQuietStart => 'Start';
+
+  @override
+  String get settingsQuietEnd => 'End';
+
+  @override
+  String get settingsAppearanceSection => 'Appearance';
+
+  @override
+  String get settingsThemeSystem => 'Follow system';
+
+  @override
+  String get settingsThemeLight => 'Light';
+
+  @override
+  String get settingsThemeDark => 'Dark';
+
+  @override
+  String get settingsLanguageSection => 'Language';
+
+  @override
+  String get settingsLanguageEnglish => 'English';
+
+  @override
+  String get settingsLanguageMore => 'More languages are planned.';
+
+  @override
+  String deviceCurrentLabel(String name) {
+    return '$name (this device)';
+  }
+
+  @override
+  String deviceLastActive(String version, String time) {
+    return 'v$version · last active $time';
+  }
+
+  @override
+  String get deviceSignOutTooltip => 'Sign out this device';
+
+  @override
+  String get deviceSignOutOthers => 'Sign out other devices';
+
+  @override
+  String get changePasswordSuccess =>
+      'Password changed. Other devices were signed out.';
+
+  @override
+  String get changePasswordNeedsConnection =>
+      'Changing your password needs a connection.';
+
+  @override
+  String get photoUploadNeedsConnection => 'Photo upload needs a connection.';
+
+  @override
+  String get showPassword => 'Show password';
+
+  @override
+  String get hidePassword => 'Hide password';
 }

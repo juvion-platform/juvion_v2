@@ -41,7 +41,7 @@ final class ThemePreferenceProvider
   }
 }
 
-String _$themePreferenceHash() => r'3b32e65cf8a536bab01d2194de6085d3e285151c';
+String _$themePreferenceHash() => r'1254e2df876ba78af76030a20e1c8c408ffdf7e1';
 
 abstract class _$ThemePreference extends $Notifier<ThemeMode> {
   ThemeMode build();

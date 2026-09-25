@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:juvi/core/env.dart';
 import 'package:juvi/core/http/api_failure.dart';
 import 'package:juvi/core/http/api_providers.dart';
@@ -26,9 +27,10 @@ abstract class AuthRepository {
 }
 
 class ApiAuthRepository implements AuthRepository {
-  ApiAuthRepository(this._api, this._bare);
+  ApiAuthRepository(this._api, this._bare, this._dio);
   final wire.MobileApi _api;
   final wire.MobileApi _bare;
+  final Dio _dio;
 
   @override
   Future<InstitutionIdentity> lookupInstitution(String code) async {
@@ -88,12 +90,18 @@ class ApiAuthRepository implements AuthRepository {
     }
   }
 
+  /// Fetches `/me` on the shared authenticated Dio rather than through
+  /// `wire.MobileApi.getMe()`: the generated `wire.Me` declares `student`/`faculty`
+  /// non-nullable and unconditionally casts them to `Map<String, dynamic>`, even
+  /// though the contract marks both `type: ["object", "null"]` — a generator gap for
+  /// nullable object properties (see core/repos/me_repository.dart and
+  /// task-7-report.md). Since exactly one of the two is null on every real account,
+  /// `wire.Me.fromJson` throws a TypeError here on every real payload.
   @override
   Future<AccountSummary> fetchAccount() async {
     try {
-      final r = await _api.getMe();
-      final json = r.data!.toJson();
-      return AccountSummary.fromJson(Map<String, dynamic>.from(json['account'] as Map));
+      final response = await _dio.get<Map<String, dynamic>>('/me');
+      return AccountSummary.fromJson(Map<String, dynamic>.from(response.data!['account'] as Map));
     } catch (e) {
       throw ApiFailure.of(e);
     }
@@ -101,7 +109,8 @@ class ApiAuthRepository implements AuthRepository {
 }
 
 @Riverpod(keepAlive: true)
-AuthRepository authRepository(Ref ref) => ApiAuthRepository(ref.read(mobileApiProvider), ref.read(bareMobileApiProvider));
+AuthRepository authRepository(Ref ref) =>
+    ApiAuthRepository(ref.read(mobileApiProvider), ref.read(bareMobileApiProvider), ref.read(dioProvider));
 
 @Riverpod(keepAlive: true)
 Future<DeviceInfo> deviceInfo(Ref ref) async => DeviceInfo(

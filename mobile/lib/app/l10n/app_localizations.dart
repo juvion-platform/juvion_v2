@@ -351,6 +351,294 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Please sign in again.'**
   String get signedOutGeneric;
+
+  /// No description provided for @todayAttentionSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Attention'**
+  String get todayAttentionSection;
+
+  /// No description provided for @todayTimelineSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Timeline'**
+  String get todayTimelineSection;
+
+  /// No description provided for @todayGlanceSection.
+  ///
+  /// In en, this message translates to:
+  /// **'At a glance'**
+  String get todayGlanceSection;
+
+  /// No description provided for @todayGlancePlaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Attendance and dues appear here soon'**
+  String get todayGlancePlaceholder;
+
+  /// No description provided for @teachingAcknowledgementsSection.
+  ///
+  /// In en, this message translates to:
+  /// **'My acknowledgements'**
+  String get teachingAcknowledgementsSection;
+
+  /// No description provided for @teachingTodaySection.
+  ///
+  /// In en, this message translates to:
+  /// **'Teaching today'**
+  String get teachingTodaySection;
+
+  /// No description provided for @teachingDepartmentSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Department'**
+  String get teachingDepartmentSection;
+
+  /// No description provided for @teachingCollegeSection.
+  ///
+  /// In en, this message translates to:
+  /// **'College'**
+  String get teachingCollegeSection;
+
+  /// No description provided for @facultyHod.
+  ///
+  /// In en, this message translates to:
+  /// **'Head of department'**
+  String get facultyHod;
+
+  /// No description provided for @studentSectionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Section {section}'**
+  String studentSectionLabel(String section);
+
+  /// No description provided for @meChangePhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Change profile photo'**
+  String get meChangePhoto;
+
+  /// No description provided for @meReportIssue.
+  ///
+  /// In en, this message translates to:
+  /// **'Something wrong? Tell the office'**
+  String get meReportIssue;
+
+  /// No description provided for @meSomethingWrongTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Something wrong with your details?'**
+  String get meSomethingWrongTitle;
+
+  /// No description provided for @meSomethingWrongBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Juvi shows what your college records hold. The office can correct them.'**
+  String get meSomethingWrongBody;
+
+  /// No description provided for @meSettingsSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get meSettingsSectionTitle;
+
+  /// Also used as the Me screen's entry label for the settings screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications and quiet hours'**
+  String get settingsTitle;
+
+  /// Also used as the Me screen's entry label for the devices screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Devices'**
+  String get devicesTitle;
+
+  /// Also used as the Me screen's entry label for the change-password screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Change password'**
+  String get changePasswordTitle;
+
+  /// No description provided for @meAboutSection.
+  ///
+  /// In en, this message translates to:
+  /// **'About'**
+  String get meAboutSection;
+
+  /// No description provided for @meAppVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Juvi {version}'**
+  String meAppVersion(String version);
+
+  /// No description provided for @meDataPrivacyNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Your data stays with your institution. Juvi never shares it with third parties.'**
+  String get meDataPrivacyNote;
+
+  /// No description provided for @meSignOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign out'**
+  String get meSignOut;
+
+  /// No description provided for @settingsTiersSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification tiers'**
+  String get settingsTiersSection;
+
+  /// No description provided for @settingsTierUrgent.
+  ///
+  /// In en, this message translates to:
+  /// **'Urgent'**
+  String get settingsTierUrgent;
+
+  /// No description provided for @settingsTierUrgentDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Exam changes, campus closures. Always delivered; cannot be turned off.'**
+  String get settingsTierUrgentDesc;
+
+  /// No description provided for @settingsTierImportant.
+  ///
+  /// In en, this message translates to:
+  /// **'Important'**
+  String get settingsTierImportant;
+
+  /// No description provided for @settingsTierImportantDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Notices needing acknowledgement, department posts, mentions.'**
+  String get settingsTierImportantDesc;
+
+  /// No description provided for @settingsTierRoutine.
+  ///
+  /// In en, this message translates to:
+  /// **'Routine'**
+  String get settingsTierRoutine;
+
+  /// No description provided for @settingsTierRoutineDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Course posts and replies. Badge and digest only, no sound.'**
+  String get settingsTierRoutineDesc;
+
+  /// No description provided for @settingsQuietHoursSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Quiet hours'**
+  String get settingsQuietHoursSection;
+
+  /// No description provided for @settingsQuietStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start'**
+  String get settingsQuietStart;
+
+  /// No description provided for @settingsQuietEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'End'**
+  String get settingsQuietEnd;
+
+  /// No description provided for @settingsAppearanceSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Appearance'**
+  String get settingsAppearanceSection;
+
+  /// No description provided for @settingsThemeSystem.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow system'**
+  String get settingsThemeSystem;
+
+  /// No description provided for @settingsThemeLight.
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get settingsThemeLight;
+
+  /// No description provided for @settingsThemeDark.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark'**
+  String get settingsThemeDark;
+
+  /// No description provided for @settingsLanguageSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Language'**
+  String get settingsLanguageSection;
+
+  /// No description provided for @settingsLanguageEnglish.
+  ///
+  /// In en, this message translates to:
+  /// **'English'**
+  String get settingsLanguageEnglish;
+
+  /// No description provided for @settingsLanguageMore.
+  ///
+  /// In en, this message translates to:
+  /// **'More languages are planned.'**
+  String get settingsLanguageMore;
+
+  /// No description provided for @deviceCurrentLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} (this device)'**
+  String deviceCurrentLabel(String name);
+
+  /// No description provided for @deviceLastActive.
+  ///
+  /// In en, this message translates to:
+  /// **'v{version} · last active {time}'**
+  String deviceLastActive(String version, String time);
+
+  /// No description provided for @deviceSignOutTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign out this device'**
+  String get deviceSignOutTooltip;
+
+  /// No description provided for @deviceSignOutOthers.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign out other devices'**
+  String get deviceSignOutOthers;
+
+  /// No description provided for @changePasswordSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Password changed. Other devices were signed out.'**
+  String get changePasswordSuccess;
+
+  /// No description provided for @changePasswordNeedsConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'Changing your password needs a connection.'**
+  String get changePasswordNeedsConnection;
+
+  /// No description provided for @photoUploadNeedsConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo upload needs a connection.'**
+  String get photoUploadNeedsConnection;
+
+  /// No description provided for @showPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Show password'**
+  String get showPassword;
+
+  /// No description provided for @hidePassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide password'**
+  String get hidePassword;
 }
 
 class _AppLocalizationsDelegate
