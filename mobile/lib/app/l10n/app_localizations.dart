@@ -639,6 +639,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Hide password'**
   String get hidePassword;
+
+  /// Action sheet entry: mute an unmuted channel.
+  ///
+  /// In en, this message translates to:
+  /// **'Mute'**
+  String get channelMute;
+
+  /// Action sheet entry: unmute a muted channel.
+  ///
+  /// In en, this message translates to:
+  /// **'Unmute'**
+  String get channelUnmute;
+
+  /// Action sheet entry on a Spaces row.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark all read'**
+  String get channelMarkAllRead;
+
+  /// Accessible custom action name for the long-press menu on a Spaces row, so screen reader users have an alternative to the long-press gesture.
+  ///
+  /// In en, this message translates to:
+  /// **'Channel actions'**
+  String get channelActionsLabel;
+
+  /// Semantic label for the muted-bell icon on a Spaces row.
+  ///
+  /// In en, this message translates to:
+  /// **'Muted'**
+  String get channelMutedLabel;
+
+  /// Section heading on the channel screen, above the channel's description.
+  ///
+  /// In en, this message translates to:
+  /// **'About'**
+  String get channelAboutTitle;
+
+  /// Channel screen posting-rule line.
+  ///
+  /// In en, this message translates to:
+  /// **'Who can post: {whoCanPost}'**
+  String channelWhoCanPost(String whoCanPost);
+
+  /// Channel screen: shown when replyRule is 'allowed'.
+  ///
+  /// In en, this message translates to:
+  /// **'Members can reply in threads.'**
+  String get channelReplyAllowed;
+
+  /// Channel screen: shown when replyRule is 'announcement_only'.
+  ///
+  /// In en, this message translates to:
+  /// **'Announcement only.'**
+  String get channelAnnouncementOnly;
+
+  /// Channel screen member count, for an active channel.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} members'**
+  String channelMemberCount(int count);
+
+  /// Channel screen member count, for an archived channel.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} members · Archived'**
+  String channelMemberCountArchived(int count);
 }
 
 class _AppLocalizationsDelegate

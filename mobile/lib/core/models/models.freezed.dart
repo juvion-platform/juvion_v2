@@ -4350,4 +4350,1149 @@ as bool,
 
 }
 
+
+/// @nodoc
+mixin _$SpaceChannel {
+
+ String get id; String get name; String get about; String get scopeType; String get templateCode; String get role; bool get muted; int get memberCount; bool get archived; String? get nextClassAt; String? get nextClassLabel;
+/// Create a copy of SpaceChannel
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$SpaceChannelCopyWith<SpaceChannel> get copyWith => _$SpaceChannelCopyWithImpl<SpaceChannel>(this as SpaceChannel, _$identity);
+
+  /// Serializes this SpaceChannel to a JSON map.
+  Map<String, dynamic> toJson();
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is SpaceChannel&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.about, about) || other.about == about)&&(identical(other.scopeType, scopeType) || other.scopeType == scopeType)&&(identical(other.templateCode, templateCode) || other.templateCode == templateCode)&&(identical(other.role, role) || other.role == role)&&(identical(other.muted, muted) || other.muted == muted)&&(identical(other.memberCount, memberCount) || other.memberCount == memberCount)&&(identical(other.archived, archived) || other.archived == archived)&&(identical(other.nextClassAt, nextClassAt) || other.nextClassAt == nextClassAt)&&(identical(other.nextClassLabel, nextClassLabel) || other.nextClassLabel == nextClassLabel));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,id,name,about,scopeType,templateCode,role,muted,memberCount,archived,nextClassAt,nextClassLabel);
+
+@override
+String toString() {
+  return 'SpaceChannel(id: $id, name: $name, about: $about, scopeType: $scopeType, templateCode: $templateCode, role: $role, muted: $muted, memberCount: $memberCount, archived: $archived, nextClassAt: $nextClassAt, nextClassLabel: $nextClassLabel)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $SpaceChannelCopyWith<$Res>  {
+  factory $SpaceChannelCopyWith(SpaceChannel value, $Res Function(SpaceChannel) _then) = _$SpaceChannelCopyWithImpl;
+@useResult
+$Res call({
+ String id, String name, String about, String scopeType, String templateCode, String role, bool muted, int memberCount, bool archived, String? nextClassAt, String? nextClassLabel
+});
+
+
+
+
+}
+/// @nodoc
+class _$SpaceChannelCopyWithImpl<$Res>
+    implements $SpaceChannelCopyWith<$Res> {
+  _$SpaceChannelCopyWithImpl(this._self, this._then);
+
+  final SpaceChannel _self;
+  final $Res Function(SpaceChannel) _then;
+
+/// Create a copy of SpaceChannel
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? about = null,Object? scopeType = null,Object? templateCode = null,Object? role = null,Object? muted = null,Object? memberCount = null,Object? archived = null,Object? nextClassAt = freezed,Object? nextClassLabel = freezed,}) {
+  return _then(SpaceChannel(
+id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
+as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
+as String,about: null == about ? _self.about : about // ignore: cast_nullable_to_non_nullable
+as String,scopeType: null == scopeType ? _self.scopeType : scopeType // ignore: cast_nullable_to_non_nullable
+as String,templateCode: null == templateCode ? _self.templateCode : templateCode // ignore: cast_nullable_to_non_nullable
+as String,role: null == role ? _self.role : role // ignore: cast_nullable_to_non_nullable
+as String,muted: null == muted ? _self.muted : muted // ignore: cast_nullable_to_non_nullable
+as bool,memberCount: null == memberCount ? _self.memberCount : memberCount // ignore: cast_nullable_to_non_nullable
+as int,archived: null == archived ? _self.archived : archived // ignore: cast_nullable_to_non_nullable
+as bool,nextClassAt: freezed == nextClassAt ? _self.nextClassAt : nextClassAt // ignore: cast_nullable_to_non_nullable
+as String?,nextClassLabel: freezed == nextClassLabel ? _self.nextClassLabel : nextClassLabel // ignore: cast_nullable_to_non_nullable
+as String?,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [SpaceChannel].
+extension SpaceChannelPatterns on SpaceChannel {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _SpaceChannel value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _SpaceChannel() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _SpaceChannel value)  $default,){
+final _that = this;
+switch (_that) {
+case _SpaceChannel():
+return $default(_that);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _SpaceChannel value)?  $default,){
+final _that = this;
+switch (_that) {
+case _SpaceChannel() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String name,  String about,  String scopeType,  String templateCode,  String role,  bool muted,  int memberCount,  bool archived,  String? nextClassAt,  String? nextClassLabel)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _SpaceChannel() when $default != null:
+return $default(_that.id,_that.name,_that.about,_that.scopeType,_that.templateCode,_that.role,_that.muted,_that.memberCount,_that.archived,_that.nextClassAt,_that.nextClassLabel);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String name,  String about,  String scopeType,  String templateCode,  String role,  bool muted,  int memberCount,  bool archived,  String? nextClassAt,  String? nextClassLabel)  $default,) {final _that = this;
+switch (_that) {
+case _SpaceChannel():
+return $default(_that.id,_that.name,_that.about,_that.scopeType,_that.templateCode,_that.role,_that.muted,_that.memberCount,_that.archived,_that.nextClassAt,_that.nextClassLabel);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String name,  String about,  String scopeType,  String templateCode,  String role,  bool muted,  int memberCount,  bool archived,  String? nextClassAt,  String? nextClassLabel)?  $default,) {final _that = this;
+switch (_that) {
+case _SpaceChannel() when $default != null:
+return $default(_that.id,_that.name,_that.about,_that.scopeType,_that.templateCode,_that.role,_that.muted,_that.memberCount,_that.archived,_that.nextClassAt,_that.nextClassLabel);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+@JsonSerializable()
+
+class _SpaceChannel implements SpaceChannel {
+  const _SpaceChannel({required this.id, required this.name, required this.about, required this.scopeType, required this.templateCode, required this.role, required this.muted, required this.memberCount, required this.archived, this.nextClassAt, this.nextClassLabel});
+  factory _SpaceChannel.fromJson(Map<String, dynamic> json) => _$SpaceChannelFromJson(json);
+
+@override final  String id;
+@override final  String name;
+@override final  String about;
+@override final  String scopeType;
+@override final  String templateCode;
+@override final  String role;
+@override final  bool muted;
+@override final  int memberCount;
+@override final  bool archived;
+@override final  String? nextClassAt;
+@override final  String? nextClassLabel;
+
+/// Create a copy of SpaceChannel
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$SpaceChannelCopyWith<_SpaceChannel> get copyWith => __$SpaceChannelCopyWithImpl<_SpaceChannel>(this, _$identity);
+
+@override
+Map<String, dynamic> toJson() {
+  return _$SpaceChannelToJson(this, );
+}
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _SpaceChannel&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.about, about) || other.about == about)&&(identical(other.scopeType, scopeType) || other.scopeType == scopeType)&&(identical(other.templateCode, templateCode) || other.templateCode == templateCode)&&(identical(other.role, role) || other.role == role)&&(identical(other.muted, muted) || other.muted == muted)&&(identical(other.memberCount, memberCount) || other.memberCount == memberCount)&&(identical(other.archived, archived) || other.archived == archived)&&(identical(other.nextClassAt, nextClassAt) || other.nextClassAt == nextClassAt)&&(identical(other.nextClassLabel, nextClassLabel) || other.nextClassLabel == nextClassLabel));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,id,name,about,scopeType,templateCode,role,muted,memberCount,archived,nextClassAt,nextClassLabel);
+
+@override
+String toString() {
+  return 'SpaceChannel(id: $id, name: $name, about: $about, scopeType: $scopeType, templateCode: $templateCode, role: $role, muted: $muted, memberCount: $memberCount, archived: $archived, nextClassAt: $nextClassAt, nextClassLabel: $nextClassLabel)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$SpaceChannelCopyWith<$Res> implements $SpaceChannelCopyWith<$Res> {
+  factory _$SpaceChannelCopyWith(_SpaceChannel value, $Res Function(_SpaceChannel) _then) = __$SpaceChannelCopyWithImpl;
+@override @useResult
+$Res call({
+ String id, String name, String about, String scopeType, String templateCode, String role, bool muted, int memberCount, bool archived, String? nextClassAt, String? nextClassLabel
+});
+
+
+
+
+}
+/// @nodoc
+class __$SpaceChannelCopyWithImpl<$Res>
+    implements _$SpaceChannelCopyWith<$Res> {
+  __$SpaceChannelCopyWithImpl(this._self, this._then);
+
+  final _SpaceChannel _self;
+  final $Res Function(_SpaceChannel) _then;
+
+/// Create a copy of SpaceChannel
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? about = null,Object? scopeType = null,Object? templateCode = null,Object? role = null,Object? muted = null,Object? memberCount = null,Object? archived = null,Object? nextClassAt = freezed,Object? nextClassLabel = freezed,}) {
+  return _then(_SpaceChannel(
+id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
+as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
+as String,about: null == about ? _self.about : about // ignore: cast_nullable_to_non_nullable
+as String,scopeType: null == scopeType ? _self.scopeType : scopeType // ignore: cast_nullable_to_non_nullable
+as String,templateCode: null == templateCode ? _self.templateCode : templateCode // ignore: cast_nullable_to_non_nullable
+as String,role: null == role ? _self.role : role // ignore: cast_nullable_to_non_nullable
+as String,muted: null == muted ? _self.muted : muted // ignore: cast_nullable_to_non_nullable
+as bool,memberCount: null == memberCount ? _self.memberCount : memberCount // ignore: cast_nullable_to_non_nullable
+as int,archived: null == archived ? _self.archived : archived // ignore: cast_nullable_to_non_nullable
+as bool,nextClassAt: freezed == nextClassAt ? _self.nextClassAt : nextClassAt // ignore: cast_nullable_to_non_nullable
+as String?,nextClassLabel: freezed == nextClassLabel ? _self.nextClassLabel : nextClassLabel // ignore: cast_nullable_to_non_nullable
+as String?,
+  ));
+}
+
+
+}
+
+
+/// @nodoc
+mixin _$SpaceGroup {
+
+ String get key; String get title; List<SpaceChannel> get channels; String? get emptyHint;
+/// Create a copy of SpaceGroup
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$SpaceGroupCopyWith<SpaceGroup> get copyWith => _$SpaceGroupCopyWithImpl<SpaceGroup>(this as SpaceGroup, _$identity);
+
+  /// Serializes this SpaceGroup to a JSON map.
+  Map<String, dynamic> toJson();
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is SpaceGroup&&(identical(other.key, key) || other.key == key)&&(identical(other.title, title) || other.title == title)&&const DeepCollectionEquality().equals(other.channels, channels)&&(identical(other.emptyHint, emptyHint) || other.emptyHint == emptyHint));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,key,title,const DeepCollectionEquality().hash(channels),emptyHint);
+
+@override
+String toString() {
+  return 'SpaceGroup(key: $key, title: $title, channels: $channels, emptyHint: $emptyHint)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $SpaceGroupCopyWith<$Res>  {
+  factory $SpaceGroupCopyWith(SpaceGroup value, $Res Function(SpaceGroup) _then) = _$SpaceGroupCopyWithImpl;
+@useResult
+$Res call({
+ String key, String title, List<SpaceChannel> channels, String? emptyHint
+});
+
+
+
+
+}
+/// @nodoc
+class _$SpaceGroupCopyWithImpl<$Res>
+    implements $SpaceGroupCopyWith<$Res> {
+  _$SpaceGroupCopyWithImpl(this._self, this._then);
+
+  final SpaceGroup _self;
+  final $Res Function(SpaceGroup) _then;
+
+/// Create a copy of SpaceGroup
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? key = null,Object? title = null,Object? channels = null,Object? emptyHint = freezed,}) {
+  return _then(SpaceGroup(
+key: null == key ? _self.key : key // ignore: cast_nullable_to_non_nullable
+as String,title: null == title ? _self.title : title // ignore: cast_nullable_to_non_nullable
+as String,channels: null == channels ? _self.channels : channels // ignore: cast_nullable_to_non_nullable
+as List<SpaceChannel>,emptyHint: freezed == emptyHint ? _self.emptyHint : emptyHint // ignore: cast_nullable_to_non_nullable
+as String?,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [SpaceGroup].
+extension SpaceGroupPatterns on SpaceGroup {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _SpaceGroup value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _SpaceGroup() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _SpaceGroup value)  $default,){
+final _that = this;
+switch (_that) {
+case _SpaceGroup():
+return $default(_that);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _SpaceGroup value)?  $default,){
+final _that = this;
+switch (_that) {
+case _SpaceGroup() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String key,  String title,  List<SpaceChannel> channels,  String? emptyHint)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _SpaceGroup() when $default != null:
+return $default(_that.key,_that.title,_that.channels,_that.emptyHint);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String key,  String title,  List<SpaceChannel> channels,  String? emptyHint)  $default,) {final _that = this;
+switch (_that) {
+case _SpaceGroup():
+return $default(_that.key,_that.title,_that.channels,_that.emptyHint);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String key,  String title,  List<SpaceChannel> channels,  String? emptyHint)?  $default,) {final _that = this;
+switch (_that) {
+case _SpaceGroup() when $default != null:
+return $default(_that.key,_that.title,_that.channels,_that.emptyHint);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+@JsonSerializable()
+
+class _SpaceGroup implements SpaceGroup {
+  const _SpaceGroup({required this.key, required this.title, required  List<SpaceChannel> channels, this.emptyHint}): _channels = channels;
+  factory _SpaceGroup.fromJson(Map<String, dynamic> json) => _$SpaceGroupFromJson(json);
+
+@override final  String key;
+@override final  String title;
+ final  List<SpaceChannel> _channels;
+@override List<SpaceChannel> get channels {
+  if (_channels is EqualUnmodifiableListView) return _channels;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_channels);
+}
+
+@override final  String? emptyHint;
+
+/// Create a copy of SpaceGroup
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$SpaceGroupCopyWith<_SpaceGroup> get copyWith => __$SpaceGroupCopyWithImpl<_SpaceGroup>(this, _$identity);
+
+@override
+Map<String, dynamic> toJson() {
+  return _$SpaceGroupToJson(this, );
+}
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _SpaceGroup&&(identical(other.key, key) || other.key == key)&&(identical(other.title, title) || other.title == title)&&const DeepCollectionEquality().equals(other._channels, _channels)&&(identical(other.emptyHint, emptyHint) || other.emptyHint == emptyHint));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,key,title,const DeepCollectionEquality().hash(_channels),emptyHint);
+
+@override
+String toString() {
+  return 'SpaceGroup(key: $key, title: $title, channels: $channels, emptyHint: $emptyHint)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$SpaceGroupCopyWith<$Res> implements $SpaceGroupCopyWith<$Res> {
+  factory _$SpaceGroupCopyWith(_SpaceGroup value, $Res Function(_SpaceGroup) _then) = __$SpaceGroupCopyWithImpl;
+@override @useResult
+$Res call({
+ String key, String title, List<SpaceChannel> channels, String? emptyHint
+});
+
+
+
+
+}
+/// @nodoc
+class __$SpaceGroupCopyWithImpl<$Res>
+    implements _$SpaceGroupCopyWith<$Res> {
+  __$SpaceGroupCopyWithImpl(this._self, this._then);
+
+  final _SpaceGroup _self;
+  final $Res Function(_SpaceGroup) _then;
+
+/// Create a copy of SpaceGroup
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? key = null,Object? title = null,Object? channels = null,Object? emptyHint = freezed,}) {
+  return _then(_SpaceGroup(
+key: null == key ? _self.key : key // ignore: cast_nullable_to_non_nullable
+as String,title: null == title ? _self.title : title // ignore: cast_nullable_to_non_nullable
+as String,channels: null == channels ? _self._channels : channels // ignore: cast_nullable_to_non_nullable
+as List<SpaceChannel>,emptyHint: freezed == emptyHint ? _self.emptyHint : emptyHint // ignore: cast_nullable_to_non_nullable
+as String?,
+  ));
+}
+
+
+}
+
+
+/// @nodoc
+mixin _$SpacesData {
+
+ List<SpaceGroup> get groups; String get asOf;
+/// Create a copy of SpacesData
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$SpacesDataCopyWith<SpacesData> get copyWith => _$SpacesDataCopyWithImpl<SpacesData>(this as SpacesData, _$identity);
+
+  /// Serializes this SpacesData to a JSON map.
+  Map<String, dynamic> toJson();
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is SpacesData&&const DeepCollectionEquality().equals(other.groups, groups)&&(identical(other.asOf, asOf) || other.asOf == asOf));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(groups),asOf);
+
+@override
+String toString() {
+  return 'SpacesData(groups: $groups, asOf: $asOf)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $SpacesDataCopyWith<$Res>  {
+  factory $SpacesDataCopyWith(SpacesData value, $Res Function(SpacesData) _then) = _$SpacesDataCopyWithImpl;
+@useResult
+$Res call({
+ List<SpaceGroup> groups, String asOf
+});
+
+
+
+
+}
+/// @nodoc
+class _$SpacesDataCopyWithImpl<$Res>
+    implements $SpacesDataCopyWith<$Res> {
+  _$SpacesDataCopyWithImpl(this._self, this._then);
+
+  final SpacesData _self;
+  final $Res Function(SpacesData) _then;
+
+/// Create a copy of SpacesData
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? groups = null,Object? asOf = null,}) {
+  return _then(SpacesData(
+groups: null == groups ? _self.groups : groups // ignore: cast_nullable_to_non_nullable
+as List<SpaceGroup>,asOf: null == asOf ? _self.asOf : asOf // ignore: cast_nullable_to_non_nullable
+as String,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [SpacesData].
+extension SpacesDataPatterns on SpacesData {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _SpacesData value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _SpacesData() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _SpacesData value)  $default,){
+final _that = this;
+switch (_that) {
+case _SpacesData():
+return $default(_that);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _SpacesData value)?  $default,){
+final _that = this;
+switch (_that) {
+case _SpacesData() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( List<SpaceGroup> groups,  String asOf)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _SpacesData() when $default != null:
+return $default(_that.groups,_that.asOf);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( List<SpaceGroup> groups,  String asOf)  $default,) {final _that = this;
+switch (_that) {
+case _SpacesData():
+return $default(_that.groups,_that.asOf);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( List<SpaceGroup> groups,  String asOf)?  $default,) {final _that = this;
+switch (_that) {
+case _SpacesData() when $default != null:
+return $default(_that.groups,_that.asOf);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+@JsonSerializable()
+
+class _SpacesData implements SpacesData {
+  const _SpacesData({required  List<SpaceGroup> groups, required this.asOf}): _groups = groups;
+  factory _SpacesData.fromJson(Map<String, dynamic> json) => _$SpacesDataFromJson(json);
+
+ final  List<SpaceGroup> _groups;
+@override List<SpaceGroup> get groups {
+  if (_groups is EqualUnmodifiableListView) return _groups;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_groups);
+}
+
+@override final  String asOf;
+
+/// Create a copy of SpacesData
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$SpacesDataCopyWith<_SpacesData> get copyWith => __$SpacesDataCopyWithImpl<_SpacesData>(this, _$identity);
+
+@override
+Map<String, dynamic> toJson() {
+  return _$SpacesDataToJson(this, );
+}
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _SpacesData&&const DeepCollectionEquality().equals(other._groups, _groups)&&(identical(other.asOf, asOf) || other.asOf == asOf));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(_groups),asOf);
+
+@override
+String toString() {
+  return 'SpacesData(groups: $groups, asOf: $asOf)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$SpacesDataCopyWith<$Res> implements $SpacesDataCopyWith<$Res> {
+  factory _$SpacesDataCopyWith(_SpacesData value, $Res Function(_SpacesData) _then) = __$SpacesDataCopyWithImpl;
+@override @useResult
+$Res call({
+ List<SpaceGroup> groups, String asOf
+});
+
+
+
+
+}
+/// @nodoc
+class __$SpacesDataCopyWithImpl<$Res>
+    implements _$SpacesDataCopyWith<$Res> {
+  __$SpacesDataCopyWithImpl(this._self, this._then);
+
+  final _SpacesData _self;
+  final $Res Function(_SpacesData) _then;
+
+/// Create a copy of SpacesData
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? groups = null,Object? asOf = null,}) {
+  return _then(_SpacesData(
+groups: null == groups ? _self._groups : groups // ignore: cast_nullable_to_non_nullable
+as List<SpaceGroup>,asOf: null == asOf ? _self.asOf : asOf // ignore: cast_nullable_to_non_nullable
+as String,
+  ));
+}
+
+
+}
+
+
+/// @nodoc
+mixin _$ChannelDetail {
+
+ String get id; String get name; String get about; String get scopeType; String get templateCode; String get status; int get memberCount; String get replyRule; String get defaultPriority; String get role; bool get muted; bool get canPost; bool get canReply; String get whoCanPost;
+/// Create a copy of ChannelDetail
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$ChannelDetailCopyWith<ChannelDetail> get copyWith => _$ChannelDetailCopyWithImpl<ChannelDetail>(this as ChannelDetail, _$identity);
+
+  /// Serializes this ChannelDetail to a JSON map.
+  Map<String, dynamic> toJson();
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ChannelDetail&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.about, about) || other.about == about)&&(identical(other.scopeType, scopeType) || other.scopeType == scopeType)&&(identical(other.templateCode, templateCode) || other.templateCode == templateCode)&&(identical(other.status, status) || other.status == status)&&(identical(other.memberCount, memberCount) || other.memberCount == memberCount)&&(identical(other.replyRule, replyRule) || other.replyRule == replyRule)&&(identical(other.defaultPriority, defaultPriority) || other.defaultPriority == defaultPriority)&&(identical(other.role, role) || other.role == role)&&(identical(other.muted, muted) || other.muted == muted)&&(identical(other.canPost, canPost) || other.canPost == canPost)&&(identical(other.canReply, canReply) || other.canReply == canReply)&&(identical(other.whoCanPost, whoCanPost) || other.whoCanPost == whoCanPost));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,id,name,about,scopeType,templateCode,status,memberCount,replyRule,defaultPriority,role,muted,canPost,canReply,whoCanPost);
+
+@override
+String toString() {
+  return 'ChannelDetail(id: $id, name: $name, about: $about, scopeType: $scopeType, templateCode: $templateCode, status: $status, memberCount: $memberCount, replyRule: $replyRule, defaultPriority: $defaultPriority, role: $role, muted: $muted, canPost: $canPost, canReply: $canReply, whoCanPost: $whoCanPost)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $ChannelDetailCopyWith<$Res>  {
+  factory $ChannelDetailCopyWith(ChannelDetail value, $Res Function(ChannelDetail) _then) = _$ChannelDetailCopyWithImpl;
+@useResult
+$Res call({
+ String id, String name, String about, String scopeType, String templateCode, String status, int memberCount, String replyRule, String defaultPriority, String role, bool muted, bool canPost, bool canReply, String whoCanPost
+});
+
+
+
+
+}
+/// @nodoc
+class _$ChannelDetailCopyWithImpl<$Res>
+    implements $ChannelDetailCopyWith<$Res> {
+  _$ChannelDetailCopyWithImpl(this._self, this._then);
+
+  final ChannelDetail _self;
+  final $Res Function(ChannelDetail) _then;
+
+/// Create a copy of ChannelDetail
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? about = null,Object? scopeType = null,Object? templateCode = null,Object? status = null,Object? memberCount = null,Object? replyRule = null,Object? defaultPriority = null,Object? role = null,Object? muted = null,Object? canPost = null,Object? canReply = null,Object? whoCanPost = null,}) {
+  return _then(ChannelDetail(
+id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
+as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
+as String,about: null == about ? _self.about : about // ignore: cast_nullable_to_non_nullable
+as String,scopeType: null == scopeType ? _self.scopeType : scopeType // ignore: cast_nullable_to_non_nullable
+as String,templateCode: null == templateCode ? _self.templateCode : templateCode // ignore: cast_nullable_to_non_nullable
+as String,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
+as String,memberCount: null == memberCount ? _self.memberCount : memberCount // ignore: cast_nullable_to_non_nullable
+as int,replyRule: null == replyRule ? _self.replyRule : replyRule // ignore: cast_nullable_to_non_nullable
+as String,defaultPriority: null == defaultPriority ? _self.defaultPriority : defaultPriority // ignore: cast_nullable_to_non_nullable
+as String,role: null == role ? _self.role : role // ignore: cast_nullable_to_non_nullable
+as String,muted: null == muted ? _self.muted : muted // ignore: cast_nullable_to_non_nullable
+as bool,canPost: null == canPost ? _self.canPost : canPost // ignore: cast_nullable_to_non_nullable
+as bool,canReply: null == canReply ? _self.canReply : canReply // ignore: cast_nullable_to_non_nullable
+as bool,whoCanPost: null == whoCanPost ? _self.whoCanPost : whoCanPost // ignore: cast_nullable_to_non_nullable
+as String,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [ChannelDetail].
+extension ChannelDetailPatterns on ChannelDetail {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _ChannelDetail value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _ChannelDetail() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _ChannelDetail value)  $default,){
+final _that = this;
+switch (_that) {
+case _ChannelDetail():
+return $default(_that);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _ChannelDetail value)?  $default,){
+final _that = this;
+switch (_that) {
+case _ChannelDetail() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String name,  String about,  String scopeType,  String templateCode,  String status,  int memberCount,  String replyRule,  String defaultPriority,  String role,  bool muted,  bool canPost,  bool canReply,  String whoCanPost)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _ChannelDetail() when $default != null:
+return $default(_that.id,_that.name,_that.about,_that.scopeType,_that.templateCode,_that.status,_that.memberCount,_that.replyRule,_that.defaultPriority,_that.role,_that.muted,_that.canPost,_that.canReply,_that.whoCanPost);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String name,  String about,  String scopeType,  String templateCode,  String status,  int memberCount,  String replyRule,  String defaultPriority,  String role,  bool muted,  bool canPost,  bool canReply,  String whoCanPost)  $default,) {final _that = this;
+switch (_that) {
+case _ChannelDetail():
+return $default(_that.id,_that.name,_that.about,_that.scopeType,_that.templateCode,_that.status,_that.memberCount,_that.replyRule,_that.defaultPriority,_that.role,_that.muted,_that.canPost,_that.canReply,_that.whoCanPost);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String name,  String about,  String scopeType,  String templateCode,  String status,  int memberCount,  String replyRule,  String defaultPriority,  String role,  bool muted,  bool canPost,  bool canReply,  String whoCanPost)?  $default,) {final _that = this;
+switch (_that) {
+case _ChannelDetail() when $default != null:
+return $default(_that.id,_that.name,_that.about,_that.scopeType,_that.templateCode,_that.status,_that.memberCount,_that.replyRule,_that.defaultPriority,_that.role,_that.muted,_that.canPost,_that.canReply,_that.whoCanPost);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+@JsonSerializable()
+
+class _ChannelDetail implements ChannelDetail {
+  const _ChannelDetail({required this.id, required this.name, required this.about, required this.scopeType, required this.templateCode, required this.status, required this.memberCount, required this.replyRule, required this.defaultPriority, required this.role, required this.muted, required this.canPost, required this.canReply, required this.whoCanPost});
+  factory _ChannelDetail.fromJson(Map<String, dynamic> json) => _$ChannelDetailFromJson(json);
+
+@override final  String id;
+@override final  String name;
+@override final  String about;
+@override final  String scopeType;
+@override final  String templateCode;
+@override final  String status;
+@override final  int memberCount;
+@override final  String replyRule;
+@override final  String defaultPriority;
+@override final  String role;
+@override final  bool muted;
+@override final  bool canPost;
+@override final  bool canReply;
+@override final  String whoCanPost;
+
+/// Create a copy of ChannelDetail
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$ChannelDetailCopyWith<_ChannelDetail> get copyWith => __$ChannelDetailCopyWithImpl<_ChannelDetail>(this, _$identity);
+
+@override
+Map<String, dynamic> toJson() {
+  return _$ChannelDetailToJson(this, );
+}
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ChannelDetail&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.about, about) || other.about == about)&&(identical(other.scopeType, scopeType) || other.scopeType == scopeType)&&(identical(other.templateCode, templateCode) || other.templateCode == templateCode)&&(identical(other.status, status) || other.status == status)&&(identical(other.memberCount, memberCount) || other.memberCount == memberCount)&&(identical(other.replyRule, replyRule) || other.replyRule == replyRule)&&(identical(other.defaultPriority, defaultPriority) || other.defaultPriority == defaultPriority)&&(identical(other.role, role) || other.role == role)&&(identical(other.muted, muted) || other.muted == muted)&&(identical(other.canPost, canPost) || other.canPost == canPost)&&(identical(other.canReply, canReply) || other.canReply == canReply)&&(identical(other.whoCanPost, whoCanPost) || other.whoCanPost == whoCanPost));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,id,name,about,scopeType,templateCode,status,memberCount,replyRule,defaultPriority,role,muted,canPost,canReply,whoCanPost);
+
+@override
+String toString() {
+  return 'ChannelDetail(id: $id, name: $name, about: $about, scopeType: $scopeType, templateCode: $templateCode, status: $status, memberCount: $memberCount, replyRule: $replyRule, defaultPriority: $defaultPriority, role: $role, muted: $muted, canPost: $canPost, canReply: $canReply, whoCanPost: $whoCanPost)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$ChannelDetailCopyWith<$Res> implements $ChannelDetailCopyWith<$Res> {
+  factory _$ChannelDetailCopyWith(_ChannelDetail value, $Res Function(_ChannelDetail) _then) = __$ChannelDetailCopyWithImpl;
+@override @useResult
+$Res call({
+ String id, String name, String about, String scopeType, String templateCode, String status, int memberCount, String replyRule, String defaultPriority, String role, bool muted, bool canPost, bool canReply, String whoCanPost
+});
+
+
+
+
+}
+/// @nodoc
+class __$ChannelDetailCopyWithImpl<$Res>
+    implements _$ChannelDetailCopyWith<$Res> {
+  __$ChannelDetailCopyWithImpl(this._self, this._then);
+
+  final _ChannelDetail _self;
+  final $Res Function(_ChannelDetail) _then;
+
+/// Create a copy of ChannelDetail
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? about = null,Object? scopeType = null,Object? templateCode = null,Object? status = null,Object? memberCount = null,Object? replyRule = null,Object? defaultPriority = null,Object? role = null,Object? muted = null,Object? canPost = null,Object? canReply = null,Object? whoCanPost = null,}) {
+  return _then(_ChannelDetail(
+id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
+as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
+as String,about: null == about ? _self.about : about // ignore: cast_nullable_to_non_nullable
+as String,scopeType: null == scopeType ? _self.scopeType : scopeType // ignore: cast_nullable_to_non_nullable
+as String,templateCode: null == templateCode ? _self.templateCode : templateCode // ignore: cast_nullable_to_non_nullable
+as String,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
+as String,memberCount: null == memberCount ? _self.memberCount : memberCount // ignore: cast_nullable_to_non_nullable
+as int,replyRule: null == replyRule ? _self.replyRule : replyRule // ignore: cast_nullable_to_non_nullable
+as String,defaultPriority: null == defaultPriority ? _self.defaultPriority : defaultPriority // ignore: cast_nullable_to_non_nullable
+as String,role: null == role ? _self.role : role // ignore: cast_nullable_to_non_nullable
+as String,muted: null == muted ? _self.muted : muted // ignore: cast_nullable_to_non_nullable
+as bool,canPost: null == canPost ? _self.canPost : canPost // ignore: cast_nullable_to_non_nullable
+as bool,canReply: null == canReply ? _self.canReply : canReply // ignore: cast_nullable_to_non_nullable
+as bool,whoCanPost: null == whoCanPost ? _self.whoCanPost : whoCanPost // ignore: cast_nullable_to_non_nullable
+as String,
+  ));
+}
+
+
+}
+
 // dart format on

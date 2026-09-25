@@ -307,4 +307,43 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get hidePassword => 'Hide password';
+
+  @override
+  String get channelMute => 'Mute';
+
+  @override
+  String get channelUnmute => 'Unmute';
+
+  @override
+  String get channelMarkAllRead => 'Mark all read';
+
+  @override
+  String get channelActionsLabel => 'Channel actions';
+
+  @override
+  String get channelMutedLabel => 'Muted';
+
+  @override
+  String get channelAboutTitle => 'About';
+
+  @override
+  String channelWhoCanPost(String whoCanPost) {
+    return 'Who can post: $whoCanPost';
+  }
+
+  @override
+  String get channelReplyAllowed => 'Members can reply in threads.';
+
+  @override
+  String get channelAnnouncementOnly => 'Announcement only.';
+
+  @override
+  String channelMemberCount(int count) {
+    return '$count members';
+  }
+
+  @override
+  String channelMemberCountArchived(int count) {
+    return '$count members · Archived';
+  }
 }

@@ -154,6 +154,60 @@ abstract class DeviceRow with _$DeviceRow {
   factory DeviceRow.fromJson(Map<String, dynamic> json) => _$DeviceRowFromJson(json);
 }
 
+@freezed
+abstract class SpaceChannel with _$SpaceChannel {
+  const factory SpaceChannel({
+    required String id,
+    required String name,
+    required String about,
+    required String scopeType,
+    required String templateCode,
+    required String role,
+    required bool muted,
+    required int memberCount,
+    required bool archived,
+    String? nextClassAt,
+    String? nextClassLabel,
+  }) = _SpaceChannel;
+  factory SpaceChannel.fromJson(Map<String, dynamic> json) => _$SpaceChannelFromJson(json);
+}
+
+@freezed
+abstract class SpaceGroup with _$SpaceGroup {
+  const factory SpaceGroup({required String key, required String title, required List<SpaceChannel> channels, String? emptyHint}) = _SpaceGroup;
+  factory SpaceGroup.fromJson(Map<String, dynamic> json) => _$SpaceGroupFromJson(json);
+}
+
+@freezed
+abstract class SpacesData with _$SpacesData {
+  const factory SpacesData({required List<SpaceGroup> groups, required String asOf}) = _SpacesData;
+  factory SpacesData.fromJson(Map<String, dynamic> json) => _$SpacesDataFromJson(json);
+}
+
+/// The channel header + About payload. The contract's `ChannelDetail` also carries a
+/// `linkedObject` field (the scope object the channel is bound to); it's not surfaced in
+/// the app yet, so `fromJson` ignores it like the other extra wire fields (R48).
+@freezed
+abstract class ChannelDetail with _$ChannelDetail {
+  const factory ChannelDetail({
+    required String id,
+    required String name,
+    required String about,
+    required String scopeType,
+    required String templateCode,
+    required String status,
+    required int memberCount,
+    required String replyRule,
+    required String defaultPriority,
+    required String role,
+    required bool muted,
+    required bool canPost,
+    required bool canReply,
+    required String whoCanPost,
+  }) = _ChannelDetail;
+  factory ChannelDetail.fromJson(Map<String, dynamic> json) => _$ChannelDetailFromJson(json);
+}
+
 /// A cached value with its server as-of time. `stale` means the last refresh failed.
 class Cached<T> {
   const Cached(this.data, this.asOf, {this.stale = false, this.failure});

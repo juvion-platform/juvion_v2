@@ -268,3 +268,99 @@ Map<String, dynamic> _$DeviceRowToJson(_DeviceRow instance) =>
       'lastActiveAt': instance.lastActiveAt,
       'isCurrent': instance.isCurrent,
     };
+
+_SpaceChannel _$SpaceChannelFromJson(Map<String, dynamic> json) =>
+    _SpaceChannel(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      about: json['about'] as String,
+      scopeType: json['scopeType'] as String,
+      templateCode: json['templateCode'] as String,
+      role: json['role'] as String,
+      muted: json['muted'] as bool,
+      memberCount: (json['memberCount'] as num).toInt(),
+      archived: json['archived'] as bool,
+      nextClassAt: json['nextClassAt'] as String?,
+      nextClassLabel: json['nextClassLabel'] as String?,
+    );
+
+Map<String, dynamic> _$SpaceChannelToJson(_SpaceChannel instance) =>
+    <String, dynamic>{
+      'id': instance.id,
+      'name': instance.name,
+      'about': instance.about,
+      'scopeType': instance.scopeType,
+      'templateCode': instance.templateCode,
+      'role': instance.role,
+      'muted': instance.muted,
+      'memberCount': instance.memberCount,
+      'archived': instance.archived,
+      'nextClassAt': instance.nextClassAt,
+      'nextClassLabel': instance.nextClassLabel,
+    };
+
+_SpaceGroup _$SpaceGroupFromJson(Map<String, dynamic> json) => _SpaceGroup(
+  key: json['key'] as String,
+  title: json['title'] as String,
+  channels: (json['channels'] as List<dynamic>)
+      .map((e) => SpaceChannel.fromJson(e as Map<String, dynamic>))
+      .toList(),
+  emptyHint: json['emptyHint'] as String?,
+);
+
+Map<String, dynamic> _$SpaceGroupToJson(_SpaceGroup instance) =>
+    <String, dynamic>{
+      'key': instance.key,
+      'title': instance.title,
+      'channels': instance.channels.map((e) => e.toJson()).toList(),
+      'emptyHint': instance.emptyHint,
+    };
+
+_SpacesData _$SpacesDataFromJson(Map<String, dynamic> json) => _SpacesData(
+  groups: (json['groups'] as List<dynamic>)
+      .map((e) => SpaceGroup.fromJson(e as Map<String, dynamic>))
+      .toList(),
+  asOf: json['asOf'] as String,
+);
+
+Map<String, dynamic> _$SpacesDataToJson(_SpacesData instance) =>
+    <String, dynamic>{
+      'groups': instance.groups.map((e) => e.toJson()).toList(),
+      'asOf': instance.asOf,
+    };
+
+_ChannelDetail _$ChannelDetailFromJson(Map<String, dynamic> json) =>
+    _ChannelDetail(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      about: json['about'] as String,
+      scopeType: json['scopeType'] as String,
+      templateCode: json['templateCode'] as String,
+      status: json['status'] as String,
+      memberCount: (json['memberCount'] as num).toInt(),
+      replyRule: json['replyRule'] as String,
+      defaultPriority: json['defaultPriority'] as String,
+      role: json['role'] as String,
+      muted: json['muted'] as bool,
+      canPost: json['canPost'] as bool,
+      canReply: json['canReply'] as bool,
+      whoCanPost: json['whoCanPost'] as String,
+    );
+
+Map<String, dynamic> _$ChannelDetailToJson(_ChannelDetail instance) =>
+    <String, dynamic>{
+      'id': instance.id,
+      'name': instance.name,
+      'about': instance.about,
+      'scopeType': instance.scopeType,
+      'templateCode': instance.templateCode,
+      'status': instance.status,
+      'memberCount': instance.memberCount,
+      'replyRule': instance.replyRule,
+      'defaultPriority': instance.defaultPriority,
+      'role': instance.role,
+      'muted': instance.muted,
+      'canPost': instance.canPost,
+      'canReply': instance.canReply,
+      'whoCanPost': instance.whoCanPost,
+    };
