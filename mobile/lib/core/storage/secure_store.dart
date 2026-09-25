@@ -7,8 +7,15 @@ class SecureStore {
   // flutter_secure_storage 11's default AndroidOptions() already uses AES-GCM with
   // RSA-OAEP key wrapping (the package's built-in `encryptedSharedPreferences` flag
   // from earlier majors was removed because this is now the only/default behaviour),
-  // so no explicit AndroidOptions override is needed.
-  SecureStore([FlutterSecureStorage? storage]) : _s = storage ?? const FlutterSecureStorage();
+  // so no explicit AndroidOptions override is needed. On iOS, the default keychain
+  // accessibility (`unlocked`) would block a background sync from reading tokens while
+  // the device is locked; `first_unlock` keeps items readable after the device has been
+  // unlocked once since boot, matching how Android background work behaves.
+  SecureStore([FlutterSecureStorage? storage])
+      : _s = storage ??
+            const FlutterSecureStorage(
+              iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+            );
   final FlutterSecureStorage _s;
 
   static const _access = 'juvi.access';

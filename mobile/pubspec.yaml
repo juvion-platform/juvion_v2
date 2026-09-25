@@ -30,6 +30,7 @@ dependencies:
   path_provider: ^2.1.6
   riverpod_annotation: ^4.0.7
   shared_preferences: ^2.5.5
+  sqlite3: ^3.5.2
   url_launcher: ^6.3.2
 
 dev_dependencies:

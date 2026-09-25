@@ -1,6 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:juvi/core/storage/app_database.dart';
 import 'package:juvi/core/sync/pending_action.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:sqlite3/common.dart';
+
+class _FakeDatabase extends Mock implements CommonDatabase {}
 
 void main() {
   late AppDatabase db;
@@ -27,6 +31,8 @@ void main() {
     await db.recordAttempt(list.first.id, 'offline');
     expect((await db.pendingActions()).first.attempts, 1);
     expect((await db.pendingActions()).first.lastError, 'offline');
+    await db.recordAttempt(list.first.id, 'offline');
+    expect((await db.pendingActions()).first.attempts, 2);
     await db.removeAction(list.first.id);
     expect((await db.pendingActions()).map((a) => a.type), ['settings.patch']);
   });
@@ -37,5 +43,14 @@ void main() {
     await db.wipe();
     expect(await db.readDoc('me'), isNull);
     expect(await db.pendingActions(), isEmpty);
+  });
+
+  test('assertSqlCipherLinked throws when the database is not linked against SQLCipher', () {
+    final raw = _FakeDatabase();
+    // A plain SQLite build doesn't recognise `cipher_version`, so the pragma returns an
+    // empty result set — this is what we'd see if the SQLCipher hook silently failed to
+    // apply (see pubspec.yaml `hooks.user_defines.sqlite3.source: sqlcipher`).
+    when(() => raw.select(any())).thenReturn(ResultSet(const [], null, const []));
+    expect(() => assertSqlCipherLinked(raw), throwsA(isA<StateError>()));
   });
 }

@@ -6,6 +6,7 @@ import 'package:drift/native.dart';
 import 'package:juvi/core/sync/pending_action.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:sqlite3/common.dart' show CommonDatabase;
 
 part 'app_database.g.dart';
 
@@ -43,6 +44,21 @@ class CachedDoc {
   final DateTime asOf;
 }
 
+/// Fails closed, in every build mode, unless [raw] is linked against SQLCipher (see
+/// pubspec.yaml `hooks.user_defines.sqlite3.source: sqlcipher`). An `assert` would be
+/// compiled out of release/profile builds, so if the hook ever silently fails to apply,
+/// `PRAGMA key` would become a no-op and the on-device cache would ship unencrypted —
+/// worse than crashing. `PRAGMA cipher_version` returns a row with the SQLCipher
+/// version on a SQLCipher build; on plain SQLite it's an unrecognized pragma and
+/// returns an empty result set.
+void assertSqlCipherLinked(CommonDatabase raw) {
+  final rows = raw.select('PRAGMA cipher_version;');
+  final version = rows.isEmpty || rows.first.values.isEmpty ? null : rows.first.values[0];
+  if (version == null || version.toString().isEmpty) {
+    throw StateError('SQLCipher is not linked; refusing to open an unencrypted database');
+  }
+}
+
 @DriftDatabase(tables: [KvCache, PendingActionRows])
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
@@ -56,17 +72,12 @@ class AppDatabase extends _$AppDatabase {
       file,
       setup: (raw) {
         raw.execute("PRAGMA key = '$key';");
-        // Debug-only check that the linked SQLite library is really a SQLCipher build
-        // (see pubspec.yaml `hooks.user_defines.sqlite3.source: sqlcipher`):
-        // `PRAGMA cipher_version` returns a row with the SQLCipher version on a
-        // SQLCipher build and an empty result set on plain SQLite. This runs on the
-        // background isolate `createInBackground` spins up, so it can only be observed
-        // by actually running the app on device/emulator, not from host unit tests
-        // (which use `AppDatabase.memory()` instead of `openEncrypted`).
-        assert(
-          raw.select('PRAGMA cipher_version;').isNotEmpty,
-          'sqlite3 is not linked against SQLCipher — check pubspec.yaml hooks.user_defines.sqlite3.source',
-        );
+        // Fails closed (every build mode, see assertSqlCipherLinked's doc) if the
+        // SQLCipher hook didn't apply. Runs on the background isolate
+        // `createInBackground` spins up, so it can only be observed by actually running
+        // the app on device/emulator, not from host unit tests (which use
+        // `AppDatabase.memory()` instead of `openEncrypted`).
+        assertSqlCipherLinked(raw);
       },
     ));
   }
