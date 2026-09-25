@@ -12,7 +12,7 @@
  */
 export const SUB_DOMAINS = {
   admissions: ['applicants', 'documents', 'inquiries', 'lead-interactions'],
-  people: [],
+  people: ['faculty', 'staff'],
   academics: ['attendance', 'course-offerings', 'exams', 'feedback', 'internal-assessments', 'lesson-plans', 'marks', 'results'],
   finance: [],
   hr: [],

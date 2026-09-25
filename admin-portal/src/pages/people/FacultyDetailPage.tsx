@@ -111,7 +111,7 @@ const DETAIL_TABS: ReadonlyArray<{ key: DetailTabKey; label: string }> = [
 ];
 
 export default function FacultyDetailPage() {
-  const canSeeIdentity = useCanSeeClass('people', 'people.identity');
+  const canSeeAadhaar = useCanSeeClass('people', 'people.aadhaar:masked');
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [tab, setTab] = useState<DetailTabKey>('profile');
@@ -292,7 +292,7 @@ export default function FacultyDetailPage() {
             <DetailField label="Phone" value={person.phone} />
             <DetailField label="Alternate Phone" value={person.alternatePhone} />
             <DetailField label="Email" value={person.email} />
-            {canSeeIdentity && <DetailField label="Aadhaar" value={person.aadhaar} mono />}
+            {canSeeAadhaar && person.aadhaar && <DetailField label="Aadhaar" value={person.aadhaar} mono />}
             <DetailField label="Preferred Language" value={person.preferredLanguage} />
             <DetailBool label="Biometric Enrolled" value={person.biometricEnrolled} />
           </DetailSection>

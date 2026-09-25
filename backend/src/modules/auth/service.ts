@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import { User } from '../../models/User';
 import { AppError } from '../../middleware/errorHandler';
 import { resolvePermissions, resolveSensitivity } from '../../shared/rbac/resolve-permissions';
-import { personaCodesOf } from '../../shared/rbac/persona-registry';
+import { personaCodesOf, loadPersonas } from '../../shared/rbac/persona-registry';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
 const JWT_EXPIRES_IN = '7d';
@@ -79,6 +79,22 @@ export async function login(email: string, password: string, collegeId?: string)
   result.permissions = await resolvePermissions(targetCollegeId, user.role, personas);
   result.sensitivity = await resolveSensitivity(targetCollegeId, user.role, personas);
 
+  const personaRows = await loadPersonas(targetCollegeId);
+  const userPersonaRows = personaRows.filter((p) => personas.includes(p.code));
+  const primaryPersona = personaRows.find((p) => p.code === user.personaType) || userPersonaRows[0];
+  const primaryModule = primaryPersona?.primaryModule || 'platform';
+  const dashboardWidgets = [...new Set(userPersonaRows.flatMap((p) => p.dashboardWidgets || []))];
+  const accessibleModules = [...new Set(userPersonaRows.flatMap((p) => p.accessibleModules || []))];
+
+  const userObj = result.user as Record<string, unknown>;
+  userObj.primaryModule = primaryModule;
+  if (dashboardWidgets.length > 0) userObj.dashboardWidgets = dashboardWidgets;
+  if (accessibleModules.length > 0) userObj.accessibleModules = accessibleModules;
+
+  result.primaryModule = primaryModule;
+  if (dashboardWidgets.length > 0) result.dashboardWidgets = dashboardWidgets;
+  if (accessibleModules.length > 0) result.accessibleModules = accessibleModules;
+
   return result;
 }
 
@@ -90,6 +106,14 @@ export async function getMe(userId: string) {
   // 010 — permissions ride on /me so a policy edit reaches the browser on its next hydrate.
   const permissions = await resolvePermissions(user.role === 'super_admin' ? undefined : collegeId, user.role, personas);
   const sensitivity = await resolveSensitivity(user.role === 'super_admin' ? undefined : collegeId, user.role, personas);
+
+  const personaRows = await loadPersonas(collegeId);
+  const userPersonaRows = personaRows.filter((p) => personas.includes(p.code));
+  const primaryPersona = personaRows.find((p) => p.code === user.personaType) || userPersonaRows[0];
+  const primaryModule = primaryPersona?.primaryModule || 'platform';
+  const dashboardWidgets = [...new Set(userPersonaRows.flatMap((p) => p.dashboardWidgets || []))];
+  const accessibleModules = [...new Set(userPersonaRows.flatMap((p) => p.accessibleModules || []))];
+
   return {
     id: String(user._id),
     name: user.name,
@@ -100,6 +124,9 @@ export async function getMe(userId: string) {
     collegeId: String(user.collegeId),
     permissions,
     sensitivity,
+    primaryModule,
+    dashboardWidgets: dashboardWidgets.length > 0 ? dashboardWidgets : undefined,
+    accessibleModules: accessibleModules.length > 0 ? accessibleModules : undefined,
   };
 }
 

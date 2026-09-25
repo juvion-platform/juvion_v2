@@ -1,9 +1,10 @@
-import { Routes, Route, useNavigate } from 'react-router-dom';
+import { Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getPlatformStats } from '../services/platform';
 import { Megaphone, FileText, Bell, ClipboardList, MessageSquare, Mail, Smartphone, MessageCircle, Shield, Upload, Settings, Plug, Users, IdCard } from 'lucide-react';
 import Breadcrumbs from '../components/ui/Breadcrumbs';
 import { StatBannerSkeleton } from '../components/ui/Skeleton';
+import { useAuthStore } from '../stores/authStore';
 
 import AnnouncementsPage from './platform/AnnouncementsPage';
 import CircularsPage from './platform/CircularsPage';
@@ -23,6 +24,10 @@ import UsersPage from './platform/UsersPage';
 function PlatformHome() {
   const navigate = useNavigate();
   const { data: stats } = useQuery({ queryKey: ['platform-stats'], queryFn: getPlatformStats });
+  const user = useAuthStore((s) => s.user);
+  const isSuperAdmin = useAuthStore((s) => s.isSuperAdmin);
+  const permissions = useAuthStore((s) => s.permissions);
+  const canManagePlatform = isSuperAdmin || user?.role === 'admin' || (user?.role === 'principal' && (permissions.includes('platform:*') || permissions.includes('*:*')));
 
   return (
     <div>
@@ -123,40 +128,44 @@ function PlatformHome() {
         })}
       </div>
 
-      {/* Administration */}
-      <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3 mt-8">Administration</h3>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <button onClick={() => navigate('users')} className="bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all border-blue-200 hover:border-blue-400">
-          <div className="inline-flex p-2.5 rounded-lg mb-3 bg-blue-50 text-blue-600"><Users size={22} /></div>
-          <div className="font-semibold text-navy-dark text-sm">Users</div>
-          <p className="text-xs text-gray-500 mt-1">Logins, personas, linked people</p>
-        </button>
-        <button onClick={() => navigate('personas')} className="bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all border-indigo-200 hover:border-indigo-400">
-          <div className="inline-flex p-2.5 rounded-lg mb-3 bg-indigo-50 text-indigo-600"><IdCard size={22} /></div>
-          <div className="font-semibold text-navy-dark text-sm">Personas</div>
-          <p className="text-xs text-gray-500 mt-1">Designations this college recognises</p>
-        </button>
-        <button onClick={() => navigate('rbac-policies')} className="bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all border-gray-200 hover:border-gray-400">
-          <div className="inline-flex p-2.5 rounded-lg mb-3 bg-purple-50 text-purple-600"><Shield size={22} /></div>
-          <div className="font-semibold text-navy-dark text-sm">RBAC Policies</div>
-          <p className="text-xs text-gray-500 mt-1">Manage access control policies</p>
-        </button>
-        <button onClick={() => navigate('bulk-imports')} className="bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all border-cyan-200 hover:border-cyan-400">
-          <div className="inline-flex p-2.5 rounded-lg mb-3 bg-cyan-50 text-cyan-600"><Upload size={22} /></div>
-          <div className="font-semibold text-navy-dark text-sm">Bulk Imports</div>
-          <p className="text-xs text-gray-500 mt-1">Schema-driven CSV import for students, faculty, fees, …</p>
-        </button>
-        <button onClick={() => navigate('config')} className="bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all border-emerald-200 hover:border-emerald-400">
-          <div className="inline-flex p-2.5 rounded-lg mb-3 bg-emerald-50 text-emerald-600"><Settings size={22} /></div>
-          <div className="font-semibold text-navy-dark text-sm">Configuration</div>
-          <p className="text-xs text-gray-500 mt-1">Feature flags, notification templates, schema-driven settings</p>
-        </button>
-        <button onClick={() => navigate('integrations')} className="bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all border-indigo-200 hover:border-indigo-400">
-          <div className="inline-flex p-2.5 rounded-lg mb-3 bg-indigo-50 text-indigo-600"><Plug size={22} /></div>
-          <div className="font-semibold text-navy-dark text-sm">Integrations</div>
-          <p className="text-xs text-gray-500 mt-1">ERPNext / Frappe HR bridge — personnel-side HR</p>
-        </button>
-      </div>
+      {/* Administration — restricted to platform/RBAC managers */}
+      {canManagePlatform && (
+        <>
+          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3 mt-8">Administration</h3>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <button onClick={() => navigate('users')} className="bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all border-blue-200 hover:border-blue-400">
+              <div className="inline-flex p-2.5 rounded-lg mb-3 bg-blue-50 text-blue-600"><Users size={22} /></div>
+              <div className="font-semibold text-navy-dark text-sm">Users</div>
+              <p className="text-xs text-gray-500 mt-1">Logins, personas, linked people</p>
+            </button>
+            <button onClick={() => navigate('personas')} className="bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all border-indigo-200 hover:border-indigo-400">
+              <div className="inline-flex p-2.5 rounded-lg mb-3 bg-indigo-50 text-indigo-600"><IdCard size={22} /></div>
+              <div className="font-semibold text-navy-dark text-sm">Personas</div>
+              <p className="text-xs text-gray-500 mt-1">Designations this college recognises</p>
+            </button>
+            <button onClick={() => navigate('rbac-policies')} className="bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all border-gray-200 hover:border-gray-400">
+              <div className="inline-flex p-2.5 rounded-lg mb-3 bg-purple-50 text-purple-600"><Shield size={22} /></div>
+              <div className="font-semibold text-navy-dark text-sm">RBAC Policies</div>
+              <p className="text-xs text-gray-500 mt-1">Manage access control policies</p>
+            </button>
+            <button onClick={() => navigate('bulk-imports')} className="bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all border-cyan-200 hover:border-cyan-400">
+              <div className="inline-flex p-2.5 rounded-lg mb-3 bg-cyan-50 text-cyan-600"><Upload size={22} /></div>
+              <div className="font-semibold text-navy-dark text-sm">Bulk Imports</div>
+              <p className="text-xs text-gray-500 mt-1">Schema-driven CSV import for students, faculty, fees, …</p>
+            </button>
+            <button onClick={() => navigate('config')} className="bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all border-emerald-200 hover:border-emerald-400">
+              <div className="inline-flex p-2.5 rounded-lg mb-3 bg-emerald-50 text-emerald-600"><Settings size={22} /></div>
+              <div className="font-semibold text-navy-dark text-sm">Configuration</div>
+              <p className="text-xs text-gray-500 mt-1">Feature flags, notification templates, schema-driven settings</p>
+            </button>
+            <button onClick={() => navigate('integrations')} className="bg-white rounded-xl border-2 shadow-sm p-5 text-left hover:shadow-lg transition-all border-indigo-200 hover:border-indigo-400">
+              <div className="inline-flex p-2.5 rounded-lg mb-3 bg-indigo-50 text-indigo-600"><Plug size={22} /></div>
+              <div className="font-semibold text-navy-dark text-sm">Integrations</div>
+              <p className="text-xs text-gray-500 mt-1">ERPNext / Frappe HR bridge — personnel-side HR</p>
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -171,6 +180,11 @@ function SubPageWrapper({ children }: { children: React.ReactNode }) {
 }
 
 export default function Platform() {
+  const user = useAuthStore((s) => s.user);
+  const isSuperAdmin = useAuthStore((s) => s.isSuperAdmin);
+  const permissions = useAuthStore((s) => s.permissions);
+  const canManagePlatform = isSuperAdmin || user?.role === 'admin' || (user?.role === 'principal' && (permissions.includes('platform:*') || permissions.includes('*:*')));
+
   return (
     <SubPageWrapper>
       <Routes>
@@ -183,12 +197,12 @@ export default function Platform() {
         <Route path="email-logs" element={<EmailLogsPage />} />
         <Route path="sms-logs" element={<SMSLogsPage />} />
         <Route path="whatsapp-logs" element={<WhatsAppLogsPage />} />
-        <Route path="rbac-policies" element={<RbacPoliciesPage />} />
-        <Route path="users" element={<UsersPage />} />
-        <Route path="personas" element={<PersonasPage />} />
-        <Route path="bulk-imports" element={<BulkImportsPage />} />
-        <Route path="config" element={<SchemaConfigPage />} />
-        <Route path="integrations" element={<IntegrationsPage />} />
+        <Route path="rbac-policies" element={canManagePlatform ? <RbacPoliciesPage /> : <Navigate to="/platform" replace />} />
+        <Route path="users" element={canManagePlatform ? <UsersPage /> : <Navigate to="/platform" replace />} />
+        <Route path="personas" element={canManagePlatform ? <PersonasPage /> : <Navigate to="/platform" replace />} />
+        <Route path="bulk-imports" element={canManagePlatform ? <BulkImportsPage /> : <Navigate to="/platform" replace />} />
+        <Route path="config" element={canManagePlatform ? <SchemaConfigPage /> : <Navigate to="/platform" replace />} />
+        <Route path="integrations" element={canManagePlatform ? <IntegrationsPage /> : <Navigate to="/platform" replace />} />
       </Routes>
     </SubPageWrapper>
   );

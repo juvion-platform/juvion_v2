@@ -1,4 +1,4 @@
-import { hiddenClassesFor } from '../../../shared/rbac/sensitivity';
+import { hiddenClassesFor, maskedClassesFor } from '../../../shared/rbac/sensitivity';
 import type { AuthScope } from '../../../shared/rbac/types';
 /**
  * Task A4 — Finance-agent orchestrator (fee-analytics-ai-native).
@@ -182,6 +182,7 @@ export async function* handleChat(
   yield* runAgentChat({
     collegeId, userId, prompt, conversationId, abortSignal,
     hiddenClasses: hiddenClassesFor(authScope),
+    maskedClasses: maskedClassesFor(authScope),
     agent: 'finance',
     actionType: 'chat',
     buildContext: () => forChat(collegeId, context),

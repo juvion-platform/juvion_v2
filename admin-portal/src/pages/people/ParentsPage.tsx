@@ -51,7 +51,7 @@ const RELATIONSHIPS = ['father', 'mother', 'guardian'] as const;
 const COMMUNICATION_PREFERENCES = ['call', 'sms', 'whatsapp', 'email'] as const;
 
 export default function ParentsPage() {
-  const canSeeIdentity = useCanSeeClass('people', 'people.identity');
+  const canEditAadhaar = useCanSeeClass('people', 'people.aadhaar');
   const qc = useQueryClient();
   const navigate = useNavigate();
   const { page, setPage, limit, setLimit } = useListControls();
@@ -152,7 +152,7 @@ export default function ParentsPage() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const payload: any = { ...form };
-    if (!canSeeIdentity) delete payload.aadhaar; // server would 403 on a hidden key
+    if (!canEditAadhaar) delete payload.aadhaar; // server would 403 on a hidden or masked key
     const address: any = {};
     ['line1', 'line2', 'city', 'state', 'pincode'].forEach(key => {
       if ((payload as any)[key]) address[key] = (payload as any)[key];
@@ -259,7 +259,7 @@ export default function ParentsPage() {
               <div><label className={lbl}>Email</label><input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} className={inp} /></div>
               <div><label className={lbl}>Gender</label><select value={form.gender} onChange={e => setForm(f => ({ ...f, gender: e.target.value }))} className={inp}><option value="">Select...</option>{GENDERS.map(g => <option key={g} value={g}>{g}</option>)}</select></div>
               <div><label className={lbl}>Date of Birth</label><input type="date" value={form.dob} onChange={e => setForm(f => ({ ...f, dob: e.target.value }))} className={inp} /></div>
-              {canSeeIdentity && <div><label className={lbl}>Aadhaar</label><input value={form.aadhaar} onChange={e => setForm(f => ({ ...f, aadhaar: e.target.value }))} className={inp} /></div>}
+              {canEditAadhaar && <div><label className={lbl}>Aadhaar</label><input value={form.aadhaar} onChange={e => setForm(f => ({ ...f, aadhaar: e.target.value }))} className={inp} /></div>}
               <div><label className={lbl}>Preferred Language</label><input value={form.preferredLanguage} onChange={e => setForm(f => ({ ...f, preferredLanguage: e.target.value }))} className={inp} /></div>
               <label className="flex items-center gap-2 text-sm font-medium text-gray-700 pt-7">
                 <input type="checkbox" checked={form.biometricEnrolled} onChange={e => setForm(f => ({ ...f, biometricEnrolled: e.target.checked }))} className="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />

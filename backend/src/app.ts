@@ -61,10 +61,11 @@ if (process.env.NODE_ENV === 'production' && !process.env.PAYMENT_WEBHOOK_SECRET
 // E2E_TESTING bypass keeps the Playwright suite (and other automated
 // load) from tripping the limit. Production NEVER sets this.
 const isE2ETesting = process.env.E2E_TESTING === '1' || process.env.E2E_TESTING === 'true';
+const isDev = process.env.NODE_ENV === 'development';
 if (!isE2ETesting) {
-  app.use(rateLimit({ windowMs: 60_000, max: 100, standardHeaders: true, legacyHeaders: false }));
-  // Stricter rate limit on login.
-  app.use('/api/auth/login', rateLimit({ windowMs: 15 * 60_000, max: 10, message: { error: 'Too many login attempts. Try again in 15 minutes.' } }));
+  app.use(rateLimit({ windowMs: 60_000, max: isDev ? 1000 : 100, standardHeaders: true, legacyHeaders: false }));
+  // Stricter rate limit on login in production.
+  app.use('/api/auth/login', rateLimit({ windowMs: 15 * 60_000, max: isDev ? 1000 : 10, message: { error: 'Too many login attempts. Try again in 15 minutes.' } }));
 }
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', version: '2.0.0' }));

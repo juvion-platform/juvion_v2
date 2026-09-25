@@ -148,7 +148,7 @@ function ComplianceCard() { const { data, isLoading } = useStats('compliance', g
 function PlatformCard() { const { data, isLoading } = useStats('platform', getPlatformStats); return <ModuleCard to="/platform" icon={Megaphone} title="Platform" loading={isLoading} rows={[['Announcements', data?.announcements], ['Circulars', data?.circulars], ['Notifications', data?.notifications], ['Surveys', data?.feedbackSurveys]]} />; }
 
 export const DASHBOARD_WIDGETS: DashboardWidget[] = [
-  { id: 'pending-proposals', module: null, title: 'Pending proposals', kind: 'banner', Component: PendingProposalsWidget },
+  { id: 'pending-proposals', module: 'campus', title: 'Pending proposals', kind: 'banner', Component: PendingProposalsWidget },
   { id: 'people-kpi', module: 'people', title: 'Students & faculty', kind: 'kpi', Component: PeopleKpi },
   { id: 'finance-kpi', module: 'finance', title: 'Payments', kind: 'kpi', Component: FinanceKpi },
   { id: 'placement-kpi', module: 'placement', title: 'Placement offers', kind: 'kpi', Component: PlacementKpi },

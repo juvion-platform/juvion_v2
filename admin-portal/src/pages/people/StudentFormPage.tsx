@@ -159,7 +159,7 @@ function ComponentBreakdown({
 }
 
 export default function StudentFormPage() {
-  const canSeeIdentity = useCanSeeClass('people', 'people.identity');
+  const canEditAadhaar = useCanSeeClass('people', 'people.aadhaar');
   const { id } = useParams();
   const isEdit = !!id;
   const navigate = useNavigate();
@@ -485,7 +485,7 @@ export default function StudentFormPage() {
     }
 
     const payload: any = { ...form, admissionYear: Number(form.admissionYear) };
-    if (!canSeeIdentity) delete payload.aadhaar; // server would 403 on a hidden key
+    if (!canEditAadhaar) delete payload.aadhaar; // server would 403 on a hidden or masked key
     // Build address object
     const address: any = {};
     ['line1', 'line2', 'city', 'state', 'pincode'].forEach(k => { if ((payload as any)[k]) address[k] = (payload as any)[k]; delete (payload as any)[k]; });
@@ -715,7 +715,7 @@ export default function StudentFormPage() {
             <div><label className={lbl}>Email</label><input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} className={inp} /></div>
             <div><label className={lbl}>Gender</label><select value={form.gender} onChange={e => setForm(f => ({ ...f, gender: e.target.value }))} className={inp}><option value="">Select...</option>{GENDERS.map(g => <option key={g} value={g} className="capitalize">{g}</option>)}</select></div>
             <div><label className={lbl}>Date of Birth</label><input type="date" value={form.dob} onChange={e => setForm(f => ({ ...f, dob: e.target.value }))} className={inp} /></div>
-            {canSeeIdentity && <div><label className={lbl}>Aadhaar</label><input value={form.aadhaar} onChange={e => setForm(f => ({ ...f, aadhaar: e.target.value }))} className={inp} maxLength={12} placeholder="12-digit Aadhaar" /></div>}
+            {canEditAadhaar && <div><label className={lbl}>Aadhaar</label><input value={form.aadhaar} onChange={e => setForm(f => ({ ...f, aadhaar: e.target.value }))} className={inp} maxLength={12} placeholder="12-digit Aadhaar" /></div>}
             <div><label className={lbl}>Preferred Language</label><input value={form.preferredLanguage} onChange={e => setForm(f => ({ ...f, preferredLanguage: e.target.value }))} className={inp} placeholder="e.g. English, Telugu" /></div>
             <div><label className={lbl}>Emergency Contact Name</label><input value={form.emergencyContactName} onChange={e => setForm(f => ({ ...f, emergencyContactName: e.target.value }))} className={inp} placeholder="Primary emergency contact" /></div>
             <div><label className={lbl}>Emergency Contact Phone</label><input value={form.emergencyContactPhone} onChange={e => setForm(f => ({ ...f, emergencyContactPhone: e.target.value }))} className={inp} placeholder="Emergency phone number" /></div>

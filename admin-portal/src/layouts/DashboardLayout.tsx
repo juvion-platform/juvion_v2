@@ -28,9 +28,9 @@ interface NavItem {
   children?: NavChild[];
 }
 
-const NAV_ITEMS: NavItem[] = [
+export const NAV_ITEMS: NavItem[] = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard', iconColor: 'text-sky-400', module: null },
-  { to: '/master-data', icon: Database, label: 'Master Data', iconColor: 'text-slate-400', module: null },
+  { to: '/master-data', icon: Database, label: 'Master Data', iconColor: 'text-slate-400', module: 'academics' },
   { to: '/admissions', icon: UserPlus, label: 'Admissions', iconColor: 'text-emerald-400', module: 'admissions' },
   { to: '/people', icon: Users, label: 'People', iconColor: 'text-blue-400', module: 'people' },
   { to: '/academics', icon: GraduationCap, label: 'Academics', iconColor: 'text-amber-400', module: 'academics' },
@@ -61,6 +61,21 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/juvi', icon: Bot, label: 'Juvi AI', iconColor: 'text-purple-400', module: 'juvi' },
 ];
 
+export function getVisibleNavItems(
+  items: NavItem[],
+  canRead: (module: string) => boolean,
+  accessibleModules?: string[],
+): NavItem[] {
+  return items.filter((item) => {
+    if (!item.module) return true;
+    if (!canRead(item.module)) return false;
+    if (accessibleModules && accessibleModules.length > 0) {
+      return accessibleModules.includes(item.module);
+    }
+    return true;
+  });
+}
+
 const SIDEBAR_COLLAPSED_KEY = 'sidebarCollapsed';
 
 export default function DashboardLayout() {
@@ -82,8 +97,10 @@ export default function DashboardLayout() {
   const collegeName = useAuthStore((s) => s.collegeName);
   const hasPermission = useAuthStore((s) => s.hasPermission);
 
-  const visibleItems = NAV_ITEMS.filter(
-    (item) => !item.module || hasPermission(item.module, 'read')
+  const visibleItems = getVisibleNavItems(
+    NAV_ITEMS,
+    (m) => hasPermission(m, 'read'),
+    user?.accessibleModules,
   );
 
   // Auto-expand any group whose `to` is a prefix of the current URL. Keeps the
