@@ -46,8 +46,10 @@ export function applyAuthScope(
   // Self scoping: student/parent sees only their own records
   if (authScope.selfOnly) {
     const field = opts?.selfField ?? 'createdBy';
-    // Use personId if available and a person-linked field is specified
-    if (authScope.personId && opts?.selfField) {
+    if (opts?.selfField === 'studentId') {
+      // Student._id-keyed records. A missing studentId must match nothing, never everything.
+      filter[field] = authScope.studentId ?? '000000000000000000000000';
+    } else if (authScope.personId && opts?.selfField) {
       filter[field] = authScope.personId;
     } else {
       filter[field] = authScope.userId;
