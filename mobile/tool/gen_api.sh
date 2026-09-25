@@ -15,8 +15,8 @@ npx --yes @openapitools/openapi-generator-cli generate \
 # generated code (null-aware map elements) fail to format under this package's effective
 # language version. Bump the floor so codegen output parses on the pinned toolchain, and
 # tighten the json_annotation constraint to match the version actually installed.
-sed -i '' "s/sdk: '>=2.17.0 <4.0.0'/sdk: '>=3.9.0 <4.0.0'/" packages/juvi_api/pubspec.yaml
-sed -i '' "s/json_annotation: '\^4.4.0'/json_annotation: '^4.12.0'/" packages/juvi_api/pubspec.yaml
+perl -pi -e "s/sdk: '>=2.17.0 <4.0.0'/sdk: '>=3.9.0 <4.0.0'/" packages/juvi_api/pubspec.yaml
+perl -pi -e "s/json_annotation: '\^4.4.0'/json_annotation: '^4.12.0'/" packages/juvi_api/pubspec.yaml
 cd packages/juvi_api
 dart pub get
 dart run build_runner build --delete-conflicting-outputs
