@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -61,9 +62,11 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       final l = context.l10n;
       setState(() => _error = switch (f.code) {
             ApiErrorCode.invalidCredentials => l.invalidCredentials,
-            ApiErrorCode.cooldown => l.cooldownMessage(((f.retryAfterSeconds ?? 60) / 60).ceil()),
+            // R56: floor at 1 minute so a 0 or missing retryAfterSeconds never reads "0 minutes".
+            ApiErrorCode.cooldown => l.cooldownMessage(math.max(1, ((f.retryAfterSeconds ?? 60) / 60).ceil())),
             ApiErrorCode.offline => l.signInNeedsConnection,
-            ApiErrorCode.institutionPaused => (f.detail['message'] as String?) ?? f.message,
+            // R56: ApiFailure.fromDio strips `message` out of `detail` into the top-level field.
+            ApiErrorCode.institutionPaused => f.message,
             _ => f.message,
           });
     } finally {

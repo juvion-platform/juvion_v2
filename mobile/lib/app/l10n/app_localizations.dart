@@ -208,6 +208,30 @@ abstract class AppLocalizations {
   /// **'Use at least 8 characters'**
   String get passwordTooShort;
 
+  /// New-password strength hint: 16 or more characters.
+  ///
+  /// In en, this message translates to:
+  /// **'Strong'**
+  String get passwordStrengthStrong;
+
+  /// New-password strength hint: 12-15 characters.
+  ///
+  /// In en, this message translates to:
+  /// **'Good'**
+  String get passwordStrengthGood;
+
+  /// New-password strength hint: 8-11 characters, the minimum accepted length.
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
+  String get passwordStrengthOk;
+
+  /// New-password strength hint: fewer than 8 characters, not yet accepted.
+  ///
+  /// In en, this message translates to:
+  /// **'Too short'**
+  String get passwordStrengthTooShort;
+
   /// No description provided for @youreClear.
   ///
   /// In en, this message translates to:

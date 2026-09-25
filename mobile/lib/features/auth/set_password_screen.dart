@@ -28,13 +28,13 @@ class _SetPasswordScreenState extends ConsumerState<SetPasswordScreen> {
     super.dispose();
   }
 
-  String _strength(String v) => v.length >= 16
-      ? 'Strong'
+  String _strength(String v, AppLocalizations l) => v.length >= 16
+      ? l.passwordStrengthStrong
       : v.length >= 12
-          ? 'Good'
+          ? l.passwordStrengthGood
           : v.length >= 8
-              ? 'OK'
-              : 'Too short';
+              ? l.passwordStrengthOk
+              : l.passwordStrengthTooShort;
 
   Future<void> _submit() async {
     final l = context.l10n;
@@ -75,7 +75,7 @@ class _SetPasswordScreenState extends ConsumerState<SetPasswordScreen> {
             decoration: InputDecoration(
               labelText: l.newPasswordLabel,
               errorText: _lengthError,
-              helperText: _next.text.isEmpty ? null : _strength(_next.text),
+              helperText: _next.text.isEmpty ? null : _strength(_next.text, l),
               suffixIcon: IconButton(icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined), onPressed: () => setState(() => _obscure = !_obscure)),
             ),
             onChanged: (_) => setState(() => _lengthError = null),

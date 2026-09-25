@@ -43,21 +43,25 @@ class _InstitutionCodeFieldState extends ConsumerState<InstitutionCodeField> {
     _debounce = Timer(const Duration(milliseconds: 500), () => unawaited(_lookup(v)));
   }
 
+  /// Whether [code] is still what the field shows — a lookup started for an earlier
+  /// value must not overwrite a later one that's since been typed (or already resolved).
+  bool _isCurrent(String code) => code.trim().toUpperCase() == _ctrl.text.trim().toUpperCase();
+
   Future<void> _lookup(String code) async {
     setState(() => _busy = true);
     try {
       final id = await ref.read(authRepositoryProvider).lookupInstitution(code);
-      if (!mounted) return;
+      if (!mounted || !_isCurrent(code)) return;
       setState(() {
         _identity = id;
         _error = null;
       });
       widget.onResolved(id, code.trim().toUpperCase());
     } on ApiFailure catch (f) {
-      if (!mounted) return;
+      if (!mounted || !_isCurrent(code)) return;
       setState(() => _error = f.isOffline ? context.l10n.signInNeedsConnection : context.l10n.institutionCodeNotFound);
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted && _isCurrent(code)) setState(() => _busy = false);
     }
   }
 

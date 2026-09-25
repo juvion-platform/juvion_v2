@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 // riverpod 3.4.3 moved `Override` out of the main flutter_riverpod.dart barrel; see misc.dart.
@@ -17,10 +19,12 @@ class _Auth extends Mock implements AuthRepository {}
 
 class _Session extends SessionController {
   ApiFailure? failWith;
+  String? lastCollegeId;
   @override
   SessionState build() => const SessionState.signedOut();
   @override
   Future<void> signIn({required String collegeId, required String identifier, required String password}) async {
+    lastCollegeId = collegeId;
     if (failWith != null) throw failWith!;
     state = const SessionState.signedIn(
       AccountSummary(id: 'a', kind: 'student', status: 'onboarding', onboardingStep: 0, onboardingSteps: ['identity'], onboardingComplete: false, mustChangePassword: true),
@@ -58,6 +62,38 @@ void main() {
     await t.pump(const Duration(milliseconds: 600));
     expect(find.text("We couldn't find that college code."), findsOneWidget);
     expect(find.text('JIT College'), findsNothing);
+  });
+
+  testWidgets('a stale lookup response is ignored once a different code has since been typed', (t) async {
+    const alfa = InstitutionIdentity(collegeId: 'a1', name: 'Alfa College', paused: false);
+    const beta = InstitutionIdentity(collegeId: 'b1', name: 'Beta College', paused: false);
+    final alfaCompleter = Completer<InstitutionIdentity>();
+    when(() => auth.lookupInstitution('ALFA')).thenAnswer((_) => alfaCompleter.future);
+    when(() => auth.lookupInstitution('BETA')).thenAnswer((_) async => beta);
+
+    await t.pumpWidget(app(ov()));
+    await t.pump(); // shared_preferences 2.5.5's getInstance() needs a second microtask/frame turn to resolve.
+    await t.enterText(find.bySemanticsLabel('Institution code'), 'ALFA');
+    await t.pump(const Duration(milliseconds: 600)); // debounce fires; lookupInstitution('ALFA') is now in flight, pending.
+    await t.enterText(find.bySemanticsLabel('Institution code'), 'BETA');
+    await t.pump(const Duration(milliseconds: 600)); // debounce fires; BETA resolves immediately.
+    expect(find.text('Beta College'), findsOneWidget);
+    expect(find.text('Alfa College'), findsNothing);
+
+    // ALFA's late response arrives after BETA has already resolved — it must not overwrite BETA.
+    alfaCompleter.complete(alfa);
+    await t.pump();
+    await t.pump();
+    expect(find.text('Beta College'), findsOneWidget);
+    expect(find.text('Alfa College'), findsNothing);
+
+    // The parent must still be bound to BETA's collegeId, never ALFA's.
+    await t.enterText(find.bySemanticsLabel('Roll number, employee code or email'), '21CS1042');
+    await t.enterText(find.bySemanticsLabel('Password'), 'river-lamp-482');
+    await t.pump();
+    await t.tap(find.widgetWithText(FilledButton, 'Sign in'));
+    await t.pumpAndSettle();
+    expect(session.lastCollegeId, 'b1');
   });
 
   testWidgets('sign-in button is disabled until code, identifier and password are present; success remembers the code', (t) async {

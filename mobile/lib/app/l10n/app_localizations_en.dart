@@ -72,6 +72,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get passwordTooShort => 'Use at least 8 characters';
 
   @override
+  String get passwordStrengthStrong => 'Strong';
+
+  @override
+  String get passwordStrengthGood => 'Good';
+
+  @override
+  String get passwordStrengthOk => 'OK';
+
+  @override
+  String get passwordStrengthTooShort => 'Too short';
+
+  @override
   String get youreClear => 'You\'re clear';
 
   @override
