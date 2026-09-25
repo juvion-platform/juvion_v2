@@ -310,6 +310,12 @@ abstract class AppLocalizations {
   /// **'Your institution has closed your Juvi account. If that\'s a mistake, contact the office below.'**
   String get deactivatedBody;
 
+  /// Button on the deactivated screen: signs out and returns to /sign-in.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to sign in'**
+  String get deactivatedBackToSignIn;
+
   /// No description provided for @pausedTitle.
   ///
   /// In en, this message translates to:

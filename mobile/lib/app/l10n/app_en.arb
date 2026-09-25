@@ -42,6 +42,8 @@
   "tabMe": "Me",
   "deactivatedTitle": "This account is no longer active",
   "deactivatedBody": "Your institution has closed your Juvi account. If that's a mistake, contact the office below.",
+  "deactivatedBackToSignIn": "Back to sign in",
+  "@deactivatedBackToSignIn": { "description": "Button on the deactivated screen: signs out and returns to /sign-in." },
   "pausedTitle": "Juvi is paused",
   "updateRequiredTitle": "Update Juvi to continue",
   "updateRequiredBody": "Your college needs version {version} or later.",

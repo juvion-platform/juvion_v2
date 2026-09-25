@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:juvi/core/analytics/analytics.dart';
 import 'package:juvi/core/http/api_failure.dart';
 import 'package:juvi/core/http/api_providers.dart';
 import 'package:juvi/core/models/models.dart';
@@ -141,6 +142,7 @@ Future<void> toggleMute(WidgetRef ref, SpaceChannel c) async {
     final db = await ref.read(appDatabaseProvider.future);
     final repo = await ref.read(spacesRepositoryProvider.future);
     final muted = !c.muted;
+    ref.read(analyticsProvider).track('channel.muted', {'muted': muted});
     final previousDoc = await db.readDoc('spaces');
     if (previousDoc != null) {
       await db.writeDoc('spaces', {...previousDoc.json, 'groups': _withMuted(previousDoc.json, c.id, muted)}, previousDoc.asOf);

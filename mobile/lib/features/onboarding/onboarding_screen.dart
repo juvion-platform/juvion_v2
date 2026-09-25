@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:juvi/app/l10n/l10n.dart';
+import 'package:juvi/core/analytics/analytics.dart';
 import 'package:juvi/core/http/api_failure.dart';
 import 'package:juvi/core/models/models.dart';
 import 'package:juvi/core/repos/me_repository.dart';
@@ -48,6 +49,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             onboardingComplete: next.onboardingComplete,
             status: next.onboardingComplete ? 'active' : account.status,
           ));
+      ref.read(analyticsProvider).track('onboarding.step_completed', {'step': widget.step});
+      if (next.onboardingComplete) ref.read(analyticsProvider).track('onboarding.completed');
       // GoRouter.maybeOf keeps the screen testable without a router; in the app the
       // router is always present. Completion is left to redirect.dart (the account is
       // no longer "incomplete", so the next redirect check bounces it home); an

@@ -1,3 +1,4 @@
+import 'package:juvi/core/analytics/analytics.dart';
 import 'package:juvi/core/http/api_failure.dart';
 import 'package:juvi/core/http/api_providers.dart';
 import 'package:juvi/core/models/models.dart';
@@ -63,6 +64,7 @@ class SessionController extends _$SessionController {
     final db = await ref.read(appDatabaseProvider.future);
     await db.writeDoc('account', result.account.toJson(), DateTime.now().toUtc());
     state = SessionState.signedIn(result.account);
+    ref.read(analyticsProvider).track('account.signed_in', {'kind': result.account.kind});
   }
 
   Future<void> signOut() async {

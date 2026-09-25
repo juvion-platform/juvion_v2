@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:juvi/core/analytics/analytics.dart';
 import 'package:juvi/core/http/api_failure.dart';
 import 'package:juvi/core/http/api_providers.dart';
 import 'package:juvi/core/models/models.dart';
@@ -137,6 +138,7 @@ class SettingsController extends _$SettingsController {
     final repo = await ref.read(meRepositoryProvider.future);
     final current = state.value;
     if (current != null) state = AsyncData(_merge(current, p));
+    ref.read(analyticsProvider).track('settings.changed', {'key': p.keys.join(',')});
     try {
       state = AsyncData(await repo.updateSettings(p));
     } on ApiFailure catch (f) {

@@ -126,6 +126,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'Your institution has closed your Juvi account. If that\'s a mistake, contact the office below.';
 
   @override
+  String get deactivatedBackToSignIn => 'Back to sign in';
+
+  @override
   String get pausedTitle => 'Juvi is paused';
 
   @override

@@ -120,7 +120,7 @@ final class SettingsControllerProvider
 }
 
 String _$settingsControllerHash() =>
-    r'4d297feba5c290f4a6b3da765e6b19af3ecc0add';
+    r'53c2da368f862e21ab1e71198b32bb649450bbfd';
 
 /// Optimistic settings with an offline queue (spec §11 pending actions).
 
