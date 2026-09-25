@@ -9,6 +9,8 @@ export interface IUser extends Document {
   personaType: string;
   personId?: mongoose.Types.ObjectId;
   isActive: boolean;
+  mustChangePassword: boolean;
+  passwordChangedAt?: Date;
 }
 
 const userSchema = new Schema<IUser>(
@@ -21,6 +23,8 @@ const userSchema = new Schema<IUser>(
     personaType: { type: String, required: true, default: 'L-PRIN' },
     personId: { type: Schema.Types.ObjectId, ref: 'Person' },
     isActive: { type: Boolean, default: true },
+    mustChangePassword: { type: Boolean, default: false },
+    passwordChangedAt: { type: Date },
   },
   { timestamps: true },
 );

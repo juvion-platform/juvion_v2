@@ -18,3 +18,6 @@ package-lock.json
 test-results/
 playwright-report/
 playwright/.cache/
+# Claude Code worktrees (scratch checkouts) and superpowers scratch
+.claude/worktrees/
+.superpowers/

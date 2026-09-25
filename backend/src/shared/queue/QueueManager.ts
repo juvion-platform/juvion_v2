@@ -136,4 +136,8 @@ export const QUEUE_NAMES = {
   FEE_COMMITMENT: 'finance_fee_commitment',
   FEE_PIN_AUDIT: 'finance_fee_pin_audit',
   FEE_ALERTS_CRON: 'finance_fee_alerts_cron',
+
+  // Juvi mobile app
+  JUVI_PROVISIONING: 'juvi_provisioning',
+  JUVI_RECONCILE: 'juvi_reconcile',
 } as const;

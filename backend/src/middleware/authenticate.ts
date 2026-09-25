@@ -28,6 +28,10 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev-secret') as any;
+    // Juvi mobile tokens share JWT_SECRET but are never valid on ERP routes.
+    if ((decoded as { typ?: string }).typ === 'mobile') {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
     req.user = decoded;
 
     // Only super_admin can use x-college-id header to scope into another college

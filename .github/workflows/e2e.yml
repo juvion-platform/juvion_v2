@@ -61,6 +61,11 @@ jobs:
       # (app.ts:55) doesn't exit when run with NODE_ENV=production below.
       # The e2e suite never actually invokes the payment-webhook path.
       PAYMENT_WEBHOOK_SECRET: 'ci-dummy-webhook-secret'
+      # Dummy Juvi credential key (32 bytes of 0x01, base64) so the Juvi
+      # startup guard (modules/juvi-app/startup-guard.ts, wired in app.ts)
+      # doesn't exit under NODE_ENV=production. The e2e suite never
+      # decrypts a real temporary password with it.
+      JUVI_CREDENTIAL_KEY: 'AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE='
       E2E_BASE_URL: http://localhost:5173
       E2E_BACKEND_URL: http://localhost:3003
       # Skip rate-limiting so serial Playwright login flows do not trip
