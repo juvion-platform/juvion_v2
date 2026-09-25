@@ -194,7 +194,7 @@ Use `POST /api/finance/students/:id/transfer-programme` instead — payload is `
 
 ### Student bulk import
 
-Two doors onto one engine. `/platform/bulk-imports` serves all five entity types and needs `platform:create` (admin/principal only). `/api/people/students/import/{template,preview,commit}` is a `people`-gated façade over the same `bulk-import-service`, so a Registrar (`ST-REG`) — who owns student records but holds no `platform` access — can actually use it. The FE entry point is the import drawer on `/people/students`.
+Two doors onto one engine. `/platform/bulk-imports` serves all five entity types and needs `platform:create` (admin/principal only). `/api/people/students/import/{template,preview,commit}` is a `people`-gated façade over the same `bulk-import-service`, so a Registrar (`ST-REG`) — who owns student records but holds no `platform:create` (only the staff-wide `*:read` fallback) — can actually use it. The FE entry point is the import drawer on `/people/students`.
 
 - Template headers are `fieldKey`, with a trailing `*` on mandatory columns. `normalizeImportHeader` (`bulk-import-service.ts`) strips it on upload. **Two-way contract** — change one side and template files stop importing.
 - Schemas live in `backend/src/modules/platform/import-schemas/`. Adding an entity type is one registry entry.
@@ -205,6 +205,8 @@ Two doors onto one engine. `/platform/bulk-imports` serves all five entity types
 ### Juvi mobile app — `backend/src/modules/juvi-app/`
 
 The student/faculty Flutter app (`mobile/`) talks to `/api/juvi-app/v1`, **not** to the ERP routes. Spec: `docs/superpowers/specs/2026-09-23-juvi-foundation-design.md`.
+
+**Admin console** (`backend/src/modules/juvi-app/admin/`, mounted at `/api/juvi-app/admin` ahead of the mobile 404 catch-all) is the ERP side of Juvi: it uses the ERP chain `authenticate` → `authorize('platform', read | create | update)` and the ERP `{ error: string }` shape with its own `errorHandler` and 404 catch-all as its last two middlewares — never the mobile envelope. Reads use `read`; run creation, the credentials CSV and reveal-credential (anything that exposes a temporary password) use `create`; settings, deactivate, reset-password and manual reconcile use `update`. Because `DEFAULT_POLICIES` gives every `staff` persona a `*:read` fallback, any staff member can read settings, runs, account lists and channels; only `platform:create` opens the secrets. Controllers validate with `schema.parse`, which the shared `errorHandler` now renders as `{ error: 'Validation failed', details }`. The portal area is `/platform/juvi` (`pages/platform/JuviAdminPage.tsx`, tabs under `components/platform/juvi/`, client `services/juvi-app.ts`); every mutation there wraps its service call (React Query 5.96 passes a second argument) and opts out of the global toast cache with `meta: { silent, silentError }` when it toasts itself.
 
 - Own auth: `authenticateMobile` (15-min JWT with `typ: 'mobile'` + per-device `MobileSession` checked in Redis). Mobile routes never use `authorize()`; permission is per channel membership.
 - Own error envelope `{ error: { code, message } }` via `MobileApiError`; controllers call `schema.parse(req.body)` themselves instead of `validate()`.
@@ -278,7 +280,7 @@ Gate guardrails:
 
 ## E2E Testing
 
-The `e2e/` workspace runs Playwright against a live backend + portal. CI workflow (`.github/workflows/e2e.yml`) seeds three test users (`e2e_super@juvion.test`, `e2e_principal@juvion.test`, `e2e_registrar@juvion.test` — the last a `staff` / `ST-REG` persona, so `people`-gated surfaces are exercised by a persona that holds no `platform` access) plus all `DEFAULT_POLICIES` via `npm run seed:e2e-users -w backend` before launching the browser. Test fixtures share an `auth-fixture.ts` `loginAs(role)` helper. Render-only tests prefer accessible queries (`getByLabel`, `getByRole`, `getByTestId`) over class names — class churn shouldn't break the suite.
+The `e2e/` workspace runs Playwright against a live backend + portal. CI workflow (`.github/workflows/e2e.yml`) seeds three test users (`e2e_super@juvion.test`, `e2e_principal@juvion.test`, `e2e_registrar@juvion.test` — the last a `staff` / `ST-REG` persona, so `people`-gated surfaces are exercised by a persona that holds `platform:read` only via the staff-wide `*:read` fallback and no `platform:create` or `platform:update`) plus all `DEFAULT_POLICIES` via `npm run seed:e2e-users -w backend` before launching the browser. Test fixtures share an `auth-fixture.ts` `loginAs(role)` helper. Render-only tests prefer accessible queries (`getByLabel`, `getByRole`, `getByTestId`) over class names — class churn shouldn't break the suite.
 
 Discipline notes (per the Phase A spec at `.captain/specs/playwright-e2e/spec.md`):
 - **Zero retries**. Flake-free is a hard acceptance criterion; retries hide drift.

@@ -15,7 +15,7 @@ import { createAuditLog } from '../../../shared/audit';
 import { generateTemporaryPassword } from './temp-password';
 import { storeCredential } from './credential-store';
 import { revokeOtherSessions } from './session-service';
-import { getJuviConfig } from '../config/institution-config';
+import { getJuviConfig, normalizeJuviConfig } from '../config/institution-config';
 import { MobileApiError, notFound } from '../errors';
 
 export interface ProvisionPersonInput {
@@ -130,7 +130,7 @@ export async function provisionPerson(input: ProvisionPersonInput): Promise<Prov
     await user.save();
   }
 
-  const quiet = college.juvi?.quietHoursDefault ?? { start: '22:00', end: '07:00' };
+  const quiet = normalizeJuviConfig(college.juvi).quietHoursDefault;
   const account = await JuviAccount.create({
     collegeId: input.collegeId,
     personId: input.personId,
