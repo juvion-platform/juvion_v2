@@ -34,6 +34,7 @@ import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
 import { User } from '../models/User';
+import { College } from '../models/College';
 import { AcademicYear } from '../models/academic-structure/AcademicYear';
 import { seedPolicies } from '../shared/seed/policies';
 
@@ -43,6 +44,22 @@ export const E2E_TEST_PASSWORD = 'E2ETestPassword!';
 
 const E2E_COLLEGE_ID = process.env.DEV_COLLEGE_ID || '000000000000000000000001';
 const E2E_ACADEMIC_YEAR_CODE = 'E2E-AY';
+
+/** The Playwright stack needs a College row for the e2e college id; settings and Juvi read it. */
+async function seedE2ECollege(collegeId: string): Promise<void> {
+  await College.updateOne(
+    { _id: collegeId },
+    {
+      $setOnInsert: {
+        _id: collegeId, name: 'E2E College', code: 'E2E',
+        address: { line1: '1 Test Road', city: 'Hyderabad', state: 'Telangana', pincode: '500001' },
+        contactEmail: 'e2e@juvion.test', contactPhone: '9000000000',
+        subscription: { plan: 'premium', status: 'active' }, status: 'active',
+      },
+    },
+    { upsert: true },
+  );
+}
 
 /**
  * The e2e college needs exactly ONE current academic year, or student import
@@ -194,6 +211,7 @@ async function main() {
   console.log(`[seed-e2e-users] connecting to ${mongoUri}`);
   await mongoose.connect(mongoUri);
   try {
+    await seedE2ECollege(E2E_COLLEGE_ID);
     const userResult = await seedE2EUsers();
     // RBAC default policies are required for `authorize()` to grant access.
     // Without them every authenticated request 403s and the e2e suite fails
