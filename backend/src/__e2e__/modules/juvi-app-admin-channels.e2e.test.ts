@@ -6,6 +6,8 @@ import { createTestApi, TestApi } from '../helpers/request';
 import { enableJuvi, provisionTestStudent } from '../factories/juvi.factory';
 import { reconcileCollege } from '../../modules/juvi-app/spaces/reconcile-service';
 import { Channel } from '../../models/juvi/Channel';
+import { College } from '../../models/College';
+import { invalidateJuviConfig } from '../../modules/juvi-app/config/institution-config';
 
 let app: Express; let api: TestApi; let fx: BaseFixtures;
 const A = '/api/juvi-app/admin';
@@ -33,4 +35,11 @@ describe('admin channels', () => {
     for (let i = 0; i < 50 && (await Channel.countDocuments({ collegeId: fx.collegeId })) < 4; i++) await new Promise((r) => setTimeout(r, 100));
     expect(await Channel.countDocuments({ collegeId: fx.collegeId })).toBe(4);
   }, 15_000);
+
+  it('POST /reconcile is refused while Juvi is disabled (409)', async () => {
+    await College.updateOne({ _id: fx.collegeId }, { $set: { 'juvi.enabled': false } });
+    await invalidateJuviConfig(fx.collegeId);
+    const res = await api.as(fx.admin.token).post(`${A}/reconcile`).expect(409);
+    expect(res.body).toEqual({ error: 'Enable Juvi in Settings before provisioning' });
+  });
 });

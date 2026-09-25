@@ -16,14 +16,10 @@ export interface JuviConfigView extends IJuviConfig {
 /** The lean projection both readers select: `name code logo status juvi`. */
 type CollegeConfigLean = Pick<ICollege, 'name' | 'code' | 'logo' | 'status'> & { _id: Types.ObjectId; juvi?: Partial<IJuviConfig> };
 
-function toView(doc: CollegeConfigLean): JuviConfigView {
-  const j: Partial<IJuviConfig> = doc.juvi ?? {};
+/** Fills every IJuviConfig default so lean reads of pre-Juvi or partially-written Colleges are safe. */
+export function normalizeJuviConfig(raw: Partial<IJuviConfig> | undefined): IJuviConfig {
+  const j: Partial<IJuviConfig> = raw ?? {};
   return {
-    collegeId: String(doc._id),
-    name: doc.name,
-    code: doc.code,
-    logo: doc.logo,
-    collegeStatus: doc.status,
     enabled: Boolean(j.enabled),
     paused: Boolean(j.paused),
     pausedMessage: j.pausedMessage,
@@ -32,7 +28,18 @@ function toView(doc: CollegeConfigLean): JuviConfigView {
     quietHoursDefault: j.quietHoursDefault ?? { start: '22:00', end: '07:00' },
     minAppVersion: j.minAppVersion,
     timezone: j.timezone ?? 'Asia/Kolkata',
-    featureFlags: j.featureFlags ?? { languageRoadmap: false },
+    featureFlags: { languageRoadmap: Boolean(j.featureFlags?.languageRoadmap) },
+  };
+}
+
+function toView(doc: CollegeConfigLean): JuviConfigView {
+  return {
+    collegeId: String(doc._id),
+    name: doc.name,
+    code: doc.code,
+    logo: doc.logo,
+    collegeStatus: doc.status,
+    ...normalizeJuviConfig(doc.juvi),
   };
 }
 

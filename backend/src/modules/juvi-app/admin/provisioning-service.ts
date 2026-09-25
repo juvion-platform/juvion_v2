@@ -44,17 +44,22 @@ export async function credentialGroups(collegeId: string, runId: string): Promis
   const byDept = count('departmentId');
   const depts = await Department.find({ collegeId, _id: { $in: [...byDept.keys()].filter(Boolean) } }).select('name').lean();
   for (const [id, n] of byDept) if (id) groups.push({ key: 'department', id, label: depts.find((d) => String(d._id) === id)?.name ?? '?', count: n });
-  return { expiresAt: run.credentialsExpireAt ?? null, live: rows.length > 0, groups };
+  const live = Boolean(run.credentialsExpireAt && run.credentialsExpireAt > new Date()) && rows.length > 0;
+  return { expiresAt: run.credentialsExpireAt ?? null, live, groups };
 }
+
+export interface CredentialsFilter { sectionId?: string; batchId?: string; departmentId?: string; unsectioned?: 'true' }
 
 const csvCell = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
 
 export async function credentialsCsv(
-  collegeId: string, runId: string, filter: { sectionId?: string; batchId?: string; departmentId?: string }, performedBy: string,
+  collegeId: string, runId: string, filter: CredentialsFilter, performedBy: string,
 ): Promise<string> {
   const run = await getRun(collegeId, runId);
   const q: Record<string, unknown> = { collegeId, runId: run._id, expiresAt: { $gt: new Date() } };
-  if (filter.sectionId) q.sectionId = new Types.ObjectId(filter.sectionId);
+  // `unsectioned` and `sectionId` are mutually exclusive (the schema refuses both).
+  if (filter.unsectioned === 'true') q.sectionId = null;
+  else if (filter.sectionId) q.sectionId = new Types.ObjectId(filter.sectionId);
   if (filter.batchId) q.batchId = new Types.ObjectId(filter.batchId);
   if (filter.departmentId) q.departmentId = new Types.ObjectId(filter.departmentId);
   const rows = await JuviProvisionedCredential.find(q).sort({ identifier: 1 }).lean();

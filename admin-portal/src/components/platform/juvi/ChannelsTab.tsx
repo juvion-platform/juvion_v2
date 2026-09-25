@@ -4,7 +4,8 @@ import { listChannels, listTemplates } from '../../../services/juvi-app';
 
 export default function ChannelsTab() {
   const [status, setStatus] = useState<'active' | 'archived'>('active');
-  const channels = useQuery({ queryKey: ['juvi-channels', status], queryFn: () => listChannels(status, 1, 100) });
+  const [page, setPage] = useState(1);
+  const channels = useQuery({ queryKey: ['juvi-channels', status, page], queryFn: () => listChannels(status, page, 100) });
   const templates = useQuery({ queryKey: ['juvi-templates'], queryFn: listTemplates });
 
   return (
@@ -14,7 +15,7 @@ export default function ChannelsTab() {
           <h3 className="font-semibold text-navy">Channels <span className="text-gray-500 font-normal text-sm">· {channels.data?.total ?? 0}</span></h3>
           <div className="inline-flex rounded-lg border overflow-hidden text-sm">
             {(['active', 'archived'] as const).map((s) => (
-              <button key={s} type="button" onClick={() => setStatus(s)} className={`px-3 py-1.5 capitalize ${status === s ? 'bg-primary-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}>{s}</button>
+              <button key={s} type="button" onClick={() => { setStatus(s); setPage(1); }} className={`px-3 py-1.5 capitalize ${status === s ? 'bg-primary-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}>{s}</button>
             ))}
           </div>
         </div>
@@ -39,6 +40,13 @@ export default function ChannelsTab() {
             </tbody>
           </table>
         </div>
+        {channels.data && channels.data.pages > 1 && (
+          <div className="flex items-center justify-end gap-2 text-sm">
+            <button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)} className="px-2 py-1 border rounded disabled:opacity-50">Previous</button>
+            <span>Page {channels.data.page} of {channels.data.pages}</span>
+            <button type="button" disabled={page >= channels.data.pages} onClick={() => setPage(page + 1)} className="px-2 py-1 border rounded disabled:opacity-50">Next</button>
+          </div>
+        )}
       </section>
 
       <section className="space-y-3">

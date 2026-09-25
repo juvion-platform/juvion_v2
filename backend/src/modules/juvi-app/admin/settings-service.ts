@@ -4,7 +4,7 @@ import { AppError } from '../../../middleware/errorHandler';
 import { createAuditLog } from '../../../shared/audit';
 import { FieldChange } from '../../../shared/types';
 import { seedChannelTemplates } from '../../../shared/seed/channel-templates';
-import { invalidateJuviConfig } from '../config/institution-config';
+import { getJuviConfig, invalidateJuviConfig, normalizeJuviConfig } from '../config/institution-config';
 import { getLastReconcile, ReconcileSummary } from '../spaces/reconcile-service';
 import { enqueueReconcile } from '../spaces/reconcile-worker';
 import { settingsUpdateSchema } from './schemas';
@@ -18,7 +18,23 @@ export interface AdminSettingsView {
 async function view(collegeId: string): Promise<AdminSettingsView> {
   const c = await College.findById(collegeId).select('name code juvi').lean();
   if (!c) throw new AppError(404, 'College not found');
-  return { juvi: c.juvi, college: { name: c.name, code: c.code }, lastReconcile: await getLastReconcile(collegeId) };
+  return { juvi: normalizeJuviConfig(c.juvi), college: { name: c.name, code: c.code }, lastReconcile: await getLastReconcile(collegeId) };
+}
+
+/** Guard for anything that provisions or reconciles: Juvi stays inert until an admin enables it. */
+export async function assertJuviEnabled(collegeId: string): Promise<void> {
+  const cfg = await getJuviConfig(collegeId);
+  if (!cfg?.enabled) throw new AppError(409, 'Enable Juvi in Settings before provisioning');
+}
+
+/** Reads a dotted path out of a plain object, returning undefined when any step is missing. */
+function valueAt(root: unknown, path: string[]): unknown {
+  let cur: unknown = root;
+  for (const k of path) {
+    if (cur === null || typeof cur !== 'object') return undefined;
+    cur = (cur as Record<string, unknown>)[k];
+  }
+  return cur;
 }
 
 export async function getSettings(collegeId: string): Promise<AdminSettingsView> {
@@ -48,7 +64,7 @@ export async function updateSettings(collegeId: string, patch: z.infer<typeof se
   await invalidateJuviConfig(collegeId);
 
   const changes: FieldChange[] = Object.entries(set).map(([field, newValue]) => ({
-    field, displayName: field.replace('juvi.', 'Juvi '), oldValue: field.split('.').slice(1).reduce<any>((o, k) => o?.[k], before.juvi), newValue,
+    field, displayName: field.replace('juvi.', 'Juvi '), oldValue: valueAt(before.juvi, field.split('.').slice(1)), newValue,
   }));
   await createAuditLog({ collegeId, entityType: 'College', entityId: collegeId, entityName: before.name, action: 'update', changes, performedBy });
 

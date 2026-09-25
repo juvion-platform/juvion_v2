@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Plus } from 'lucide-react';
-import { listRuns, type ProvisioningRun } from '../../../services/juvi-app';
+import { getJuviSettings, listRuns, type ProvisioningRun } from '../../../services/juvi-app';
 import { useAuthStore } from '../../../stores/authStore';
 import NewRunForm from './NewRunForm';
 import RunsTable from './RunsTable';
@@ -13,6 +13,9 @@ type Mode = { kind: 'list' } | { kind: 'new' } | { kind: 'run'; run: Provisionin
 export default function ProvisioningTab() {
   const canCreate = useAuthStore((s) => s.hasPermission('platform', 'create'));
   const [mode, setMode] = useState<Mode>({ kind: 'list' });
+  // Shares its cache with the Settings tab, so enabling Juvi there reveals "New run" here.
+  const settings = useQuery({ queryKey: ['juvi-admin-settings'], queryFn: getJuviSettings });
+  const enabled = Boolean(settings.data?.juvi.enabled);
   const runs = useQuery({
     queryKey: ['juvi-runs'], queryFn: () => listRuns(1, 20),
     refetchInterval: (q) => (q.state.data?.items.some((r) => r.status === 'queued' || r.status === 'running') ? 3000 : false),
@@ -23,7 +26,10 @@ export default function ProvisioningTab() {
       <section className="space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold text-navy">Provisioning runs</h3>
-          {mode.kind === 'list' && canCreate && (
+          {mode.kind === 'list' && canCreate && settings.data && !enabled && (
+            <p className="text-sm text-gray-500">Enable Juvi in Settings to start provisioning.</p>
+          )}
+          {mode.kind === 'list' && canCreate && enabled && (
             <button type="button" onClick={() => setMode({ kind: 'new' })} className="inline-flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700"><Plus size={16} /> New run</button>
           )}
           {mode.kind !== 'list' && (

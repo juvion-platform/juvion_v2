@@ -21,6 +21,26 @@ describe('admin settings', () => {
     expect(res.body.lastReconcile).toBeNull();
   });
 
+  it('GET returns full defaults for a college whose juvi subdocument is missing (pre-Juvi record)', async () => {
+    await College.updateOne({ _id: fx.collegeId }, { $unset: { juvi: 1 } });
+    const res = await api.as(fx.admin.token).get(`${A}/settings`).expect(200);
+    expect(res.body.juvi.enabled).toBe(false);
+    expect(res.body.juvi).toMatchObject({ paused: false, quietHoursDefault: { start: '22:00', end: '07:00' }, timezone: 'Asia/Kolkata', featureFlags: { languageRoadmap: false } });
+  });
+
+  it('PUT refuses a non-IANA timezone and accepts an IANA one', async () => {
+    const bad = await api.as(fx.admin.token).put(`${A}/settings`).send({ timezone: 'IST' }).expect(400);
+    expect(JSON.stringify(bad.body)).toMatch(/IANA timezone/);
+    const ok = await api.as(fx.admin.token).put(`${A}/settings`).send({ timezone: 'Asia/Kolkata' }).expect(200);
+    expect(ok.body.juvi.timezone).toBe('Asia/Kolkata');
+  });
+
+  it('PUT clears the support contact with null', async () => {
+    await api.as(fx.admin.token).put(`${A}/settings`).send({ supportContact: { name: 'Office' } }).expect(200);
+    const res = await api.as(fx.admin.token).put(`${A}/settings`).send({ supportContact: null }).expect(200);
+    expect(res.body.juvi.supportContact ?? null).toBeNull();
+  });
+
   it('PUT enables Juvi, seeds templates, writes an audit row and returns the new view', async () => {
     const res = await api.as(fx.admin.token).put(`${A}/settings`).send({
       enabled: true, accentColor: '#0B5FA5', supportContact: { name: 'Office', phone: '040-1' },

@@ -26,6 +26,21 @@ describe('ChannelsTab', () => {
     expect(await screen.findByText('CS101 Old · A')).toBeInTheDocument();
   });
 
+  it('pages through channels when there are more than one page', async () => {
+    (listChannels as Mock).mockImplementation(async (_status?: string, page = 1) => ({
+      items: [{ _id: `c${page}`, name: `Channel page ${page}`, templateCode: 'course', scopeType: 'course_offering', status: 'active', memberCount: 1, replyRule: 'allowed', defaultPriority: 'routine' }],
+      total: 150, page, pages: 2,
+    }));
+    renderWithProviders(<ChannelsTab />);
+    expect(await screen.findByText('Channel page 1')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^next$/i }));
+    expect(await screen.findByText('Channel page 2')).toBeInTheDocument();
+    expect(listChannels).toHaveBeenLastCalledWith('active', 2, 100);
+    fireEvent.click(screen.getByRole('button', { name: /^archived$/i }));
+    await screen.findByText('Page 1 of 2');
+    expect(listChannels).toHaveBeenLastCalledWith('archived', 1, 100);
+  });
+
   it('shows the templates read-only with a note about editing', async () => {
     renderWithProviders(<ChannelsTab />);
     expect(await screen.findByText('{{college.name}}')).toBeInTheDocument();

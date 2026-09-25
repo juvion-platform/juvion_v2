@@ -6,6 +6,7 @@ import { ChannelTemplate } from '../../../models/juvi/ChannelTemplate';
 import { paginate } from '../../../shared/pagination';
 import { enqueueReconcile } from '../spaces/reconcile-worker';
 import { pageQuerySchema } from './schemas';
+import { assertJuviEnabled } from './settings-service';
 
 const channelsQuery = pageQuerySchema.extend({ status: z.enum(['active', 'archived']).optional() });
 const TEMPLATE_ORDER = ['college', 'department', 'batch', 'course', 'hostel'];
@@ -28,5 +29,5 @@ export async function listTemplates(req: AuthRequest, res: Response, next: NextF
 }
 
 export async function reconcileNow(req: AuthRequest, res: Response, next: NextFunction) {
-  try { await enqueueReconcile(req.collegeId!); res.status(202).json({ queued: true }); } catch (e) { next(e); }
+  try { await assertJuviEnabled(req.collegeId!); await enqueueReconcile(req.collegeId!); res.status(202).json({ queued: true }); } catch (e) { next(e); }
 }

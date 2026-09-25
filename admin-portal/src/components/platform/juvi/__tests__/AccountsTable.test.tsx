@@ -42,8 +42,12 @@ describe('AccountsTable', () => {
   it('confirms before deactivate and before reset', async () => {
     renderWithProviders(<AccountsTable />);
     await screen.findByText('Aditya Nair');
+    fireEvent.click(screen.getByRole('button', { name: /reveal credential for aditya nair/i }));
+    expect(await screen.findByText('river-lamp-482')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /reset password for aditya nair/i }));
     await waitFor(() => expect(resetAccountPassword).toHaveBeenCalledWith('a1'));
+    // The old password is no longer valid once reset, so it must not stay on screen.
+    await waitFor(() => expect(screen.queryByText('river-lamp-482')).toBeNull());
     confirmMock.confirmed = false;
     fireEvent.click(screen.getByRole('button', { name: /deactivate aditya nair/i }));
     await waitFor(() => expect(deactivateAccount).not.toHaveBeenCalled());

@@ -7,12 +7,15 @@ import { Person, Student, Section } from '../../models';
 import { JuviProvisioningRun } from '../../models/juvi/JuviProvisioningRun';
 import { JuviProvisionedCredential } from '../../models/juvi/JuviProvisionedCredential';
 import { AuditLog } from '../../shared/audit';
+import { College } from '../../models/College';
+import { invalidateJuviConfig } from '../../modules/juvi-app/config/institution-config';
 import { runProvisioningJob } from '../../modules/juvi-app/accounts/provisioning-worker';
+import { enableJuvi } from '../factories/juvi.factory';
 
 let app: Express; let api: TestApi; let fx: BaseFixtures;
 const A = '/api/juvi-app/admin';
 beforeAll(async () => { app = await getTestApp(); api = createTestApi(app); });
-beforeEach(async () => { await cleanupTestApp(); fx = await seedBase(); });
+beforeEach(async () => { await cleanupTestApp(); fx = await seedBase(); await enableJuvi(fx.collegeId); });
 afterAll(async () => { await cleanupTestApp(); });
 
 async function studentNoUser(roll: string, sectionId?: unknown) {
@@ -71,9 +74,30 @@ describe('provisioning runs', () => {
     expect(lines[1]).toMatch(/^24D00[12],S 24D00[12],A,[a-z]+-[a-z]+-\d{3},JIT-TEST$/);
     expect(await AuditLog.countDocuments({ entityType: 'JuviProvisioningRun', entityId: String(run._id), action: 'update' })).toBe(1);
 
+    const none = await api.as(fx.admin.token).get(`${A}/provisioning/runs/${run._id}/credentials.csv?unsectioned=true`).expect(200);
+    expect(none.headers['content-disposition']).toMatch(/filename="juvi-credentials-[0-9a-f]{6}-unsectioned\.csv"/);
+    const noneLines = none.text.trim().split('\n');
+    expect(noneLines).toHaveLength(2);
+    expect(noneLines[1]?.split(',')[0]).toBe('24D003');
+    await api.as(fx.admin.token).get(`${A}/provisioning/runs/${run._id}/credentials.csv?unsectioned=true&sectionId=${fx.cseSection._id}`).expect(400);
+
     await JuviProvisionedCredential.deleteMany({ runId: run._id });   // simulate TTL expiry
     const gone = await api.as(fx.admin.token).get(`${A}/provisioning/runs/${run._id}/credentials.csv`).expect(410);
     expect(gone.body.error).toMatch(/expired/i);
+  });
+
+  it('POST refuses to create a run while Juvi is disabled (409)', async () => {
+    await College.updateOne({ _id: fx.collegeId }, { $set: { 'juvi.enabled': false } });
+    await invalidateJuviConfig(fx.collegeId);
+    const res = await api.as(fx.admin.token).post(`${A}/provisioning/runs`).send({ kinds: ['student'] }).expect(409);
+    expect(res.body).toEqual({ error: 'Enable Juvi in Settings before provisioning' });
+    expect(await JuviProvisioningRun.countDocuments({ collegeId: fx.collegeId })).toBe(0);
+  });
+
+  it('a malformed run id is a 400, not a 500', async () => {
+    await api.as(fx.admin.token).get(`${A}/provisioning/runs/not-an-id`).expect(400);
+    await api.as(fx.admin.token).get(`${A}/provisioning/runs/not-an-id/credential-groups`).expect(400);
+    await api.as(fx.admin.token).get(`${A}/provisioning/runs/not-an-id/credentials.csv`).expect(400);
   });
 
   it('reads are allowed for any platform reader (RBAC is a pass-through in this harness)', async () => {

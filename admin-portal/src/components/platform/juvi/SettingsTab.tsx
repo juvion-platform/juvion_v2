@@ -31,7 +31,9 @@ function diff(form: Form, base: Form): JuviSettingsPatch {
   if (form.pausedMessage !== base.pausedMessage) p.pausedMessage = form.pausedMessage;
   if (form.accentColor !== base.accentColor) p.accentColor = form.accentColor === '' ? null : form.accentColor;
   if (form.contactName !== base.contactName || form.contactPhone !== base.contactPhone || form.contactEmail !== base.contactEmail) {
-    p.supportContact = { name: form.contactName, ...(form.contactPhone ? { phone: form.contactPhone } : {}), ...(form.contactEmail ? { email: form.contactEmail } : {}) };
+    // Blanking the name of an existing contact clears it; the backend accepts null.
+    if (!form.contactName.trim() && base.contactName) p.supportContact = null;
+    else p.supportContact = { name: form.contactName, ...(form.contactPhone ? { phone: form.contactPhone } : {}), ...(form.contactEmail ? { email: form.contactEmail } : {}) };
   }
   if (form.quietStart !== base.quietStart || form.quietEnd !== base.quietEnd) p.quietHoursDefault = { start: form.quietStart, end: form.quietEnd };
   if (form.minAndroid !== base.minAndroid || form.minIos !== base.minIos) {
@@ -39,6 +41,17 @@ function diff(form: Form, base: Form): JuviSettingsPatch {
   }
   if (form.timezone !== base.timezone) p.timezone = form.timezone;
   return p;
+}
+
+const FALLBACK_ZONES = ['Asia/Kolkata'];
+/** IANA zones for the picker; `current` is always included so a saved value is never lost. */
+function timeZoneOptions(current: string): string[] {
+  let zones: string[];
+  try { zones = Intl.supportedValuesOf('timeZone'); } catch { zones = FALLBACK_ZONES; }
+  // ICU lists canonical names only (Asia/Calcutta), so keep the documented default visible too.
+  const all = new Set([...zones, ...FALLBACK_ZONES]);
+  if (current) all.add(current);
+  return [...all].sort();
 }
 
 function validate(form: Form): Record<string, string> {
@@ -134,7 +147,9 @@ export default function SettingsTab() {
           </div>
           <div>
             <label htmlFor="timezone" className={lbl}>Timezone</label>
-            <input id="timezone" className={inp} value={form.timezone} onChange={(e) => set('timezone', e.target.value)} disabled={fieldsDisabled} />
+            <select id="timezone" className={inp} value={form.timezone} onChange={(e) => set('timezone', e.target.value)} disabled={fieldsDisabled}>
+              {timeZoneOptions(form.timezone).map((tz) => <option key={tz} value={tz}>{tz}</option>)}
+            </select>
           </div>
           <div>
             <label htmlFor="contactName" className={lbl}>Support contact name</label>

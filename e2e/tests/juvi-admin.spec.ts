@@ -30,7 +30,7 @@ test.describe('Platform — Juvi mobile app', () => {
     await page.getByRole('button', { name: /^new run$/i }).click();
     await page.getByRole('button', { name: /^start run$/i }).click();
     await expect(page.getByText(/^run [0-9a-f]{6}$/i)).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText(/completed|partial|queued|running/i).first()).toBeVisible();
+    await expect(page.getByText(/^\s*(completed|partial|queued|running)\s*$/i)).toBeVisible();
 
     await page.getByRole('link', { name: /^channels$/i }).click();
     await expect(page).toHaveURL(/\/platform\/juvi\/channels$/);
@@ -38,7 +38,7 @@ test.describe('Platform — Juvi mobile app', () => {
     await expect(page.getByText('{{college.name}}')).toBeVisible({ timeout: 10_000 });
   });
 
-  test('registrar (no platform access) cannot manage Juvi settings', async ({ page, loginAs }) => {
+  test('registrar has read-only access to Juvi settings', async ({ page, loginAs }) => {
     // Neither of the brief's two anticipated shapes holds here, and both were
     // checked against the live stack (not assumed) before landing on this body:
     //

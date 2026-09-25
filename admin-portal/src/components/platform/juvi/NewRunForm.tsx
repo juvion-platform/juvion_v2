@@ -13,7 +13,8 @@ export default function NewRunForm({ onCreated, onCancel }: { onCreated: (run: P
   const [programmeId, setProgrammeId] = useState('');
   const [batchId, setBatchId] = useState('');
   const [departmentId, setDepartmentId] = useState('');
-  const [reset, setReset] = useState(true);
+  // Off by default (R38): the User is shared with the ERP web login, so a reset also changes the portal password.
+  const [reset, setReset] = useState(false);
 
   // services/academics exports `list*(page = 1, limit = 20, search?)`; 200 covers any college's structure.
   const programmes = useQuery({ queryKey: ['programmes', 'all'], queryFn: () => listProgrammes(1, 200) });
@@ -77,7 +78,7 @@ export default function NewRunForm({ onCreated, onCancel }: { onCreated: (run: P
       </div>
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" checked={reset} onChange={(e) => setReset(e.target.checked)} />
-        Reset passwords of people who already have a login (they have never used Juvi; recommended)
+        Reset passwords of people who already have a login. This also replaces their ERP portal password — they will need the new temporary password to sign in anywhere.
       </label>
       <p className="text-xs text-gray-500">Temporary passwords are stored encrypted for 7 days. Export them per section from the run once it completes.</p>
       <div className="flex justify-end gap-2">

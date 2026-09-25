@@ -50,6 +50,18 @@ describe('SettingsTab', () => {
     expect(updateJuviSettings).not.toHaveBeenCalled();
   });
 
+  it('uses a timezone picker that keeps the saved zone, and clears a blanked support contact', async () => {
+    (getJuviSettings as Mock).mockResolvedValue({ ...VIEW, juvi: { ...VIEW.juvi, supportContact: { name: 'Office', phone: '040-1' } } });
+    renderWithProviders(<SettingsTab />);
+    const tz = await screen.findByLabelText(/^timezone$/i);
+    expect(tz.tagName).toBe('SELECT');
+    expect(tz).toHaveValue('Asia/Kolkata');
+    fireEvent.change(screen.getByLabelText(/support contact name/i), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText(/support phone/i), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: /^save settings$/i }));
+    await waitFor(() => expect(updateJuviSettings).toHaveBeenCalledWith({ supportContact: null }));
+  });
+
   it('shows the last reconcile summary and triggers a manual run', async () => {
     (getJuviSettings as Mock).mockResolvedValue({ ...VIEW, juvi: { ...VIEW.juvi, enabled: true }, lastReconcile: { at: '2026-09-23T03:00:00Z', durationMs: 1234, skipped: false, channels: { total: 42, created: 1, archived: 0, unarchived: 0 }, memberships: { added: 10, removed: 2, roleChanged: 0 }, errors: 0 } });
     renderWithProviders(<SettingsTab />);

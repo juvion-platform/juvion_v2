@@ -35,7 +35,9 @@ export default function CredentialsDownload({ run }: { run: ProvisioningRun }) {
       )}
       <div>
         <h4 className="text-sm font-medium text-gray-700 mb-2">Credential exports</h4>
-        {groups.data?.live === false ? (
+        {groups.data?.live === false && run.counts.created === 0 ? (
+          <p className="text-sm text-gray-500">No credentials were issued by this run.</p>
+        ) : groups.data?.live === false ? (
           <p className="text-sm text-gray-500">The temporary passwords for this run have expired. Reset a password from the accounts table to issue a new one.</p>
         ) : (
           <ul className="space-y-2">

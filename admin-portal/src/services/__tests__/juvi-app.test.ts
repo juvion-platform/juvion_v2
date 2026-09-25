@@ -25,4 +25,10 @@ describe('juvi-app service', () => {
     expect(api.get).toHaveBeenCalledWith('/juvi-app/admin/provisioning/runs/r1/credentials.csv', { params: { sectionId: 's1' }, responseType: 'blob' });
     expect(out.filename).toBe('juvi-credentials-2026-09-23.csv');
   });
+
+  it('downloadCredentialsCsv asks for unsectioned rows only for the "No section" group', async () => {
+    (api.get as any).mockResolvedValue({ data: new Blob(['x']), headers: {} });
+    await downloadCredentialsCsv('r1', { key: 'none', id: null });
+    expect(api.get).toHaveBeenCalledWith('/juvi-app/admin/provisioning/runs/r1/credentials.csv', { params: { unsectioned: 'true' }, responseType: 'blob' });
+  });
 });

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Eye, KeyRound, UserX } from 'lucide-react';
 import { listAccounts, deactivateAccount, resetAccountPassword, revealAccountCredential, type AccountKind, type AccountStatus } from '../../../services/juvi-app';
@@ -19,6 +19,11 @@ export default function AccountsTable() {
   const [page, setPage] = useState(1);
   const [revealed, setRevealed] = useState<Record<string, { password: string; expiresAt: string }>>({});
 
+  // A revealed password is only valid until the next reset/deactivation, and must not
+  // follow the admin onto another page or filter of the table.
+  const forget = (id: string) => setRevealed((r) => { const { [id]: _gone, ...rest } = r; return rest; });
+  useEffect(() => { setRevealed({}); }, [page, q, kind, status]);
+
   const query = { q, kind: kind || undefined, status: status || undefined, page, limit: 20 };
   const accounts = useQuery({ queryKey: ['juvi-accounts', query], queryFn: () => listAccounts(query) });
   const refresh = () => qc.invalidateQueries({ queryKey: ['juvi-accounts'] });
@@ -28,13 +33,13 @@ export default function AccountsTable() {
   const deactivate = useMutation({
     mutationFn: (id: string) => deactivateAccount(id),
     meta: { silent: true, silentError: true },
-    onSuccess: () => { toast.success('Account deactivated'); refresh(); },
+    onSuccess: (_res, id) => { forget(id); toast.success('Account deactivated'); refresh(); },
     onError: () => toast.error('Could not deactivate'),
   });
   const reset = useMutation({
     mutationFn: (id: string) => resetAccountPassword(id),
     meta: { silent: true, silentError: true },
-    onSuccess: () => { toast.success('Temporary password issued. Reveal it to share.'); refresh(); },
+    onSuccess: (_res, id) => { forget(id); toast.success('Temporary password issued. Reveal it to share.'); refresh(); },
     onError: () => toast.error('Could not reset the password'),
   });
   const reveal = useMutation({
@@ -56,7 +61,7 @@ export default function AccountsTable() {
   return (
     <div className="space-y-3">
       <form role="search" className="grid gap-2 sm:grid-cols-4" onSubmit={(e) => { e.preventDefault(); setPage(1); setQ(draft.trim()); }}>
-        <input aria-label="Search accounts" className={`${inp} sm:col-span-2`} placeholder="Name, roll number or employee code" value={draft} onChange={(e) => setDraft(e.target.value)} />
+        <input aria-label="Search accounts" maxLength={80} className={`${inp} sm:col-span-2`} placeholder="Name, roll number or employee code" value={draft} onChange={(e) => setDraft(e.target.value)} />
         <select aria-label="Kind" className={inp} value={kind} onChange={(e) => { setKind(e.target.value as AccountKind | ''); setPage(1); }}>
           <option value="">All kinds</option><option value="student">Students</option><option value="faculty">Faculty</option><option value="staff">Staff</option>
         </select>

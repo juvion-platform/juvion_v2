@@ -23,7 +23,10 @@ export interface ReconcileSummary {
   memberships: { added: number; removed: number; roleChanged: number }; errors: number;
 }
 export interface AdminSettingsView { juvi: JuviSettings; college: { name: string; code: string }; lastReconcile: ReconcileSummary | null }
-export type JuviSettingsPatch = Partial<Omit<JuviSettings, 'accentColor'>> & { accentColor?: string | null };
+export type JuviSettingsPatch = Partial<Omit<JuviSettings, 'accentColor' | 'supportContact'>> & {
+  accentColor?: string | null;
+  supportContact?: JuviSettings['supportContact'] | null;
+};
 
 export interface ProvisioningRun {
   _id: string; status: RunStatus;
@@ -71,6 +74,8 @@ export async function downloadCredentialsCsv(runId: string, group: { key: Creden
   if (group.key === 'section' && group.id) params.sectionId = group.id;
   if (group.key === 'batch' && group.id) params.batchId = group.id;
   if (group.key === 'department' && group.id) params.departmentId = group.id;
+  // Without this the backend treats an empty filter as "every row in the run".
+  if (group.key === 'none') params.unsectioned = 'true';
   const res = await api.get(`${BASE}/provisioning/runs/${runId}/credentials.csv`, { params, responseType: 'blob' });
   const match = /filename="([^"]+)"/.exec(String(res.headers['content-disposition'] ?? ''));
   return { blob: res.data as Blob, filename: match?.[1] ?? 'juvi-credentials.csv' };

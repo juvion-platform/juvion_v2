@@ -25,8 +25,11 @@
  *   - Local dev: `npm run seed:e2e-users -w backend`
  *   - CI:        the .github/workflows/e2e.yml workflow runs this
  *                before launching Playwright.
- *   - Playwright global-setup: imports `seedE2EUsers` directly when
- *                running the suite against a live backend.
+ *   - Playwright global-setup (e2e/tests/global-setup.ts): shells out to
+ *                the npm script above; it does not import this module.
+ *
+ * `seedE2EUsers()` also upserts the E2E College row and the current academic
+ * year, so importing callers (the unit test) and the CLI see the same state.
  */
 
 import dotenv from 'dotenv';
@@ -157,6 +160,8 @@ export interface SeedResult {
  * `updated` = rows that existed and were refreshed.
  */
 export async function seedE2EUsers(): Promise<SeedResult> {
+  // Settings and Juvi read the College row; seed it first so every entry point agrees.
+  await seedE2ECollege(E2E_COLLEGE_ID);
   const passwordHash = await bcrypt.hash(E2E_TEST_PASSWORD, 10);
 
   let created = 0;
@@ -193,8 +198,8 @@ export async function seedE2EUsers(): Promise<SeedResult> {
   }
 
   // Fee-pinning on student import needs one current academic year for the
-  // e2e college; seed it alongside the users so both the CLI and the
-  // Playwright global-setup (which import this function) get it.
+  // e2e college; seed it alongside the users so every caller of this
+  // function gets it.
   await seedE2EAcademicYear();
 
   return { created, updated, total: created + updated };
@@ -211,7 +216,6 @@ async function main() {
   console.log(`[seed-e2e-users] connecting to ${mongoUri}`);
   await mongoose.connect(mongoUri);
   try {
-    await seedE2ECollege(E2E_COLLEGE_ID);
     const userResult = await seedE2EUsers();
     // RBAC default policies are required for `authorize()` to grant access.
     // Without them every authenticated request 403s and the e2e suite fails
