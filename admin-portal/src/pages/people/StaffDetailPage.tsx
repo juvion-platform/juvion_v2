@@ -19,7 +19,7 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 export default function StaffDetailPage() {
-  const canSeeIdentity = useCanSeeClass('people', 'people.identity');
+  const canSeeAadhaar = useCanSeeClass('people', 'people.aadhaar:masked');
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: st, isLoading, error } = useQuery({
@@ -92,7 +92,7 @@ export default function StaffDetailPage() {
         <DetailField label="Phone" value={person.phone} />
         <DetailField label="Alternate Phone" value={person.alternatePhone} />
         <DetailField label="Email" value={person.email} />
-        {canSeeIdentity && <DetailField label="Aadhaar" value={person.aadhaar} mono />}
+        {canSeeAadhaar && person.aadhaar && <DetailField label="Aadhaar" value={person.aadhaar} mono />}
         <DetailField label="Preferred Language" value={person.preferredLanguage} />
         <DetailBool label="Biometric Enrolled" value={person.biometricEnrolled} />
       </DetailSection>

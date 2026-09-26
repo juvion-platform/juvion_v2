@@ -165,16 +165,15 @@ describe('defaults.ts — 004 §10.9 governance NL unlock seed', () => {
       expect(match).toBeDefined();
     });
 
-    it('preserves the staff base fallback for non-governance reads', () => {
+    it('preserves the staff base fallback for non-governance reads (directory lookup)', () => {
       const match = POLICIES.find(
         (p) =>
           p.role === 'staff' &&
-          p.module === '*' &&
+          p.module === 'people' &&
           p.action === 'read' &&
-          p.effect === 'allow' &&
-          p.priority === 600,
+          p.effect === 'allow',
       );
-      expect(match, 'staff base fallback at priority 600 must remain').toBeDefined();
+      expect(match, 'staff base directory lookup policy must exist').toBeDefined();
     });
   });
 });

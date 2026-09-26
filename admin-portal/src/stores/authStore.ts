@@ -1,6 +1,16 @@
 import { create } from 'zustand';
 
-interface User { id: string; name: string; email: string; role: string; personaType: string; personas?: string[]; }
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  personaType: string;
+  personas?: string[];
+  primaryModule?: string;
+  dashboardWidgets?: string[];
+  accessibleModules?: string[];
+}
 interface CollegeRef { _id: string; name: string; code: string; status: string; }
 
 interface AuthState {
@@ -140,6 +150,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         role: data.role,
         personaType: data.personaType,
         personas: data.personas,
+        primaryModule: data.primaryModule,
+        dashboardWidgets: data.dashboardWidgets,
+        accessibleModules: data.accessibleModules,
       };
       localStorage.setItem('user', JSON.stringify(user));
       // 010 — /auth/me carries permissions, so a policy edit lands on the next hydrate.
@@ -167,7 +180,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   // 010 P3 — undefined/null for a module means unrestricted; a list means only those classes.
   canSeeClass: (module, cls) => {
     const allowed = get().sensitivity[module];
-    return allowed == null || allowed.includes(cls);
+    if (allowed == null) return true;
+    if (allowed.includes(cls)) return true;
+    if (cls.endsWith(':masked')) {
+      const base = cls.slice(0, -7);
+      if (allowed.includes(base)) return true;
+    }
+    return false;
   },
   hasPermission: (module, action, subDomain) => {
     const perms = get().permissions;

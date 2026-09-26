@@ -134,7 +134,10 @@ export const createRbacPolicySchema = z.object({
     selfOnly: z.boolean().optional(),
     subDomain: z.string().optional(),
     assignedVia: z.array(z.enum(['mentees', 'sections', 'courses'])).optional(),
-    sensitivity: z.array(z.enum(SENSITIVITY_CLASSES)).optional(),
+    sensitivity: z.array(z.string().refine((cls) => {
+      const base = cls.endsWith(':masked') ? cls.slice(0, -7) : cls;
+      return (SENSITIVITY_CLASSES as readonly string[]).includes(base);
+    }, { message: 'Must be a valid sensitivity class or <class>:masked' })).optional(),
   }).optional(),
   priority: z.number().int().min(1).max(999),
   description: z.string().optional(),
@@ -202,6 +205,7 @@ export const createPersonaSchema = z.object({
   defaultRole: z.enum(PERSONA_ROLES),
   tier: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
   dashboardWidgets: z.array(z.string()).optional(),
+  accessibleModules: z.array(z.string()).optional(),
   permissionsHint: z.string().max(300).optional(),
   isActive: z.boolean().optional(),
 }).strict();

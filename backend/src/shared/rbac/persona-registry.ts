@@ -25,6 +25,7 @@ export interface PersonaRow {
   defaultRole: string;
   tier: number;
   dashboardWidgets?: string[];
+  accessibleModules?: string[];
   isActive: boolean;
 }
 
@@ -40,6 +41,7 @@ function catalogRows(): PersonaRow[] {
     code: p.code, label: p.label, family: p.family,
     parentCode: p.parentCode && p.parentCode !== p.code ? p.parentCode : null,
     primaryModule: p.primaryModule, defaultRole: p.defaultRole, tier: p.tier, isActive: true,
+    dashboardWidgets: p.dashboardWidgets, accessibleModules: p.accessibleModules,
   }));
 }
 
@@ -58,7 +60,7 @@ export async function loadPersonas(collegeId?: string): Promise<PersonaRow[]> {
     rows = docs.map((d) => ({
       code: d.code, label: d.label, family: d.family, parentCode: d.parentCode ?? null,
       primaryModule: d.primaryModule, defaultRole: d.defaultRole, tier: d.tier,
-      dashboardWidgets: d.dashboardWidgets, isActive: d.isActive,
+      dashboardWidgets: d.dashboardWidgets, accessibleModules: d.accessibleModules, isActive: d.isActive,
     }));
   } catch { /* fall through to the code catalog */ }
 
