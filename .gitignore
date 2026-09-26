@@ -21,3 +21,13 @@ playwright/.cache/
 # Claude Code worktrees (scratch checkouts) and superpowers scratch
 .claude/worktrees/
 .superpowers/
+
+# Flutter
+mobile/.dart_tool/
+mobile/build/
+mobile/.flutter-plugins-dependencies
+mobile/packages/juvi_api/.dart_tool/
+mobile/packages/juvi_api/build/
+mobile/ios/Pods/
+mobile/android/.gradle/
+mobile/android/local.properties
