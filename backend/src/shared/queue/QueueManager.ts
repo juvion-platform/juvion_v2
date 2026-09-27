@@ -140,4 +140,7 @@ export const QUEUE_NAMES = {
   // Juvi mobile app
   JUVI_PROVISIONING: 'juvi_provisioning',
   JUVI_RECONCILE: 'juvi_reconcile',
+
+  // Durable outbox (shared/outbox) — notices fan-out, reminders, ack audit
+  OUTBOX: 'platform_outbox',
 } as const;
