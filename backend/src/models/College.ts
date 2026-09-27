@@ -10,6 +10,8 @@ export interface IJuviConfig {
   minAppVersion?: { android?: string; ios?: string };
   timezone: string;
   featureFlags: { languageRoadmap: boolean };
+  /** Per-kind published `purpose: 'welcome'` notice ids, as hex strings (Juvi notices spec §5). */
+  welcomeNotice?: { studentNoticeId?: string; facultyNoticeId?: string };
 }
 
 export interface ICollege extends Document {
@@ -53,6 +55,7 @@ const juviConfigSchema = new Schema<IJuviConfig>(
     minAppVersion: { type: new Schema({ android: String, ios: String }, { _id: false }), default: undefined },
     timezone: { type: String, default: 'Asia/Kolkata' },
     featureFlags: { languageRoadmap: { type: Boolean, default: false } },
+    welcomeNotice: { type: new Schema({ studentNoticeId: String, facultyNoticeId: String }, { _id: false }), default: undefined },
   },
   { _id: false },
 );
