@@ -13,14 +13,19 @@
  *
  * R7: only `staff`, `hod` and `faculty` are ever eligible for an office,
  * headship or offerings scope — a student or parent gets `none` outright,
- * without even a Staff/Faculty lookup. And "genuinely holds" (R6b) means a
- * *currently active* employment record: the office check reads only
- * `Staff.personaCode` (the canonical persona source — see
- * `people/Staff.ts`'s doc comment; `User.personaType` is a derived cache for
- * JWTs, not authoritative) from a Staff row filtered to
- * `AUDIENCE_EMPLOYEE_STATUSES`, and the Faculty lookup for headship/offerings
- * is filtered the same way — a separated employee's stale `User.personaType`
- * or an offboarded Staff/Faculty row can never grant a scope here.
+ * without even a Staff/Faculty lookup. The Faculty lookup for headship and
+ * offerings is filtered to `AUDIENCE_EMPLOYEE_STATUSES`, so a separated
+ * Faculty row grants neither.
+ *
+ * R8: office scope needs BOTH the role gate above AND an office persona from
+ * one of two sources — `User.personaType`/`personas` (the source
+ * `authorize()` and the real provisioning path, `platform/user-service.ts`,
+ * actually grant personas through; `Staff.personaCode` is optional in Phase A,
+ * so a legitimately provisioned office holder often has no Staff row at all)
+ * or the `personaCode` of an *active* Staff row (a separated Staff row
+ * contributes nothing, even if a stale `User.personaType` still names the
+ * same office). Trusting `User.personaType`/`personas` only fires once the
+ * role gate has already passed, so a student or parent can never reach it.
  */
 import { AppError } from '../../../middleware/errorHandler';
 import { User } from '../../../models/User';
@@ -45,7 +50,7 @@ const OFFICE_ELIGIBLE_ROLES: ReadonlySet<string> = new Set(['staff', 'hod', 'fac
 const activeStatus = { status: { $in: AUDIENCE_EMPLOYEE_STATUSES } };
 
 export async function resolvePublisherScope(collegeId: string, user: ErpUserRef, officeOverride?: string): Promise<PublisherScope> {
-  const row = await User.findOne({ _id: user.id, collegeId }).select('personId').lean();
+  const row = await User.findOne({ _id: user.id, collegeId }).select('personId personaType personas').lean();
   const personId = row?.personId ? String(row.personId) : undefined;
   const base = { userId: user.id, personId, offeringIds: [] as string[], isAdmin: ADMIN_ROLES.has(user.role) };
   const none: PublisherScope = { ...base, kind: 'none', office: '' };
@@ -55,15 +60,17 @@ export async function resolvePublisherScope(collegeId: string, user: ErpUserRef,
     return { ...base, kind: 'college', office: officeOverride ?? (user.role === 'principal' ? PRINCIPAL_OFFICE : COLLEGE_OFFICE) };
   }
   // A student, parent or any other role never gets an office, headship or
-  // offerings scope, whatever their `personas` claim (R7).
+  // offerings scope, whatever `personaType`/`personas` claim (R7) — the gate
+  // below runs before either persona source is even read.
   if (!OFFICE_ELIGIBLE_ROLES.has(user.role)) return none;
 
-  // An office persona wins regardless of whether the caller's primary role is
-  // staff, hod or faculty (R6b) — but only a currently active Staff row
-  // counts, and only its own canonical `personaCode` (R7): no fallback to
-  // `User.personaType`/`personas`, which can go stale after offboarding.
+  // R8: an office persona from `User.personaType`/`personas` (what
+  // `authorize()` and real provisioning actually grant through) OR from an
+  // active Staff row's `personaCode` (Staff is optional in Phase A, and a
+  // separated Staff row contributes nothing regardless of what `User` says).
+  const codes = [...new Set([user.personaType, ...(user.personas ?? []), row?.personaType, ...(row?.personas ?? [])].filter((c): c is string => Boolean(c)))];
   const staff = personId ? await Staff.findOne({ collegeId, personId, ...activeStatus }).select('personaCode').lean() : null;
-  const office = staff?.personaCode ? officeForPersonas([staff.personaCode]) : null;
+  const office = officeForPersonas(staff?.personaCode ? [...codes, staff.personaCode] : codes);
   if (office) return { ...base, kind: 'college', office };
 
   if (user.role !== 'hod' && user.role !== 'faculty') return none;

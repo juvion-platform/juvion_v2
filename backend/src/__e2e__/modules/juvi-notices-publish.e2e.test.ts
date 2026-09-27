@@ -14,7 +14,7 @@ import { enableJuvi, provisionTestStudent, provisionTestFaculty } from '../facto
 import { createTestCourse, createTestCourseOffering, createTestEnrollment } from '../factories/academic.factory';
 import { createTestUser } from '../factories/user.factory';
 import { adminRef, erpRef, activateAccount, createStaffPublisher, makeHod, publishTestNotice } from '../factories/notice.factory';
-import { Department, Staff } from '../../models';
+import { Department, Staff, Person } from '../../models';
 import { Notice } from '../../models/juvi/Notice';
 import { NoticeRecipient } from '../../models/juvi/NoticeRecipient';
 import { Channel } from '../../models/juvi/Channel';
@@ -188,10 +188,42 @@ describe('publisher scope on preview and publish (US-1.1)', () => {
     expect(scope).toMatchObject({ kind: 'college', office: 'Exam Section', isAdmin: false });
   });
 
-  it('a separated Staff row with ST-EXAM gives no college scope, even if User.personaType still names it (R7)', async () => {
-    const exam = await createStaffPublisher(fx, 'ST-EXAM');
-    await Staff.updateOne({ _id: exam.staff._id }, { $set: { status: 'separated' } });
-    const scope = await resolvePublisherScope(fx.collegeId, erpRef(exam.user));
+  it('a separated Staff row with ST-EXAM gives no college scope, when User.personaType names no office (R7/R8)', async () => {
+    // Isolated from R8's User.personaType/personas source: this User's own
+    // persona ('ST-HR', not an office family) never grants an office, so the
+    // only way it could escalate is through the Staff row — which is separated.
+    const person = await Person.create({ collegeId: fx.collegeId, name: 'Ex Exam Officer', phone: '9600099999' });
+    const staff = await Staff.create({
+      collegeId: fx.collegeId, personId: person._id, employeeCode: 'STF-SEP-0001', designation: 'Exam Officer',
+      staffType: 'administrative', personaCode: 'ST-EXAM', status: 'separated',
+    });
+    const { user } = await createTestUser({
+      collegeId: fx.collegeId, role: 'staff', personaType: 'ST-HR', personas: ['ST-HR'],
+      name: person.name, email: 'separated-exam-officer@test.com', personId: String(person._id),
+    });
+    const scope = await resolvePublisherScope(fx.collegeId, erpRef(user));
+    expect(scope.kind).toBe('none');
+    expect(String(staff.status)).toBe('separated');
+  });
+
+  it('a staff-role user with ST-REG only in User.personas and no Staff row gets college scope (R8)', async () => {
+    const person = await Person.create({ collegeId: fx.collegeId, name: 'Registrar Clerk', phone: '9600088888' });
+    const { user } = await createTestUser({
+      collegeId: fx.collegeId, role: 'staff', personaType: 'ST-REG', personas: ['ST-REG'],
+      name: person.name, email: 'registrar-clerk@test.com', personId: String(person._id),
+    });
+    expect(await Staff.findOne({ collegeId: fx.collegeId, personId: person._id })).toBeNull();   // persona-only, no Staff row
+    const scope = await resolvePublisherScope(fx.collegeId, erpRef(user));
+    expect(scope).toMatchObject({ kind: 'college', office: 'Registrar', isAdmin: false });
+  });
+
+  it('the same shape of user with role student gets no publisher scope (R8)', async () => {
+    const person = await Person.create({ collegeId: fx.collegeId, name: 'Student Claiming Registrar', phone: '9600077777' });
+    const { user } = await createTestUser({
+      collegeId: fx.collegeId, role: 'student', personaType: 'ST-REG', personas: ['ST-REG'],
+      name: person.name, email: 'student-claims-registrar@test.com', personId: String(person._id),
+    });
+    const scope = await resolvePublisherScope(fx.collegeId, erpRef(user));
     expect(scope.kind).toBe('none');
   });
 
