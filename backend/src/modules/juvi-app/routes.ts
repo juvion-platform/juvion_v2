@@ -4,6 +4,10 @@ import { configRouter } from './config/routes';
 import { accountsRouter } from './accounts/routes';
 import { spacesRouter } from './spaces/routes';
 import { adminRouter } from './admin/routes';
+import { registerNoticeConsumers } from './notices/consumers';
+
+// Outbox consumers for notices; the dispatcher (server.ts) and inline kick() both run them.
+registerNoticeConsumers();
 
 export const v1Router = Router();
 v1Router.use(configRouter);
