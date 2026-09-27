@@ -13,6 +13,16 @@ import { channelIdsForRules, NOTICE_EVENTS, noticeEventKey } from './publish-ser
 export const FANOUT_BATCH_SIZE = 1000;
 export const STUCK_PUBLISHING_MS = 120_000;
 
+/**
+ * The batch size `fanOutNotice` actually loops with. Defaults to
+ * `FANOUT_BATCH_SIZE`; test-only setters below let a partial-failure test
+ * exercise the multi-batch path without waiting on 1,000 real rows, without
+ * changing the documented production constant.
+ */
+let fanoutBatchSize: number = FANOUT_BATCH_SIZE;
+export function __setFanoutBatchSizeForTesting(n: number): void { fanoutBatchSize = n; }
+export function __resetFanoutBatchSizeForTesting(): void { fanoutBatchSize = FANOUT_BATCH_SIZE; }
+
 function snapshotRow(notice: LeanNotice, p: PersonNode, now: Date) {
   const onJuvi = Boolean(p.accountId);
   return {
@@ -37,8 +47,8 @@ export async function fanOutNotice(payload: OutboxPayload): Promise<void> {
 
   const people = resolveAudience(notice.audience.rules, await loadAudienceGraph(collegeId));
   const now = new Date();
-  for (let i = 0; i < people.length; i += FANOUT_BATCH_SIZE) {
-    const batch = people.slice(i, i + FANOUT_BATCH_SIZE);
+  for (let i = 0; i < people.length; i += fanoutBatchSize) {
+    const batch = people.slice(i, i + fanoutBatchSize);
     await NoticeRecipient.bulkWrite(batch.map((p) => ({
       updateOne: {
         filter: { noticeId: notice._id, personId: new Types.ObjectId(p.personId) },

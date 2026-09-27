@@ -12,8 +12,9 @@ import { getTestApp, cleanupTestApp } from '../setup/test-app';
 import { seedBase, BaseFixtures } from '../setup/seed-base';
 import { enableJuvi, provisionTestStudent, provisionTestFaculty } from '../factories/juvi.factory';
 import { createTestCourse, createTestCourseOffering, createTestEnrollment } from '../factories/academic.factory';
+import { createTestUser } from '../factories/user.factory';
 import { adminRef, erpRef, activateAccount, createStaffPublisher, makeHod, publishTestNotice } from '../factories/notice.factory';
-import { Department } from '../../models';
+import { Department, Staff } from '../../models';
 import { Notice } from '../../models/juvi/Notice';
 import { NoticeRecipient } from '../../models/juvi/NoticeRecipient';
 import { Channel } from '../../models/juvi/Channel';
@@ -21,8 +22,8 @@ import { OutboxEvent, drainOutbox } from '../../shared/outbox';
 import { AuditLog } from '../../shared/audit';
 import { reconcileCollege } from '../../modules/juvi-app/spaces/reconcile-service';
 import { resolvePublisherScope } from '../../modules/juvi-app/notices/publisher-scope';
-import { previewAudience, publishNotice, uploadAttachment } from '../../modules/juvi-app/notices/publish-service';
-import { fanOutNotice, sweepStuckNotices } from '../../modules/juvi-app/notices/consumers';
+import { previewAudience, publishNotice, uploadAttachment, attachmentPrefix } from '../../modules/juvi-app/notices/publish-service';
+import { fanOutNotice, sweepStuckNotices, __setFanoutBatchSizeForTesting, __resetFanoutBatchSizeForTesting } from '../../modules/juvi-app/notices/consumers';
 import { publishSchema, audiencePreviewSchema } from '../../modules/juvi-app/notices/admin-schemas';
 
 let fx: BaseFixtures;
@@ -175,11 +176,43 @@ describe('publisher scope on preview and publish (US-1.1)', () => {
     expect(scope).toMatchObject({ kind: 'department', departmentId: String(fx.cse._id), office: 'HOD, Computer Science' });
   });
 
-  it('a teaching faculty who also holds a staff office persona gets the broader college scope (R6b)', async () => {
+  it('a teaching faculty who also holds an active staff office persona gets the broader college scope (R6b)', async () => {
     const fac = await provisionTestFaculty(fx);
-    const ref = { id: String(fac.user._id), role: 'faculty', personaType: fac.user.personaType, personas: [fac.user.personaType, 'ST-EXAM'] };
-    const scope = await resolvePublisherScope(fx.collegeId, ref);
+    // A genuine second, active employment record for the same person — not
+    // just a claimed persona string — is what "genuinely holds" means (R7).
+    await Staff.create({
+      collegeId: fx.collegeId, personId: fac.person._id, employeeCode: `EXAM-${fac.faculty.employeeCode}`,
+      designation: 'Exam Cell Coordinator', staffType: 'administrative', personaCode: 'ST-EXAM', status: 'active',
+    });
+    const scope = await resolvePublisherScope(fx.collegeId, erpRef(fac.user));
     expect(scope).toMatchObject({ kind: 'college', office: 'Exam Section', isAdmin: false });
+  });
+
+  it('a separated Staff row with ST-EXAM gives no college scope, even if User.personaType still names it (R7)', async () => {
+    const exam = await createStaffPublisher(fx, 'ST-EXAM');
+    await Staff.updateOne({ _id: exam.staff._id }, { $set: { status: 'separated' } });
+    const scope = await resolvePublisherScope(fx.collegeId, erpRef(exam.user));
+    expect(scope.kind).toBe('none');
+  });
+
+  it('a faculty member with a separated exam-cell Staff row gets only their offerings scope, not college (R7)', async () => {
+    const fac = await provisionTestFaculty(fx);
+    const examCell = await Staff.create({
+      collegeId: fx.collegeId, personId: fac.person._id, employeeCode: `EXAM-${fac.faculty.employeeCode}`,
+      designation: 'Exam Cell Coordinator', staffType: 'administrative', personaCode: 'ST-EXAM', status: 'separated',
+    });
+    const scope = await resolvePublisherScope(fx.collegeId, erpRef(fac.user));
+    expect(scope.kind).toBe('offerings');
+    expect(String(examCell.status)).toBe('separated');
+  });
+
+  it('a student role is refused publisher scope even when personas name a staff office (R7)', async () => {
+    const { user } = await createTestUser({
+      collegeId: fx.collegeId, role: 'student', personaType: 'L-STU', personas: ['L-STU', 'ST-EXAM'],
+      name: 'Student With Claimed Office', email: 'student-claimed-office@test.com',
+    });
+    const scope = await resolvePublisherScope(fx.collegeId, { id: String(user._id), role: 'student', personaType: 'L-STU', personas: ['L-STU', 'ST-EXAM'] });
+    expect(scope.kind).toBe('none');
   });
 
   it('a staff office publishes college-wide under its office words; another staff member cannot publish', async () => {
@@ -210,6 +243,8 @@ describe('publish validation', () => {
     await expect(publishNotice(fx.collegeId, scope, body({ attachments: [foreign] }), 'x')).rejects.toMatchObject({ statusCode: 400 });
     const nested = { ...foreign, key: `colleges/${fx.collegeId}/notices/a/b` };
     await expect(publishNotice(fx.collegeId, scope, body({ attachments: [nested] }), 'x')).rejects.toMatchObject({ statusCode: 400 });
+    const madeUp = { ...foreign, key: `${attachmentPrefix(fx.collegeId)}not-a-real-uuid` };
+    await expect(publishNotice(fx.collegeId, scope, body({ attachments: [madeUp] }), 'x')).rejects.toMatchObject({ statusCode: 400 });
     const hod = await makeHod(fx, fx.cse);
     const hodScope = await resolvePublisherScope(fx.collegeId, erpRef(hod.user));
     await expect(publishNotice(fx.collegeId, hodScope, body({ purpose: 'welcome', audience: { rules: [{ kind: 'department', ids: [String(fx.cse._id)] }] } }), 'x')).rejects.toMatchObject({ statusCode: 403 });
@@ -278,5 +313,38 @@ describe('sweeper', () => {
     expect(await sweepStuckNotices()).toBe(0);                                 // the dedupe key makes a re-emit a no-op
     await drainOutbox();
     expect((await Notice.findById(n._id).lean())!).toMatchObject({ status: 'published', counts: { audience: 1, onJuvi: 0 } });
+  });
+});
+
+describe('fan-out partial failure (R7)', () => {
+  afterAll(() => { __resetFanoutBatchSizeForTesting(); });
+
+  it('a bulkWrite failure mid-batch leaves the notice publishing and backs the outbox event off; the retry fills only the gap without duplicating rows or changing counts', async () => {
+    const people = [];
+    for (let i = 0; i < 5; i += 1) people.push(await provisionTestStudent(fx, { sectionId: String(fx.cseSection._id) }));
+    __setFanoutBatchSizeForTesting(2);
+
+    const scope = await resolvePublisherScope(fx.collegeId, adminRef(fx));
+    const notice = await publishNotice(fx.collegeId, scope, body({ audience: { rules: [{ kind: 'section', ids: [String(fx.cseSection._id)] }] } }), 'test');
+
+    const realBulkWrite = NoticeRecipient.bulkWrite.bind(NoticeRecipient);
+    const spy = vi.spyOn(NoticeRecipient, 'bulkWrite')
+      .mockImplementationOnce(realBulkWrite as unknown as typeof NoticeRecipient.bulkWrite)
+      .mockImplementationOnce(() => Promise.reject(new Error('simulated bulkWrite failure')));
+
+    await drainOutbox();   // batch 1 (2 rows) succeeds; batch 2 rejects, so fanOutNotice throws before batch 3 or the status update
+
+    expect((await Notice.findById(notice._id).lean())!.status).toBe('publishing');
+    expect(await NoticeRecipient.countDocuments({ noticeId: notice._id })).toBe(2);
+    const event = await OutboxEvent.findOne({ dedupeKey: `notice:${notice._id}:published` }).lean();
+    expect(event).toMatchObject({ status: 'pending', attempts: 1 });
+
+    spy.mockRestore();
+    await fanOutNotice({ collegeId: fx.collegeId, noticeId: String(notice._id) });   // the retry: real bulkWrite, fills only the gap
+
+    const rows = await NoticeRecipient.find({ noticeId: notice._id }).lean();
+    expect(rows).toHaveLength(5);
+    expect(new Set(rows.map((r) => String(r.personId))).size).toBe(5);   // no duplicates
+    expect((await Notice.findById(notice._id).lean())!).toMatchObject({ status: 'published', counts: { audience: 5, onJuvi: 0 } });
   });
 });

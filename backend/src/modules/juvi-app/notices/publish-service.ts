@@ -85,11 +85,14 @@ export async function channelIdsForRules(collegeId: string, rules: IAudienceRule
   return rows.map((r) => r._id);
 }
 
+/** Matches exactly what `randomUUID()` produces (lowercase RFC 4122 v4). */
+const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
 function assertOwnAttachments(collegeId: string, attachments: INoticeAttachment[]): void {
   const prefix = attachmentPrefix(collegeId);
   for (const a of attachments) {
     const rest = a.key.startsWith(prefix) ? a.key.slice(prefix.length) : '';
-    if (!rest || rest.includes('/')) throw new AppError(400, 'Unknown attachment; upload it again');
+    if (!UUID_V4.test(rest)) throw new AppError(400, 'Unknown attachment; upload it again');
   }
 }
 
@@ -109,7 +112,9 @@ export async function publishNotice(collegeId: string, scope: PublisherScope, in
     ackCommentAllowed: input.ackCommentAllowed, priority: input.priority, purpose: input.purpose, status: 'publishing',
   });
   const noticeId = String(notice._id);
-  await emit(NOTICE_EVENTS.published, { collegeId, noticeId }, noticeEventKey.published(noticeId));
+  // Audit before emit: a failed audit write must never leave a notice already
+  // queued for delivery (spec §10 R7) — so it must never be possible for the
+  // emit+kick to have already happened when the audit write throws.
   await createAuditLog({
     collegeId, entityType: 'Notice', entityId: noticeId, entityName: `Notice from ${scope.office}`, action: 'publish',
     changes: [
@@ -118,6 +123,7 @@ export async function publishNotice(collegeId: string, scope: PublisherScope, in
     ],
     performedBy,
   });
+  await emit(NOTICE_EVENTS.published, { collegeId, noticeId }, noticeEventKey.published(noticeId));
   await kick();
   return notice.toObject() as unknown as LeanNotice;
 }
