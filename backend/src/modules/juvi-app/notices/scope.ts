@@ -55,16 +55,16 @@ function assertDepartmentRules(departmentId: string | undefined, rules: IAudienc
   for (const r of rules) {
     switch (r.kind) {
       case 'department':
-        if (!r.ids.every((id) => inDept(id))) throw refuse('You can only send notices to your own department.');
+        if (r.ids.length === 0 || !r.ids.every((id) => inDept(id))) throw refuse('You can only send notices to your own department.');
         break;
       case 'section':
-        if (!r.ids.every((id) => inDept(g.sections.get(id)?.departmentId))) throw refuse('That section is outside your department.');
+        if (r.ids.length === 0 || !r.ids.every((id) => inDept(g.sections.get(id)?.departmentId))) throw refuse('That section is outside your department.');
         break;
       case 'course_offering':
-        if (!r.ids.every((id) => inDept(g.offerings.get(id)?.departmentId))) throw refuse('That course is outside your department.');
+        if (r.ids.length === 0 || !r.ids.every((id) => inDept(g.offerings.get(id)?.departmentId))) throw refuse('That course is outside your department.');
         break;
       case 'batch':
-        if (!r.ids.every((id) => batchInDepartment(id, departmentId ?? '', g))) {
+        if (r.ids.length === 0 || !r.ids.every((id) => batchInDepartment(id, departmentId ?? '', g))) {
           throw refuse('That batch includes students outside your department. Choose its sections instead.');
         }
         break;
@@ -72,7 +72,7 @@ function assertDepartmentRules(departmentId: string | undefined, rules: IAudienc
         if (!inDept(r.departmentId)) throw refuse('A role audience must stay within your department.');
         break;
       case 'custom':
-        if (!r.ids.every((id) => inDept(g.people.get(id)?.departmentId))) throw refuse('Some selected people are outside your department.');
+        if (r.ids.length === 0 || !r.ids.every((id) => inDept(g.people.get(id)?.departmentId))) throw refuse('Some selected people are outside your department.');
         break;
       default:
         throw refuse('You can only send notices to your own department.');
@@ -84,10 +84,10 @@ function assertOfferingRules(offeringIds: string[], rules: IAudienceRule[], g: A
   const mine = new Set(offeringIds);
   for (const r of rules) {
     if (r.kind === 'course_offering') {
-      if (!r.ids.every((id) => mine.has(id))) throw refuse('You can only send notices to the courses you teach.');
+      if (r.ids.length === 0 || !r.ids.every((id) => mine.has(id))) throw refuse('You can only send notices to the courses you teach.');
     } else if (r.kind === 'custom') {
       const enrolled = (id: string) => { const p = g.people.get(id); return p?.kind === 'student' && p.offeringIds.some((o) => mine.has(o)); };
-      if (!r.ids.every(enrolled)) throw refuse('Some selected people are not enrolled in your courses.');
+      if (r.ids.length === 0 || !r.ids.every(enrolled)) throw refuse('Some selected people are not enrolled in your courses.');
     } else {
       throw refuse('You can only send notices to the courses you teach.');
     }

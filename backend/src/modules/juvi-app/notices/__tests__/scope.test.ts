@@ -70,12 +70,53 @@ describe('assertAudienceInScope — teaching faculty', () => {
     refused(faculty, [r('department', ['cse'])]);
     refused(faculty, [r('all')]);
   });
+
+  it('refuses role, programme, batch and hostel_block rules', () => {
+    refused(faculty, [r('role', ['faculty'])]);
+    refused(faculty, [r('programme', ['btech'])]);
+    refused(faculty, [r('batch', ['b24'])]);
+    refused(faculty, [r('hostel_block', ['h1'])]);
+  });
 });
 
 describe('assertAudienceInScope — anyone else', () => {
   it('refuses everything', () => {
     refused(nobody, [r('custom', ['s1'])], /cannot publish/);
     refused(nobody, [r('all')]);
+  });
+});
+
+describe('assertAudienceInScope — empty ids never pass vacuously', () => {
+  const kinds: IAudienceRule['kind'][] = ['department', 'section', 'course_offering', 'batch', 'custom'];
+
+  it('HOD scope refuses every kind with an empty ids list', () => {
+    for (const kind of kinds) refused(hod, [r(kind, [])]);
+  });
+
+  it('faculty scope refuses every kind with an empty ids list', () => {
+    for (const kind of kinds) refused(faculty, [r(kind, [])]);
+  });
+});
+
+describe('assertAudienceInScope — unknown rule kind', () => {
+  const garbage: IAudienceRule = { kind: 'nonsense' as IAudienceRule['kind'], ids: ['s1'] };
+
+  it('college allows it unconditionally, same as any other kind (resolveAudience separately resolves it to nobody)', () => {
+    ok(college, [garbage]);
+  });
+
+  it('HOD, faculty and anyone-else scopes refuse it', () => {
+    refused(hod, [garbage]);
+    refused(faculty, [garbage]);
+    refused(nobody, [garbage]);
+  });
+});
+
+describe('narrowToScope composed with assertAudienceInScope', () => {
+  it('an HOD role rule without departmentId is refused directly, but passes once narrowed', () => {
+    const rules = [r('role', ['faculty'])];
+    refused(hod, rules, /within your department/);
+    ok(hod, narrowToScope(hod, rules));
   });
 });
 
