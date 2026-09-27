@@ -1140,6 +1140,7 @@ export function graphFixture(): AudienceGraph {
 }
 
 export const ids = (people: PersonNode[]) => people.map((p) => p.personId);
+```
 
 - [ ] **Step 2: Write the failing audience tests**
 
