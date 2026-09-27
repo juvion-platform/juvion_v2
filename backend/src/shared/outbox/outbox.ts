@@ -31,12 +31,21 @@ export function setTickEnqueuer(fn: (() => Promise<void>) | null): void { enqueu
 
 /** Upsert on dedupeKey. Returns true when a new event was recorded, false when it already existed. */
 export async function emit(type: string, payload: OutboxPayload, dedupeKey: string): Promise<boolean> {
-  const res = await OutboxEvent.updateOne(
-    { dedupeKey },
-    { $setOnInsert: { collegeId: payload.collegeId, type, payload, dedupeKey, status: 'pending', attempts: 0, availableAt: new Date(), lockedUntil: null } },
-    { upsert: true },
-  );
-  return res.upsertedCount > 0;
+  try {
+    const res = await OutboxEvent.updateOne(
+      { dedupeKey },
+      { $setOnInsert: { collegeId: payload.collegeId, type, payload, dedupeKey, status: 'pending', attempts: 0, availableAt: new Date(), lockedUntil: null } },
+      { upsert: true },
+    );
+    return res.upsertedCount > 0;
+  } catch (err) {
+    // Two concurrent emits of a brand-new dedupeKey can both pass the upsert's
+    // existence check and race on the unique index; the loser gets a duplicate-key
+    // error (11000) rather than a clean "matched" result. That's the same outcome
+    // as a re-emit — the event was already recorded — so treat it as such.
+    if ((err as { code?: number } | null)?.code === 11000) return false;
+    throw err;
+  }
 }
 
 /** 5 s × 2^attempts, capped at ten minutes. */
@@ -53,6 +62,9 @@ export async function claimNext(now = new Date()): Promise<IOutboxEvent | null> 
   );
 }
 
+/** Consumer error messages are stored as `lastError`; cap length so one runaway consumer can't blow up a document. */
+export const MAX_LAST_ERROR_LENGTH = 500;
+
 export async function processEvent(event: IOutboxEvent): Promise<void> {
   const handler = consumers.get(event.type);
   try {
@@ -61,7 +73,7 @@ export async function processEvent(event: IOutboxEvent): Promise<void> {
     await OutboxEvent.updateOne({ _id: event._id }, { $set: { status: 'done', processedAt: new Date(), lockedUntil: null } });
   } catch (err) {
     const attempts = event.attempts + 1;
-    const message = err instanceof Error ? err.message : String(err);
+    const message = (err instanceof Error ? err.message : String(err)).slice(0, MAX_LAST_ERROR_LENGTH);
     if (attempts >= MAX_ATTEMPTS) {
       console.error(`[outbox] ${event.type} ${event.dedupeKey} is dead after ${attempts} attempts: ${message}`);
       await OutboxEvent.updateOne({ _id: event._id }, { $set: { status: 'dead', attempts, lastError: message, lockedUntil: null } });

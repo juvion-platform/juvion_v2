@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, afterAll, afterEach, beforeEach } from 'vitest';
 import { Types } from 'mongoose';
 import { setupMongo, teardownMongo, clearCollections } from '../../../__tests__/helpers/mongoMemory';
 import { OutboxEvent } from '../OutboxEvent';
 import {
   emit, registerConsumer, registerSweeper, claimNext, processEvent, processOnce, kick, drainOutbox, retryDead,
-  nextAvailableAt, setTickEnqueuer, __resetOutboxForTesting, MAX_ATTEMPTS, LOCK_MS, MAX_DELAY_MS,
+  nextAvailableAt, setTickEnqueuer, __resetOutboxForTesting, MAX_ATTEMPTS, LOCK_MS, MAX_DELAY_MS, MAX_LAST_ERROR_LENGTH,
 } from '../outbox';
 
 const cid = String(new Types.ObjectId());
@@ -22,6 +22,28 @@ describe('emit', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ type: 't.x', status: 'pending', attempts: 0, payload: { collegeId: cid, a: 1 }, lockedUntil: null });
     expect(String(rows[0]!.collegeId)).toBe(cid);
+  });
+
+  it('survives two concurrent emits of the same new dedupeKey without throwing', async () => {
+    await OutboxEvent.init(); // ensure the unique dedupeKey index is actually built so the race can hit it
+    const results = await Promise.all([
+      emit('t.race', { collegeId: cid }, 'race1'),
+      emit('t.race', { collegeId: cid }, 'race1'),
+    ]);
+    expect(results.sort()).toEqual([false, true]);
+    expect(await OutboxEvent.countDocuments({ dedupeKey: 'race1' })).toBe(1);
+  });
+
+  it('treats a duplicate-key error from updateOne as an already-recorded event', async () => {
+    const spy = vi.spyOn(OutboxEvent, 'updateOne').mockRejectedValueOnce(Object.assign(new Error('E11000 duplicate key error'), { code: 11000 }));
+    expect(await emit('t.race', { collegeId: cid }, 'race2')).toBe(false);
+    spy.mockRestore();
+  });
+
+  it('rethrows any other error from updateOne', async () => {
+    const spy = vi.spyOn(OutboxEvent, 'updateOne').mockRejectedValueOnce(new Error('connection lost'));
+    await expect(emit('t.race', { collegeId: cid }, 'race3')).rejects.toThrow('connection lost');
+    spy.mockRestore();
   });
 });
 
@@ -82,6 +104,15 @@ describe('processEvent', () => {
     await emit('t.none', { collegeId: cid }, 'n');
     await processEvent((await claimNext())!);
     expect((await OutboxEvent.findOne({ dedupeKey: 'n' }).lean())?.lastError).toMatch(/No consumer registered for t.none/);
+  });
+
+  it('truncates lastError to 500 characters when a consumer throws a very long message', async () => {
+    registerConsumer('t.longfail', async () => { throw new Error('x'.repeat(10_000)); });
+    await emit('t.longfail', { collegeId: cid }, 'longfail');
+    await processEvent((await claimNext())!);
+    const row = (await OutboxEvent.findOne({ dedupeKey: 'longfail' }).lean())!;
+    expect(row.lastError!.length).toBeLessThanOrEqual(MAX_LAST_ERROR_LENGTH);
+    expect(row.lastError!.length).toBe(MAX_LAST_ERROR_LENGTH);
   });
 
   it('nextAvailableAt caps at ten minutes', () => {
