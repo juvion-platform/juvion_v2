@@ -44,6 +44,8 @@ export type AuditAction =
   | 'submit'
   | 'publish'
   | 'archive'
+  // Juvi notices: an acknowledgement recorded from the app
+  | 'acknowledge'
   // AI / scoring events
   | 'ai_score_computed'
   | 'ai_config_suggested'

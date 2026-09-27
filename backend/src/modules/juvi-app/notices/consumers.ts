@@ -4,8 +4,10 @@
  */
 import { Types } from 'mongoose';
 import { Notice, LeanNotice } from '../../../models/juvi/Notice';
-import { NoticeRecipient } from '../../../models/juvi/NoticeRecipient';
+import { NoticeRecipient, LeanNoticeRecipient } from '../../../models/juvi/NoticeRecipient';
+import { Person } from '../../../models/people/Person';
 import { registerConsumer, registerSweeper, emit, OutboxPayload } from '../../../shared/outbox';
+import { createAuditLog, AuditLog } from '../../../shared/audit';
 import { loadAudienceGraph } from './audience-graph';
 import { resolveAudience, PersonNode } from './audience';
 import { channelIdsForRules, NOTICE_EVENTS, noticeEventKey } from './publish-service';
@@ -87,7 +89,39 @@ export async function sweepStuckNotices(now = new Date()): Promise<number> {
   return emitted;
 }
 
+/**
+ * notice.acknowledged: the ERP audit entry (spec §6.3, NTC-06). Never the comment text.
+ * One entry per recipient row, even when the event is retried.
+ */
+export async function recordAcknowledgement(payload: OutboxPayload): Promise<void> {
+  const collegeId = payload.collegeId;
+  const row = await NoticeRecipient.findOne({ _id: String(payload.recipientId), collegeId }).lean<LeanNoticeRecipient>();
+  if (!row?.ack) return;
+  const recipientId = String(row._id);
+  const noticeId = String(row.noticeId);
+  if (await AuditLog.exists({ collegeId, entityType: 'NoticeAcknowledgement', entityId: noticeId, 'changes.newValue.recipientId': recipientId })) return;
+  const [notice, person] = await Promise.all([
+    Notice.findOne({ _id: row.noticeId, collegeId }).select('publisher.office').lean(),
+    Person.findOne({ _id: row.personId, collegeId }).select('name').lean(),
+  ]);
+  const name = person?.name ?? 'Unknown member';
+  await createAuditLog({
+    collegeId, entityType: 'NoticeAcknowledgement', entityId: noticeId,
+    entityName: `Notice from ${notice?.publisher.office ?? 'the college'}`,
+    action: 'acknowledge',
+    changes: [{
+      field: 'ack', displayName: 'Acknowledged', oldValue: null,
+      newValue: {
+        recipientId, name, at: row.ack.at, late: row.ack.late, method: row.ack.method,
+        offline: row.ack.offline, sessionId: String(row.ack.sessionId), hasComment: Boolean(row.ack.comment),
+      },
+    }],
+    performedBy: name,
+  });
+}
+
 export function registerNoticeConsumers(): void {
   registerConsumer(NOTICE_EVENTS.published, fanOutNotice);
+  registerConsumer(NOTICE_EVENTS.acknowledged, recordAcknowledgement);
   registerSweeper(async () => { await sweepStuckNotices(); });
 }

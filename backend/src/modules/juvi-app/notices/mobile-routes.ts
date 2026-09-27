@@ -11,5 +11,7 @@ noticesRouter.get('/attention', authenticateMobile, ctrl.attention);
 noticesRouter.get('/notices', authenticateMobile, ctrl.list);
 noticesRouter.get('/notices/:id', authenticateMobile, ctrl.detail);
 noticesRouter.post('/notices/:id/seen', authenticateMobile, ctrl.seen);
+noticesRouter.post('/notices/:id/ack', authenticateMobile, ctrl.ack);
+noticesRouter.post('/notices/:id/dismiss', authenticateMobile, ctrl.dismiss);
 // The key contains slashes; the app sends it URL-encoded as one path segment.
 noticesRouter.get('/notices/:id/attachments/:key', authenticateMobile, ctrl.attachmentUrl);

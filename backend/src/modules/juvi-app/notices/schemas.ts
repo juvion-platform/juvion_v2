@@ -3,6 +3,7 @@
  * R57/R61): nested objects are always present and nullable values are scalars.
  */
 import { z } from 'zod';
+import { ACK_COMMENT_MAX } from '../../../models/juvi/NoticeRecipient';
 
 export const NOTICE_STATES = ['received', 'seen', 'acknowledged', 'dismissed'] as const;
 export type NoticeState = (typeof NOTICE_STATES)[number];
@@ -59,3 +60,24 @@ export type NoticeListResponse = z.infer<typeof noticeListResponseSchema>;
 
 export const seenResponseSchema = z.object({ seenAt: z.string() });
 export const attachmentUrlResponseSchema = z.object({ url: z.string(), expiresAt: z.string() });
+
+/** `.strict()`: late, at and sessionId are the server's, never the client's. */
+export const ackRequestSchema = z.object({
+  method: z.enum(['hold', 'confirm']),
+  comment: z.string().max(ACK_COMMENT_MAX).optional(),
+  offline: z.boolean().default(false),
+  clientAt: z.string().datetime({ offset: true }).optional(),
+}).strict();
+export type AckRequest = z.infer<typeof ackRequestSchema>;
+
+export const ackResponseSchema = z.object({
+  ackAt: z.string(),
+  late: z.boolean(),
+  method: z.enum(['hold', 'confirm']),
+  offline: z.boolean(),
+  comment: z.string().nullable(),
+  clientAt: z.string().nullable(),
+});
+export type AckResponse = z.infer<typeof ackResponseSchema>;
+
+export const dismissResponseSchema = z.object({ dismissedAt: z.string() });
