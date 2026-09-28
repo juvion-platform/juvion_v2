@@ -49,6 +49,7 @@ import { ensureStudents } from './demo-seed/students';
 import { seedAcademics } from './demo-seed/academics';
 import { seedStoryExtras, storyStudents } from './demo-seed/extras';
 import { seedBreadth } from './demo-seed/breadth';
+import { verifyDemo } from './demo-seed/verify';
 
 const CHECK_ONLY = process.argv.includes('--check');
 const t0 = Date.now();
@@ -148,13 +149,22 @@ async function build(): Promise<void> {
   step('Clearing cached roles and AI answers');
   await clearCaches(collegeId, log);
 
+  step('Self-check');
+  const failed = await verifyDemo(ctx);
+
   const story = await storyStudents(collegeId);
   console.log('\n══ Demo logins ══');
   for (const l of DEMO_LOGINS) console.log(`  ${l.label.padEnd(24)} ${l.email.padEnd(26)} ${l.password}`);
   console.log(`  ${SUPER_LOGIN.label.padEnd(24)} ${SUPER_LOGIN.email.padEnd(26)} ${SUPER_LOGIN.password}`);
   console.log('\n══ Student Risk board (open these in the demo) ══');
   for (const s of story.slice(0, 10)) console.log(`  ${s.priority.padEnd(3)} ${String(s.score).padStart(3)}  ${s.name.padEnd(22)} ${s.roll.padEnd(11)} ${s.label}`);
-  console.log(`\nDone in ${Math.round((Date.now() - t0) / 1000)}s. On demo morning (after 5:30 am IST), log in as admin and open`);
+  if (failed) {
+    console.log(`\n⚠ ${failed} self-check(s) failed (marked ✗ above). The data is written; send this whole output to the team before the demo.`);
+    process.exitCode = 1;
+  } else {
+    console.log('\nAll self-checks passed.');
+  }
+  console.log(`Done in ${Math.round((Date.now() - t0) / 1000)}s. On demo morning (after 5:30 am IST), log in as admin and open`);
   console.log('Finance → Dashboard, Welfare → Student Risk, and Admissions once each, so the AI answers are ready.');
 }
 
