@@ -57,7 +57,7 @@ Also: exam@ / exam123, warden@ / warden123, registrar@ / registrar123, admission
 Open **Sai Kiran Bandaru (25B01A0501, CSE year 2)** — P1, first-generation, hostel resident.
 Three signals from three different modules inside two weeks:
 
-- **Academics:** attendance collapsed — normal for five weeks, then ~30% over the last three
+- **Academics:** attendance collapsed — normal for four weeks, then about one class in five over the last four
 - **Finance:** fee default
 - **Hostel:** warden report (curfew)
 

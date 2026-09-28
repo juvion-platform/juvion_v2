@@ -54,15 +54,17 @@ export async function seedAcademics(ctx: DemoCtx): Promise<void> {
   await insertChunked((d) => Enrollment.insertMany(d), newEnrollments);
 
   // ── Attendance: Mon/Wed/Fri over the last eight weeks of the term ───────
-  // Per-student rate. A student with an attendance signal holds up for five
+  // Per-student rate. A student with an attendance signal holds up for four
   // weeks and then drops off — the register shows the cliff the signal names.
+  // ~84% then ~22% averages ~53%: far enough under 75% that chance never lifts
+  // a flagged student over the line (30% over three weeks did, at ~67%).
   const rate = new Map<string, number>();
   for (const s of ctx.students) rate.set(String(s._id), 0.8 + r.next() * 0.17);
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const from = new Date(Math.max(ctx.semesterStart.getTime(), today.getTime() - 56 * DAY));
   const days: Date[] = [];
   for (let d = new Date(from); d < today; d = new Date(d.getTime() + DAY)) if ([1, 3, 5].includes(d.getDay())) days.push(new Date(d));
-  const cliff = today.getTime() - 21 * DAY;
+  const cliff = today.getTime() - 28 * DAY;
 
   let sessions = 0, records = 0;
   for (const [oi, o] of offerings.entries()) {
@@ -78,7 +80,7 @@ export async function seedAcademics(ctx: DemoCtx): Promise<void> {
       const late = sess.date.getTime() >= cliff;
       for (const sid of bySection.get(String(o.sectionId)) ?? []) {
         let p = rate.get(String(sid))!;
-        if (has(sid, 'attendance_drop')) p = late ? 0.3 : 0.86;
+        if (has(sid, 'attendance_drop')) p = late ? 0.22 : 0.84;
         else if (has(sid, 'failing_grades') || has(sid, 'backlog_accumulation')) p = Math.min(p, 0.78);
         const x = r.next();
         const status = x < p ? (x < p - 0.04 ? 'present' : 'late') : x < p + 0.02 ? 'od' : 'absent';
