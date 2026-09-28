@@ -7,6 +7,7 @@ import { DefaulterRecord } from '../../models/finance/DefaulterRecord';
 import { FeeReminder } from '../../models/finance/FeeReminder';
 import { Payment } from '../../models/finance/Payment';
 import { Inquiry } from '../../models/admissions/Inquiry';
+import { User } from '../../models/User';
 import { scoreInquiry } from '../../modules/admissions/lead-scoring/service';
 import { DemoCtx, DAY, TAG, daysAgo } from './context';
 
@@ -97,10 +98,12 @@ export async function seedStoryExtras(ctx: DemoCtx): Promise<void> {
 
   // ── Lead scores through the real scorer (rules, plus the model when available) ──
   const inquiries = await Inquiry.find({ collegeId: cid, tags: AI_TAG, leadScore: { $exists: false } }).select({ _id: 1 }).lean();
+  // The AI audit (and so the spend gate) needs a real user; bill it to the admin login.
+  const admin = await User.findOne({ collegeId: cid, email: 'admin@jit.edu.in' }).select({ _id: 1 }).lean();
   let scored = 0;
   for (const q of inquiries) {
     try {
-      await scoreInquiry(cid, String(q._id), 'demo-seed', { trigger: 'batch' });
+      await scoreInquiry(cid, String(q._id), String(admin!._id), { trigger: 'batch' });
       scored += 1;
     } catch (e) {
       ctx.log(`  lead score skipped for ${q._id}: ${(e as Error).message}`);
