@@ -58,14 +58,14 @@ const TAG = 'demo-ai-v1';
 const DAY = 86_400_000;
 const daysAgo = (n: number, hour = 10) => { const d = new Date(Date.now() - n * DAY); d.setHours(hour, 0, 0, 0); return d; };
 
-// ── args ────────────────────────────────────────────────────────────────────
-const args = new Map(process.argv.slice(2).map((a) => { const [k, ...v] = a.replace(/^--/, '').split('='); return [k!, v.join('=')]; }));
-const COLLEGE_ID = args.get('college-id');
-const CONFIRM = args.get('confirm-college-name');
-const CLEAR = args.has('clear-first');
-if (!COLLEGE_ID || !CONFIRM) {
-  console.error('Usage: --college-id=<id> --confirm-college-name="<exact name>" [--clear-first]');
-  process.exit(1);
+export interface SeedDemoAiOpts {
+  collegeId: string;
+  confirmCollegeName: string;
+  clearFirst?: boolean;
+  /** Which roll numbers form the demo pool. Default: any JNTU-style roll number. */
+  poolPattern?: RegExp;
+  /** Leave hostel placement to the caller (it knows block genders). */
+  skipHousing?: boolean;
 }
 
 // Deterministic PRNG so re-runs produce the same story.
@@ -108,12 +108,12 @@ const CHANNELS = ['whatsapp', 'sms', 'call', 'whatsapp', 'email'] as const;
 const MODES = ['upi', 'upi', 'upi', 'upi', 'neft', 'neft', 'online', 'online', 'cash', 'card', 'cheque'];
 const AMOUNTS = [12500, 25000, 25000, 37500, 50000, 50000, 75000];
 
-async function main() {
-  await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/juvion_v2');
+export async function seedDemoAi(opts: SeedDemoAiOpts): Promise<void> {
+  const { collegeId: COLLEGE_ID, confirmCollegeName: CONFIRM, clearFirst: CLEAR = false } = opts;
+  seed = 20260912;
   const college = await College.findById(COLLEGE_ID).lean();
   if (!college || college.name !== CONFIRM) {
-    console.error(`College ${COLLEGE_ID} not found or name mismatch (got "${college?.name}")`);
-    process.exit(1);
+    throw new Error(`College ${COLLEGE_ID} not found or name mismatch (got "${college?.name}")`);
   }
   const cid = String(college._id);
   const oid = new Types.ObjectId(cid);
@@ -161,7 +161,8 @@ async function main() {
   // non-risk alert. Fixture students (TEST…, PIN…, FEEPIN…) stay in the
   // college but off the AI surfaces.
   const busy = new Set((await CrisisAlert.find({ collegeId: cid, type: { $ne: 'compound_risk' } }).select({ studentId: 1 }).lean()).map((a) => String(a.studentId)));
-  const pool = students.filter((s) => /^\d{2}B01A\d{4}$/.test(s.rollNumber ?? '') && !busy.has(String(s._id)));
+  const poolPattern = opts.poolPattern ?? /^\d{2}B01A\d{4}$/;
+  const pool = students.filter((s) => poolPattern.test(s.rollNumber ?? '') && !busy.has(String(s._id)));
   log(`${students.length} students (${pool.length} in the demo pool), ${faculty.length} faculty, ${rooms.length} hostel rooms`);
   if (pool.length < 20 || faculty.length === 0) throw new Error('need ≥20 pool students and ≥1 faculty');
   // Year of study for unpinned older batches, so branch × year questions have an answer.
@@ -206,7 +207,7 @@ async function main() {
 
   // ── 5. Hostel residents: ~a third, including several flagged ────────────
   let housed = 0;
-  if (rooms.length > 0) {
+  if (rooms.length > 0 && !opts.skipHousing) {
     for (const [i, s] of students.entries()) {
       if (i % 3 !== 0) continue;
       const has = await HostelAllocation.exists({ collegeId: cid, studentId: s._id, status: 'active' });
@@ -382,7 +383,18 @@ async function main() {
 
   const open = await CrisisAlert.countDocuments({ collegeId: cid, type: 'compound_risk', status: { $in: ['generated', 'acknowledged', 'investigating', 'intervening'] } });
   log(`done — open alerts on the board: ${open}`);
-  await mongoose.disconnect();
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+if (require.main === module) {
+  const args = new Map(process.argv.slice(2).map((a) => { const [k, ...v] = a.replace(/^--/, '').split('='); return [k!, v.join('=')]; }));
+  const collegeId = args.get('college-id');
+  const confirmCollegeName = args.get('confirm-college-name');
+  if (!collegeId || !confirmCollegeName) {
+    console.error('Usage: --college-id=<id> --confirm-college-name="<exact name>" [--clear-first]');
+    process.exit(1);
+  }
+  mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/juvion_v2')
+    .then(() => seedDemoAi({ collegeId, confirmCollegeName, clearFirst: args.has('clear-first') }))
+    .then(() => mongoose.disconnect())
+    .catch((e) => { console.error(e); process.exit(1); });
+}
