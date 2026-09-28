@@ -78,8 +78,8 @@ export async function ensureStudents(ctx: DemoCtx): Promise<DemoStudent[]> {
   const cid = ctx.collegeId;
   const r = rng(20260930);
   const sections = await Section.find({ collegeId: cid, name: 'A', branchId: { $in: Object.values(ctx.branches) } }).select({ branchId: 1, batchId: 1 }).lean();
-  const batches = await Batch.find({ collegeId: cid, programmeId: ctx.programmeId, admissionYear: { $in: [...ADMISSION_YEARS] } }).select({ admissionYear: 1 }).lean();
-  const batchOf = (yr: number) => batches.find((b) => b.admissionYear === yr)!._id as Types.ObjectId;
+  const batches = await Batch.find({ collegeId: cid, programmeId: ctx.programmeId, admissionYear: { $in: [...ADMISSION_YEARS] } }).select({ admissionYear: 1 }).lean<Array<{ _id: Types.ObjectId; admissionYear: number }>>();
+  const batchOf = (yr: number) => batches.find((b) => b.admissionYear === yr)!._id;
   const sectionOf = (branch: string, yr: number) =>
     sections.find((s) => String(s.branchId) === String(ctx.branches[branch]) && String(s.batchId) === String(batchOf(yr)))!._id as Types.ObjectId;
 
@@ -106,9 +106,9 @@ export async function ensureStudents(ctx: DemoCtx): Promise<DemoStudent[]> {
     const motherName = r.pick(MOTHER);
     const hostel = p.story ? p.story.hostel : r.next() < 0.3;
 
-    const existing = await Student.findOne({ collegeId: cid, rollNumber }).select({ personId: 1 }).lean();
+    const existing = await Student.findOne({ collegeId: cid, rollNumber }).select({ personId: 1 }).lean<{ _id: Types.ObjectId; personId: Types.ObjectId }>();
     if (existing) {
-      out.push({ _id: existing._id as Types.ObjectId, personId: existing.personId as Types.ObjectId, rollNumber, branch: p.branch.code, year, sectionId });
+      out.push({ _id: existing._id, personId: existing.personId, rollNumber, branch: p.branch.code, year, sectionId });
       continue;
     }
 

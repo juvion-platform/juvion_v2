@@ -97,22 +97,21 @@ async function ensure(model: Model<any>, filter: Record<string, unknown>, doc: R
 }
 
 export async function findOrCreateCollege(log: (m: string) => void): Promise<{ collegeId: string; collegeName: string }> {
-  let college = await College.findOne({ code: 'JIT' }).lean();
-  if (!college) {
-    const idFree = !(await College.exists({ _id: JIT_ID }));
-    const created = await College.create({
-      ...(idFree ? { _id: new Types.ObjectId(JIT_ID) } : {}),
-      name: JIT_NAME, code: 'JIT', status: 'active',
-      address: { line1: 'Gandipet Road', city: 'Hyderabad', state: 'Telangana', pincode: '500075' },
-      contactEmail: 'info@jit.edu.in', contactPhone: '04023456789',
-      subscription: { plan: 'premium', status: 'active' },
-    });
-    college = created.toObject();
-    log(`college: created ${JIT_NAME}`);
-  } else {
-    log(`college: using existing ${college.name} (${college._id})`);
+  const existing = await College.findOne({ code: 'JIT' }).select({ name: 1 }).lean<{ _id: Types.ObjectId; name: string }>();
+  if (existing) {
+    log(`college: using existing ${existing.name} (${existing._id})`);
+    return { collegeId: String(existing._id), collegeName: existing.name };
   }
-  return { collegeId: String(college._id), collegeName: college.name };
+  const idFree = !(await College.exists({ _id: JIT_ID }));
+  const created = await College.create({
+    ...(idFree ? { _id: new Types.ObjectId(JIT_ID) } : {}),
+    name: JIT_NAME, code: 'JIT', status: 'active',
+    address: { line1: 'Gandipet Road', city: 'Hyderabad', state: 'Telangana', pincode: '500075' },
+    contactEmail: 'info@jit.edu.in', contactPhone: '04023456789',
+    subscription: { plan: 'premium', status: 'active' },
+  });
+  log(`college: created ${JIT_NAME}`);
+  return { collegeId: String(created._id), collegeName: created.name };
 }
 
 /** People behind a login: reuse the login's Person, else create one. */
