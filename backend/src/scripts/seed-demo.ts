@@ -40,7 +40,8 @@ import { seedFeeCategoriesForCollege } from './seed-fee-categories';
 import { seedFeeStructureInstancesForCollege } from './seed-fee-structure-instances';
 import { runBackfill } from './backfill-fee-pins';
 import { seedDemoAi } from './seed-demo-ai';
-import { seedAgentFindings } from './seed-agent-findings';
+import { seedAgentFindings, clearAgentFindings } from './seed-agent-findings';
+import { DefaulterRecord } from '../models/finance/DefaulterRecord';
 
 import { findOrCreateCollege, ensureFoundations } from './demo-seed/foundations';
 import { resyncRbac, ensureLogins, clearCaches, DEMO_LOGINS, SUPER_LOGIN } from './demo-seed/access';
@@ -122,10 +123,17 @@ async function build(): Promise<void> {
   log(`fee pins: exit ${pins.exitCode}${pins.error ? ` — ${pins.error}` : ''}`);
 
   step('Risk board, six months of fees, defaulters, admissions funnel');
+  // The findings fixtures go first, or last run's defaulters make the story skip students.
+  await clearAgentFindings(collegeId);
   await seedDemoAi({ collegeId, confirmCollegeName: collegeName, clearFirst: true, poolPattern: /^2[3-6]B01A\d{4}$/, skipHousing: true });
 
   step('Finance agent findings');
-  const findings = await seedAgentFindings({ collegeId, confirmCollegeName: collegeName, clearFirst: true });
+  // On students outside the risk story, so the two never contradict each other.
+  const storyIds = [
+    ...(await CrisisAlert.distinct('studentId', { collegeId, type: 'compound_risk' })),
+    ...(await DefaulterRecord.distinct('studentId', { collegeId, 'metadata.source': 'demo-ai-v1' })),
+  ].map((id) => new mongoose.Types.ObjectId(String(id)));
+  const findings = await seedAgentFindings({ collegeId, confirmCollegeName: collegeName, clearFirst: true, excludeStudentIds: storyIds });
   log(`findings: ${JSON.stringify(findings)}`);
 
   step('Attendance, marks and backlogs behind every signal');
