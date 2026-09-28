@@ -152,7 +152,11 @@ export async function seedDemoAi(opts: SeedDemoAiOpts): Promise<void> {
   }
 
   // ── 2. Load people ───────────────────────────────────────────────────────
+  // Creation order, explicitly: PROFILES[i] goes to pool[i], and without a sort
+  // Mongo returns whatever order its query plan gives (branch-grouped on a
+  // populated college), which scatters the story across the wrong students.
   const students = await Student.find({ collegeId: cid, status: { $nin: ['exited', 'graduated', 'withdrawn'] } })
+    .sort({ _id: 1 })
     .select({ personId: 1, rollNumber: 1, branchId: 1, quota: 1, studyYearAtAdmission: 1 }).lean();
   const faculty = await Faculty.find({ collegeId: cid }).select({ personId: 1 }).lean();
   const rooms = await HostelRoom.find({ collegeId: cid }).select({ _id: 1 }).lean();
