@@ -19,7 +19,7 @@ const PER_SECTION = 15;
  * Keep in step with PROFILES in seed-demo-ai.ts.
  */
 export const STORY_SLOTS: Array<{ branch: string; year: number; hostel: boolean; name: [string, string, 'male' | 'female'] }> = [
-  { branch: 'CSE', year: 3, hostel: true, name: ['Sai Kiran', 'Bandaru', 'male'] },        // P1 first-gen: fees + attendance + warden
+  { branch: 'CSE', year: 2, hostel: true, name: ['Sai Kiran', 'Bandaru', 'male'] },        // P1 first-gen: fees + attendance + warden — the answer to the "CSE second-years with fee and attendance" chip
   { branch: 'CSE', year: 2, hostel: true, name: ['Meghana', 'Pulla', 'female'] },          // P1 backlog + fees + mess
   { branch: 'ECE', year: 3, hostel: true, name: ['Naveen', 'Gundu', 'male'] },             // P1 first-gen: scholarship + attendance + warden
   { branch: 'CSE', year: 2, hostel: false, name: ['Harshitha', 'Mekala', 'female'] },      // P1 failing + fees + counselling, no mentor
