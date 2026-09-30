@@ -83,9 +83,10 @@ instead of guessing.
 on their preferred channel. Approving records it on the alert and says nothing was sent.
 
 **Finance → Dashboard.** Six months of collection (~₹1.77 Cr across ~440 payments), the AI
-month-end forecast, and the agent's finding cards: stale partial payments, a concession spike,
-holds nobody reviewed for 48h, welfare referrals ignored, holds waived without a reason, UPI
-share falling this week, collection behind target. Dismiss one to show the snooze.
+month-end forecast, and **Agent findings**: eight checks run over the finance data (stale partial
+payments, a concession spike, holds nobody reviewed, holds waived without a reason, UPI share
+falling this week, collection behind target, …) and the AI surfaces the 3–5 that most need
+attention today — so the cards you see are its pick, not a fixed list. Dismiss one to show the snooze.
 
 **Admissions.** 25 inquiries over 60 days, each with a lead score and its reasons. Creating a
 new inquiry live scores it too (needs Redis — see §1).

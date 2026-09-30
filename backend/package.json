@@ -17,7 +17,7 @@
     "test:all": "vitest run && vitest run --config vitest.e2e.config.ts",
     "migrate:optional-allotment": "ts-node -r dotenv/config src/migrations/2026-04-optional-allotment.ts",
     "openapi:mobile": "ts-node -r dotenv/config src/modules/juvi-app/openapi/generate.ts",
-    "seed:demo": "ts-node -r dotenv/config src/scripts/seed-demo.ts"
+    "seed:demo": "ts-node --transpile-only -r dotenv/config src/scripts/seed-demo.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.1",
