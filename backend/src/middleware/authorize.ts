@@ -45,10 +45,22 @@ export function authorize<M extends RbacModule>(module: M, action: RbacAction | 
         return res.status(403).json({ error: 'Access denied' });
       }
 
-      // Sub-domain check: if policy is restricted to sub-domains, require matching route subDomain
-      if (policy.scope?.subDomain) {
+      // Sub-domain check. Enforced only where the route declares which
+      // sub-domain it serves, because a `scope.subDomain` is a restriction on
+      // a vocabulary the route has to opt into.
+      //
+      // ponytail: requiring the declaration instead (deny when a scoped
+      // policy meets an undeclared route) is the stronger posture, but only
+      // `campus`, `platform` and the person-type routes in `people` are
+      // annotated today — flipping it wholesale 403s faculty on attendance,
+      // the warden on welfare and the tele-counsellor on inquiries, since
+      // those policies name sub-domains their routes never declare. Upgrade
+      // path: annotate every route of one module, grant the personas the
+      // sub-domains they need, then fail closed for that module.
+      // `subdomain-coverage.test.ts` lists what is still unannotated.
+      if (opts?.subDomain && policy.scope?.subDomain) {
         const allowed = policy.scope.subDomain.split(',').map((s) => s.trim());
-        if (!opts?.subDomain || !allowed.includes(opts.subDomain)) {
+        if (!allowed.includes(opts.subDomain)) {
           return res.status(403).json({ error: 'Access denied for this resource' });
         }
       }
