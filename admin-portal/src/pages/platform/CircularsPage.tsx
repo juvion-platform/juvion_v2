@@ -10,6 +10,7 @@ import { confirmAction } from '../../stores/confirmStore';
 import Pagination from '../../components/ui/Pagination';
 import { useListControls } from '../../hooks/useListControls';
 import SearchInput from '../../components/ui/SearchInput';
+import LegacyNoticesBanner from '../../components/communication/LegacyNoticesBanner';
 
 const AUDIENCES = ['all', 'students', 'faculty', 'staff', 'parents'] as const;
 const inp = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default";
@@ -76,6 +77,7 @@ export default function CircularsPage() {
 
   return (
     <div>
+      <LegacyNoticesBanner kind="circulars" />
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-xl font-bold text-navy">Circulars</h2>
         <div className="flex items-center gap-3">

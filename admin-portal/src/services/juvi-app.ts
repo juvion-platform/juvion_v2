@@ -16,6 +16,8 @@ export interface JuviSettings {
   quietHoursDefault: { start: string; end: string };
   minAppVersion?: { android?: string; ios?: string };
   timezone: string; featureFlags: { languageRoadmap: boolean };
+  /** Published `purpose: welcome` notice per kind; absent means the auto-created default. */
+  welcomeNotice?: { studentNoticeId?: string; facultyNoticeId?: string };
 }
 export interface ReconcileSummary {
   at: string; durationMs: number; skipped: boolean;
@@ -23,9 +25,11 @@ export interface ReconcileSummary {
   memberships: { added: number; removed: number; roleChanged: number }; errors: number;
 }
 export interface AdminSettingsView { juvi: JuviSettings; college: { name: string; code: string }; lastReconcile: ReconcileSummary | null }
-export type JuviSettingsPatch = Partial<Omit<JuviSettings, 'accentColor' | 'supportContact'>> & {
+export type JuviSettingsPatch = Partial<Omit<JuviSettings, 'accentColor' | 'supportContact' | 'welcomeNotice'>> & {
   accentColor?: string | null;
   supportContact?: JuviSettings['supportContact'] | null;
+  /** null clears a slot back to the default welcome notice. */
+  welcomeNotice?: { studentNoticeId?: string | null; facultyNoticeId?: string | null };
 };
 
 export interface ProvisioningRun {
