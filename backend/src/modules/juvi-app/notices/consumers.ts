@@ -120,8 +120,23 @@ export async function recordAcknowledgement(payload: OutboxPayload): Promise<voi
   });
 }
 
+/** notice.reminder: stamp remindedAt on members who have neither acknowledged nor dismissed. */
+export async function markReminded(payload: OutboxPayload): Promise<void> {
+  await NoticeRecipient.updateMany(
+    { collegeId: payload.collegeId, noticeId: String(payload.noticeId), ack: null, dismissedAt: null, archived: false },
+    { $set: { remindedAt: new Date() } },
+  );
+}
+
+/** notice.archived: mirror the archive onto every row (it drives the Due filter). */
+export async function mirrorArchive(payload: OutboxPayload): Promise<void> {
+  await NoticeRecipient.updateMany({ collegeId: payload.collegeId, noticeId: String(payload.noticeId) }, { $set: { archived: true } });
+}
+
 export function registerNoticeConsumers(): void {
   registerConsumer(NOTICE_EVENTS.published, fanOutNotice);
   registerConsumer(NOTICE_EVENTS.acknowledged, recordAcknowledgement);
+  registerConsumer(NOTICE_EVENTS.reminder, markReminded);
+  registerConsumer(NOTICE_EVENTS.archived, mirrorArchive);
   registerSweeper(async () => { await sweepStuckNotices(); });
 }

@@ -81,3 +81,61 @@ export const ackResponseSchema = z.object({
 export type AckResponse = z.infer<typeof ackResponseSchema>;
 
 export const dismissResponseSchema = z.object({ dismissedAt: z.string() });
+
+export const remindersSchema = z.object({ used: z.number().int(), max: z.number().int(), lastAt: z.string().nullable() });
+export type Reminders = z.infer<typeof remindersSchema>;
+
+/** A member in a reach list: names and roll numbers only, never a personId (spec §10). */
+export const reachPersonSchema = z.object({ name: z.string(), identifier: z.string().nullable(), group: z.string(), at: z.string().nullable() });
+export const reachCommentSchema = reachPersonSchema.extend({ comment: z.string(), late: z.boolean() });
+export const REACH_STATES = ['acknowledged', 'seen', 'not_seen', 'not_on_juvi'] as const;
+export const reachGroupSchema = z.object({
+  label: z.string(), total: z.number().int(), acknowledged: z.number().int(), seen: z.number().int(), notSeen: z.number().int(), notOnJuvi: z.number().int(),
+});
+export type ReachGroup = z.infer<typeof reachGroupSchema>;
+
+export const reachResponseSchema = z.object({
+  noticeId: z.string(),
+  title: z.string(),
+  status: z.enum(['publishing', 'published', 'archived']),
+  ackRequired: z.boolean(),
+  deadline: z.string().nullable(),
+  publishedAt: z.string().nullable(),
+  audience: z.number().int(),
+  acknowledged: z.number().int(),
+  seen: z.number().int(),
+  notSeen: z.number().int(),
+  notOnJuvi: z.number().int(),
+  dismissed: z.number().int(),
+  late: z.number().int(),
+  reminders: remindersSchema,
+  sparkline: z.array(z.number().int()),
+  groups: z.array(reachGroupSchema),
+  lateAcks: z.array(reachPersonSchema),
+  comments: z.array(reachCommentSchema),
+  addedLater: z.object({
+    total: z.number().int(), acknowledged: z.number().int(), seen: z.number().int(),
+    items: z.array(reachPersonSchema.extend({ state: z.enum(REACH_STATES) })),
+  }),
+  asOf: z.string(),
+});
+export type ReachResponse = z.infer<typeof reachResponseSchema>;
+
+export const pendingQuerySchema = z.object({
+  group: z.string().trim().min(1).max(120).optional(),
+  q: z.string().trim().min(1).max(80).optional(),
+  cursor: z.string().min(1).max(300).optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+export type PendingQuery = z.infer<typeof pendingQuerySchema>;
+export const pendingPersonSchema = z.object({
+  name: z.string(), identifier: z.string().nullable(), group: z.string(),
+  state: z.enum(['seen', 'not_seen', 'not_on_juvi']), lastSeenInApp: z.string().nullable(),
+});
+export const pendingResponseSchema = z.object({
+  items: z.array(pendingPersonSchema), total: z.number().int(),
+  groups: z.array(z.object({ label: z.string(), count: z.number().int() })), nextCursor: z.string().nullable(),
+});
+export type PendingResponse = z.infer<typeof pendingResponseSchema>;
+
+export const remindResponseSchema = z.object({ reminders: remindersSchema });

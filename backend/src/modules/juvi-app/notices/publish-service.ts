@@ -18,6 +18,9 @@ import { loadAudienceGraph } from './audience-graph';
 import { resolveAudience, ruleChannelRefs, audienceLine, groupLabel } from './audience';
 import { PublisherScope, narrowToScope, assertAudienceInScope } from './scope';
 import { PublishInput } from './admin-schemas';
+import { MobileApiError } from '../errors';
+import { NoticeActor, manageableNotice, remindersView } from './reach-service';
+import { Reminders } from './schemas';
 
 export const NOTICE_EVENTS = {
   published: 'notice.published',
@@ -126,4 +129,49 @@ export async function publishNotice(collegeId: string, scope: PublisherScope, in
   await emit(NOTICE_EVENTS.published, { collegeId, noticeId }, noticeEventKey.published(noticeId));
   await kick();
   return notice.toObject() as unknown as LeanNotice;
+}
+
+const stillDelivering = () => new MobileApiError(409, 'VALIDATION_FAILED', 'This notice is still being delivered; try again in a minute.');
+const archivedError = () => new MobileApiError(409, 'NOTICE_ARCHIVED', 'This notice has been archived.');
+
+/** At most two reminders (NTC-08). The cap is part of the update filter, so concurrent requests cannot exceed it. */
+export async function remindNotice(actor: NoticeActor, noticeId: string, now = new Date()): Promise<{ reminders: Reminders }> {
+  const notice = await manageableNotice(actor, noticeId, 'remind');
+  const updated = await Notice.findOneAndUpdate(
+    { _id: notice._id, collegeId: actor.collegeId, status: 'published', 'reminders.1': { $exists: false } },
+    { $push: { reminders: { at: now, by: actor.name } } },
+    { new: true },
+  ).lean<LeanNotice>();
+  if (!updated) {
+    const current = (await Notice.findOne({ _id: notice._id, collegeId: actor.collegeId }).select('status reminders').lean<LeanNotice>())!;
+    if (current.status === 'archived') throw archivedError();
+    if (current.status === 'publishing') throw stillDelivering();
+    throw new MobileApiError(409, 'REMINDER_LIMIT', 'A notice can have at most two reminders.', { reminders: remindersView(current) });
+  }
+  const n = updated.reminders.length;
+  await emit(NOTICE_EVENTS.reminder, { collegeId: actor.collegeId, noticeId: String(notice._id) }, noticeEventKey.reminder(String(notice._id), n));
+  await createAuditLog({
+    collegeId: actor.collegeId, entityType: 'Notice', entityId: String(notice._id), entityName: `Notice from ${notice.publisher.office}`,
+    action: 'update', changes: [{ field: 'reminders', displayName: 'Reminders sent', oldValue: n - 1, newValue: n }], performedBy: actor.name,
+  });
+  await kick();
+  return { reminders: remindersView(updated) };
+}
+
+/** published → archived; the only change a published notice allows (US-1.4). Reach data is kept. */
+export async function archiveNotice(actor: NoticeActor, noticeId: string, now = new Date()): Promise<{ status: 'archived'; archivedAt: string }> {
+  const notice = await manageableNotice(actor, noticeId, 'archive');
+  const updated = await Notice.findOneAndUpdate(
+    { _id: notice._id, collegeId: actor.collegeId, status: 'published' },
+    { $set: { status: 'archived', archivedAt: now } },
+    { new: true },
+  ).lean<LeanNotice>();
+  if (!updated) throw notice.status === 'publishing' ? stillDelivering() : archivedError();
+  await emit(NOTICE_EVENTS.archived, { collegeId: actor.collegeId, noticeId: String(notice._id) }, noticeEventKey.archived(String(notice._id)));
+  await createAuditLog({
+    collegeId: actor.collegeId, entityType: 'Notice', entityId: String(notice._id), entityName: `Notice from ${notice.publisher.office}`,
+    action: 'archive', changes: [{ field: 'status', displayName: 'Status', oldValue: 'published', newValue: 'archived' }], performedBy: actor.name,
+  });
+  await kick();
+  return { status: 'archived', archivedAt: now.toISOString() };
 }

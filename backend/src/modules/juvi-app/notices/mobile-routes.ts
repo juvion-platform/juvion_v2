@@ -15,3 +15,7 @@ noticesRouter.post('/notices/:id/ack', authenticateMobile, ctrl.ack);
 noticesRouter.post('/notices/:id/dismiss', authenticateMobile, ctrl.dismiss);
 // The key contains slashes; the app sends it URL-encoded as one path segment.
 noticesRouter.get('/notices/:id/attachments/:key', authenticateMobile, ctrl.attachmentUrl);
+// Publisher only (403 NOT_PUBLISHER, audited).
+noticesRouter.get('/notices/:id/reach', authenticateMobile, ctrl.reach);
+noticesRouter.get('/notices/:id/reach/pending', authenticateMobile, ctrl.pending);
+noticesRouter.post('/notices/:id/remind', authenticateMobile, ctrl.remind);
