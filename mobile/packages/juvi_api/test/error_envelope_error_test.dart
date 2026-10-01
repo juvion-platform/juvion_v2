@@ -7,6 +7,11 @@ void main() {
   // TODO add properties to the entity
 
   group(ErrorEnvelopeError, () {
+    // ErrorEnvelopeErrorAck ack
+    test('to test the property `ack`', () async {
+      // TODO
+    });
+
     // String code
     test('to test the property `code`', () async {
       // TODO
@@ -14,6 +19,11 @@ void main() {
 
     // String message
     test('to test the property `message`', () async {
+      // TODO
+    });
+
+    // ErrorEnvelopeErrorReminders reminders
+    test('to test the property `reminders`', () async {
       // TODO
     });
 

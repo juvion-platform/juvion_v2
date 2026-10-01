@@ -49,13 +49,14 @@ import 'package:juvi_api/juvi_api.dart';
 
 
 final api = JuviApi().getMobileApi();
-final OnboardingAdvance onboardingAdvance = ; // OnboardingAdvance | 
+final String id = id_example; // String | 
+final AckRequest ackRequest = ; // AckRequest | 
 
 try {
-    final response = await api.advanceOnboarding(onboardingAdvance);
+    final response = await api.acknowledgeNotice(id, ackRequest);
     print(response);
 } catch on DioException (e) {
-    print("Exception when calling MobileApi->advanceOnboarding: $e\n");
+    print("Exception when calling MobileApi->acknowledgeNotice: $e\n");
 }
 
 ```
@@ -66,18 +67,29 @@ All URIs are relative to *http://localhost/api/juvi-app/v1*
 
 Class | Method | HTTP request | Description
 ------------ | ------------- | ------------- | -------------
+[*MobileApi*](doc/MobileApi.md) | [**acknowledgeNotice**](doc/MobileApi.md#acknowledgenotice) | **POST** /notices/{id}/ack | Acknowledge a notice; 409 ALREADY_ACKNOWLEDGED carries the existing record
 [*MobileApi*](doc/MobileApi.md) | [**advanceOnboarding**](doc/MobileApi.md#advanceonboarding) | **POST** /me/onboarding/advance | Complete the current onboarding step
 [*MobileApi*](doc/MobileApi.md) | [**changePassword**](doc/MobileApi.md#changepassword) | **POST** /auth/change-password | Change password; revokes other sessions
+[*MobileApi*](doc/MobileApi.md) | [**dismissNotice**](doc/MobileApi.md#dismissnotice) | **POST** /notices/{id}/dismiss | Dismiss a notice that needs no acknowledgement
+[*MobileApi*](doc/MobileApi.md) | [**getAttention**](doc/MobileApi.md#getattention) | **GET** /attention | Due acknowledgement notices: count and the first three
 [*MobileApi*](doc/MobileApi.md) | [**getChannel**](doc/MobileApi.md#getchannel) | **GET** /channels/{id} | Channel header and About
 [*MobileApi*](doc/MobileApi.md) | [**getConfig**](doc/MobileApi.md#getconfig) | **GET** /config | Institution configuration for the signed-in user
+[*MobileApi*](doc/MobileApi.md) | [**getFirstNotice**](doc/MobileApi.md#getfirstnotice) | **GET** /onboarding/first-notice | Onboarding step 4: the welcome notice
 [*MobileApi*](doc/MobileApi.md) | [**getMe**](doc/MobileApi.md#getme) | **GET** /me | Identity card, account state, settings, institution
+[*MobileApi*](doc/MobileApi.md) | [**getNotice**](doc/MobileApi.md#getnotice) | **GET** /notices/{id} | Notice detail with my state (does not mark it seen)
+[*MobileApi*](doc/MobileApi.md) | [**getNoticeAttachmentUrl**](doc/MobileApi.md#getnoticeattachmenturl) | **GET** /notices/{id}/attachments/{key} | A 5-minute download URL for one attachment (key URL-encoded)
+[*MobileApi*](doc/MobileApi.md) | [**getNoticeReach**](doc/MobileApi.md#getnoticereach) | **GET** /notices/{id}/reach | Reach for the publisher
 [*MobileApi*](doc/MobileApi.md) | [**getSettings**](doc/MobileApi.md#getsettings) | **GET** /me/settings | Notification and language settings
 [*MobileApi*](doc/MobileApi.md) | [**listDevices**](doc/MobileApi.md#listdevices) | **GET** /me/devices | Signed-in devices
+[*MobileApi*](doc/MobileApi.md) | [**listNoticePending**](doc/MobileApi.md#listnoticepending) | **GET** /notices/{id}/reach/pending | Pending members for the publisher, grouped and searchable
+[*MobileApi*](doc/MobileApi.md) | [**listNotices**](doc/MobileApi.md#listnotices) | **GET** /notices | Notice cards by segment (due, done, all, published), cursor-paged
 [*MobileApi*](doc/MobileApi.md) | [**listSpaces**](doc/MobileApi.md#listspaces) | **GET** /spaces | Grouped channel list
 [*MobileApi*](doc/MobileApi.md) | [**lookupInstitution**](doc/MobileApi.md#lookupinstitution) | **GET** /institutions/{code} | Resolve an institution code for sign-in
 [*MobileApi*](doc/MobileApi.md) | [**markChannelRead**](doc/MobileApi.md#markchannelread) | **POST** /channels/{id}/read | Mark a channel read
+[*MobileApi*](doc/MobileApi.md) | [**markNoticeSeen**](doc/MobileApi.md#marknoticeseen) | **POST** /notices/{id}/seen | Mark a notice seen (once)
 [*MobileApi*](doc/MobileApi.md) | [**muteChannel**](doc/MobileApi.md#mutechannel) | **PUT** /channels/{id}/mute | Mute a channel
 [*MobileApi*](doc/MobileApi.md) | [**refresh**](doc/MobileApi.md#refresh) | **POST** /auth/refresh | Rotate the refresh token
+[*MobileApi*](doc/MobileApi.md) | [**remindNotice**](doc/MobileApi.md#remindnotice) | **POST** /notices/{id}/remind | Send a reminder (at most two)
 [*MobileApi*](doc/MobileApi.md) | [**revokeDevice**](doc/MobileApi.md#revokedevice) | **DELETE** /me/devices/{id} | Sign out one device
 [*MobileApi*](doc/MobileApi.md) | [**revokeOtherDevices**](doc/MobileApi.md#revokeotherdevices) | **POST** /me/devices/revoke-others | Sign out every other device
 [*MobileApi*](doc/MobileApi.md) | [**signIn**](doc/MobileApi.md#signin) | **POST** /auth/sign-in | Sign in with institution, identifier and password
@@ -89,6 +101,10 @@ Class | Method | HTTP request | Description
 
 ## Documentation For Models
 
+ - [AckRequest](doc/AckRequest.md)
+ - [AckResult](doc/AckResult.md)
+ - [Attention](doc/Attention.md)
+ - [AttentionItemsInner](doc/AttentionItemsInner.md)
  - [ChangePasswordRequest](doc/ChangePasswordRequest.md)
  - [ChannelDetail](doc/ChannelDetail.md)
  - [ChannelDetailLinkedObject](doc/ChannelDetailLinkedObject.md)
@@ -99,8 +115,11 @@ Class | Method | HTTP request | Description
  - [ConfigSupportContact](doc/ConfigSupportContact.md)
  - [Devices](doc/Devices.md)
  - [DevicesItemsInner](doc/DevicesItemsInner.md)
+ - [DismissResult](doc/DismissResult.md)
  - [ErrorEnvelope](doc/ErrorEnvelope.md)
  - [ErrorEnvelopeError](doc/ErrorEnvelopeError.md)
+ - [ErrorEnvelopeErrorAck](doc/ErrorEnvelopeErrorAck.md)
+ - [ErrorEnvelopeErrorReminders](doc/ErrorEnvelopeErrorReminders.md)
  - [InstitutionLookup](doc/InstitutionLookup.md)
  - [Me](doc/Me.md)
  - [MeAccount](doc/MeAccount.md)
@@ -112,12 +131,34 @@ Class | Method | HTTP request | Description
  - [MeSettingsTiers](doc/MeSettingsTiers.md)
  - [MeStudent](doc/MeStudent.md)
  - [MuteResult](doc/MuteResult.md)
+ - [NoticeAttachment](doc/NoticeAttachment.md)
+ - [NoticeAttachmentUrl](doc/NoticeAttachmentUrl.md)
+ - [NoticeCard](doc/NoticeCard.md)
+ - [NoticeDetail](doc/NoticeDetail.md)
+ - [NoticeDetailAttachmentsInner](doc/NoticeDetailAttachmentsInner.md)
+ - [NoticeList](doc/NoticeList.md)
+ - [NoticePending](doc/NoticePending.md)
+ - [NoticePendingGroupsInner](doc/NoticePendingGroupsInner.md)
+ - [NoticePendingItemsInner](doc/NoticePendingItemsInner.md)
+ - [NoticeReach](doc/NoticeReach.md)
+ - [NoticeReachAddedLater](doc/NoticeReachAddedLater.md)
+ - [NoticeReachAddedLaterItemsInner](doc/NoticeReachAddedLaterItemsInner.md)
+ - [NoticeReachCommentsInner](doc/NoticeReachCommentsInner.md)
+ - [NoticeReachGroupsInner](doc/NoticeReachGroupsInner.md)
+ - [NoticeReachLateAcksInner](doc/NoticeReachLateAcksInner.md)
+ - [NoticeReminders](doc/NoticeReminders.md)
  - [OnboardingAdvance](doc/OnboardingAdvance.md)
  - [OnboardingState](doc/OnboardingState.md)
+ - [PendingPerson](doc/PendingPerson.md)
  - [PhotoResult](doc/PhotoResult.md)
+ - [ReachComment](doc/ReachComment.md)
+ - [ReachGroup](doc/ReachGroup.md)
+ - [ReachPerson](doc/ReachPerson.md)
  - [ReadResult](doc/ReadResult.md)
  - [RefreshRequest](doc/RefreshRequest.md)
+ - [RemindResult](doc/RemindResult.md)
  - [RevokedCount](doc/RevokedCount.md)
+ - [SeenResult](doc/SeenResult.md)
  - [Settings](doc/Settings.md)
  - [SettingsPatch](doc/SettingsPatch.md)
  - [SettingsPatchTiers](doc/SettingsPatchTiers.md)

@@ -20,6 +20,7 @@ ChannelDetail _$ChannelDetailFromJson(Map<String, dynamic> json) =>
           'memberCount',
           'muted',
           'name',
+          'notices',
           'replyRule',
           'role',
           'scopeType',
@@ -44,6 +45,12 @@ ChannelDetail _$ChannelDetailFromJson(Map<String, dynamic> json) =>
         memberCount: $checkedConvert('memberCount', (v) => (v as num).toInt()),
         muted: $checkedConvert('muted', (v) => v as bool),
         name: $checkedConvert('name', (v) => v as String),
+        notices: $checkedConvert(
+          'notices',
+          (v) => (v as List<dynamic>)
+              .map((e) => NoticeCard.fromJson(e as Map<String, dynamic>))
+              .toList(),
+        ),
         replyRule: $checkedConvert(
           'replyRule',
           (v) => $enumDecode(_$ChannelDetailReplyRuleEnumEnumMap, v),
@@ -81,6 +88,7 @@ Map<String, dynamic> _$ChannelDetailToJson(ChannelDetail instance) =>
       'memberCount': instance.memberCount,
       'muted': instance.muted,
       'name': instance.name,
+      'notices': instance.notices.map((e) => e.toJson()).toList(),
       'replyRule': _$ChannelDetailReplyRuleEnumEnumMap[instance.replyRule]!,
       'role': _$ChannelDetailRoleEnumEnumMap[instance.role]!,
       'scopeType': _$ChannelDetailScopeTypeEnumEnumMap[instance.scopeType]!,
