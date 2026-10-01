@@ -25,14 +25,22 @@ describe('DashboardLayout navigation visibility', () => {
     const canReadAll = () => true;
     const items = getVisibleNavItems(NAV_ITEMS, canReadAll, ['finance']);
     const labels = items.map((i) => i.label);
-    expect(labels).toEqual(['Dashboard', 'Finance']);
+    expect(labels).toEqual(['Dashboard', 'Finance', 'Notices']);
   });
 
   it('restricts sidebar items for Warden via accessibleModules', () => {
     const canReadAll = () => true;
     const items = getVisibleNavItems(NAV_ITEMS, canReadAll, ['welfare', 'campus']);
     const labels = items.map((i) => i.label);
-    expect(labels).toEqual(['Dashboard', 'Welfare', 'Campus Ops']);
+    expect(labels).toEqual(['Dashboard', 'Welfare', 'Campus Ops', 'Notices']);
+  });
+
+  it('keeps the cross-cutting Notices item for any persona that may read notices', () => {
+    const hodReads = (m: string) => ['academics', 'people', 'notices'].includes(m);
+    const labels = getVisibleNavItems(NAV_ITEMS, hodReads, ['academics', 'finance', 'welfare', 'people']).map((i) => i.label);
+    expect(labels).toContain('Notices');
+    const noNotices = getVisibleNavItems(NAV_ITEMS, (m) => m === 'academics', ['academics']).map((i) => i.label);
+    expect(noNotices).not.toContain('Notices');
   });
 
   it('shows full accessible navigation for Leadership when accessibleModules is not set', () => {
