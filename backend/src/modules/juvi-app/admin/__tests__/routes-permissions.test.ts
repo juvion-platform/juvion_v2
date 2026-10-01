@@ -10,6 +10,7 @@ describe('admin routes declare the spec permissions', () => {
     expect(calls.filter((c) => c === 'platform:create').length).toBeGreaterThanOrEqual(3);
     expect(calls).toContain('platform:update');
     expect(calls).toContain('platform:read');
-    expect(calls.every((c) => c.startsWith('platform:'))).toBe(true);
+    expect(calls.every((c) => c.startsWith('platform:') || c.startsWith('notices:'))).toBe(true);
+    expect(calls.filter((c) => c.startsWith('notices:')).length).toBe(13);
   });
 });

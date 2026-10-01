@@ -61,3 +61,12 @@ export const audiencePreviewSchema = z.object({
   rules: z.array(audienceRuleSchema).min(1).max(20),
   office: z.string().trim().min(1).max(60).optional(),
 }).strict();
+
+export const adminNoticeListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  status: z.enum(['publishing', 'published', 'archived']).optional(),
+  office: z.string().trim().min(1).max(60).optional(),
+  q: z.string().trim().max(80).optional(),
+});
+export type AdminNoticeListQuery = z.infer<typeof adminNoticeListQuerySchema>;
