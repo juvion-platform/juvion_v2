@@ -17,6 +17,7 @@ import { storeCredential } from './credential-store';
 import { revokeOtherSessions } from './session-service';
 import { getJuviConfig, normalizeJuviConfig } from '../config/institution-config';
 import { MobileApiError, notFound } from '../errors';
+import { onAccountActivated } from '../notices/recipient-service';
 
 export interface ProvisionPersonInput {
   collegeId: string;
@@ -191,6 +192,14 @@ export async function transitionAccount(account: IJuviAccount, to: AccountStatus
     performedBy: by,
     studentId: account.studentId ? String(account.studentId) : undefined,
   });
+  if (to === 'active') {
+    // Notices spec §6.6: rows snapshotted while the person was Not on Juvi now reach them.
+    try {
+      await onAccountActivated(String(account.collegeId), String(account._id), String(account.personId));
+    } catch (err) {
+      console.error('[juvi-app] notice back-fill on activation failed', String(account._id), err);
+    }
+  }
   return account;
 }
 

@@ -8,6 +8,7 @@ import { seedChannelTemplates } from '../../../shared/seed/channel-templates';
 import { loadCollegeGraph, loadAccountGraph, CollegeGraph } from './graph-loader';
 import { computeExpectedMembers } from './strategies';
 import { renderPattern } from './templates';
+import { backfillAddedLater } from '../notices/recipient-service';
 
 export interface MembershipDiff { added: number; removed: number; roleChanged: number }
 export interface ReconcileSummary {
@@ -167,6 +168,8 @@ export async function reconcileAccount(collegeId: string, accountId: string): Pr
     await Channel.updateOne({ _id: id, collegeId }, { $set: { memberCount: await ChannelMembership.countDocuments({ collegeId, channelId: id }) } });
   }
   await JuviAccount.updateOne({ _id: accountId, collegeId }, { $set: { lastReconciledAt: new Date() } });
+  // Notices spec §6.6: recent notices this account matches now but did not at publish.
+  try { await backfillAddedLater(collegeId, accountId); } catch (err) { console.error('[juvi-app] added-later back-fill failed', accountId, err); }
   return diff;
 }
 
