@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import NoticesPage from './communication/NoticesPage';
+import NoticeDetailPage from './communication/NoticeDetailPage';
 
 /**
  * Communication hub (notices spec §8), gated on `notices:read` in App.tsx.
@@ -10,6 +11,7 @@ export default function Communication() {
     <Routes>
       <Route index element={<Navigate to="notices" replace />} />
       <Route path="notices" element={<NoticesPage />} />
+      <Route path="notices/:id/*" element={<NoticeDetailPage />} />
     </Routes>
   );
 }
