@@ -10,7 +10,7 @@ import { seedBase, BaseFixtures } from '../setup/seed-base';
 import { createTestApi, TestApi } from '../helpers/request';
 import { createTestStudent } from '../factories/student.factory';
 import { enableJuvi } from '../factories/juvi.factory';
-import { createStaffPublisher, publishTestNotice } from '../factories/notice.factory';
+import { createStaffPublisher, makeHod, publishTestNotice } from '../factories/notice.factory';
 import { drainOutbox } from '../../shared/outbox';
 
 process.env.E2E_TESTING = '1';
@@ -51,5 +51,30 @@ describe('GET / ?purpose=', () => {
     const all = await api.as(fx.admin.token).get(A).expect(200);
     expect(all.body.items.find((r: { id: string }) => r.id === String(standard._id)).purpose).toBe('standard');
     await api.as(fx.admin.token).get(`${A}?purpose=other`).expect(400);
+  });
+});
+
+describe('GET /targets/people (custom rules)', () => {
+  const label = (p: { label: string }) => p.label;
+
+  it('searches people by name within the publisher scope', async () => {
+    await createTestStudent(fx.collegeId, { name: 'Asha Rao', batchId: String(fx.batch._id), branchId: String(fx.cseBranch._id) });
+    await createTestStudent(fx.collegeId, { name: 'Asha Iyer', batchId: String(fx.batch._id), branchId: String(fx.eceBranch._id) });
+
+    const all = await api.as(fx.admin.token).get(`${A}/targets/people?q=asha`).expect(200);
+    expect(all.body.items.map(label)).toEqual(['Asha Iyer', 'Asha Rao']);
+    expect(all.body.items[0]).toEqual({ id: expect.stringMatching(/^[0-9a-f]{24}$/), label: 'Asha Iyer', hint: '2024 Batch' });
+
+    const hod = await makeHod(fx, fx.cse);
+    const mine = await api.as(hod.token).get(`${A}/targets/people?q=asha`).expect(200);
+    expect(mine.body.items.map(label)).toEqual(['Asha Rao']);
+  });
+
+  it('treats the search text literally and refuses callers who cannot publish', async () => {
+    const student = await createTestStudent(fx.collegeId, { name: 'Ravi (Kumar)', batchId: String(fx.batch._id), branchId: String(fx.cseBranch._id) });
+    const res = await api.as(fx.admin.token).get(`${A}/targets/people?q=${encodeURIComponent('(Kumar')}`).expect(200);
+    expect(res.body.items.map(label)).toEqual(['Ravi (Kumar)']);
+    const refused = await api.as(student.token).get(`${A}/targets/people?q=a`).expect(403);
+    expect(refused.body).toEqual({ error: 'You cannot publish notices.' });
   });
 });

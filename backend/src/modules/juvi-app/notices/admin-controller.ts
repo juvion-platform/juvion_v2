@@ -9,7 +9,8 @@ import { allowedTargets } from './scope';
 import { uploadAttachment, previewAudience, publishNotice, remindNotice, archiveNotice } from './publish-service';
 import { erpActor, manageableNotice, buildReach, pendingPage, reachCsv, auditNonPublisher, NON_PUBLISHER_ROLES, notPublisher } from './reach-service';
 import { listAdminNotices, getAdminNotice, auditTrail, retryDelivery, listDeadEvents } from './admin-service';
-import { publishSchema, audiencePreviewSchema, adminNoticeListQuerySchema, deadEventsQuerySchema } from './admin-schemas';
+import { publishSchema, audiencePreviewSchema, adminNoticeListQuerySchema, deadEventsQuerySchema, targetPeopleQuerySchema } from './admin-schemas';
+import { searchCustomPeople } from './people-search';
 import { pendingQuerySchema } from './schemas';
 import { OFFICE_NAMES } from './offices';
 import { getJuviConfig } from '../config/institution-config';
@@ -56,6 +57,13 @@ export async function targets(req: AuthRequest, res: Response, next: NextFunctio
       timezone: cfg?.timezone ?? 'Asia/Kolkata',
       ...allowedTargets(scope, graph),
     });
+  } catch (e) { next(e); }
+}
+export async function targetPeople(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const q = targetPeopleQuerySchema.parse(req.query);
+    const scope = await resolvePublisherScope(cid(req), userRef(req));
+    res.json(await searchCustomPeople(cid(req), scope, q.q, q.limit));
   } catch (e) { next(e); }
 }
 export async function deadEvents(req: AuthRequest, res: Response, next: NextFunction) {

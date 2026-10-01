@@ -18,6 +18,7 @@ describe('admin notices routes declare the spec §7.2 permissions', () => {
     expect(perms).toEqual({
       'GET /': 'notices:read',
       'GET /targets': 'notices:create',
+      'GET /targets/people': 'notices:create',
       'GET /dead-events': 'notices:read',
       'GET /:id': 'notices:read',
       'GET /:id/reach': 'notices:read',
