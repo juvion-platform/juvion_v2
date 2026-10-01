@@ -8,6 +8,7 @@ import { getJuviConfig } from '../config/institution-config';
 import { notFound } from '../errors';
 import { reconcileAccount } from './reconcile-service';
 import { nextClassByOffering, formatNextClassLabel } from './next-class';
+import { channelNotices } from '../notices/mobile-service';
 import { SpacesResponse, SpaceChannelRow, ChannelDetail } from './schemas';
 
 export const RECONCILE_STALE_MS = 60_000;
@@ -89,6 +90,7 @@ export async function getChannel(ctx: MobileContext, channelId: string): Promise
     canReply: active && (c.replyRule === 'allowed' || m.role === 'publisher'),
     whoCanPost: WHO_CAN_POST[c.templateCode],
     linkedObject: { type: c.scopeType, id: c.scopeId ? String(c.scopeId) : null },
+    notices: await channelNotices(ctx, String(c._id)),
   };
 }
 

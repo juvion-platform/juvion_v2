@@ -9,7 +9,7 @@ import { getPresignedUrl, isS3Configured } from '../../../shared/s3/s3-client';
 import { MobileContext } from '../middleware/authenticate-mobile';
 import { MobileApiError } from '../errors';
 import { toCard, toDetail } from './cards';
-import { AttentionResponse, NoticeDetail, NoticeListQuery, NoticeListResponse } from './schemas';
+import { AttentionResponse, NoticeCard, NoticeDetail, NoticeListQuery, NoticeListResponse } from './schemas';
 
 export const ATTENTION_ITEMS = 3;
 export const DUE_SCAN_MAX = 500;
@@ -155,4 +155,18 @@ export async function attachmentUrl(ctx: MobileContext, noticeId: string, key: s
   if (!isS3Configured()) throw new MobileApiError(503, 'INTERNAL', 'Attachments are unavailable right now. Please try again later.');
   const signed = await getPresignedUrl(key, { expiresIn: ATTACHMENT_URL_TTL_SECONDS });
   return { url: signed.url, expiresAt: signed.expiresAt.toISOString() };
+}
+
+export const CHANNEL_NOTICES_MAX = 20;
+
+/** Inline cards for a channel (NTC-07): notices carrying the channel that the caller received. */
+export async function channelNotices(ctx: MobileContext, channelId: string): Promise<NoticeCard[]> {
+  const notices = await Notice.find({ collegeId: ctx.collegeId, channelIds: new Types.ObjectId(channelId), status: { $in: ['published', 'archived'] } })
+    .sort({ publishedAt: -1 }).limit(100).lean<LeanNotice[]>();
+  if (notices.length === 0) return [];
+  const rows = await NoticeRecipient.find({ collegeId: ctx.collegeId, accountId: ctx.accountId, noticeId: { $in: notices.map((n) => n._id) } }).lean<LeanNoticeRecipient[]>();
+  const rowBy = new Map(rows.map((r) => [String(r.noticeId), r]));
+  return notices
+    .flatMap((n) => { const row = rowBy.get(String(n._id)); return row ? [toCard(n, row, ctx.userId)] : []; })
+    .slice(0, CHANNEL_NOTICES_MAX);
 }

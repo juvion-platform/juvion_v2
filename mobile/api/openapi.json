@@ -69,6 +69,122 @@
           "name": {
             "type": "string"
           },
+          "notices": {
+            "items": {
+              "properties": {
+                "ackAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "ackCommentAllowed": {
+                  "type": "boolean"
+                },
+                "ackRequired": {
+                  "type": "boolean"
+                },
+                "archived": {
+                  "type": "boolean"
+                },
+                "attachmentCount": {
+                  "type": "integer"
+                },
+                "audienceLine": {
+                  "type": "string"
+                },
+                "deadline": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "type": "string"
+                },
+                "isPublisher": {
+                  "type": "boolean"
+                },
+                "late": {
+                  "type": "boolean"
+                },
+                "office": {
+                  "type": "string"
+                },
+                "preview": {
+                  "type": "string"
+                },
+                "priority": {
+                  "enum": [
+                    "routine",
+                    "important",
+                    "urgent"
+                  ],
+                  "type": "string"
+                },
+                "publishedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "purpose": {
+                  "enum": [
+                    "standard",
+                    "welcome"
+                  ],
+                  "type": "string"
+                },
+                "remindedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "seenAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "state": {
+                  "enum": [
+                    "received",
+                    "seen",
+                    "acknowledged",
+                    "dismissed"
+                  ],
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "preview",
+                "office",
+                "audienceLine",
+                "priority",
+                "purpose",
+                "ackRequired",
+                "ackCommentAllowed",
+                "deadline",
+                "publishedAt",
+                "archived",
+                "attachmentCount",
+                "state",
+                "seenAt",
+                "ackAt",
+                "late",
+                "remindedAt",
+                "isPublisher"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
           "replyRule": {
             "enum": [
               "allowed",
@@ -129,7 +245,8 @@
           "canPost",
           "canReply",
           "whoCanPost",
-          "linkedObject"
+          "linkedObject",
+          "notices"
         ],
         "type": "object"
       },

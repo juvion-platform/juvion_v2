@@ -5,6 +5,7 @@ import * as svc from './mobile-service';
 import * as acks from './ack-service';
 import * as reachSvc from './reach-service';
 import { remindNotice } from './publish-service';
+import { getFirstNotice } from './welcome-service';
 
 // Notice ids are passed through unparsed: a malformed id is 404 NOTICE_NOT_FOUND, like any notice the caller cannot see.
 const id = (req: MobileRequest) => String(req.params.id);
@@ -47,4 +48,8 @@ export async function pending(req: MobileRequest, res: Response, next: NextFunct
 }
 export async function remind(req: MobileRequest, res: Response, next: NextFunction) {
   try { res.json(await remindNotice(await reachSvc.mobileActor(requireMobile(req)), id(req))); } catch (e) { next(e); }
+}
+
+export async function firstNotice(req: MobileRequest, res: Response, next: NextFunction) {
+  try { res.json(await getFirstNotice(requireMobile(req))); } catch (e) { next(e); }
 }

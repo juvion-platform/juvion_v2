@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { College, IJuviConfig } from '../../../models/College';
+import { Notice } from '../../../models/juvi/Notice';
 import { AppError } from '../../../middleware/errorHandler';
 import { createAuditLog } from '../../../shared/audit';
 import { FieldChange } from '../../../shared/types';
@@ -57,6 +58,11 @@ function flatten(patch: Record<string, unknown>, prefix = 'juvi'): Record<string
 export async function updateSettings(collegeId: string, patch: z.infer<typeof settingsUpdateSchema>, performedBy: string): Promise<AdminSettingsView> {
   const before = await College.findById(collegeId).select('name juvi').lean();
   if (!before) throw new AppError(404, 'College not found');
+  for (const id of Object.values(patch.welcomeNotice ?? {})) {
+    if (id && !(await Notice.exists({ _id: id, collegeId, purpose: 'welcome', status: 'published' }))) {
+      throw new AppError(400, 'Choose a published welcome notice');
+    }
+  }
   const set = flatten(patch as Record<string, unknown>);
   if (Object.keys(set).length === 0) throw new AppError(400, 'Nothing to update');
 

@@ -26,6 +26,8 @@ export const settingsUpdateSchema = z.object({
   minAppVersion: z.object({ android: version.optional(), ios: version.optional() }).optional(),
   timezone: z.string().trim().min(1).max(64).refine((tz) => isValidTimeZone(tz), 'Use an IANA timezone like Asia/Kolkata').optional(),
   featureFlags: z.object({ languageRoadmap: z.boolean().optional() }).optional(),
+  /** Published `purpose: 'welcome'` notice per kind; null clears the slot (the default is used). */
+  welcomeNotice: z.object({ studentNoticeId: objectId.nullable().optional(), facultyNoticeId: objectId.nullable().optional() }).strict().optional(),
 }).strict();
 
 export const createRunSchema = z.object({

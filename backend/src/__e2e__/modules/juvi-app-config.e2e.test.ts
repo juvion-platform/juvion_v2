@@ -36,7 +36,7 @@ describe('GET /config', () => {
     const s = await provisionTestStudent(fx);
     const t = (await mobileClient(app).post(`${V1}/auth/sign-in`).send({ collegeId: fx.collegeId, identifier: s.student.rollNumber, password: s.tempPassword, device: TEST_DEVICE })).body.accessToken;
     const res = await mobileClient(app, t).get(`${V1}/config`).expect(200);
-    expect(res.body).toMatchObject({ name: 'JIT Test College', code: 'JIT-TEST', supportContact: { name: 'Office', phone: '1' }, quietHoursDefault: { start: '22:00', end: '07:00' }, timezone: 'Asia/Kolkata', featureFlags: { languageRoadmap: false }, onboardingSteps: ['identity', 'spaces', 'notifications'] });
+    expect(res.body).toMatchObject({ name: 'JIT Test College', code: 'JIT-TEST', supportContact: { name: 'Office', phone: '1' }, quietHoursDefault: { start: '22:00', end: '07:00' }, timezone: 'Asia/Kolkata', featureFlags: { languageRoadmap: false }, onboardingSteps: ['identity', 'spaces', 'notifications', 'first_notice'] });
   });
 
   it('is 503 INSTITUTION_PAUSED once the admin pauses', async () => {

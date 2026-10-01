@@ -19,3 +19,5 @@ noticesRouter.get('/notices/:id/attachments/:key', authenticateMobile, ctrl.atta
 noticesRouter.get('/notices/:id/reach', authenticateMobile, ctrl.reach);
 noticesRouter.get('/notices/:id/reach/pending', authenticateMobile, ctrl.pending);
 noticesRouter.post('/notices/:id/remind', authenticateMobile, ctrl.remind);
+// Onboarding step 4 (first_notice): the welcome notice, with the caller's row created on demand.
+noticesRouter.get('/onboarding/first-notice', authenticateMobile, ctrl.firstNotice);
