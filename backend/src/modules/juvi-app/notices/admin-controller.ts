@@ -11,6 +11,8 @@ import { erpActor, manageableNotice, buildReach, pendingPage, reachCsv, auditNon
 import { listAdminNotices, getAdminNotice, auditTrail, retryDelivery, listDeadEvents } from './admin-service';
 import { publishSchema, audiencePreviewSchema, adminNoticeListQuerySchema, deadEventsQuerySchema } from './admin-schemas';
 import { pendingQuerySchema } from './schemas';
+import { OFFICE_NAMES } from './offices';
+import { getJuviConfig } from '../config/institution-config';
 
 const UNSUPPORTED = 'Unsupported file type. Use PDF, PNG, JPEG, WEBP, DOCX, XLSX or PPTX.';
 
@@ -44,7 +46,16 @@ export async function list(req: AuthRequest, res: Response, next: NextFunction) 
 export async function targets(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const scope = await resolvePublisherScope(cid(req), userRef(req));
-    res.json({ office: scope.office, ...allowedTargets(scope, await loadAudienceGraph(cid(req))) });
+    const [graph, cfg] = await Promise.all([loadAudienceGraph(cid(req)), getJuviConfig(cid(req))]);
+    res.json({
+      office: scope.office,
+      isAdmin: scope.isAdmin,
+      // Admins choose the office (spec §5); everyone else publishes from the one their persona gives.
+      offices: scope.isAdmin ? [...OFFICE_NAMES] : scope.office ? [scope.office] : [],
+      // The composer's deadline is entered in college time (spec §8), and /settings is platform-gated.
+      timezone: cfg?.timezone ?? 'Asia/Kolkata',
+      ...allowedTargets(scope, graph),
+    });
   } catch (e) { next(e); }
 }
 export async function deadEvents(req: AuthRequest, res: Response, next: NextFunction) {

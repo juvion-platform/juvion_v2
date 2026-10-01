@@ -34,7 +34,7 @@ Values copied from the spec, the Plan 1 code and the root `CLAUDE.md`. Every tas
 - **Accessibility** (spec §8): every control has a label; chips and dropdowns are keyboard operable (Enter/Space, arrows, Escape returns focus to the chip); the drawer traps focus, closes on Escape, and hands focus back to its trigger.
 - **Portal tests:** `renderWithProviders` from `src/__tests__/test-utils.tsx`, services mocked with `vi.mock`, accessible queries (`getByRole`, `getByLabelText`). The portal has no ESLint config or dependency (`npm run lint -w admin-portal` fails on `main` with "couldn't find an eslint.config"), so the gates per task are `npm run typecheck` and the portal and backend test suites.
 - **Playwright:** zero retries, no `waitForTimeout`, accessible selectors, `loginAs(role)` from `e2e/tests/fixtures/auth-fixture.ts`.
-- **Commits:** the controller commits after each task. Every message ends with `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
+- **Commits:** the controller commits after each task. Every message ends with `Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>`.
 
 ---
 
@@ -375,7 +375,7 @@ git commit -m "feat(juvi-app): serve the notices portal: permissions, offices, t
 could ever see a notices grant). GET /targets adds isAdmin, the office list
 and the college timezone; the list filters by purpose and returns it per row.
 
-Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 ```
 
 ---
@@ -595,7 +595,7 @@ Returns names and group labels from exactly the candidate sets
 assertAudienceInScope accepts, so the composer can offer the People kind
 without ever showing a raw id.
 
-Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 ```
 
 ---
@@ -1153,7 +1153,7 @@ Typed client for /juvi-app/admin/notices, college-timezone date conversion,
 ERP error messages (status-driven, server text verbatim), list and reach
 wording, and a primitive-only debounce hook.
 
-Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 ```
 
 ---
@@ -1528,7 +1528,7 @@ persona's accessibleModules list, which no persona extends with notices.
 The list shows Delivering… and Delivery failed, polls while delivering,
 and filters by status (and by office for admins).
 
-Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 ```
 
 ---
@@ -2339,7 +2339,7 @@ fed by /targets (People searches /targets/people), selections show labels
 only, and a debounced live count shows total, on Juvi, not on Juvi and the
 per-group breakdown, or the server's scope refusal.
 
-Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 ```
 
 ---
@@ -3118,7 +3118,7 @@ priority with the Urgent note, a Juvi card preview with the deadline ring,
 and a confirm step that shows the live count before anything is posted.
 NoticeComposerForm is exported for embedding on other pages.
 
-Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 ```
 
 ---
@@ -3788,7 +3788,7 @@ breakdown, a paged and searchable pending list with last-seen-in-app, late
 acknowledgements, comments and added-later members. Remind (at most 2),
 archive, CSV for admins and copy-pending-as-text.
 
-Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 ```
 
 ---
@@ -4217,7 +4217,7 @@ reach attempt. Delivery shows the fan-out state and gives admins Retry
 delivery on a dead event. Admins see a Failed deliveries panel on the
 Notices page that links each dead delivery to its notice.
 
-Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 ```
 
 ---
@@ -4646,7 +4646,7 @@ to Notices. Juvi Settings gains a Welcome notice section: choose a
 published welcome notice per kind or the default, or create one in the
 composer, prefilled.
 
-Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 ```
 
 ---
@@ -4971,7 +4971,7 @@ e2e_hod login heading the first. The Registrar (an office persona)
 publishes through the composer and the list shows 0 / 0 / 1; the HOD is
 offered only their department and the server refuses another with 403.
 
-Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 ```
 
 ---

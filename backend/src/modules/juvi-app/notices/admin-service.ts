@@ -18,13 +18,13 @@ import { Reminders } from './schemas';
 export type DeliveryState = 'delivering' | 'delivered' | 'failed';
 export interface DeliveryView { state: DeliveryState; attempts: number; lastError: string | null; updatedAt: string | null }
 export interface AdminNoticeRow {
-  id: string; title: string; office: string; audienceLine: string; status: LeanNotice['status']; delivery: DeliveryView;
+  id: string; title: string; office: string; audienceLine: string; status: LeanNotice['status']; purpose: LeanNotice['purpose']; delivery: DeliveryView;
   publishedAt: string | null; createdAt: string; ackRequired: boolean; deadline: string | null; deadlineState: 'none' | 'open' | 'passed';
   counts: { audience: number; onJuvi: number }; acknowledged: number; seen: number; reminders: Reminders; isMine: boolean;
 }
 export interface AdminNoticeDetail extends AdminNoticeRow {
   body: string; attachments: INoticeAttachment[]; audience: { rules: IAudienceRule[]; line: string };
-  ackCommentAllowed: boolean; priority: LeanNotice['priority']; purpose: LeanNotice['purpose']; archivedAt: string | null; canManage: boolean;
+  ackCommentAllowed: boolean; priority: LeanNotice['priority']; archivedAt: string | null; canManage: boolean;
 }
 
 const iso = (d?: Date | null): string | null => (d ? new Date(d).toISOString() : null);
@@ -42,7 +42,7 @@ const isMine = (actor: NoticeActor, n: LeanNotice) => Boolean(n.publisher.userId
 function row(actor: NoticeActor, n: LeanNotice, event: Parameters<typeof deliveryView>[1], stats?: { acknowledged: number; seen: number }): AdminNoticeRow {
   const deadline = n.ackDeadline ? new Date(n.ackDeadline) : null;
   return {
-    id: String(n._id), title: n.title, office: n.publisher.office, audienceLine: n.audience.line, status: n.status,
+    id: String(n._id), title: n.title, office: n.publisher.office, audienceLine: n.audience.line, status: n.status, purpose: n.purpose,
     delivery: deliveryView(n, event), publishedAt: iso(n.publishedAt), createdAt: new Date(n.createdAt).toISOString(),
     ackRequired: n.ackRequired, deadline: iso(deadline), deadlineState: !deadline ? 'none' : deadline.getTime() > Date.now() ? 'open' : 'passed',
     counts: n.counts, acknowledged: stats?.acknowledged ?? 0, seen: stats?.seen ?? 0, reminders: remindersView(n), isMine: isMine(actor, n),
@@ -59,6 +59,7 @@ export async function listAdminNotices(actor: NoticeActor, q: AdminNoticeListQue
   const filter: Record<string, unknown> = { collegeId: actor.collegeId };
   if (!actor.isAdmin) filter['publisher.userId'] = new Types.ObjectId(actor.userId);
   if (q.status) filter.status = q.status;
+  if (q.purpose) filter.purpose = q.purpose;
   if (q.office) filter['publisher.office'] = q.office;
   const page = await paginate(Notice, filter, q.page, q.limit, { createdAt: -1 }, undefined, { search: q.q ?? '' });
   const notices = page.items as unknown as LeanNotice[];
@@ -93,7 +94,7 @@ export async function getAdminNotice(actor: NoticeActor, noticeId: string): Prom
     ...row(actor, n, events.get(noticeEventKey.published(String(n._id))), stats),
     body: n.body, attachments: n.attachments.map(({ key, name, mime, size }) => ({ key, name, mime, size })),
     audience: { rules: n.audience.rules.map((r) => ({ kind: r.kind, ids: [...r.ids], ...(r.departmentId ? { departmentId: r.departmentId } : {}) })), line: n.audience.line },
-    ackCommentAllowed: n.ackCommentAllowed, priority: n.priority, purpose: n.purpose, archivedAt: iso(n.archivedAt),
+    ackCommentAllowed: n.ackCommentAllowed, priority: n.priority, archivedAt: iso(n.archivedAt),
     canManage: actor.isAdmin || isMine(actor, n),
   };
 }
