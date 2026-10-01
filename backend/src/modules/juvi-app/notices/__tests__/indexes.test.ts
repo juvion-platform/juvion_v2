@@ -17,6 +17,10 @@ describe('notice indexes (spec §5, final review)', () => {
     expect(keys(NoticeRecipient).map(([k]) => k)).toContainEqual({ collegeId: 1, personId: 1 });
   });
 
+  it('NoticeRecipient: the activation recount by (noticeId, addedLater, accountId)', () => {
+    expect(keys(NoticeRecipient).map(([k]) => k)).toContainEqual({ noticeId: 1, addedLater: 1, accountId: 1 });
+  });
+
   it('AuditLog: the acknowledgement dedupe, partial on NoticeAcknowledgement', () => {
     expect(keys(AuditLog)).toContainEqual([
       { collegeId: 1, entityType: 1, entityId: 1, 'changes.newValue.recipientId': 1 },

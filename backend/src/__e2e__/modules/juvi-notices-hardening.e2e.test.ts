@@ -75,6 +75,26 @@ describe('activation racing the fan-out (final review I1)', () => {
     expect((await Notice.findById(notice._id).lean())!).toMatchObject({ status: 'published', counts: { audience: 2, onJuvi: 2 } });
   });
 
+  it('an activation while the notice is still publishing leaves its count to the fan-out, whose final count is exact', async () => {
+    const early = await provisionTestStudent(fx, { sectionId: String(fx.cseSection._id) });
+    const late = await provisionTestStudent(fx, { sectionId: String(fx.cseSection._id) });
+    const notice = await publishingNotice();
+    // Rows written (as by an earlier, interrupted fan-out batch) while the notice is still publishing.
+    for (const s of [early, late]) {
+      await NoticeRecipient.create({
+        collegeId: fx.collegeId, noticeId: notice._id, personId: s.person._id, accountId: null, kind: 'student',
+        labels: { batch: '2024 Batch', section: 'A' }, ackRequired: true,
+      });
+    }
+    await activateAccount(String(early.account._id));
+    const mid = (await Notice.findById(notice._id).lean())!;
+    expect(mid).toMatchObject({ status: 'publishing', counts: { audience: 0, onJuvi: 0 } });                       // untouched
+    expect(String((await NoticeRecipient.findOne({ noticeId: notice._id, personId: early.person._id }).lean())!.accountId)).toBe(String(early.account._id));
+
+    await fanOutNotice({ collegeId: fx.collegeId, noticeId: String(notice._id) });
+    expect((await Notice.findById(notice._id).lean())!).toMatchObject({ status: 'published', counts: { audience: 2, onJuvi: 1 } });
+  });
+
   it('activation recounts onJuvi from the rows instead of incrementing it', async () => {
     const s = await provisionTestStudent(fx, { sectionId: String(fx.cseSection._id) });
     const n = await publishTestNotice(fx);

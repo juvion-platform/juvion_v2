@@ -21,10 +21,11 @@ export async function onAccountActivated(collegeId: string, accountId: string, p
     { $set: { accountId: new Types.ObjectId(accountId), receivedAt: now } },
   );
   // Recounted from the rows, not $inc: an increment landing after the fan-out's own count would over-count.
+  // A notice still `publishing` is skipped: its fan-out sets the count itself after its fix-up.
   const snapshotNotices = [...new Set(rows.filter((r) => !r.addedLater).map((r) => String(r.noticeId)))];
   for (const noticeId of snapshotNotices) {
     const onJuvi = await NoticeRecipient.countDocuments({ collegeId, noticeId, addedLater: false, accountId: { $ne: null } });
-    await Notice.updateOne({ _id: noticeId, collegeId }, { $set: { 'counts.onJuvi': onJuvi } });
+    await Notice.updateOne({ _id: noticeId, collegeId, status: { $ne: 'publishing' } }, { $set: { 'counts.onJuvi': onJuvi } });
   }
   return res.modifiedCount;
 }
