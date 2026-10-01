@@ -196,6 +196,18 @@ describe('NoticeComposer', () => {
     expect(toast.success).toHaveBeenCalledWith('Welcome notice published', expect.stringMatching(/onboarding/));
   });
 
+  it('offers no deadline on a welcome notice and never sends one, keeping acknowledgement and comments', async () => {
+    open({ purpose: 'welcome', title: 'Welcome to Juvi', ackRequired: true, audience: { role: [{ id: 'student', label: 'All students' }] } });
+    expect(screen.queryByLabelText('Acknowledge by (Asia/Kolkata)')).toBeNull();
+    expect(screen.getByText(/No deadline: each person sees a welcome notice when they join\./)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Notice'), { target: { value: 'Hello.' } });
+    fireEvent.click(screen.getByLabelText('Allow a comment with the acknowledgement'));
+    await screen.findByText(/2 on Juvi/);
+    fireEvent.click(screen.getByRole('button', { name: 'Review and publish' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Publish notice' }));
+    await waitFor(() => expect(publishNotice).toHaveBeenCalledWith(expect.objectContaining({ purpose: 'welcome', ackRequired: true, ackCommentAllowed: true, ackDeadline: null })));
+  });
+
   it('shows an audience preview failure once, not again under the builder', async () => {
     (previewAudience as Mock).mockRejectedValue({ isAxiosError: true, response: { status: 403, data: { error: 'You can only send notices to your own department.' } } });
     open();

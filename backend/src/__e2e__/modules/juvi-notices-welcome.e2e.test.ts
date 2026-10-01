@@ -92,6 +92,18 @@ describe('GET /onboarding/first-notice (US-5, spec §6.5)', () => {
     expect(audit.changes.find((c) => c.field === 'status')?.newValue).toBe('published');
   });
 
+  it('refuses a deadline on a welcome notice with a 400, but keeps acknowledgement and comments', async () => {
+    const future = new Date(Date.now() + 86_400_000).toISOString();
+    const base = { title: 'Welcome to JIT', body: 'Hello.', purpose: 'welcome', ackRequired: true, audience: { rules: [{ kind: 'role', ids: ['student'] }] } };
+    const res = await api.as(fx.admin.token).post(`${ADMIN}/notices`).send({ ...base, ackDeadline: future }).expect(400);
+    expect(res.body.error).toBe('Validation failed');
+    expect(res.body.details.map((d: { message: string }) => d.message)).toContain('A welcome notice cannot have a deadline: each person sees it when they join');
+    expect(await Notice.countDocuments({ collegeId: fx.collegeId, purpose: 'welcome' })).toBe(0);
+
+    const ok = await api.as(fx.admin.token).post(`${ADMIN}/notices`).send({ ...base, ackCommentAllowed: true }).expect(201);
+    expect((await Notice.findById(ok.body.id).lean())!).toMatchObject({ status: 'published', ackRequired: true, ackCommentAllowed: true, ackDeadline: null });
+  });
+
   it('a welcome notice publishes even when nobody matches its rules yet', async () => {
     // No student is provisioned yet, so the batch rule (the factory default) matches nobody.
     const w = await publishTestNotice(fx, { title: 'Welcome, batch', purpose: 'welcome' });

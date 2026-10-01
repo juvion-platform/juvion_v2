@@ -54,6 +54,8 @@ export const publishSchema = z.object({
   if (b.ackDeadline && !b.ackRequired) ctx.addIssue({ code: 'custom', path: ['ackDeadline'], message: 'A deadline requires acknowledgement' });
   if (b.ackDeadline && new Date(b.ackDeadline).getTime() <= Date.now()) ctx.addIssue({ code: 'custom', path: ['ackDeadline'], message: 'The deadline must be in the future' });
   if (b.ackCommentAllowed && !b.ackRequired) ctx.addIssue({ code: 'custom', path: ['ackCommentAllowed'], message: 'Comments are collected with an acknowledgement only' });
+  // Welcome rows are created at onboarding with the notice's deadline, so a fixed date would make late joiners late on arrival.
+  if (b.ackDeadline && b.purpose === 'welcome') ctx.addIssue({ code: 'custom', path: ['ackDeadline'], message: 'A welcome notice cannot have a deadline: each person sees it when they join' });
 });
 export type PublishInput = z.infer<typeof publishSchema>;
 

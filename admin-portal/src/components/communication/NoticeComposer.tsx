@@ -70,7 +70,8 @@ export function NoticeComposerForm({ initial, onPublished, onCancel, titleRef }:
   const rules = selectionToRules(audience);
   // Count only once /targets has said which office applies, so the first count is already the right one.
   const preview = useAudiencePreview(targets ? rules : [], officeChoice);
-  const deadlineIso = ackRequired && deadline ? zonedLocalToIso(deadline, tz) : null;
+  // A welcome notice never has a deadline: each person sees it when they join (backend publishSchema).
+  const deadlineIso = ackRequired && deadline && purpose !== 'welcome' ? zonedLocalToIso(deadline, tz) : null;
   const confirming = step === 'confirm' ? preview.data : undefined;
   const welcome = purpose === 'welcome';
 
@@ -195,13 +196,17 @@ export function NoticeComposerForm({ initial, onPublished, onCancel, titleRef }:
                 <input type="checkbox" checked={ackRequired} onChange={(e) => toggleAck(e.target.checked)} />
                 Require acknowledgement
               </label>
-              <div>
-                <label htmlFor={deadlineId} className={lbl}>Acknowledge by ({tz})</label>
-                <input id={deadlineId} type="datetime-local" className={inp} value={deadline} disabled={!ackRequired}
-                  min={isoToZonedLocal(new Date().toISOString(), tz)} onChange={(e) => setDeadline(e.target.value)} />
-                <p className="mt-1 text-xs text-gray-500">Optional. Acknowledgements after it are still accepted and marked late.</p>
-                {err('deadline')}
-              </div>
+              {welcome ? (
+                <p className="text-xs text-gray-500">No deadline: each person sees a welcome notice when they join.</p>
+              ) : (
+                <div>
+                  <label htmlFor={deadlineId} className={lbl}>Acknowledge by ({tz})</label>
+                  <input id={deadlineId} type="datetime-local" className={inp} value={deadline} disabled={!ackRequired}
+                    min={isoToZonedLocal(new Date().toISOString(), tz)} onChange={(e) => setDeadline(e.target.value)} />
+                  <p className="mt-1 text-xs text-gray-500">Optional. Acknowledgements after it are still accepted and marked late.</p>
+                  {err('deadline')}
+                </div>
+              )}
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={ackCommentAllowed} disabled={!ackRequired} onChange={(e) => setAckCommentAllowed(e.target.checked)} />
                 Allow a comment with the acknowledgement
