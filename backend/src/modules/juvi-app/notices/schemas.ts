@@ -34,7 +34,8 @@ export const noticeCardSchema = z.object({
 });
 export type NoticeCard = z.infer<typeof noticeCardSchema>;
 
-export const noticeDetailSchema = noticeCardSchema.extend({
+export const noticeDetailSchema = z.object({
+  ...noticeCardSchema.shape,
   body: z.string(),
   attachments: z.array(noticeAttachmentSchema),
   ackMethod: z.enum(['hold', 'confirm']).nullable(),
@@ -87,7 +88,7 @@ export type Reminders = z.infer<typeof remindersSchema>;
 
 /** A member in a reach list: names and roll numbers only, never a personId (spec §10). */
 export const reachPersonSchema = z.object({ name: z.string(), identifier: z.string().nullable(), group: z.string(), at: z.string().nullable() });
-export const reachCommentSchema = reachPersonSchema.extend({ comment: z.string(), late: z.boolean() });
+export const reachCommentSchema = z.object({ ...reachPersonSchema.shape, comment: z.string(), late: z.boolean() });
 export const REACH_STATES = ['acknowledged', 'seen', 'not_seen', 'not_on_juvi'] as const;
 export const reachGroupSchema = z.object({
   label: z.string(), total: z.number().int(), acknowledged: z.number().int(), seen: z.number().int(), notSeen: z.number().int(), notOnJuvi: z.number().int(),
@@ -115,7 +116,7 @@ export const reachResponseSchema = z.object({
   comments: z.array(reachCommentSchema),
   addedLater: z.object({
     total: z.number().int(), acknowledged: z.number().int(), seen: z.number().int(),
-    items: z.array(reachPersonSchema.extend({ state: z.enum(REACH_STATES) })),
+    items: z.array(z.object({ ...reachPersonSchema.shape, state: z.enum(REACH_STATES) })),
   }),
   asOf: z.string(),
 });

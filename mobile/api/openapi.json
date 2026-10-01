@@ -2,74 +2,81 @@
   "components": {
     "parameters": {},
     "schemas": {
-      "ChangePasswordRequest": {
+      "AckRequest": {
+        "additionalProperties": false,
         "properties": {
-          "currentPassword": {
-            "maxLength": 200,
-            "minLength": 1,
+          "clientAt": {
+            "format": "date-time",
             "type": "string"
           },
-          "newPassword": {
-            "maxLength": 200,
-            "minLength": 8,
+          "comment": {
+            "maxLength": 500,
             "type": "string"
+          },
+          "method": {
+            "enum": [
+              "hold",
+              "confirm"
+            ],
+            "type": "string"
+          },
+          "offline": {
+            "default": false,
+            "type": "boolean"
           }
         },
         "required": [
-          "currentPassword",
-          "newPassword"
+          "method"
         ],
         "type": "object"
       },
-      "ChannelDetail": {
+      "AckResult": {
         "properties": {
-          "about": {
+          "ackAt": {
             "type": "string"
           },
-          "canPost": {
+          "clientAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "comment": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "late": {
             "type": "boolean"
           },
-          "canReply": {
-            "type": "boolean"
-          },
-          "defaultPriority": {
+          "method": {
             "enum": [
-              "routine",
-              "important"
+              "hold",
+              "confirm"
             ],
             "type": "string"
           },
-          "id": {
-            "type": "string"
-          },
-          "linkedObject": {
-            "properties": {
-              "id": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "type": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "type",
-              "id"
-            ],
-            "type": "object"
-          },
-          "memberCount": {
+          "offline": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ackAt",
+          "late",
+          "method",
+          "offline",
+          "comment",
+          "clientAt"
+        ],
+        "type": "object"
+      },
+      "Attention": {
+        "properties": {
+          "dueCount": {
             "type": "integer"
           },
-          "muted": {
-            "type": "boolean"
-          },
-          "name": {
-            "type": "string"
-          },
-          "notices": {
+          "items": {
             "items": {
               "properties": {
                 "ackAt": {
@@ -182,6 +189,86 @@
                 "isPublisher"
               ],
               "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "dueCount",
+          "items"
+        ],
+        "type": "object"
+      },
+      "ChangePasswordRequest": {
+        "properties": {
+          "currentPassword": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "newPassword": {
+            "maxLength": 200,
+            "minLength": 8,
+            "type": "string"
+          }
+        },
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ],
+        "type": "object"
+      },
+      "ChannelDetail": {
+        "properties": {
+          "about": {
+            "type": "string"
+          },
+          "canPost": {
+            "type": "boolean"
+          },
+          "canReply": {
+            "type": "boolean"
+          },
+          "defaultPriority": {
+            "enum": [
+              "routine",
+              "important"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "linkedObject": {
+            "properties": {
+              "id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "type": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "id"
+            ],
+            "type": "object"
+          },
+          "memberCount": {
+            "type": "integer"
+          },
+          "muted": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "notices": {
+            "items": {
+              "$ref": "#/components/schemas/NoticeCard"
             },
             "type": "array"
           },
@@ -400,6 +487,17 @@
         ],
         "type": "object"
       },
+      "DismissResult": {
+        "properties": {
+          "dismissedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "dismissedAt"
+        ],
+        "type": "object"
+      },
       "ErrorEnvelope": {
         "properties": {
           "error": {
@@ -417,7 +515,14 @@
                   "UPDATE_REQUIRED",
                   "COOLDOWN",
                   "INSTITUTION_PAUSED",
-                  "INTERNAL"
+                  "INTERNAL",
+                  "NOTICE_NOT_FOUND",
+                  "ALREADY_ACKNOWLEDGED",
+                  "NOTICE_ARCHIVED",
+                  "NOT_PUBLISHER",
+                  "REMINDER_LIMIT",
+                  "ACK_REQUIRED",
+                  "ACK_NOT_REQUIRED"
                 ],
                 "type": "string"
               },
@@ -786,6 +891,845 @@
         ],
         "type": "object"
       },
+      "NoticeAttachment": {
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "mime": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "mime",
+          "size"
+        ],
+        "type": "object"
+      },
+      "NoticeAttachmentUrl": {
+        "properties": {
+          "expiresAt": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "expiresAt"
+        ],
+        "type": "object"
+      },
+      "NoticeCard": {
+        "properties": {
+          "ackAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ackCommentAllowed": {
+            "type": "boolean"
+          },
+          "ackRequired": {
+            "type": "boolean"
+          },
+          "archived": {
+            "type": "boolean"
+          },
+          "attachmentCount": {
+            "type": "integer"
+          },
+          "audienceLine": {
+            "type": "string"
+          },
+          "deadline": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "isPublisher": {
+            "type": "boolean"
+          },
+          "late": {
+            "type": "boolean"
+          },
+          "office": {
+            "type": "string"
+          },
+          "preview": {
+            "type": "string"
+          },
+          "priority": {
+            "enum": [
+              "routine",
+              "important",
+              "urgent"
+            ],
+            "type": "string"
+          },
+          "publishedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "purpose": {
+            "enum": [
+              "standard",
+              "welcome"
+            ],
+            "type": "string"
+          },
+          "remindedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "seenAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state": {
+            "enum": [
+              "received",
+              "seen",
+              "acknowledged",
+              "dismissed"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "preview",
+          "office",
+          "audienceLine",
+          "priority",
+          "purpose",
+          "ackRequired",
+          "ackCommentAllowed",
+          "deadline",
+          "publishedAt",
+          "archived",
+          "attachmentCount",
+          "state",
+          "seenAt",
+          "ackAt",
+          "late",
+          "remindedAt",
+          "isPublisher"
+        ],
+        "type": "object"
+      },
+      "NoticeDetail": {
+        "properties": {
+          "ackAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ackClientAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ackComment": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ackCommentAllowed": {
+            "type": "boolean"
+          },
+          "ackMethod": {
+            "enum": [
+              "hold",
+              "confirm"
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ackOffline": {
+            "type": "boolean"
+          },
+          "ackRequired": {
+            "type": "boolean"
+          },
+          "archived": {
+            "type": "boolean"
+          },
+          "attachmentCount": {
+            "type": "integer"
+          },
+          "attachments": {
+            "items": {
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "mime": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "size": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "key",
+                "name",
+                "mime",
+                "size"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "audienceLine": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "deadline": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dismissedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "isPublisher": {
+            "type": "boolean"
+          },
+          "late": {
+            "type": "boolean"
+          },
+          "office": {
+            "type": "string"
+          },
+          "preview": {
+            "type": "string"
+          },
+          "priority": {
+            "enum": [
+              "routine",
+              "important",
+              "urgent"
+            ],
+            "type": "string"
+          },
+          "publishedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "purpose": {
+            "enum": [
+              "standard",
+              "welcome"
+            ],
+            "type": "string"
+          },
+          "remindedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "seenAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state": {
+            "enum": [
+              "received",
+              "seen",
+              "acknowledged",
+              "dismissed"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "preview",
+          "office",
+          "audienceLine",
+          "priority",
+          "purpose",
+          "ackRequired",
+          "ackCommentAllowed",
+          "deadline",
+          "publishedAt",
+          "archived",
+          "attachmentCount",
+          "state",
+          "seenAt",
+          "ackAt",
+          "late",
+          "remindedAt",
+          "isPublisher",
+          "body",
+          "attachments",
+          "ackMethod",
+          "ackOffline",
+          "ackComment",
+          "ackClientAt",
+          "dismissedAt"
+        ],
+        "type": "object"
+      },
+      "NoticeList": {
+        "properties": {
+          "items": {
+            "items": {
+              "properties": {
+                "ackAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "ackCommentAllowed": {
+                  "type": "boolean"
+                },
+                "ackRequired": {
+                  "type": "boolean"
+                },
+                "archived": {
+                  "type": "boolean"
+                },
+                "attachmentCount": {
+                  "type": "integer"
+                },
+                "audienceLine": {
+                  "type": "string"
+                },
+                "deadline": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "type": "string"
+                },
+                "isPublisher": {
+                  "type": "boolean"
+                },
+                "late": {
+                  "type": "boolean"
+                },
+                "office": {
+                  "type": "string"
+                },
+                "preview": {
+                  "type": "string"
+                },
+                "priority": {
+                  "enum": [
+                    "routine",
+                    "important",
+                    "urgent"
+                  ],
+                  "type": "string"
+                },
+                "publishedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "purpose": {
+                  "enum": [
+                    "standard",
+                    "welcome"
+                  ],
+                  "type": "string"
+                },
+                "remindedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "seenAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "state": {
+                  "enum": [
+                    "received",
+                    "seen",
+                    "acknowledged",
+                    "dismissed"
+                  ],
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "preview",
+                "office",
+                "audienceLine",
+                "priority",
+                "purpose",
+                "ackRequired",
+                "ackCommentAllowed",
+                "deadline",
+                "publishedAt",
+                "archived",
+                "attachmentCount",
+                "state",
+                "seenAt",
+                "ackAt",
+                "late",
+                "remindedAt",
+                "isPublisher"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "type": "object"
+      },
+      "NoticePending": {
+        "properties": {
+          "groups": {
+            "items": {
+              "properties": {
+                "count": {
+                  "type": "integer"
+                },
+                "label": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "label",
+                "count"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "items": {
+            "items": {
+              "properties": {
+                "group": {
+                  "type": "string"
+                },
+                "identifier": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "lastSeenInApp": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "name": {
+                  "type": "string"
+                },
+                "state": {
+                  "enum": [
+                    "seen",
+                    "not_seen",
+                    "not_on_juvi"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "identifier",
+                "group",
+                "state",
+                "lastSeenInApp"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "groups",
+          "nextCursor"
+        ],
+        "type": "object"
+      },
+      "NoticeReach": {
+        "properties": {
+          "ackRequired": {
+            "type": "boolean"
+          },
+          "acknowledged": {
+            "type": "integer"
+          },
+          "addedLater": {
+            "properties": {
+              "acknowledged": {
+                "type": "integer"
+              },
+              "items": {
+                "items": {
+                  "properties": {
+                    "at": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "group": {
+                      "type": "string"
+                    },
+                    "identifier": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "enum": [
+                        "acknowledged",
+                        "seen",
+                        "not_seen",
+                        "not_on_juvi"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "identifier",
+                    "group",
+                    "at",
+                    "state"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "seen": {
+                "type": "integer"
+              },
+              "total": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "total",
+              "acknowledged",
+              "seen",
+              "items"
+            ],
+            "type": "object"
+          },
+          "asOf": {
+            "type": "string"
+          },
+          "audience": {
+            "type": "integer"
+          },
+          "comments": {
+            "items": {
+              "properties": {
+                "at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "comment": {
+                  "type": "string"
+                },
+                "group": {
+                  "type": "string"
+                },
+                "identifier": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "late": {
+                  "type": "boolean"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "identifier",
+                "group",
+                "at",
+                "comment",
+                "late"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "deadline": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dismissed": {
+            "type": "integer"
+          },
+          "groups": {
+            "items": {
+              "properties": {
+                "acknowledged": {
+                  "type": "integer"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "notOnJuvi": {
+                  "type": "integer"
+                },
+                "notSeen": {
+                  "type": "integer"
+                },
+                "seen": {
+                  "type": "integer"
+                },
+                "total": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "label",
+                "total",
+                "acknowledged",
+                "seen",
+                "notSeen",
+                "notOnJuvi"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "late": {
+            "type": "integer"
+          },
+          "lateAcks": {
+            "items": {
+              "properties": {
+                "at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "group": {
+                  "type": "string"
+                },
+                "identifier": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "identifier",
+                "group",
+                "at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "notOnJuvi": {
+            "type": "integer"
+          },
+          "notSeen": {
+            "type": "integer"
+          },
+          "noticeId": {
+            "type": "string"
+          },
+          "publishedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reminders": {
+            "properties": {
+              "lastAt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "max": {
+                "type": "integer"
+              },
+              "used": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "used",
+              "max",
+              "lastAt"
+            ],
+            "type": "object"
+          },
+          "seen": {
+            "type": "integer"
+          },
+          "sparkline": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "publishing",
+              "published",
+              "archived"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "noticeId",
+          "title",
+          "status",
+          "ackRequired",
+          "deadline",
+          "publishedAt",
+          "audience",
+          "acknowledged",
+          "seen",
+          "notSeen",
+          "notOnJuvi",
+          "dismissed",
+          "late",
+          "reminders",
+          "sparkline",
+          "groups",
+          "lateAcks",
+          "comments",
+          "addedLater",
+          "asOf"
+        ],
+        "type": "object"
+      },
+      "NoticeReminders": {
+        "properties": {
+          "lastAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "max": {
+            "type": "integer"
+          },
+          "used": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "used",
+          "max",
+          "lastAt"
+        ],
+        "type": "object"
+      },
       "OnboardingAdvance": {
         "properties": {
           "step": {
@@ -821,6 +1765,44 @@
         ],
         "type": "object"
       },
+      "PendingPerson": {
+        "properties": {
+          "group": {
+            "type": "string"
+          },
+          "identifier": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lastSeenInApp": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "seen",
+              "not_seen",
+              "not_on_juvi"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "identifier",
+          "group",
+          "state",
+          "lastSeenInApp"
+        ],
+        "type": "object"
+      },
       "PhotoResult": {
         "properties": {
           "photoUrl": {
@@ -832,6 +1814,103 @@
         },
         "required": [
           "photoUrl"
+        ],
+        "type": "object"
+      },
+      "ReachComment": {
+        "properties": {
+          "at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "comment": {
+            "type": "string"
+          },
+          "group": {
+            "type": "string"
+          },
+          "identifier": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "late": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "identifier",
+          "group",
+          "at",
+          "comment",
+          "late"
+        ],
+        "type": "object"
+      },
+      "ReachGroup": {
+        "properties": {
+          "acknowledged": {
+            "type": "integer"
+          },
+          "label": {
+            "type": "string"
+          },
+          "notOnJuvi": {
+            "type": "integer"
+          },
+          "notSeen": {
+            "type": "integer"
+          },
+          "seen": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "label",
+          "total",
+          "acknowledged",
+          "seen",
+          "notSeen",
+          "notOnJuvi"
+        ],
+        "type": "object"
+      },
+      "ReachPerson": {
+        "properties": {
+          "at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "group": {
+            "type": "string"
+          },
+          "identifier": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "identifier",
+          "group",
+          "at"
         ],
         "type": "object"
       },
@@ -865,6 +1944,36 @@
         ],
         "type": "object"
       },
+      "RemindResult": {
+        "properties": {
+          "reminders": {
+            "properties": {
+              "lastAt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "max": {
+                "type": "integer"
+              },
+              "used": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "used",
+              "max",
+              "lastAt"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "reminders"
+        ],
+        "type": "object"
+      },
       "RevokedCount": {
         "properties": {
           "revoked": {
@@ -873,6 +1982,17 @@
         },
         "required": [
           "revoked"
+        ],
+        "type": "object"
+      },
+      "SeenResult": {
+        "properties": {
+          "seenAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "seenAt"
         ],
         "type": "object"
       },
@@ -1254,6 +2374,42 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/attention": {
+      "get": {
+        "operationId": "getAttention",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Attention"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 401"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Due acknowledgement notices: count and the first three",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
     "/auth/change-password": {
       "post": {
         "operationId": "changePassword",
@@ -2220,6 +3376,732 @@
           }
         ],
         "summary": "Update settings",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/notices": {
+      "get": {
+        "operationId": "listNotices",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "segment",
+            "required": false,
+            "schema": {
+              "default": "all",
+              "enum": [
+                "due",
+                "done",
+                "all",
+                "published"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "office",
+            "required": false,
+            "schema": {
+              "maxLength": 60,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "maxLength": 300,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 50,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticeList"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 400"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 401"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Notice cards by segment (due, done, all, published), cursor-paged",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/notices/{id}": {
+      "get": {
+        "operationId": "getNotice",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticeDetail"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 401"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 404"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Notice detail with my state (does not mark it seen)",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/notices/{id}/ack": {
+      "post": {
+        "operationId": "acknowledgeNotice",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AckRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AckResult"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 400"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 401"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 404"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 409"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Acknowledge a notice; 409 ALREADY_ACKNOWLEDGED carries the existing record",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/notices/{id}/attachments/{key}": {
+      "get": {
+        "operationId": "getNoticeAttachmentUrl",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticeAttachmentUrl"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 401"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 404"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 503"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "A 5-minute download URL for one attachment (key URL-encoded)",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/notices/{id}/dismiss": {
+      "post": {
+        "operationId": "dismissNotice",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DismissResult"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 401"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 404"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 409"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Dismiss a notice that needs no acknowledgement",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/notices/{id}/reach": {
+      "get": {
+        "operationId": "getNoticeReach",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticeReach"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 401"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 403"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 404"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Reach for the publisher",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/notices/{id}/reach/pending": {
+      "get": {
+        "operationId": "listNoticePending",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "group",
+            "required": false,
+            "schema": {
+              "maxLength": 120,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "maxLength": 80,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "maxLength": 300,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticePending"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 400"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 401"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 403"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 404"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Pending members for the publisher, grouped and searchable",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/notices/{id}/remind": {
+      "post": {
+        "operationId": "remindNotice",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemindResult"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 401"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 403"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 404"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 409"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Send a reminder (at most two)",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/notices/{id}/seen": {
+      "post": {
+        "operationId": "markNoticeSeen",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeenResult"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 401"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 404"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Mark a notice seen (once)",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/onboarding/first-notice": {
+      "get": {
+        "operationId": "getFirstNotice",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticeDetail"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 401"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Onboarding step 4: the welcome notice",
         "tags": [
           "mobile"
         ]

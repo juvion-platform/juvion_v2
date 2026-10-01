@@ -6,12 +6,22 @@ import {
 } from '../accounts/schemas';
 import { spacesResponseSchema, channelDetailSchema, muteResponseSchema, readResponseSchema } from '../spaces/schemas';
 import { institutionLookupResponseSchema, configResponseSchema } from '../config/schemas';
+import {
+  noticeAttachmentSchema, noticeCardSchema, noticeDetailSchema, attentionResponseSchema, noticeListQuerySchema, noticeListResponseSchema,
+  seenResponseSchema, attachmentUrlResponseSchema, ackRequestSchema, ackResponseSchema, dismissResponseSchema,
+  remindersSchema, reachPersonSchema, reachCommentSchema, reachGroupSchema, reachResponseSchema,
+  pendingQuerySchema, pendingPersonSchema, pendingResponseSchema, remindResponseSchema,
+} from '../notices/schemas';
 
 extendZodWithOpenApi(z);
 
 const errorEnvelopeSchema = z.object({
   error: z.object({
-    code: z.enum(['VALIDATION_FAILED', 'INVALID_CREDENTIALS', 'TOKEN_EXPIRED', 'SESSION_INVALIDATED', 'ACCOUNT_DEACTIVATED', 'FORBIDDEN', 'NOT_FOUND', 'GONE', 'UPDATE_REQUIRED', 'COOLDOWN', 'INSTITUTION_PAUSED', 'INTERNAL']),
+    code: z.enum([
+      'VALIDATION_FAILED', 'INVALID_CREDENTIALS', 'TOKEN_EXPIRED', 'SESSION_INVALIDATED', 'ACCOUNT_DEACTIVATED', 'FORBIDDEN', 'NOT_FOUND', 'GONE', 'UPDATE_REQUIRED', 'COOLDOWN', 'INSTITUTION_PAUSED', 'INTERNAL',
+      // Juvi notices
+      'NOTICE_NOT_FOUND', 'ALREADY_ACKNOWLEDGED', 'NOTICE_ARCHIVED', 'NOT_PUBLISHER', 'REMINDER_LIMIT', 'ACK_REQUIRED', 'ACK_NOT_REQUIRED',
+    ]),
     message: z.string(),
   }).passthrough(),
 });
@@ -21,7 +31,7 @@ interface RouteDef {
   /** Becomes the Dart method name on the generated `MobileApi` class. */
   operationId: string;
   method: Method; path: string; summary: string; auth: boolean;
-  body?: z.ZodTypeAny; response?: z.ZodTypeAny; status?: number; params?: string[]; errors: number[]; multipart?: boolean;
+  body?: z.ZodTypeAny; response?: z.ZodTypeAny; status?: number; params?: string[]; query?: z.AnyZodObject; errors: number[]; multipart?: boolean;
 }
 
 const json = (schema: z.ZodTypeAny) => ({ content: { 'application/json': { schema } } });
@@ -31,6 +41,11 @@ export type OpenApiDocument = ReturnType<OpenApiGeneratorV31['generateDocument']
 export function buildOpenApiDocument(): OpenApiDocument {
   const registry = new OpenAPIRegistry();
   const bearerAuth = registry.registerComponent('securitySchemes', 'bearerAuth', { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' });
+
+  // Registered ahead of `C` so ChannelDetail.notices below can reference the component
+  // instance itself: zod-to-openapi only $refs a nested schema when it is literally the
+  // object `.register()` returned, not merely the same schema used elsewhere by value.
+  const NoticeCardComponent = registry.register('NoticeCard', noticeCardSchema);
 
   // Every schema is a named component so the generated Dart models have stable class names
   // (SignInRequest, Me, Spaces, ChannelDetail, …) instead of derived inline names.
@@ -52,9 +67,29 @@ export function buildOpenApiDocument(): OpenApiDocument {
     RevokedCount: registry.register('RevokedCount', z.object({ revoked: z.number().int() })),
     PhotoResult: registry.register('PhotoResult', z.object({ photoUrl: z.string().nullable() })),
     Spaces: registry.register('Spaces', spacesResponseSchema),
-    ChannelDetail: registry.register('ChannelDetail', channelDetailSchema),
+    // Rebuilt with the registered NoticeCard component in place of the raw array item
+    // schema, so `notices` $refs NoticeCard instead of inlining a duplicate object.
+    ChannelDetail: registry.register('ChannelDetail', z.object({ ...channelDetailSchema.shape, notices: z.array(NoticeCardComponent) })),
     MuteResult: registry.register('MuteResult', muteResponseSchema),
     ReadResult: registry.register('ReadResult', readResponseSchema),
+    NoticeAttachment: registry.register('NoticeAttachment', noticeAttachmentSchema),
+    NoticeReminders: registry.register('NoticeReminders', remindersSchema),
+    ReachPerson: registry.register('ReachPerson', reachPersonSchema),
+    ReachComment: registry.register('ReachComment', reachCommentSchema),
+    ReachGroup: registry.register('ReachGroup', reachGroupSchema),
+    PendingPerson: registry.register('PendingPerson', pendingPersonSchema),
+    NoticeCard: NoticeCardComponent,
+    NoticeDetail: registry.register('NoticeDetail', noticeDetailSchema),
+    Attention: registry.register('Attention', attentionResponseSchema),
+    NoticeList: registry.register('NoticeList', noticeListResponseSchema),
+    SeenResult: registry.register('SeenResult', seenResponseSchema),
+    AckRequest: registry.register('AckRequest', ackRequestSchema),
+    AckResult: registry.register('AckResult', ackResponseSchema),
+    DismissResult: registry.register('DismissResult', dismissResponseSchema),
+    NoticeAttachmentUrl: registry.register('NoticeAttachmentUrl', attachmentUrlResponseSchema),
+    NoticeReach: registry.register('NoticeReach', reachResponseSchema),
+    NoticePending: registry.register('NoticePending', pendingResponseSchema),
+    RemindResult: registry.register('RemindResult', remindResponseSchema),
   };
 
   const routes: RouteDef[] = [
@@ -77,6 +112,17 @@ export function buildOpenApiDocument(): OpenApiDocument {
     { operationId: 'muteChannel', method: 'put', path: '/channels/{id}/mute', summary: 'Mute a channel', auth: true, params: ['id'], response: C.MuteResult, errors: [400, 401, 404] },
     { operationId: 'unmuteChannel', method: 'delete', path: '/channels/{id}/mute', summary: 'Unmute a channel', auth: true, params: ['id'], response: C.MuteResult, errors: [400, 401, 404] },
     { operationId: 'markChannelRead', method: 'post', path: '/channels/{id}/read', summary: 'Mark a channel read', auth: true, params: ['id'], response: C.ReadResult, errors: [400, 401, 404] },
+    { operationId: 'getAttention', method: 'get', path: '/attention', summary: 'Due acknowledgement notices: count and the first three', auth: true, response: C.Attention, errors: [401] },
+    { operationId: 'listNotices', method: 'get', path: '/notices', summary: 'Notice cards by segment (due, done, all, published), cursor-paged', auth: true, query: noticeListQuerySchema, response: C.NoticeList, errors: [400, 401] },
+    { operationId: 'getNotice', method: 'get', path: '/notices/{id}', summary: 'Notice detail with my state (does not mark it seen)', auth: true, params: ['id'], response: C.NoticeDetail, errors: [401, 404] },
+    { operationId: 'markNoticeSeen', method: 'post', path: '/notices/{id}/seen', summary: 'Mark a notice seen (once)', auth: true, params: ['id'], response: C.SeenResult, errors: [401, 404] },
+    { operationId: 'acknowledgeNotice', method: 'post', path: '/notices/{id}/ack', summary: 'Acknowledge a notice; 409 ALREADY_ACKNOWLEDGED carries the existing record', auth: true, params: ['id'], body: C.AckRequest, response: C.AckResult, errors: [400, 401, 404, 409] },
+    { operationId: 'dismissNotice', method: 'post', path: '/notices/{id}/dismiss', summary: 'Dismiss a notice that needs no acknowledgement', auth: true, params: ['id'], response: C.DismissResult, errors: [401, 404, 409] },
+    { operationId: 'getNoticeAttachmentUrl', method: 'get', path: '/notices/{id}/attachments/{key}', summary: 'A 5-minute download URL for one attachment (key URL-encoded)', auth: true, params: ['id', 'key'], response: C.NoticeAttachmentUrl, errors: [401, 404, 503] },
+    { operationId: 'getNoticeReach', method: 'get', path: '/notices/{id}/reach', summary: 'Reach for the publisher', auth: true, params: ['id'], response: C.NoticeReach, errors: [401, 403, 404] },
+    { operationId: 'listNoticePending', method: 'get', path: '/notices/{id}/reach/pending', summary: 'Pending members for the publisher, grouped and searchable', auth: true, params: ['id'], query: pendingQuerySchema, response: C.NoticePending, errors: [400, 401, 403, 404] },
+    { operationId: 'remindNotice', method: 'post', path: '/notices/{id}/remind', summary: 'Send a reminder (at most two)', auth: true, params: ['id'], response: C.RemindResult, errors: [401, 403, 404, 409] },
+    { operationId: 'getFirstNotice', method: 'get', path: '/onboarding/first-notice', summary: 'Onboarding step 4: the welcome notice', auth: true, response: C.NoticeDetail, errors: [401] },
   ];
 
   for (const r of routes) {
@@ -91,6 +137,7 @@ export function buildOpenApiDocument(): OpenApiDocument {
       ...(r.auth ? { security: [{ [bearerAuth.name]: [] }] } : {}),
       request: {
         ...(r.params ? { params: z.object(Object.fromEntries(r.params.map((p) => [p, z.string()]))) } : {}),
+        ...(r.query ? { query: r.query } : {}),
         ...(r.body ? { body: json(r.body) } : {}),
         ...(r.multipart ? { body: { content: { 'multipart/form-data': { schema: z.object({ file: z.string().openapi({ format: 'binary' }) }) } } } } : {}),
       },
