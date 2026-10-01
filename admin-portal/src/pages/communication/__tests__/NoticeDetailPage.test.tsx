@@ -5,6 +5,8 @@ import NoticeDetailPage from '../NoticeDetailPage';
 import { renderWithProviders } from '../../../__tests__/test-utils';
 
 vi.mock('../../../components/communication/ReachTab', () => ({ default: () => <p>Reach tab</p> }));
+vi.mock('../../../components/communication/AuditTab', () => ({ default: () => <p>Audit tab</p> }));
+vi.mock('../../../components/communication/DeliveryTab', () => ({ default: () => <p>Delivery tab</p> }));
 vi.mock('../../../services/notices', () => ({ getNotice: vi.fn() }));
 import { getNotice } from '../../../services/notices';
 
@@ -41,6 +43,13 @@ describe('NoticeDetailPage', () => {
     expect(screen.getByRole('list', { name: 'Attachments' })).toHaveTextContent('timetable.pdf');
     expect(screen.getByRole('link', { name: 'Reach' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByText('Reach tab')).toBeInTheDocument();
+  });
+
+  it('routes the Audit and Delivery tabs', async () => {
+    renderAt('/communication/notices/n1/delivery');
+    expect(await screen.findByText('Delivery tab')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Delivery' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'Audit' })).toHaveAttribute('href', '/communication/notices/n1/audit');
   });
 
   it('says so when the notice is not one the caller can see', async () => {

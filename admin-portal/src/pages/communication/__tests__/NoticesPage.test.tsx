@@ -8,8 +8,8 @@ const auth = vi.hoisted(() => ({ role: 'admin', can: true }));
 vi.mock('../../../stores/authStore', () => ({
   useAuthStore: (sel: (s: unknown) => unknown) => sel({ user: { role: auth.role }, hasPermission: () => auth.can }),
 }));
-vi.mock('../../../services/notices', () => ({ listNotices: vi.fn(), getNoticeTargets: vi.fn(), previewAudience: vi.fn(), searchNoticePeople: vi.fn() }));
-import { listNotices, getNoticeTargets } from '../../../services/notices';
+vi.mock('../../../services/notices', () => ({ listNotices: vi.fn(), getNoticeTargets: vi.fn(), previewAudience: vi.fn(), searchNoticePeople: vi.fn(), listDeadEvents: vi.fn() }));
+import { listNotices, getNoticeTargets, listDeadEvents } from '../../../services/notices';
 
 const ROW = {
   id: 'n1', title: 'Exam timetable', office: 'Exam Section', audienceLine: 'Sent to 2024 Batch', status: 'published', purpose: 'standard',
@@ -34,6 +34,7 @@ beforeEach(() => {
   vi.clearAllMocks(); auth.role = 'admin'; auth.can = true;
   (listNotices as Mock).mockResolvedValue(page([ROW]));
   (getNoticeTargets as Mock).mockResolvedValue(TARGETS);
+  (listDeadEvents as Mock).mockResolvedValue(page([]));
 });
 afterEach(() => { vi.useRealTimers(); });
 
@@ -69,12 +70,21 @@ describe('NoticesPage', () => {
     await waitFor(() => expect(listNotices).toHaveBeenLastCalledWith(expect.objectContaining({ office: 'Exam Section' })));
   });
 
-  it('gives non-admins no office filter', async () => {
+  it('gives non-admins no office filter and no failed-deliveries panel', async () => {
     auth.role = 'staff';
     renderPage();
     await screen.findByRole('button', { name: /open notice exam timetable/i });
     expect(screen.queryByLabelText('Office')).toBeNull();
     expect(getNoticeTargets).not.toHaveBeenCalled();
+    expect(listDeadEvents).not.toHaveBeenCalled();
+  });
+
+  it('shows admins the failed deliveries, linking to the Delivery tab', async () => {
+    (listDeadEvents as Mock).mockResolvedValue(page([{ id: 'e1', type: 'notice.published', noticeId: 'n9', attempts: 8, lastError: 'Mongo timeout', createdAt: '2026-09-30T04:00:00.000Z', updatedAt: null }]));
+    renderPage();
+    const panel = await screen.findByRole('region', { name: /failed deliveries \(1\)/i });
+    expect(panel).toHaveTextContent('Mongo timeout');
+    expect(screen.getByRole('link', { name: 'Open delivery' })).toHaveAttribute('href', '/communication/notices/n9/delivery');
   });
 
   it('opens the composer drawer from New notice', async () => {

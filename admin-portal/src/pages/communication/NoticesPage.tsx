@@ -7,6 +7,7 @@ import Badge from '../../components/ui/Badge';
 import Pagination from '../../components/ui/Pagination';
 import SearchInput from '../../components/ui/SearchInput';
 import NoticeComposer from '../../components/communication/NoticeComposer';
+import DeadEventsPanel from '../../components/communication/DeadEventsPanel';
 import { useListControls } from '../../hooks/useListControls';
 import { useAuthStore } from '../../stores/authStore';
 import { listNotices, getNoticeTargets, type NoticeRow, type NoticeStatus } from '../../services/notices';
@@ -75,6 +76,8 @@ export default function NoticesPage() {
           </button>
         )}
       </div>
+
+      {admin && <DeadEventsPanel />}
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <SearchInput value={search} onChange={setSearch} placeholder="Search notices…" className="w-64" />

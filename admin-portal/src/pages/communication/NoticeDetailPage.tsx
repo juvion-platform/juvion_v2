@@ -3,6 +3,8 @@ import { Link, NavLink, Route, Routes, useParams } from 'react-router-dom';
 import { ArrowLeft, Paperclip } from 'lucide-react';
 import Badge from '../../components/ui/Badge';
 import ReachTab from '../../components/communication/ReachTab';
+import AuditTab from '../../components/communication/AuditTab';
+import DeliveryTab from '../../components/communication/DeliveryTab';
 import { getNotice } from '../../services/notices';
 import { PRIORITY_LABELS, deadlineText, errorStatus, formatBytes, formatWhen, noticeErrorMessage, noticeStatus } from '../../lib/notices';
 
@@ -35,6 +37,8 @@ export default function NoticeDetailPage() {
   // Absolute targets, as in JuviAdminPage: this page is mounted at "notices/:id/*".
   const tabs = [
     { to: base, label: 'Reach', end: true },
+    { to: `${base}/audit`, label: 'Audit', end: false },
+    { to: `${base}/delivery`, label: 'Delivery', end: false },
   ];
 
   return (
@@ -74,6 +78,8 @@ export default function NoticeDetailPage() {
       </nav>
       <Routes>
         <Route index element={<ReachTab notice={notice} />} />
+        <Route path="audit" element={<AuditTab noticeId={notice.id} />} />
+        <Route path="delivery" element={<DeliveryTab notice={notice} />} />
       </Routes>
     </div>
   );
