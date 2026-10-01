@@ -8,7 +8,7 @@ const auth = vi.hoisted(() => ({ role: 'admin', can: true }));
 vi.mock('../../../stores/authStore', () => ({
   useAuthStore: (sel: (s: unknown) => unknown) => sel({ user: { role: auth.role }, hasPermission: () => auth.can }),
 }));
-vi.mock('../../../services/notices', () => ({ listNotices: vi.fn(), getNoticeTargets: vi.fn() }));
+vi.mock('../../../services/notices', () => ({ listNotices: vi.fn(), getNoticeTargets: vi.fn(), previewAudience: vi.fn(), searchNoticePeople: vi.fn() }));
 import { listNotices, getNoticeTargets } from '../../../services/notices';
 
 const ROW = {
@@ -75,6 +75,21 @@ describe('NoticesPage', () => {
     await screen.findByRole('button', { name: /open notice exam timetable/i });
     expect(screen.queryByLabelText('Office')).toBeNull();
     expect(getNoticeTargets).not.toHaveBeenCalled();
+  });
+
+  it('opens the composer drawer from New notice', async () => {
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: /new notice/i }));
+    expect(screen.getByRole('dialog', { name: 'New notice' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('offers no New notice without notices:create', async () => {
+    auth.can = false;
+    renderPage();
+    await screen.findByRole('button', { name: /open notice exam timetable/i });
+    expect(screen.queryByRole('button', { name: /new notice/i })).toBeNull();
   });
 
   it('polls while a notice is still delivering', async () => {

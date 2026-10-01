@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
+import { Plus } from 'lucide-react';
 import DataTable from '../../components/ui/DataTable';
 import Badge from '../../components/ui/Badge';
 import Pagination from '../../components/ui/Pagination';
 import SearchInput from '../../components/ui/SearchInput';
+import NoticeComposer from '../../components/communication/NoticeComposer';
 import { useListControls } from '../../hooks/useListControls';
 import { useAuthStore } from '../../stores/authStore';
 import { listNotices, getNoticeTargets, type NoticeRow, type NoticeStatus } from '../../services/notices';
@@ -28,6 +30,7 @@ export default function NoticesPage() {
   const { page, setPage, limit, setLimit, search, setSearch } = useListControls();
   const [status, setStatus] = useState<'' | NoticeStatus>('');
   const [office, setOffice] = useState('');
+  const [composing, setComposing] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['notices', { page, limit, search, status, office }],
@@ -65,6 +68,12 @@ export default function NoticesPage() {
           <h2 className="text-xl font-bold text-navy">Notices</h2>
           <p className="mt-1 text-sm text-gray-500">Official notices sent to the Juvi app, with who has seen and acknowledged each one.</p>
         </div>
+        {canCreate && (
+          <button type="button" onClick={() => setComposing(true)}
+            className="flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm text-white hover:bg-primary-700">
+            <Plus size={16} /> New notice
+          </button>
+        )}
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -97,6 +106,7 @@ export default function NoticesPage() {
       {data && (
         <Pagination page={data.page} pages={data.pages} total={data.total} limit={limit} onPageChange={setPage} onLimitChange={setLimit} itemLabel="notices" />
       )}
+      <NoticeComposer open={composing} onClose={() => setComposing(false)} />
     </div>
   );
 }
