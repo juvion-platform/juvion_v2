@@ -107,7 +107,7 @@ import {
   JuviNoticeCard, AckRecord, StudyRecommendation,
   // Juvi mobile app
   JuviAccount, MobileSession, ChannelTemplate, Channel, ChannelMembership,
-  JuviProvisioningRun, JuviProvisionedCredential,
+  JuviProvisioningRun, JuviProvisionedCredential, Notice, NoticeRecipient,
 } from './models';
 import { User } from './models/User';
 import { College } from './models/College';
@@ -290,6 +290,8 @@ async function seed() {
     ChannelMembership.deleteMany({ collegeId: CID }),
     JuviProvisioningRun.deleteMany({ collegeId: CID }),
     JuviProvisionedCredential.deleteMany({ collegeId: CID }),
+    Notice.deleteMany({ collegeId: CID }),
+    NoticeRecipient.deleteMany({ collegeId: CID }),
     // W01 Admissions workflow
     Inquiry.deleteMany({ collegeId: CID }),
     SeatInventory.deleteMany({ collegeId: CID }),

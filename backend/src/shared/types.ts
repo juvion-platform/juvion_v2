@@ -44,6 +44,10 @@ export type AuditAction =
   | 'submit'
   | 'publish'
   | 'archive'
+  // Juvi notices: an acknowledgement recorded from the app
+  | 'acknowledge'
+  // A refused attempt to read or act on something the caller may not (RCH-02)
+  | 'access_denied'
   // AI / scoring events
   | 'ai_score_computed'
   | 'ai_config_suggested'

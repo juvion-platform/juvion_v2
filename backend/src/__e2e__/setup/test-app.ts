@@ -18,9 +18,11 @@ export async function getTestApp(): Promise<Express> {
     app = mod.default;
   }
 
-  // Connect mongoose if not already connected
+  // Connect mongoose if not already connected. Each vitest worker has its own
+  // MongoDB server (see global-setup.ts), so files run in parallel without seeing
+  // each other's data.
   if (mongoose.connection.readyState === 0) {
-    const uri = process.env.MONGO_TEST_URI;
+    const uri = process.env[`MONGO_TEST_URI_${process.env.VITEST_POOL_ID ?? '1'}`] ?? process.env.MONGO_TEST_URI;
     if (!uri) throw new Error('MONGO_TEST_URI not set. Did global-setup run?');
     await mongoose.connect(uri);
   }

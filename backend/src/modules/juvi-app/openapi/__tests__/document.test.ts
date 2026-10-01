@@ -8,6 +8,9 @@ const EXPECTED_PATHS = [
   '/auth/sign-in', '/auth/refresh', '/auth/sign-out', '/auth/change-password',
   '/me', '/me/settings', '/me/onboarding/advance', '/me/devices', '/me/devices/{id}', '/me/devices/revoke-others', '/me/photo',
   '/spaces', '/channels/{id}', '/channels/{id}/mute', '/channels/{id}/read',
+  '/attention', '/notices', '/notices/{id}', '/notices/{id}/seen', '/notices/{id}/ack', '/notices/{id}/dismiss',
+  '/notices/{id}/attachments/{key}', '/notices/{id}/reach', '/notices/{id}/reach/pending', '/notices/{id}/remind',
+  '/onboarding/first-notice',
 ];
 
 describe('mobile OpenAPI document', () => {
@@ -29,13 +32,35 @@ describe('mobile OpenAPI document', () => {
 
   it('names every component and operation so the Dart client is predictable', () => {
     expect(Object.keys(doc.components.schemas).sort()).toEqual([
-      'ChangePasswordRequest', 'ChannelDetail', 'Config', 'Devices', 'ErrorEnvelope', 'InstitutionLookup', 'Me', 'MuteResult',
-      'OnboardingAdvance', 'OnboardingState', 'PhotoResult', 'ReadResult', 'RefreshRequest', 'RevokedCount', 'SettingsPatch',
-      'Settings', 'SignInRequest', 'SignInResponse', 'Spaces', 'Tokens',
+      'AckRequest', 'AckResult', 'Attention', 'ChangePasswordRequest', 'ChannelDetail', 'Config', 'Devices', 'DismissResult',
+      'ErrorEnvelope', 'InstitutionLookup', 'Me', 'MuteResult', 'NoticeAttachment', 'NoticeAttachmentUrl', 'NoticeCard',
+      'NoticeDetail', 'NoticeList', 'NoticePending', 'NoticeReach', 'NoticeReminders', 'OnboardingAdvance', 'OnboardingState',
+      'PendingPerson', 'PhotoResult', 'ReachComment', 'ReachGroup', 'ReachPerson', 'ReadResult', 'RefreshRequest', 'RemindResult',
+      'RevokedCount', 'SeenResult', 'SettingsPatch', 'Settings', 'SignInRequest', 'SignInResponse', 'Spaces', 'Tokens',
     ].sort());
     expect(doc.paths['/auth/sign-in'].post.operationId).toBe('signIn');
     expect(doc.paths['/channels/{id}/mute'].delete.operationId).toBe('unmuteChannel');
     expect(doc.paths['/me'].get.tags).toEqual(['mobile']);
+    expect(doc.paths['/notices/{id}/ack'].post.operationId).toBe('acknowledgeNotice');
+    expect(doc.paths['/notices/{id}/reach/pending'].get.operationId).toBe('listNoticePending');
+    expect(doc.paths['/onboarding/first-notice'].get.operationId).toBe('getFirstNotice');
+  });
+
+  it('describes the notice endpoints: query parameters, error codes and flat components', () => {
+    const listParams = doc.paths['/notices'].get.parameters.map((p: { name: string; in: string }) => `${p.in}:${p.name}`).sort();
+    expect(listParams).toEqual(['query:cursor', 'query:limit', 'query:office', 'query:segment']);
+    expect(doc.paths['/notices/{id}/attachments/{key}'].get.parameters.map((p: { name: string }) => p.name).sort()).toEqual(['id', 'key']);
+    expect(doc.paths['/notices/{id}/ack'].post.responses['409']).toBeDefined();
+    expect(doc.paths['/notices/{id}/reach'].get.responses['403']).toBeDefined();
+    expect(doc.components.schemas.ErrorEnvelope.properties.error.properties.code.enum).toEqual(expect.arrayContaining([
+      'NOTICE_NOT_FOUND', 'ALREADY_ACKNOWLEDGED', 'NOTICE_ARCHIVED', 'NOT_PUBLISHER', 'REMINDER_LIMIT', 'ACK_REQUIRED', 'ACK_NOT_REQUIRED',
+    ]));
+    const errorProps = doc.components.schemas.ErrorEnvelope.properties.error;
+    expect(errorProps.properties.ack).toMatchObject({ type: 'object', properties: { ackAt: { type: 'string' } } });
+    expect(errorProps.properties.reminders).toMatchObject({ type: 'object', properties: { used: { type: 'integer' } } });
+    expect(errorProps.required).toEqual(['code', 'message']);
+    for (const name of ['NoticeDetail', 'ReachComment', 'NoticeReach']) expect(doc.components.schemas[name].allOf, name).toBeUndefined();
+    expect(doc.components.schemas.ChannelDetail.properties.notices.items).toEqual({ $ref: '#/components/schemas/NoticeCard' });
   });
 
   it('stableStringify orders keys so the file is deterministic', () => {

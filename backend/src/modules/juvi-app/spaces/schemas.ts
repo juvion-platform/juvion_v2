@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { noticeCardSchema } from '../notices/schemas';
 
 export const spaceChannelRowSchema = z.object({
   id: z.string(), name: z.string(), about: z.string(),
@@ -22,6 +23,8 @@ export const channelDetailSchema = z.object({
   replyRule: z.enum(['allowed', 'announcement_only']), defaultPriority: z.enum(['routine', 'important']),
   role: z.enum(['member', 'publisher']), muted: z.boolean(), canPost: z.boolean(), canReply: z.boolean(),
   whoCanPost: z.string(), linkedObject: z.object({ type: z.string(), id: z.string().nullable() }),
+  /** Recent notices whose audience matches this channel and that the caller received (notices spec §7.1). */
+  notices: z.array(noticeCardSchema),
 });
 export type ChannelDetail = z.infer<typeof channelDetailSchema>;
 

@@ -414,6 +414,8 @@ export { Channel } from './juvi/Channel';
 export { ChannelMembership } from './juvi/ChannelMembership';
 export { JuviProvisioningRun } from './juvi/JuviProvisioningRun';
 export { JuviProvisionedCredential } from './juvi/JuviProvisionedCredential';
+export { Notice } from './juvi/Notice';
+export { NoticeRecipient } from './juvi/NoticeRecipient';
 
 // === Workflow ===
 export { ClearanceWorkflow } from './workflow/ClearanceWorkflow';

@@ -8,6 +8,7 @@ import * as settingsCtrl from './settings-controller';
 import * as provisioningCtrl from './provisioning-controller';
 import * as accountsCtrl from './accounts-controller';
 import * as channelsCtrl from './channels-controller';
+import { noticesAdminRouter } from '../notices/admin-routes';
 
 /**
  * ERP-side administration of Juvi. ERP auth chain, ERP error shape.
@@ -34,6 +35,8 @@ adminRouter.post('/accounts/:id/reveal-credential', authorize('platform', 'creat
 adminRouter.get('/channels', authorize('platform', 'read'), channelsCtrl.listChannels);
 adminRouter.get('/templates', authorize('platform', 'read'), channelsCtrl.listTemplates);
 adminRouter.post('/reconcile', authorize('platform', 'update'), channelsCtrl.reconcileNow);
+
+adminRouter.use('/notices', noticesAdminRouter);
 
 adminRouter.use((_req, _res, next) => next(new AppError(404, 'Not found')));
 adminRouter.use(errorHandler);

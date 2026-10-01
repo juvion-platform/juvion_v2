@@ -29,6 +29,7 @@ export function normalizeJuviConfig(raw: Partial<IJuviConfig> | undefined): IJuv
     minAppVersion: j.minAppVersion,
     timezone: j.timezone ?? 'Asia/Kolkata',
     featureFlags: { languageRoadmap: Boolean(j.featureFlags?.languageRoadmap) },
+    welcomeNotice: j.welcomeNotice,
   };
 }
 

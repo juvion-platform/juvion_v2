@@ -24,6 +24,7 @@ export const SUB_DOMAINS = {
   governance: [],
   platform: ['communication'],
   juvi: [],
+  notices: [],
 } as const;
 
 export type RbacModule = keyof typeof SUB_DOMAINS;

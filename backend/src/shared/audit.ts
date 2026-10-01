@@ -29,6 +29,7 @@ const AUDIT_ACTIONS: AuditAction[] = [
   'propose', 'accept', 'decline', 'withdraw', 'expire',
   'waitlist_promote', 'vacate_request', 'vacate_approve', 'vacate_reject',
   'approve', 'reject', 'submit', 'publish', 'archive',
+  'acknowledge', 'access_denied',
   'ai_score_computed',
   'ai_config_suggested',
   'ai_config_applied',
@@ -48,6 +49,11 @@ const auditLogSchema = new Schema<IAuditLog>({
 });
 
 auditLogSchema.index({ entityType: 1, entityId: 1, timestamp: -1 });
+// Juvi notices: one acknowledgement entry per recipient row (recordAcknowledgement's dedupe check).
+auditLogSchema.index(
+  { collegeId: 1, entityType: 1, entityId: 1, 'changes.newValue.recipientId': 1 },
+  { partialFilterExpression: { entityType: 'NoticeAcknowledgement' } },
+);
 
 export const AuditLog = model<IAuditLog>('AuditLog', auditLogSchema);
 

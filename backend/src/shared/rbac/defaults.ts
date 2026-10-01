@@ -179,5 +179,21 @@ export const DEFAULT_POLICIES: Omit<PolicyDoc, '_id'>[] = [
   // Research Coordinator (ST-RES-COORD)
   { role: 'staff', personaType: 'ST-RES-COORD', module: 'compliance', action: '*', effect: 'allow', priority: 750, isActive: true, scope: { subDomain: 'research,publications,faculty-documents' }, description: 'Research Coordinator: research + publication evidence' },
   { role: 'staff', personaType: 'ST-RES-COORD', module: 'people', action: 'read', effect: 'allow', priority: 750, isActive: true, scope: { sensitivity: ['people.identity', 'people.aadhaar:masked'] }, description: 'Research Coordinator: read people for evidence cross-ref (masked Aadhaar)' },
+
+  // ─── Juvi notices (notices spec §7.4) ───────────────────────────
+  // Admin and super admin already hold *:*. The audience a publisher may
+  // target (whole college / own department / own course offerings) is
+  // enforced in modules/juvi-app/notices/scope.ts, not by row scope here.
+  { role: 'principal', module: 'notices', action: '*', effect: 'allow', priority: 900, isActive: true, description: 'Principal: publish and manage Juvi notices' },
+  { role: 'hod', module: 'notices', action: '*', effect: 'allow', priority: 800, isActive: true, description: 'HOD: publish Juvi notices to own department' },
+  { role: 'faculty', module: 'notices', action: 'read', effect: 'allow', priority: 700, isActive: true, description: 'Faculty: read own Juvi notices' },
+  { role: 'faculty', module: 'notices', action: 'create', effect: 'allow', priority: 700, isActive: true, description: 'Faculty: publish Juvi notices to the courses they teach' },
+  { role: 'faculty', module: 'notices', action: 'update', effect: 'allow', priority: 700, isActive: true, description: 'Faculty: remind and archive own Juvi notices' },
+  { role: 'staff', module: 'notices', action: 'read', effect: 'allow', priority: 700, isActive: true, description: 'Staff: read own Juvi notices' },
+  // Staff offices (modules/juvi-app/notices/offices.ts OFFICE_PERSONA_CODES; a test keeps the two lists equal).
+  ...['ST-EXAM', 'ST-ACC', 'ST-ADM', 'ST-TPO', 'ST-WARDEN', 'ST-TRANSPORT-OFFICER', 'ST-SEC', 'ST-LIB', 'ST-REG'].flatMap((personaType) => [
+    { role: 'staff', personaType, module: 'notices', action: 'create', effect: 'allow' as const, priority: 750, isActive: true, description: `${personaType}: publish Juvi notices college-wide` },
+    { role: 'staff', personaType, module: 'notices', action: 'update', effect: 'allow' as const, priority: 750, isActive: true, description: `${personaType}: remind and archive own Juvi notices` },
+  ]),
 ];
 

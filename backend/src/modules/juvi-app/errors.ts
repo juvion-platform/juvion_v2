@@ -5,7 +5,10 @@ import { AppError } from '../../middleware/errorHandler';
 export type MobileErrorCode =
   | 'VALIDATION_FAILED' | 'INVALID_CREDENTIALS' | 'TOKEN_EXPIRED' | 'SESSION_INVALIDATED'
   | 'ACCOUNT_DEACTIVATED' | 'FORBIDDEN' | 'NOT_FOUND' | 'GONE' | 'UPDATE_REQUIRED'
-  | 'COOLDOWN' | 'INSTITUTION_PAUSED' | 'INTERNAL';
+  | 'COOLDOWN' | 'INSTITUTION_PAUSED' | 'INTERNAL'
+  // Juvi notices (notices spec §7.1)
+  | 'NOTICE_NOT_FOUND' | 'ALREADY_ACKNOWLEDGED' | 'NOTICE_ARCHIVED' | 'NOT_PUBLISHER'
+  | 'REMINDER_LIMIT' | 'ACK_REQUIRED' | 'ACK_NOT_REQUIRED';
 
 /**
  * Mobile-facing error. `detail` keys are spread into the envelope next to

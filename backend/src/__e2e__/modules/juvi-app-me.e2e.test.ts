@@ -22,7 +22,7 @@ describe('GET /me', () => {
     const s = await provisionTestStudent(fx, { sectionId: String(fx.cseSection._id) });
     const t = await tokenFor(s.student.rollNumber, s.tempPassword);
     const res = await mobileClient(app, t).get(`${V1}/me`).expect(200);
-    expect(res.body.account).toMatchObject({ kind: 'student', onboardingSteps: ['identity', 'spaces', 'notifications'], mustChangePassword: true });
+    expect(res.body.account).toMatchObject({ kind: 'student', onboardingSteps: ['identity', 'spaces', 'notifications', 'first_notice'], mustChangePassword: true });
     expect(res.body.person.name).toBe(s.person.name);
     expect(res.body.student).toMatchObject({ rollNumber: s.student.rollNumber, programme: 'B.Tech', branch: 'CSE', batch: '2024 Batch', section: 'A', department: 'Computer Science', isLateralEntry: false, hostel: null });
     expect(res.body.faculty).toBeNull();
@@ -61,23 +61,23 @@ describe('settings and onboarding', () => {
     const t = await tokenFor(s.student.rollNumber, s.tempPassword);
     const wrong = await mobileClient(app, t).post(`${V1}/me/onboarding/advance`).send({ step: 1 }).expect(400);
     expect(wrong.body.error).toMatchObject({ code: 'VALIDATION_FAILED', currentStep: 0 });
-    for (const step of [0, 1]) {
+    for (const step of [0, 1, 2]) {
       const r = await mobileClient(app, t).post(`${V1}/me/onboarding/advance`).send({ step }).expect(200);
       expect(r.body).toMatchObject({ onboardingStep: step + 1, onboardingComplete: false });
     }
-    const done = await mobileClient(app, t).post(`${V1}/me/onboarding/advance`).send({ step: 2 }).expect(200);
-    expect(done.body).toMatchObject({ onboardingStep: 3, onboardingComplete: true });
+    const done = await mobileClient(app, t).post(`${V1}/me/onboarding/advance`).send({ step: 3 }).expect(200);
+    expect(done.body).toMatchObject({ onboardingStep: 4, onboardingComplete: true });
     const acct = await JuviAccount.findById(s.account._id).lean();
     expect(acct?.status).toBe('active');
     expect(acct?.onboardingCompletedAt).toBeInstanceOf(Date);
     // Re-sending the last step is idempotent.
-    await mobileClient(app, t).post(`${V1}/me/onboarding/advance`).send({ step: 2 }).expect(200);
+    await mobileClient(app, t).post(`${V1}/me/onboarding/advance`).send({ step: 3 }).expect(200);
     // R12: once complete, any step is a no-op and nothing is rewritten.
     const before = (await JuviAccount.findById(s.account._id).lean())!;
-    const r3 = await mobileClient(app, t).post(`${V1}/me/onboarding/advance`).send({ step: 3 }).expect(200);
-    expect(r3.body).toMatchObject({ onboardingStep: 3, onboardingComplete: true });
+    const r3 = await mobileClient(app, t).post(`${V1}/me/onboarding/advance`).send({ step: 4 }).expect(200);
+    expect(r3.body).toMatchObject({ onboardingStep: 4, onboardingComplete: true });
     const after = (await JuviAccount.findById(s.account._id).lean())!;
-    expect(after.onboardingStep).toBe(3);
+    expect(after.onboardingStep).toBe(4);
     expect(after.onboardingCompletedAt?.toISOString()).toBe(before.onboardingCompletedAt?.toISOString());
   });
 });
