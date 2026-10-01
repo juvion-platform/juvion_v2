@@ -62,6 +62,8 @@ export function NoticeComposerForm({ initial, onPublished, onCancel, titleRef }:
   const [priority, setPriority] = useState<NoticePriority>('routine');
   const [step, setStep] = useState<'compose' | 'confirm'>('compose');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const reviewRef = useRef<HTMLButtonElement>(null);
+  const backFromConfirm = useRef(false);
 
   const purpose = initial?.purpose ?? 'standard';
   const officeChoice = targets?.isAdmin ? office || targets.office : undefined;
@@ -70,6 +72,12 @@ export function NoticeComposerForm({ initial, onPublished, onCancel, titleRef }:
   const preview = useAudiencePreview(targets ? rules : [], officeChoice);
   const deadlineIso = ackRequired && deadline ? zonedLocalToIso(deadline, tz) : null;
   const confirming = step === 'confirm' ? preview.data : undefined;
+  const welcome = purpose === 'welcome';
+
+  // Back to edit returns focus to the button that opened the confirm step.
+  useEffect(() => {
+    if (step === 'compose' && backFromConfirm.current) { backFromConfirm.current = false; reviewRef.current?.focus(); }
+  }, [step]);
 
   const publish = useMutation({
     mutationFn: (input: PublishNoticeInput) => publishNotice(input),
@@ -78,7 +86,8 @@ export function NoticeComposerForm({ initial, onPublished, onCancel, titleRef }:
     onSuccess: (notice) => {
       qc.invalidateQueries({ queryKey: ['notices'] });
       const total = preview.data?.total ?? 0;
-      toast.success('Notice published', `Delivering to ${n(total)} ${total === 1 ? 'person' : 'people'}.`);
+      if (welcome) toast.success('Welcome notice published', 'New accounts see it at onboarding once it is saved as the welcome notice.');
+      else toast.success('Notice published', `Delivering to ${n(total)} ${total === 1 ? 'person' : 'people'}.`);
       onPublished(notice);
     },
   });
@@ -90,7 +99,8 @@ export function NoticeComposerForm({ initial, onPublished, onCancel, titleRef }:
     if (rules.length === 0) e.audience = 'Choose who should receive this notice';
     else if (preview.isError) e.audience = noticeErrorMessage(preview.error);
     else if (!preview.current) e.audience = 'Wait for the audience count to finish';
-    else if (preview.data?.total === 0) e.audience = 'This audience has no members';
+    // A welcome notice reaches accounts as they onboard, so an audience with no members yet is fine.
+    else if (preview.data?.total === 0 && !welcome) e.audience = 'This audience has no members';
     if (files.uploading) e.attachments = 'Wait for the uploads to finish';
     else if (files.failed) e.attachments = 'Remove the attachments that could not be uploaded';
     if (deadlineIso && new Date(deadlineIso).getTime() <= Date.now()) e.deadline = 'The deadline must be in the future';
@@ -111,6 +121,12 @@ export function NoticeComposerForm({ initial, onPublished, onCancel, titleRef }:
     });
   }
 
+  function backToEdit() {
+    publish.reset();   // a failure from this attempt must not reappear on the next review
+    backFromConfirm.current = true;
+    setStep('compose');
+  }
+
   function toggleAck(on: boolean) {
     setAckRequired(on);
     if (!on) { setDeadline(''); setAckCommentAllowed(false); }
@@ -122,9 +138,9 @@ export function NoticeComposerForm({ initial, onPublished, onCancel, titleRef }:
     <>
       {confirming && (
         <ConfirmStep
-          preview={confirming} office={officeChoice} deadline={deadlineIso && `${formatInZone(deadlineIso, tz)} (${tz})`}
+          preview={confirming} office={officeChoice} deadline={deadlineIso && `${formatInZone(deadlineIso, tz)} (${tz})`} welcome={welcome}
           pending={publish.isPending} error={publish.isError ? noticeErrorMessage(publish.error) : null}
-          onBack={() => setStep('compose')} onPublish={submit}
+          onBack={backToEdit} onPublish={submit}
         />
       )}
       <div hidden={Boolean(confirming)}>
@@ -168,7 +184,8 @@ export function NoticeComposerForm({ initial, onPublished, onCancel, titleRef }:
             {targets ? (
               <div>
                 <AudienceBuilder targets={targets} value={audience} onChange={setAudience} preview={preview} />
-                {err('audience')}
+                {/* AudienceCount already shows a preview failure. */}
+                {!preview.isError && err('audience')}
               </div>
             ) : !targetsQ.isError && <p className="text-sm text-gray-500">Loading who you can send to…</p>}
 
@@ -206,7 +223,7 @@ export function NoticeComposerForm({ initial, onPublished, onCancel, titleRef }:
 
             <div className="flex justify-end gap-2 border-t pt-4">
               <button type="button" onClick={onCancel} className="rounded-lg border px-4 py-2 text-sm hover:bg-gray-50">Cancel</button>
-              <button type="button" onClick={review} disabled={!targets}
+              <button ref={reviewRef} type="button" onClick={review} disabled={!targets}
                 className="rounded-lg bg-primary-600 px-4 py-2 text-sm text-white hover:bg-primary-700 disabled:opacity-50">
                 Review and publish
               </button>
@@ -227,23 +244,36 @@ export function NoticeComposerForm({ initial, onPublished, onCancel, titleRef }:
 }
 
 interface ConfirmProps {
-  preview: AudiencePreview; office?: string; deadline: string | null;
+  preview: AudiencePreview; office?: string; deadline: string | null; welcome: boolean;
   pending: boolean; error: string | null; onBack: () => void; onPublish: () => void;
 }
 
-/** Confirm-to-publish (spec §8): the count, the on-Juvi split, the deadline in college time. Takes focus. */
-function ConfirmStep({ preview: d, office, deadline, pending, error, onBack, onPublish }: ConfirmProps) {
+/**
+ * Confirm-to-publish (spec §8): the count, the on-Juvi split, the deadline in college time. Takes focus.
+ * A welcome notice is not sent to anyone now (spec §6.5), so it says who sees it instead of a count.
+ */
+function ConfirmStep({ preview: d, office, deadline, welcome, pending, error, onBack, onPublish }: ConfirmProps) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => { headingRef.current?.focus(); }, []);
   return (
     <div className="space-y-4">
       <h4 ref={headingRef} tabIndex={-1} className="text-lg font-semibold text-navy focus:outline-none">
-        Publish to {n(d.total)} {d.total === 1 ? 'person' : 'people'}?
+        {welcome ? 'Publish this welcome notice?' : `Publish to ${n(d.total)} ${d.total === 1 ? 'person' : 'people'}?`}
       </h4>
       <ul className="list-disc space-y-1 pl-5 text-sm text-gray-700">
-        <li>{d.line}{office ? `, from ${office}` : ''}.</li>
-        <li>{n(d.onJuvi)} on Juvi see it on their next refresh.</li>
-        {d.notOnJuvi > 0 && <li>{n(d.notOnJuvi)} not on Juvi yet get it when they activate the app.</li>}
+        {welcome ? (
+          <>
+            <li>Each new account sees it at onboarding step 4, once it is saved as the welcome notice.</li>
+            <li>People already using Juvi do not receive it. To reach them, publish a regular notice.</li>
+            {office && <li>From {office}.</li>}
+          </>
+        ) : (
+          <>
+            <li>{d.line}{office ? `, from ${office}` : ''}.</li>
+            <li>{n(d.onJuvi)} on Juvi see it on their next refresh.</li>
+            {d.notOnJuvi > 0 && <li>{n(d.notOnJuvi)} not on Juvi yet get it when they activate the app.</li>}
+          </>
+        )}
         {deadline && <li>Acknowledge by {deadline}.</li>}
         <li>A published notice cannot be edited. You can archive it.</li>
       </ul>

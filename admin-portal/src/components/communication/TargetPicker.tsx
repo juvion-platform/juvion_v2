@@ -4,6 +4,7 @@ import { Check, ChevronDown } from 'lucide-react';
 import clsx from 'clsx';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import type { PersonOption, TargetOption } from '../../services/notices';
+import { noticeErrorMessage } from '../../lib/notices';
 
 const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default';
 
@@ -67,6 +68,10 @@ export default function TargetPicker({ label, options, search, selected, onChang
   const toggle = (item: AudienceItem) =>
     onChange(isSelected(item.id) ? selected.filter((s) => s.id !== item.id) : [...selected, { id: item.id, label: item.label, ...(item.hint ? { hint: item.hint } : {}) }]);
   const close = () => { setOpen(false); setTerm(''); buttonRef.current?.focus(); };
+  // Tabbing out closes the popup; focus moving within it (chip ↔ search) does not.
+  function onBlur(e: React.FocusEvent<HTMLDivElement>) {
+    if (open && !rootRef.current?.contains(e.relatedTarget as Node | null)) { setOpen(false); setTerm(''); }
+  }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'ArrowDown') { e.preventDefault(); setActive((i) => Math.min(i + 1, Math.max(shown.length - 1, 0))); }
@@ -79,8 +84,9 @@ export default function TargetPicker({ label, options, search, selected, onChang
   }
 
   const loading = Boolean(search) && remote.isFetching;
+  const failed = Boolean(search) && remote.isError && !loading;
   return (
-    <div ref={rootRef} className="relative">
+    <div ref={rootRef} className="relative" onBlur={onBlur}>
       <button
         ref={buttonRef}
         type="button"
@@ -98,7 +104,9 @@ export default function TargetPicker({ label, options, search, selected, onChang
         <ChevronDown size={14} aria-hidden="true" />
       </button>
       {open && (
-        <div className="absolute left-0 z-20 mt-1 w-80 rounded-lg border bg-white p-2 shadow-lg">
+        // A press on the popup's padding or scrollbar keeps focus in the search, so it is not a blur outside.
+        <div className="absolute left-0 z-20 mt-1 w-80 rounded-lg border bg-white p-2 shadow-lg"
+          onMouseDown={(e) => { if (e.target !== inputRef.current) e.preventDefault(); }}>
           <input
             ref={inputRef}
             role="combobox"
@@ -133,7 +141,8 @@ export default function TargetPicker({ label, options, search, selected, onChang
             ))}
           </ul>
           {loading && <p className="px-2 py-1 text-xs text-gray-500">Searching…</p>}
-          {!loading && shown.length === 0 && <p className="px-2 py-1 text-xs text-gray-500">No matches you can send to.</p>}
+          {failed && <p role="alert" className="px-2 py-1 text-xs text-red-600">{noticeErrorMessage(remote.error)}</p>}
+          {!loading && !failed && shown.length === 0 && <p className="px-2 py-1 text-xs text-gray-500">No matches you can send to.</p>}
         </div>
       )}
     </div>

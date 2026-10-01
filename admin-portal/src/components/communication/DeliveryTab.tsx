@@ -21,6 +21,7 @@ export default function DeliveryTab({ notice }: { notice: NoticeDetail }) {
       qc.invalidateQueries({ queryKey: ['notice', notice.id] });
       qc.invalidateQueries({ queryKey: ['notices'] });
       qc.invalidateQueries({ queryKey: ['notice-dead-events'] });
+      qc.invalidateQueries({ queryKey: ['notice-audit', notice.id] });
       toast.success('Delivery retried', 'The notice is being delivered again.');
     },
     onError: (err) => toast.error('Could not retry delivery', noticeErrorMessage(err)),
@@ -29,7 +30,7 @@ export default function DeliveryTab({ notice }: { notice: NoticeDetail }) {
   return (
     <div className="space-y-4 rounded-xl border bg-white p-5 text-sm">
       <dl className="grid gap-3 sm:grid-cols-2">
-        <div><dt className="text-xs text-gray-500">State</dt><dd className="mt-0.5"><Badge variant={status.variant}>{status.label}</Badge></dd></div>
+        <div><dt className="text-xs text-gray-500">State</dt><dd className="mt-0.5" role="status"><Badge variant={status.variant}>{status.label}</Badge></dd></div>
         <div><dt className="text-xs text-gray-500">Attempts</dt><dd className="mt-0.5 tabular-nums">{d.attempts}</dd></div>
         <div><dt className="text-xs text-gray-500">Last update</dt><dd className="mt-0.5">{formatWhen(d.updatedAt)}</dd></div>
         <div>

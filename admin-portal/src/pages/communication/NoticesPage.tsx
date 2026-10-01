@@ -11,7 +11,7 @@ import DeadEventsPanel from '../../components/communication/DeadEventsPanel';
 import { useListControls } from '../../hooks/useListControls';
 import { useAuthStore } from '../../stores/authStore';
 import { listNotices, getNoticeTargets, type NoticeRow, type NoticeStatus } from '../../services/notices';
-import { countsText, deadlineText, formatWhen, isNoticeAdmin, noticeStatus } from '../../lib/notices';
+import { countsText, deadlineText, formatWhen, isNoticeAdmin, noticeErrorMessage, noticeStatus } from '../../lib/notices';
 
 const sel = 'border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none';
 const STATUSES: { value: '' | NoticeStatus; label: string }[] = [
@@ -33,10 +33,12 @@ export default function NoticesPage() {
   const [office, setOffice] = useState('');
   const [composing, setComposing] = useState(false);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: ['notices', { page, limit, search, status, office }],
     queryFn: () => listNotices({ page, limit, q: search, status: status || undefined, office: office || undefined }),
     refetchInterval: (q) => (q.state.data?.items.some((r) => r.delivery.state === 'delivering') ? DELIVERING_POLL_MS : false),
+    // Shown inline below; a global toast would repeat on every poll during an outage.
+    meta: { silentError: true },
   });
   // Only admins see other offices' notices, so only they get the office filter.
   const { data: targets } = useQuery({ queryKey: ['notice-targets'], queryFn: getNoticeTargets, enabled: admin && canCreate, staleTime: 5 * 60_000 });
@@ -96,6 +98,7 @@ export default function NoticesPage() {
         )}
       </div>
 
+      {isError && <p role="alert" className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{noticeErrorMessage(error)}</p>}
       <DataTable
         columns={columns}
         data={data?.items ?? []}

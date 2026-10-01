@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest';
-import { screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { act, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import NoticeComposer from '../NoticeComposer';
 import { renderWithProviders } from '../../../__tests__/test-utils';
 
@@ -78,7 +78,7 @@ describe('NoticeComposer', () => {
     fireEvent.change(input, { target: { files: [pdf(), new File(['x'], 'notes.txt', { type: 'text/plain' }), pdf('huge.pdf', 10 * 1024 * 1024 + 1)] } });
     expect(screen.getByText(/Unsupported file type/)).toBeInTheDocument();
     expect(screen.getByText('File too large (max 10 MB)')).toBeInTheDocument();
-    report(40);
+    act(() => report(40));
     expect(await screen.findByRole('progressbar', { name: 'Uploading timetable.pdf' })).toHaveAttribute('aria-valuenow', '40');
     upload.resolve({ key: 'colleges/c/notices/u1', name: 'timetable.pdf', mime: 'application/pdf', size: 1000 });
     await waitFor(() => expect(screen.queryByRole('progressbar')).toBeNull());
@@ -160,18 +160,51 @@ describe('NoticeComposer', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('keeps the draft on Back to edit and shows a publish failure in the confirm step', async () => {
-    (publishNotice as Mock).mockRejectedValue({ isAxiosError: true, response: { status: 400, data: { error: 'This audience has no members' } } });
+  it('keeps the draft on Back to edit, shows a publish failure in the confirm step, and does not bring it back', async () => {
+    (publishNotice as Mock).mockRejectedValue({ isAxiosError: true, response: { status: 400, data: { error: 'Something went wrong on the server' } } });
     open({ purpose: 'welcome', title: 'Welcome to Juvi', ackRequired: true, audience: { role: [{ id: 'student', label: 'All students' }] } });
     fireEvent.change(screen.getByLabelText('Notice'), { target: { value: 'Hello.' } });
     await screen.findByText(/2 on Juvi/);
     fireEvent.click(screen.getByRole('button', { name: 'Review and publish' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Publish notice' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('This audience has no members');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Something went wrong on the server');
     expect(publishNotice).toHaveBeenCalledWith(expect.objectContaining({ purpose: 'welcome', title: 'Welcome to Juvi', audience: { rules: [{ kind: 'role', ids: ['student'] }] } }));
     fireEvent.click(screen.getByRole('button', { name: 'Back to edit' }));
     expect(screen.getByLabelText('Title')).toHaveValue('Welcome to Juvi');
     expect(screen.getByLabelText('Notice')).toHaveValue('Hello.');
     expect(onClose).not.toHaveBeenCalled();
+    // Focus lands on the button that opens the confirm step again.
+    const reviewButton = screen.getByRole('button', { name: 'Review and publish' });
+    await waitFor(() => expect(document.activeElement).toBe(reviewButton));
+    // Reviewing again starts clean: the earlier failure is gone.
+    fireEvent.click(reviewButton);
+    expect(await screen.findByRole('button', { name: 'Publish notice' })).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('tells the publisher a welcome notice goes to new accounts at onboarding, not to existing users', async () => {
+    open({ purpose: 'welcome', title: 'Welcome to Juvi', ackRequired: true, audience: { role: [{ id: 'student', label: 'All students' }] } });
+    fireEvent.change(screen.getByLabelText('Notice'), { target: { value: 'Hello.' } });
+    await screen.findByText(/2 on Juvi/);
+    fireEvent.click(screen.getByRole('button', { name: 'Review and publish' }));
+    expect(await screen.findByRole('heading', { name: 'Publish this welcome notice?' })).toBeInTheDocument();
+    expect(screen.getByText(/Each new account sees it at onboarding step 4/)).toBeInTheDocument();
+    expect(screen.getByText(/People already using Juvi do not receive it/)).toBeInTheDocument();
+    expect(screen.queryByText(/see it on their next refresh/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Publish notice' }));
+    await waitFor(() => expect(onPublished).toHaveBeenCalled());
+    expect(toast.success).toHaveBeenCalledWith('Welcome notice published', expect.stringMatching(/onboarding/));
+  });
+
+  it('shows an audience preview failure once, not again under the builder', async () => {
+    (previewAudience as Mock).mockRejectedValue({ isAxiosError: true, response: { status: 403, data: { error: 'You can only send notices to your own department.' } } });
+    open();
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Exams' } });
+    fireEvent.change(screen.getByLabelText('Notice'), { target: { value: 'Soon.' } });
+    fireEvent.click(await screen.findByRole('button', { name: 'Everyone' }));
+    await screen.findByRole('alert');
+    fireEvent.click(screen.getByRole('button', { name: 'Review and publish' }));
+    expect(screen.getAllByText(/You can only send notices to your own department\./)).toHaveLength(1);
+    expect(screen.queryByRole('heading', { name: /Publish to/ })).toBeNull();
   });
 });

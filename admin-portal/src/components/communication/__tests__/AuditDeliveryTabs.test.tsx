@@ -3,7 +3,7 @@ import { screen, fireEvent, waitFor, within } from '@testing-library/react';
 import AuditTab from '../AuditTab';
 import DeliveryTab from '../DeliveryTab';
 import DeadEventsPanel from '../DeadEventsPanel';
-import { renderWithProviders } from '../../../__tests__/test-utils';
+import { renderWithProviders, makeQueryClient } from '../../../__tests__/test-utils';
 import { formatWhen } from '../../../lib/notices';
 import type { NoticeDetail } from '../../../services/notices';
 
@@ -158,6 +158,15 @@ describe('DeliveryTab', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Retry delivery' }));
     await waitFor(() => expect(retryNoticeDelivery).toHaveBeenCalledWith('n1'));
     expect(toast.success).toHaveBeenCalledWith('Delivery retried', expect.any(String));
+  });
+
+  it('announces the delivery state and refreshes the audit trail after a retry', async () => {
+    const queryClient = makeQueryClient();
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+    renderWithProviders(<DeliveryTab notice={FAILED} />, { queryClient });
+    expect(screen.getByRole('status')).toHaveTextContent('Delivery failed');
+    fireEvent.click(screen.getByRole('button', { name: 'Retry delivery' }));
+    await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: ['notice-audit', 'n1'] }));
   });
 
   it('shows the server reason when a retry is refused', async () => {

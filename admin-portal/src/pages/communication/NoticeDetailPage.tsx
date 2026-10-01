@@ -21,7 +21,8 @@ export default function NoticeDetailPage() {
   });
 
   if (isLoading) return <p className="text-sm text-gray-500">Loading notice…</p>;
-  if (isError || !notice) {
+  // The full error screen only when there is nothing to show; a failed background refetch keeps the page.
+  if (!notice) {
     return (
       <div role="alert" className="space-y-2 text-sm">
         <p className="text-red-700">
@@ -46,6 +47,11 @@ export default function NoticeDetailPage() {
       <Link to="/communication/notices" className="mb-3 inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900">
         <ArrowLeft size={14} /> Notices
       </Link>
+      {isError && (
+        <p role="alert" className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          Could not refresh this notice: {noticeErrorMessage(error)} Showing what was last loaded.
+        </p>
+      )}
       <div className="mb-4 rounded-xl border bg-white p-5">
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-xl font-bold text-navy">{notice.title}</h2>

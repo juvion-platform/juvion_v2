@@ -17,6 +17,7 @@ vi.mock('../persona-registry', async (importOriginal) => {
 
 import { loadPolicies } from '../engine';
 import { resolvePermissions } from '../resolve-permissions';
+import { DEFAULT_POLICIES } from '../defaults';
 
 const mockedLoadPolicies = vi.mocked(loadPolicies);
 
@@ -161,6 +162,17 @@ describe('resolvePermissions — Juvi notices', () => {
     const result = await resolvePermissions('c1', 'staff', ['ST-REG']);
     expect(result).toEqual(expect.arrayContaining(['notices:read', 'notices:create']));
     expect(result).not.toContain('notices:update');
+  });
+
+  it.each([
+    ['student', 'L-STU'],
+    ['parent', 'L-PAR'],
+  ])('gives the %s role no notices grant under DEFAULT_POLICIES', async (role, persona) => {
+    // loadPolicies keeps the rows for this role and for '*'.
+    mockedLoadPolicies.mockResolvedValue(DEFAULT_POLICIES.filter((p) => p.role === role || p.role === '*') as PolicyDoc[]);
+    const result = await resolvePermissions('c1', role, [persona]);
+    expect(result.length).toBeGreaterThan(0);
+    expect(result.filter((p) => p.startsWith('notices'))).toEqual([]);
   });
 });
 

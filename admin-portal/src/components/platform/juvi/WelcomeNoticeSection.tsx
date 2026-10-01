@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Save } from 'lucide-react';
 import NoticeComposer, { type ComposerInitial } from '../../communication/NoticeComposer';
 import { getJuviSettings, updateJuviSettings, type AdminSettingsView } from '../../../services/juvi-app';
-import { listNotices } from '../../../services/notices';
+import { listNotices, type NoticeRow } from '../../../services/notices';
 import { useAuthStore } from '../../../stores/authStore';
 import { toast } from '../../../stores/toastStore';
 import { formatWhen, noticeErrorMessage, roleLabel } from '../../../lib/notices';
@@ -37,6 +37,8 @@ export default function WelcomeNoticeSection({ canUpdate }: { canUpdate: boolean
   const [base, setBase] = useState<Record<Slot, string> | null>(null);
   const [choice, setChoice] = useState<Record<Slot, string> | null>(null);
   const [composing, setComposing] = useState<(typeof SLOTS)[number] | null>(null);
+  // Notices made in the composer here, listed until the refetched welcome list has them.
+  const [created, setCreated] = useState<NoticeRow[]>([]);
 
   // Seed once, like SettingsTab: a background refetch never clobbers a pending choice.
   useEffect(() => {
@@ -57,7 +59,15 @@ export default function WelcomeNoticeSection({ canUpdate }: { canUpdate: boolean
   });
 
   if (!choice || !base) return null;
-  const items = welcomeQ.data?.items ?? [];
+  const fetched = welcomeQ.data?.items ?? [];
+  const items = [...created.filter((c) => !fetched.some((n) => n.id === c.id)), ...fetched];
+
+  /** A welcome notice is published at once (no fan-out), so it can be chosen now; it is saved with Save. */
+  function onCreated(slot: Slot, notice: NoticeRow) {
+    setCreated((prev) => [notice, ...prev]);
+    setChoice((prev) => (prev ? { ...prev, [slot]: notice.id } : prev));
+    qc.invalidateQueries({ queryKey: ['notices', WELCOME_QUERY] });
+  }
 
   function onSave() {
     const patch: Partial<Record<Slot, string | null>> = {};
@@ -103,7 +113,7 @@ export default function WelcomeNoticeSection({ canUpdate }: { canUpdate: boolean
           </div>
         );
       })}
-      <p className="text-xs text-gray-500">A new welcome notice appears in these lists once its delivery has finished.</p>
+      <p className="text-xs text-gray-500">A welcome notice you create here is selected for its kind. Save to start showing it.</p>
       <div className="flex justify-end">
         <button type="button" onClick={onSave} disabled={!canUpdate || save.isPending}
           className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm text-white hover:bg-primary-700 disabled:opacity-50">
@@ -111,7 +121,8 @@ export default function WelcomeNoticeSection({ canUpdate }: { canUpdate: boolean
         </button>
       </div>
       <NoticeComposer open={composing !== null} onClose={() => setComposing(null)} title={composing?.composer ?? 'Welcome notice'}
-        initial={composing ? initialFor(composing) : undefined} />
+        initial={composing ? initialFor(composing) : undefined}
+        onPublished={(notice) => { if (composing) onCreated(composing.slot, notice); }} />
     </section>
   );
 }

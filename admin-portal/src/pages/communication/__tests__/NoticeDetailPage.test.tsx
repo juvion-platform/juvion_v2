@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest';
-import { screen } from '@testing-library/react';
+import { act, screen } from '@testing-library/react';
 import { Routes, Route } from 'react-router-dom';
 import NoticeDetailPage from '../NoticeDetailPage';
 import { renderWithProviders } from '../../../__tests__/test-utils';
@@ -57,5 +57,16 @@ describe('NoticeDetailPage', () => {
     renderAt('/communication/notices/nope');
     expect(await screen.findByRole('alert')).toHaveTextContent('This notice does not exist, or it is not one you can see.');
     expect(screen.getByRole('link', { name: 'Back to notices' })).toHaveAttribute('href', '/communication/notices');
+  });
+
+  it('keeps the page when a background refetch fails, with an inline alert', async () => {
+    const { queryClient } = renderAt('/communication/notices/n1');
+    expect(await screen.findByRole('heading', { name: 'Exam timetable' })).toBeInTheDocument();
+    (getNotice as Mock).mockRejectedValue({ isAxiosError: true, response: { status: 503, data: { error: 'Service unavailable' } } });
+    await act(async () => { await queryClient.refetchQueries({ queryKey: ['notice', 'n1'] }); });
+    expect(await screen.findByRole('alert')).toHaveTextContent('Service unavailable');
+    expect(screen.getByRole('heading', { name: 'Exam timetable' })).toBeInTheDocument();
+    expect(screen.getByText('Reach tab')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Back to notices' })).toBeNull();
   });
 });

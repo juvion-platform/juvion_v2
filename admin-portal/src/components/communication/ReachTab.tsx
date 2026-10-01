@@ -31,6 +31,8 @@ export default function ReachTab({ notice }: { notice: NoticeDetail }) {
   const qc = useQueryClient();
   const role = useAuthStore((s) => s.user?.role);
   const admin = isNoticeAdmin(role);
+  // canManage is the row-level answer; notices:update is the policy one (spec §7.2). Both must hold.
+  const manage = useAuthStore((s) => s.hasPermission('notices', 'update')) && notice.canManage;
   const id = notice.id;
   const delivered = notice.status !== 'publishing';
   const [q, setQ] = useState('');
@@ -49,6 +51,7 @@ export default function ReachTab({ notice }: { notice: NoticeDetail }) {
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['notice', id] });
     qc.invalidateQueries({ queryKey: ['notices'] });
+    qc.invalidateQueries({ queryKey: ['notice-audit', id] });
   };
   const setReminders = (reminders: Reminders) =>
     qc.setQueryData<Reach>(['notice-reach', id], (old) => (old ? { ...old, reminders } : old));
@@ -151,7 +154,7 @@ export default function ReachTab({ notice }: { notice: NoticeDetail }) {
         </p>
 
         <div className="mt-4 flex flex-wrap gap-2">
-          {notice.canManage && (
+          {manage && (
             <button type="button" className={btn} onClick={() => onRemind(r.reminders)} disabled={remindBlocked || remind.isPending}
               title={r.reminders.used >= r.reminders.max ? 'A notice can have at most two reminders.' : r.status !== 'published' ? 'Only a published notice can be reminded.' : undefined}>
               <BellRing size={14} /> Remind ({r.reminders.used} of {r.reminders.max} used)
@@ -165,7 +168,7 @@ export default function ReachTab({ notice }: { notice: NoticeDetail }) {
               <Download size={14} /> Export CSV
             </button>
           )}
-          {notice.canManage && notice.status !== 'archived' && (
+          {manage && notice.status !== 'archived' && (
             <button type="button" className={`${btn} text-red-700`} onClick={onArchive} disabled={archive.isPending}>
               <Archive size={14} /> Archive
             </button>

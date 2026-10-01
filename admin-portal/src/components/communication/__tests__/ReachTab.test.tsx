@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest';
 import { screen, fireEvent, waitFor, within } from '@testing-library/react';
 import ReachTab from '../ReachTab';
-import { renderWithProviders } from '../../../__tests__/test-utils';
+import { renderWithProviders, makeQueryClient } from '../../../__tests__/test-utils';
 import type { NoticeDetail, Reach } from '../../../services/notices';
 
-const auth = vi.hoisted(() => ({ role: 'admin' }));
-vi.mock('../../../stores/authStore', () => ({ useAuthStore: (sel: (s: unknown) => unknown) => sel({ user: { role: auth.role } }) }));
+const auth = vi.hoisted(() => ({ role: 'admin', perms: ['notices:update'] }));
+vi.mock('../../../stores/authStore', () => ({
+  useAuthStore: (sel: (s: unknown) => unknown) => sel({ user: { role: auth.role }, hasPermission: (m: string, a: string) => auth.perms.includes(`${m}:${a}`) }),
+}));
 vi.mock('../../../stores/toastStore', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 const confirm = vi.hoisted(() => ({ confirmed: true }));
 vi.mock('../../../stores/confirmStore', () => ({ confirmAction: vi.fn(() => Promise.resolve(confirm)) }));
@@ -41,7 +43,7 @@ const PENDING = (items: object[], nextCursor: string | null = null) => ({ items,
 const pendingPerson = (name: string, state = 'not_seen') => ({ name, identifier: null, group: '2024 Batch · Section A', state, lastSeenInApp: state === 'not_on_juvi' ? null : '2026-09-29T04:00:00.000Z' });
 
 beforeEach(() => {
-  vi.clearAllMocks(); auth.role = 'admin'; confirm.confirmed = true;
+  vi.clearAllMocks(); auth.role = 'admin'; auth.perms = ['notices:update']; confirm.confirmed = true;
   (getReach as Mock).mockResolvedValue(REACH);
   (getPending as Mock).mockImplementation(async (_id: string, q: { cursor?: string }) =>
     (q.cursor ? PENDING([pendingPerson('Pallavi Pending')]) : PENDING([pendingPerson('Nikhil Notseen'), pendingPerson('Omar Offline', 'not_on_juvi')], 'c2')));
@@ -108,6 +110,32 @@ describe('ReachTab', () => {
     await waitFor(() => expect(archiveNotice).toHaveBeenCalledWith('n1'));
     expect(confirmAction).toHaveBeenCalledWith(expect.objectContaining({ tone: 'danger' }));
     expect(toast.success).toHaveBeenCalledWith('Notice archived', expect.any(String));
+  });
+
+  it('refreshes the audit trail after a reminder and after archiving', async () => {
+    const queryClient = makeQueryClient();
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+    renderWithProviders(<ReachTab notice={NOTICE} />, { queryClient });
+    fireEvent.click(await screen.findByRole('button', { name: 'Remind (1 of 2 used)' }));
+    await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: ['notice-audit', 'n1'] }));
+    invalidate.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: 'Archive' }));
+    await waitFor(() => expect(archiveNotice).toHaveBeenCalled());
+    await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: ['notice-audit', 'n1'] }));
+  });
+
+  it('offers Remind and Archive only with notices:update and a notice the caller manages', async () => {
+    auth.perms = [];
+    const { unmount } = renderWithProviders(<ReachTab notice={NOTICE} />);
+    await screen.findByText(/in the audience snapshot/);
+    expect(screen.queryByRole('button', { name: /^Remind/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Archive' })).toBeNull();
+    unmount();
+    auth.perms = ['notices:update'];
+    renderWithProviders(<ReachTab notice={{ ...NOTICE, canManage: false }} />);
+    await screen.findByText(/in the audience snapshot/);
+    expect(screen.queryByRole('button', { name: /^Remind/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Archive' })).toBeNull();
   });
 
   it('does nothing when a confirmation is cancelled', async () => {

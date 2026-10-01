@@ -135,17 +135,22 @@ function AudienceCount({ hasRules, preview }: { hasRules: boolean; preview: Audi
   }
   const d = preview.data;
   return (
-    <div aria-live="polite" className="rounded-lg border bg-gray-50 p-3 text-sm">
-      {!d ? (
-        <p className="text-gray-500">Counting the audience…</p>
-      ) : (
-        <>
+    <div className="rounded-lg border bg-gray-50 p-3 text-sm">
+      {/* Only the totals sentence is announced, not the breakdown under it. */}
+      <div aria-live="polite">
+        {!d ? (
+          <p className="text-gray-500">Counting the audience…</p>
+        ) : (
           <p className="text-gray-900">
             <span className="font-semibold">{d.total.toLocaleString('en-IN')}</span> {d.total === 1 ? 'person' : 'people'}
             {' · '}{d.onJuvi.toLocaleString('en-IN')} on Juvi
             {' · '}{d.notOnJuvi.toLocaleString('en-IN')} not on Juvi yet
             {preview.updating && <span className="ml-2 text-xs text-gray-500">updating…</span>}
           </p>
+        )}
+      </div>
+      {d && (
+        <>
           <p className="mt-0.5 text-gray-500">{d.line}</p>
           {d.notOnJuvi > 0 && <p className="mt-1 text-xs text-gray-500">People not on Juvi yet get the notice when they activate the app.</p>}
           {d.groups.length > 0 && (

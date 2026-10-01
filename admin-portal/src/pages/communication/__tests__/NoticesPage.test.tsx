@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest';
 import { screen, fireEvent, waitFor, act, within } from '@testing-library/react';
 import { Routes, Route } from 'react-router-dom';
+import { QueryCache, QueryClient } from '@tanstack/react-query';
 import NoticesPage from '../NoticesPage';
 import { renderWithProviders } from '../../../__tests__/test-utils';
 
@@ -20,13 +21,13 @@ const ROW = {
 const page = (items: unknown[]) => ({ items, total: items.length, page: 1, pages: 1 });
 const TARGETS = { office: 'College Office', offices: ['College Office', 'Exam Section'], isAdmin: true, timezone: 'Asia/Kolkata', kinds: [], roles: [], departments: [], programmes: [], batches: [], sections: [], courseOfferings: [], hostelBlocks: [] };
 
-function renderPage() {
+function renderPage(queryClient?: QueryClient) {
   return renderWithProviders(
     <Routes>
       <Route path="/communication/notices" element={<NoticesPage />} />
       <Route path="/communication/notices/:id" element={<p>Detail page</p>} />
     </Routes>,
-    { route: '/communication/notices' },
+    { route: '/communication/notices', ...(queryClient ? { queryClient } : {}) },
   );
 }
 
@@ -112,5 +113,23 @@ describe('NoticesPage', () => {
     await act(async () => { vi.advanceTimersByTime(3100); });
     expect(await screen.findByText('40 / 30 / 120')).toBeInTheDocument();
     expect(listNotices).toHaveBeenCalledTimes(2);
+  });
+
+  it('shows a failed poll inline instead of handing it to the global error toast', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    // Mirrors main.tsx: the query cache toasts every failed read unless it is meta.silentError.
+    const toasted = vi.fn();
+    const queryClient = new QueryClient({
+      queryCache: new QueryCache({ onError: (_e, q) => { if (!(q.meta as { silentError?: boolean } | undefined)?.silentError) toasted(q.queryKey[0]); } }),
+      defaultOptions: { queries: { retry: false } },
+    });
+    (listNotices as Mock)
+      .mockResolvedValueOnce(page([{ ...ROW, status: 'publishing', delivery: { state: 'delivering', attempts: 0, lastError: null, updatedAt: null } }]))
+      .mockRejectedValue({ isAxiosError: true, response: { status: 503, data: { error: 'Service unavailable' } } });
+    renderPage(queryClient);
+    expect(await screen.findByText('Delivering…')).toBeInTheDocument();
+    await act(async () => { vi.advanceTimersByTime(3100); });
+    expect(await screen.findByRole('alert')).toHaveTextContent('Service unavailable');
+    expect(toasted).not.toHaveBeenCalledWith('notices');
   });
 });

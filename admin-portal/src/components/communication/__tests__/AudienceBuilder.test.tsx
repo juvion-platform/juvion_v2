@@ -81,6 +81,12 @@ describe('AudienceBuilder', () => {
     expect(screen.getByText('Sent to CSE 2024')).toBeInTheDocument();
     const table = screen.getByRole('table', { name: /audience by batch/i });
     expect(within(table).getByText('CSE 2024 · Section A')).toBeInTheDocument();
+    // Only the totals sentence is a live region; the breakdown is not re-announced.
+    const live = screen.getByText(/2 on Juvi/).closest('[aria-live]')!;
+    expect(live).toHaveAttribute('aria-live', 'polite');
+    expect(live).not.toContainElement(table);
+    expect(live).not.toHaveTextContent('Sent to CSE 2024');
+    expect(document.querySelectorAll('[aria-live]')).toHaveLength(1);
   });
 
   it('searches people on the server and removes a tag', async () => {
@@ -93,6 +99,26 @@ describe('AudienceBuilder', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Remove Asha Rao' }));
     expect(screen.queryByRole('list', { name: /selected audience/i })).toBeNull();
     expect(screen.getByText(/choose who should receive/i)).toBeInTheDocument();
+  });
+
+  it('says why a people search failed instead of claiming there are no matches', async () => {
+    (searchNoticePeople as Mock).mockRejectedValue({ isAxiosError: true, response: { status: 500, data: { error: 'People search is unavailable right now.' } } });
+    renderWithProviders(<Harness targets={COLLEGE} />);
+    fireEvent.click(screen.getByRole('button', { name: /^people/i }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('People search is unavailable right now.');
+    expect(screen.queryByText(/no matches you can send to/i)).toBeNull();
+  });
+
+  it('closes the popup when focus leaves the picker, but not when it moves inside it', async () => {
+    renderWithProviders(<><Harness targets={COLLEGE} /><button type="button">Outside</button></>);
+    const chip = screen.getByRole('button', { name: /^batches/i });
+    fireEvent.click(chip);
+    const search = screen.getByRole('combobox', { name: /search batches/i });
+    fireEvent.blur(search, { relatedTarget: chip });
+    expect(screen.getByRole('listbox', { name: 'Batches' })).toBeInTheDocument();
+    fireEvent.blur(search, { relatedTarget: screen.getByRole('button', { name: 'Outside' }) });
+    expect(screen.queryByRole('listbox')).toBeNull();
+    expect(chip).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('shows the server scope refusal as an alert', async () => {
