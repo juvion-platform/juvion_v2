@@ -20,8 +20,11 @@ export function selectWidgets(
   }
   const visible = widgets.filter((w) => !w.module || can(w.module, 'read', w.subDomain));
   if (!primaryModule) return visible;
-  // Stable partition: home-module widgets first, everything else in registry order.
-  return [...visible.filter((w) => w.module === primaryModule), ...visible.filter((w) => w.module !== primaryModule)];
+  return [...visible].sort((a, b) => {
+    const aMatch = a.module === primaryModule ? -1 : 0;
+    const bMatch = b.module === primaryModule ? -1 : 0;
+    return aMatch - bMatch;
+  });
 }
 
 export default function Dashboard() {
@@ -41,11 +44,17 @@ export default function Dashboard() {
     enabled: canPlatform || canPeople,
     retry: false,
   });
-  const primary = personaRows?.find((p) => p.code === user?.personaType);
+
+  const primaryFromCatalog = personaRows?.find((p) => p.code === user?.personaType);
+  const primaryModule = user?.primaryModule || primaryFromCatalog?.primaryModule;
+  const pinned = (user?.dashboardWidgets && user.dashboardWidgets.length > 0)
+    ? user.dashboardWidgets
+    : (primaryFromCatalog?.dashboardWidgets ?? undefined);
+
   const widgets = useMemo(
-    () => selectWidgets(DASHBOARD_WIDGETS, hasPermission, primary?.primaryModule, primary?.dashboardWidgets ?? undefined),
+    () => selectWidgets(DASHBOARD_WIDGETS, hasPermission, primaryModule, pinned),
     // `permissions` is a dependency so a policy refresh re-runs the selection.
-    [hasPermission, primary, permissions],
+    [hasPermission, primaryModule, pinned, permissions],
   );
 
   const kpis = widgets.filter((w) => w.kind === 'kpi');

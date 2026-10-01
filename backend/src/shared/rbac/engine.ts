@@ -89,7 +89,7 @@ export async function loadPolicies(collegeId: string | undefined, role: string):
     const snapshotted = await Policy.exists({ collegeId, createdBy: 'snapshot' });
     filter.collegeId = snapshotted ? collegeId : { $in: [collegeId, null, undefined] };
   } else {
-    filter.collegeId = { $exists: false };
+    filter.collegeId = { $in: [null, undefined] };
   }
 
   const docs = await Policy.find(filter).lean();

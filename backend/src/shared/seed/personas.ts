@@ -23,6 +23,8 @@ export async function seedPersonas(opts: { createdBy?: string } = {}): Promise<S
           parentCode: p.parentCode && p.parentCode !== p.code ? p.parentCode : null,
           primaryModule: p.primaryModule, defaultRole: p.defaultRole, tier: p.tier,
           permissionsHint: p.permissionsHint,
+          dashboardWidgets: p.dashboardWidgets,
+          accessibleModules: p.accessibleModules,
         },
         $setOnInsert: { isActive: true, createdBy },
       },
@@ -44,7 +46,13 @@ export async function snapshotPersonasForCollege(collegeId: string, createdBy = 
   const existing = new Set((await Persona.find({ collegeId }).select('code').lean()).map((p) => p.code));
   let copied = 0;
   for (const p of system) {
-    if (existing.has(p.code)) continue;
+    if (existing.has(p.code)) {
+      await Persona.updateOne(
+        { collegeId, code: p.code },
+        { $set: { dashboardWidgets: p.dashboardWidgets, accessibleModules: p.accessibleModules } },
+      );
+      continue;
+    }
     const { _id, createdAt, updatedAt, ...rest } = p as any;
     await Persona.create({ ...rest, collegeId, createdBy });
     copied += 1;

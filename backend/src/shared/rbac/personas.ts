@@ -49,48 +49,161 @@ export interface PersonaDescriptor {
   /** Permissions hint shown in admin UI. Not enforced — RBAC engine
    *  is the source of truth at evaluation time. */
   permissionsHint?: string;
+  /** Role-aware dashboard widget IDs shown for this persona. */
+  dashboardWidgets?: string[];
+  /** Sub-set of modules relevant in navigation for this persona (defaults to all readable). */
+  accessibleModules?: string[];
 }
 
 // ─── L1 / L2 personas (already in DEFAULT_POLICIES) ─────────────────
 
 export const L1_L2_PERSONAS: PersonaDescriptor[] = [
   // Leadership L1
-  { code: 'L-SADM', family: 'L-SADM', label: 'Super Admin', description: 'Cross-college platform admin.', primaryModule: 'platform', defaultRole: 'super_admin', tier: 1 },
-  { code: 'L-ADM',  family: 'L-ADM',  label: 'College Admin', description: 'Full college-scoped admin.', primaryModule: 'platform', defaultRole: 'admin', tier: 1 },
-  { code: 'L-PRIN', family: 'L-PRIN', label: 'Principal', description: 'Institution leadership, read-all + governance/compliance/platform write.', primaryModule: 'governance', defaultRole: 'principal', tier: 1 },
-  { code: 'L-FAC',  family: 'L-FAC',  label: 'Faculty (L1)', description: 'Top-level faculty designator.', primaryModule: 'academics', defaultRole: 'faculty', tier: 1 },
-  { code: 'L-STU',  family: 'L-STU',  label: 'Student', description: 'Student-portal user.', primaryModule: 'student-dev', defaultRole: 'student', tier: 1 },
+  {
+    code: 'L-SADM', family: 'L-SADM', label: 'Super Admin', description: 'Cross-college platform admin.',
+    primaryModule: 'platform', defaultRole: 'super_admin', tier: 1,
+    dashboardWidgets: [
+      'pending-proposals', 'people-kpi', 'finance-kpi', 'placement-kpi', 'admissions-kpi', 'academics-kpi',
+      'welfare-kpi', 'campus-kpi', 'onboarding-banner', 'academics-card', 'admissions-card', 'finance-card',
+      'hr-card', 'placement-card', 'welfare-card', 'campus-card', 'student-dev-card', 'governance-card',
+      'compliance-card', 'platform-card',
+    ],
+  },
+  {
+    code: 'L-ADM', family: 'L-ADM', label: 'College Admin', description: 'Full college-scoped admin.',
+    primaryModule: 'platform', defaultRole: 'admin', tier: 1,
+    dashboardWidgets: [
+      'pending-proposals', 'people-kpi', 'finance-kpi', 'placement-kpi', 'admissions-kpi', 'academics-kpi',
+      'welfare-kpi', 'campus-kpi', 'onboarding-banner', 'academics-card', 'admissions-card', 'finance-card',
+      'hr-card', 'placement-card', 'welfare-card', 'campus-card', 'student-dev-card', 'governance-card',
+      'compliance-card', 'platform-card',
+    ],
+  },
+  {
+    code: 'L-PRIN', family: 'L-PRIN', label: 'Principal', description: 'Institution leadership, read-all + governance/compliance/platform write.',
+    primaryModule: 'governance', defaultRole: 'principal', tier: 1,
+    dashboardWidgets: [
+      'pending-proposals', 'people-kpi', 'finance-kpi', 'placement-kpi', 'admissions-kpi', 'academics-kpi',
+      'welfare-kpi', 'onboarding-banner', 'academics-card', 'admissions-card', 'finance-card', 'hr-card',
+      'placement-card', 'welfare-card', 'governance-card', 'compliance-card',
+    ],
+  },
+  {
+    code: 'L-FAC', family: 'L-FAC', label: 'Faculty (L1)', description: 'Top-level faculty designator.',
+    primaryModule: 'academics', defaultRole: 'faculty', tier: 1,
+    dashboardWidgets: ['academics-kpi', 'academics-card', 'student-dev-card'],
+  },
+  {
+    code: 'L-STU', family: 'L-STU', label: 'Student', description: 'Student-portal user.',
+    primaryModule: 'student-dev', defaultRole: 'student', tier: 1,
+    dashboardWidgets: ['academics-kpi', 'academics-card', 'student-dev-card', 'placement-card'],
+  },
+  {
+    code: 'L-PAR', family: 'L-PAR', label: 'Parent', description: 'Parent-portal user.',
+    primaryModule: 'student-dev', defaultRole: 'parent', tier: 1,
+    dashboardWidgets: ['academics-card', 'finance-card', 'welfare-card'],
+    accessibleModules: ['academics', 'finance', 'welfare', 'people'],
+  },
 
   // Faculty L1/L2
-  { code: 'F-HOD',  family: 'F-HOD',  label: 'Head of Department', description: 'Department-scoped academic head.', primaryModule: 'academics', defaultRole: 'hod', tier: 1, permissionsHint: 'Department-scoped academics + people read.' },
-  { code: 'F-FAC',  family: 'F-FAC',  label: 'Faculty', description: 'Teaching faculty.', primaryModule: 'academics', defaultRole: 'faculty', tier: 1, permissionsHint: 'Attendance, marks, lesson plans, course feedback.' },
+  {
+    code: 'F-HOD', family: 'F-HOD', label: 'Head of Department', description: 'Department-scoped academic head.',
+    primaryModule: 'academics', defaultRole: 'hod', tier: 1, permissionsHint: 'Department-scoped academics + people read.',
+    dashboardWidgets: ['people-kpi', 'academics-kpi', 'academics-card', 'student-dev-card', 'placement-card', 'governance-card'],
+  },
+  {
+    code: 'F-FAC', family: 'F-FAC', label: 'Faculty', description: 'Teaching faculty.',
+    primaryModule: 'academics', defaultRole: 'faculty', tier: 1, permissionsHint: 'Attendance, marks, lesson plans, course feedback.',
+    dashboardWidgets: ['academics-kpi', 'academics-card', 'student-dev-card'],
+  },
 
   // Staff L2 (one per major operational concern)
-  { code: 'ST-ADM',                 family: 'ST-ADM',                 label: 'Admissions Staff', description: 'Admissions team root.', primaryModule: 'admissions', defaultRole: 'staff', tier: 2, permissionsHint: 'Full admissions + people access.' },
-  { code: 'ST-ACC',                 family: 'ST-ACC',                 label: 'Accounts Staff', description: 'Finance & fee accounts.', primaryModule: 'finance', defaultRole: 'staff', tier: 2, permissionsHint: 'Full finance access.' },
-  { code: 'ST-HR',                  family: 'ST-HR',                  label: 'HR Staff', description: 'HR operations.', primaryModule: 'hr', defaultRole: 'staff', tier: 2, permissionsHint: 'Full HR + people access.' },
-  { code: 'ST-WARDEN',              family: 'ST-WARDEN',              label: 'Hostel Warden', description: 'Hostel & mess management.', primaryModule: 'welfare', defaultRole: 'staff', tier: 2, permissionsHint: 'Welfare/hostel + campus/hostel.' },
-  { code: 'ST-TRANSPORT-OFFICER',   family: 'ST-TRANSPORT-OFFICER',   label: 'Transport Officer', description: 'Routes & transport allocation.', primaryModule: 'campus', defaultRole: 'staff', tier: 2, permissionsHint: 'Campus/transport sub-domain.' },
-  { code: 'ST-TPO',                 family: 'ST-TPO',                 label: 'Training & Placement Officer', description: 'Placement workflow lead.', primaryModule: 'placement', defaultRole: 'staff', tier: 2, permissionsHint: 'Full placement access.' },
-  { code: 'ST-EXAM',                family: 'ST-EXAM',                label: 'Exam Controller', description: 'Examination administration.', primaryModule: 'academics', defaultRole: 'staff', tier: 2, permissionsHint: 'Academics/exams + results.' },
-  { code: 'ST-LIB',                 family: 'ST-LIB',                 label: 'Librarian', description: 'Library operations.', primaryModule: 'campus', defaultRole: 'staff', tier: 2, permissionsHint: 'Campus/library sub-domain.' },
-  { code: 'ST-SEC',                 family: 'ST-SEC',                 label: 'Security', description: 'Gate-pass, visitors, security.', primaryModule: 'campus', defaultRole: 'staff', tier: 2, permissionsHint: 'Campus/security sub-domain.' },
-  { code: 'ST-IQAC',                family: 'ST-IQAC',                label: 'IQAC Coordinator', description: 'Quality assurance + accreditation.', primaryModule: 'compliance', defaultRole: 'staff', tier: 2, permissionsHint: 'Full compliance access.' },
-  { code: 'ST-REG',                 family: 'ST-REG',                 label: 'Registrar', description: 'Records & enrolments.', primaryModule: 'people', defaultRole: 'staff', tier: 2, permissionsHint: 'Full people access.' },
+  {
+    code: 'ST-ADM', family: 'ST-ADM', label: 'Admissions Staff', description: 'Admissions team root.',
+    primaryModule: 'admissions', defaultRole: 'staff', tier: 2, permissionsHint: 'Full admissions + people access.',
+    dashboardWidgets: ['admissions-kpi', 'onboarding-banner', 'admissions-card'],
+    accessibleModules: ['admissions', 'people'],
+  },
+  {
+    code: 'ST-ACC', family: 'ST-ACC', label: 'Accounts Staff', description: 'Finance & fee accounts.',
+    primaryModule: 'finance', defaultRole: 'staff', tier: 2, permissionsHint: 'Full finance access.',
+    dashboardWidgets: ['finance-kpi', 'finance-card'],
+    accessibleModules: ['finance'],
+  },
+  {
+    code: 'ST-HR', family: 'ST-HR', label: 'HR Staff', description: 'HR operations.',
+    primaryModule: 'hr', defaultRole: 'staff', tier: 2, permissionsHint: 'Full HR + people access.',
+    dashboardWidgets: ['people-kpi', 'hr-card'],
+    accessibleModules: ['hr', 'people'],
+  },
+  {
+    code: 'ST-WARDEN', family: 'ST-WARDEN', label: 'Hostel Warden', description: 'Hostel & mess management.',
+    primaryModule: 'welfare', defaultRole: 'staff', tier: 2, permissionsHint: 'Welfare/hostel + campus/hostel.',
+    dashboardWidgets: ['welfare-kpi', 'welfare-card', 'campus-card'],
+    accessibleModules: ['welfare', 'campus'],
+  },
+  {
+    code: 'ST-TRANSPORT-OFFICER', family: 'ST-TRANSPORT-OFFICER', label: 'Transport Officer', description: 'Routes & transport allocation.',
+    primaryModule: 'campus', defaultRole: 'staff', tier: 2, permissionsHint: 'Campus/transport sub-domain.',
+    dashboardWidgets: ['campus-kpi', 'campus-card', 'welfare-card'],
+    accessibleModules: ['campus', 'welfare'],
+  },
+  {
+    code: 'ST-TPO', family: 'ST-TPO', label: 'Training & Placement Officer', description: 'Placement workflow lead.',
+    primaryModule: 'placement', defaultRole: 'staff', tier: 2, permissionsHint: 'Full placement access.',
+    dashboardWidgets: ['placement-kpi', 'placement-card', 'student-dev-card'],
+    accessibleModules: ['placement', 'student-dev'],
+  },
+  {
+    code: 'ST-EXAM', family: 'ST-EXAM', label: 'Exam Controller', description: 'Examination administration.',
+    primaryModule: 'academics', defaultRole: 'staff', tier: 2, permissionsHint: 'Academics/exams + results.',
+    dashboardWidgets: ['academics-kpi', 'academics-card'],
+    accessibleModules: ['academics'],
+  },
+  {
+    code: 'ST-LIB', family: 'ST-LIB', label: 'Librarian', description: 'Library operations.',
+    primaryModule: 'campus', defaultRole: 'staff', tier: 2, permissionsHint: 'Campus/library sub-domain.',
+    dashboardWidgets: ['campus-kpi', 'campus-card'],
+    accessibleModules: ['campus'],
+  },
+  {
+    code: 'ST-SEC', family: 'ST-SEC', label: 'Security', description: 'Gate-pass, visitors, security.',
+    primaryModule: 'campus', defaultRole: 'staff', tier: 2, permissionsHint: 'Campus/security sub-domain.',
+    dashboardWidgets: ['campus-kpi', 'campus-card'],
+    accessibleModules: ['campus'],
+  },
+  {
+    code: 'ST-IQAC', family: 'ST-IQAC', label: 'IQAC Coordinator', description: 'Quality assurance + accreditation.',
+    primaryModule: 'compliance', defaultRole: 'staff', tier: 2, permissionsHint: 'Full compliance access.',
+    dashboardWidgets: ['compliance-card', 'academics-card'],
+    accessibleModules: ['compliance', 'academics'],
+  },
+  {
+    code: 'ST-REG', family: 'ST-REG', label: 'Registrar', description: 'Records & enrolments.',
+    primaryModule: 'people', defaultRole: 'staff', tier: 2, permissionsHint: 'Full people access.',
+    dashboardWidgets: ['people-kpi', 'onboarding-banner', 'academics-card'],
+    accessibleModules: ['people', 'academics'],
+  },
+  {
+    code: 'ST-ACOPS', family: 'ST-ACOPS', label: 'Academic Operations Lead', description: 'Academic operations root.',
+    primaryModule: 'academics', defaultRole: 'staff', tier: 2, permissionsHint: 'Academic operations oversight.',
+    dashboardWidgets: ['academics-kpi', 'academics-card'],
+    accessibleModules: ['academics', 'compliance'],
+  },
 ];
 
 // ─── L3 sub-personas (Strategic Gap 7) ──────────────────────────────
 
 export const L3_SUB_PERSONAS: PersonaDescriptor[] = [
-  // Admissions tier — sub-personas of ST-ADM. The doc maps these to
-  // CampX's Tele-Counsellor / Admissions Counsellor / Admissions
-  // Officer (with cluster-head variant) / Admissions Director.
+  // Admissions tier — sub-personas of ST-ADM.
   {
     code: 'ST-ADM-TC', family: 'ST-ADM', parentCode: 'ST-ADM',
     label: 'Tele-Counsellor',
     description: 'Outbound call team. Handles cold inquiries, first-contact attempts, basic qualification.',
     primaryModule: 'admissions', defaultRole: 'staff', tier: 3,
     permissionsHint: 'Inquiry CRUD, lead-interaction log, follow-up scheduling. Cannot convert to applicant.',
+    dashboardWidgets: ['admissions-kpi', 'admissions-card'],
+    accessibleModules: ['admissions'],
   },
   {
     code: 'ST-ADM-AC', family: 'ST-ADM', parentCode: 'ST-ADM',
@@ -98,6 +211,8 @@ export const L3_SUB_PERSONAS: PersonaDescriptor[] = [
     description: 'Senior counsellor — handles qualified leads, parent meetings, fee quotations.',
     primaryModule: 'admissions', defaultRole: 'staff', tier: 3,
     permissionsHint: 'Inquiry + applicant CRUD, convert lead → applicant, fee-quote drafts.',
+    dashboardWidgets: ['admissions-kpi', 'onboarding-banner', 'admissions-card'],
+    accessibleModules: ['admissions', 'people'],
   },
   {
     code: 'ST-ADM-AO', family: 'ST-ADM', parentCode: 'ST-ADM',
@@ -105,6 +220,8 @@ export const L3_SUB_PERSONAS: PersonaDescriptor[] = [
     description: 'Field officer — assigned a regional cluster of leads via assignment rules.',
     primaryModule: 'admissions', defaultRole: 'staff', tier: 3,
     permissionsHint: 'Same as Admissions Counsellor + offer-letter issue.',
+    dashboardWidgets: ['admissions-kpi', 'onboarding-banner', 'admissions-card'],
+    accessibleModules: ['admissions', 'people'],
   },
   {
     code: 'ST-ADM-AO-CH', family: 'ST-ADM', parentCode: 'ST-ADM-AO',
@@ -112,6 +229,8 @@ export const L3_SUB_PERSONAS: PersonaDescriptor[] = [
     description: 'Cluster lead with visibility into all officers below. Push-receives target-miss alerts.',
     primaryModule: 'admissions', defaultRole: 'staff', tier: 3,
     permissionsHint: 'Admissions Officer + cluster-aggregation reads + reassignment within cluster.',
+    dashboardWidgets: ['admissions-kpi', 'onboarding-banner', 'admissions-card'],
+    accessibleModules: ['admissions', 'people'],
   },
   {
     code: 'ST-ADM-DIR', family: 'ST-ADM', parentCode: 'ST-ADM',
@@ -119,18 +238,19 @@ export const L3_SUB_PERSONAS: PersonaDescriptor[] = [
     description: 'Admissions function head. CRM dashboard owner, assignment-rule policy admin.',
     primaryModule: 'admissions', defaultRole: 'staff', tier: 3,
     permissionsHint: 'Full admissions + CRM dashboard + assignment-rule CRUD + cluster-head overrides.',
+    dashboardWidgets: ['admissions-kpi', 'onboarding-banner', 'admissions-card'],
+    accessibleModules: ['admissions', 'people', 'platform'],
   },
 
-  // Academic-ops tier — three sub-personas the doc explicitly calls out.
-  // We introduce a new ST-ACOPS family so policies can address them
-  // collectively without colliding with ST-EXAM (which already owns
-  // the exam-controller bucket).
+  // Academic-ops tier
   {
     code: 'ST-ACOPS-CC', family: 'ST-ACOPS', parentCode: 'ST-ACOPS',
     label: 'Course Coordinator',
     description: 'Subject-level coordinator. Owns one course offering across sections.',
     primaryModule: 'academics', defaultRole: 'staff', tier: 3,
     permissionsHint: 'CourseOffering CRUD for owned course, attendance/marks read, lesson-plan approvals.',
+    dashboardWidgets: ['academics-kpi', 'academics-card'],
+    accessibleModules: ['academics'],
   },
   {
     code: 'ST-ACOPS-CR', family: 'ST-ACOPS', parentCode: 'ST-ACOPS',
@@ -138,6 +258,8 @@ export const L3_SUB_PERSONAS: PersonaDescriptor[] = [
     description: 'Section-level lead. Owns one section across all subjects.',
     primaryModule: 'academics', defaultRole: 'staff', tier: 3,
     permissionsHint: 'Section-scoped attendance + student-dev reads + parent communication.',
+    dashboardWidgets: ['academics-kpi', 'academics-card', 'student-dev-card'],
+    accessibleModules: ['academics', 'student-dev', 'people'],
   },
   {
     code: 'ST-ACOPS-AC', family: 'ST-ACOPS', parentCode: 'ST-ACOPS',
@@ -145,15 +267,18 @@ export const L3_SUB_PERSONAS: PersonaDescriptor[] = [
     description: 'Programme/department-level coordinator. Aggregates across courses + sections.',
     primaryModule: 'academics', defaultRole: 'staff', tier: 3,
     permissionsHint: 'Programme-scoped academics, lesson-plan oversight, OBE attainment reads.',
+    dashboardWidgets: ['academics-kpi', 'academics-card', 'compliance-card'],
+    accessibleModules: ['academics', 'compliance'],
   },
-  // Research family — single L3 persona; the doc notes M02/M10 already
-  // implicitly support this but it lacks workspace-depth.
+  // Research family
   {
     code: 'ST-RES-COORD', family: 'ST-RES-COORD', parentCode: 'ST-RES-COORD',
     label: 'Research Coordinator',
     description: 'Co-ordinates research-administration: publication evidence, fellowships, accreditation.',
     primaryModule: 'compliance', defaultRole: 'staff', tier: 3,
     permissionsHint: 'People read + compliance/research sub-domain + faculty-document verification.',
+    dashboardWidgets: ['compliance-card', 'academics-card'],
+    accessibleModules: ['compliance', 'people'],
   },
 ];
 

@@ -20,6 +20,7 @@ export interface IPersona extends Document {
   defaultRole: string;
   tier: 1 | 2 | 3;
   dashboardWidgets?: string[];
+  accessibleModules?: string[];
   permissionsHint?: string;
   isActive: boolean;
   createdBy?: string;
@@ -41,6 +42,7 @@ const personaSchema = new Schema<IPersona>(
     },
     tier: { type: Number, required: true, default: 3 },
     dashboardWidgets: { type: [String], default: undefined },
+    accessibleModules: { type: [String], default: undefined },
     permissionsHint: { type: String },
     isActive: { type: Boolean, default: true },
     createdBy: { type: String },

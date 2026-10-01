@@ -1,4 +1,4 @@
-import { hiddenClassesFor } from '../../../shared/rbac/sensitivity';
+import { hiddenClassesFor, maskedClassesFor } from '../../../shared/rbac/sensitivity';
 /**
  * 008 Phase 3 — People agent orchestrator.
  *
@@ -361,6 +361,7 @@ export async function* handleQuery(
     agent: 'people',
     actionType: 'chat-people',
     hiddenClasses: hiddenClassesFor(authScope),
+    maskedClasses: maskedClassesFor(authScope),
     buildContext: () => forPeopleQuery(collegeId, authScope),
     buildMessages: (masked, userPrompt) =>
       buildPeopleQueryMessages({

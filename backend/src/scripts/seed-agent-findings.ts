@@ -54,6 +54,25 @@ interface SeedOpts {
   collegeId: string;
   confirmCollegeName: string;
   clearFirst?: boolean;
+  /** Students the fixtures must not land on (e.g. the risk-board story). */
+  excludeStudentIds?: mongoose.Types.ObjectId[];
+}
+
+/** Remove everything a previous run wrote, tagged `agent-findings-v1`. */
+export async function clearAgentFindings(collegeId: string): Promise<NonNullable<Summary['cleared']>> {
+  const tagFilter = { collegeId: new mongoose.Types.ObjectId(collegeId), 'metadata.source': TAG };
+  const [invRes, conRes, defRes, hldRes] = await Promise.all([
+    Invoice.deleteMany(tagFilter),
+    Concession.deleteMany(tagFilter),
+    DefaulterRecord.deleteMany(tagFilter),
+    FinancialHold.deleteMany(tagFilter),
+  ]);
+  return {
+    invoices: invRes.deletedCount ?? 0,
+    concessions: conRes.deletedCount ?? 0,
+    defaulters: defRes.deletedCount ?? 0,
+    holds: hldRes.deletedCount ?? 0,
+  };
 }
 
 interface Summary {
@@ -114,19 +133,7 @@ export async function seedAgentFindings(opts: SeedOpts): Promise<Summary> {
 
   // ── Optional purge ─────────────────────────────────────────────────
   if (opts.clearFirst) {
-    const tagFilter = { collegeId: cId, 'metadata.source': TAG };
-    const [invRes, conRes, defRes, hldRes] = await Promise.all([
-      Invoice.deleteMany(tagFilter),
-      Concession.deleteMany(tagFilter),
-      DefaulterRecord.deleteMany(tagFilter),
-      FinancialHold.deleteMany(tagFilter),
-    ]);
-    summary.cleared = {
-      invoices: invRes.deletedCount ?? 0,
-      concessions: conRes.deletedCount ?? 0,
-      defaulters: defRes.deletedCount ?? 0,
-      holds: hldRes.deletedCount ?? 0,
-    };
+    summary.cleared = await clearAgentFindings(opts.collegeId);
     console.log('[clear]', summary.cleared);
   }
 
@@ -146,7 +153,7 @@ export async function seedAgentFindings(opts: SeedOpts): Promise<Summary> {
   //   4 partial + 5 concession + 4 pendingHold + 3 welfare + 5 stage4 + 4 waived.
   // Pad to 26 for safety so a small demo-seed undercount doesn't break us.
   const needed = 26;
-  const students = await pickStudents(cId, needed);
+  const students = await pickStudents(cId, needed, opts.excludeStudentIds);
   if (students.length < needed) {
     throw new Error(
       `Not enough active students: need ${needed}, found ${students.length}. Run seed-fee-demo-data.ts first.`,

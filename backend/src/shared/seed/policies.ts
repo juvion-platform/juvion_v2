@@ -73,6 +73,15 @@ export async function seedPolicies(opts: SeedPoliciesOptions = {}): Promise<Seed
     else updated += 1;
   }
 
+  // Clean up obsolete system policies created by seed that are no longer in DEFAULT_POLICIES
+  const defaultKeySet = new Set(DEFAULT_POLICIES.map(policyKey));
+  const existingSystemDocs = await Policy.find({ collegeId: null, createdBy }).lean();
+  for (const doc of existingSystemDocs) {
+    if (!defaultKeySet.has(policyKey(doc))) {
+      await Policy.deleteOne({ _id: doc._id });
+    }
+  }
+
   return { attempted: DEFAULT_POLICIES.length, created, updated };
 }
 
@@ -101,10 +110,30 @@ function stripDoc(d: any) {
  */
 export async function snapshotPoliciesForCollege(collegeId: string, createdBy = 'snapshot'): Promise<number> {
   const system = await Policy.find({ collegeId: null, isActive: true }).lean();
-  const existing = new Set((await Policy.find({ collegeId }).lean()).map(policyKey));
+  const existingDocs = await Policy.find({ collegeId }).lean();
+  const existingMap = new Map(existingDocs.map((doc) => [policyKey(doc), doc]));
+  const systemKeySet = new Set(system.map(policyKey));
+
+  // Remove obsolete snapshots that were seeded from system defaults but no longer exist
+  for (const doc of existingDocs) {
+    if (doc.createdBy === 'snapshot' && !systemKeySet.has(policyKey(doc))) {
+      await Policy.deleteOne({ _id: doc._id });
+    }
+  }
+
   let copied = 0;
   for (const p of system) {
-    if (existing.has(policyKey(p))) continue;
+    const key = policyKey(p);
+    const existing = existingMap.get(key);
+    if (existing) {
+      if (existing.createdBy === 'snapshot') {
+        await Policy.updateOne(
+          { _id: existing._id },
+          { $set: { ...stripDoc(p), updatedBy: createdBy } },
+        );
+      }
+      continue;
+    }
     await Policy.create({ ...stripDoc(p), collegeId, createdBy });
     copied += 1;
   }

@@ -5,7 +5,12 @@
     "inquiries",
     "lead-interactions"
   ],
-  "people": [],
+  "people": [
+    "faculty",
+    "parents",
+    "staff",
+    "students"
+  ],
   "academics": [
     "attendance",
     "course-offerings",

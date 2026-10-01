@@ -122,7 +122,7 @@ export default function App() {
           <Route path="/governance/*" element={gated('governance', <Governance />)} />
           <Route path="/platform/*" element={gated('platform', <Platform />)} />
           <Route path="/juvi/*" element={gated('juvi', <Juvi />)} />
-          <Route path="/master-data/*" element={renderLazyPage(<MasterData />)} />
+          <Route path="/master-data/*" element={gated('academics', <MasterData />)} />
           <Route path="/search" element={renderLazyPage(<SearchResults />)} />
           {/* Show an explicit 404 rather than silently bouncing typos to the
               dashboard, which made broken links look like working ones. */}

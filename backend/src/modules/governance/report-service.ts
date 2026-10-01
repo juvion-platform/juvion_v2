@@ -1,4 +1,4 @@
-import { maskFields, hiddenClassesFor } from '../../shared/rbac/sensitivity';
+import { maskFields, resolveSensitivityMasks } from '../../shared/rbac/sensitivity';
 import { scopeNotApplicable } from '../../shared/rbac/apply-scope';
 /**
  * report-service — orchestrates ReportDefinition execution and
@@ -126,7 +126,8 @@ export async function runReport(
   try {
     const out = await def.run({ collegeId, authScope }, parameters);
     // 010 P3 — the same mask the JSON layer applies, for rows that leave through the report engine.
-    const truncated = maskFields((out.rows || []).slice(0, ROW_CAP), hiddenClassesFor(authScope));
+    const { hidden, masked } = resolveSensitivityMasks(authScope);
+    const truncated = maskFields((out.rows || []).slice(0, ROW_CAP), hidden, masked);
 
     runDoc.status = 'success';
     runDoc.result = truncated;

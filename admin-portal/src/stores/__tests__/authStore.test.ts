@@ -49,4 +49,32 @@ describe('authStore.canSeeClass', () => {
     expect(can('welfare', 'welfare.medical')).toBe(true);
     expect(can('finance', 'finance.bank')).toBe(true);
   });
+  it('hides people.identity when people sensitivity is empty array (HOD, Faculty, Accounts)', () => {
+    useAuthStore.setState({ sensitivity: { people: [] } });
+    expect(can('people', 'people.identity')).toBe(false);
+  });
 });
+
+describe('authStore user persona fields', () => {
+  it('stores accessibleModules, dashboardWidgets, and primaryModule on user', () => {
+    useAuthStore.getState().setAuth(
+      {
+        id: 'u1',
+        email: 'acc@jit.edu.in',
+        name: 'Accounts User',
+        role: 'staff',
+        personaType: 'ST-ACC',
+        primaryModule: 'finance',
+        dashboardWidgets: ['finance-kpi', 'finance-card'],
+        accessibleModules: ['finance'],
+      },
+      'token-123',
+      'c1',
+    );
+    const user = useAuthStore.getState().user;
+    expect(user?.primaryModule).toBe('finance');
+    expect(user?.dashboardWidgets).toEqual(['finance-kpi', 'finance-card']);
+    expect(user?.accessibleModules).toEqual(['finance']);
+  });
+});
+

@@ -7,7 +7,7 @@ import { AuthScope } from '../shared/rbac/types';
 import { RbacModule, RbacAction, SubDomainOf } from '../shared/rbac/sub-domains';
 import { scopeNarrows } from '../shared/rbac/apply-scope';
 import { resolveAssigned } from '../shared/rbac/assignment-resolvers';
-import { hiddenClassesFor, maskFields, findHiddenKey } from '../shared/rbac/sensitivity';
+import { resolveSensitivityMasks, maskFields, findHiddenKey } from '../shared/rbac/sensitivity';
 import { getListContext } from '../shared/request-context';
 
 /**
@@ -45,7 +45,19 @@ export function authorize<M extends RbacModule>(module: M, action: RbacAction | 
         return res.status(403).json({ error: 'Access denied' });
       }
 
-      // Sub-domain check: if route specifies a subDomain, verify the policy allows it
+      // Sub-domain check. Enforced only where the route declares which
+      // sub-domain it serves, because a `scope.subDomain` is a restriction on
+      // a vocabulary the route has to opt into.
+      //
+      // ponytail: requiring the declaration instead (deny when a scoped
+      // policy meets an undeclared route) is the stronger posture, but only
+      // `campus`, `platform` and the person-type routes in `people` are
+      // annotated today — flipping it wholesale 403s faculty on attendance,
+      // the warden on welfare and the tele-counsellor on inquiries, since
+      // those policies name sub-domains their routes never declare. Upgrade
+      // path: annotate every route of one module, grant the personas the
+      // sub-domains they need, then fail closed for that module.
+      // `subdomain-coverage.test.ts` lists what is still unannotated.
       if (opts?.subDomain && policy.scope?.subDomain) {
         const allowed = policy.scope.subDomain.split(',').map((s) => s.trim());
         if (!allowed.includes(opts.subDomain)) {
@@ -72,16 +84,16 @@ export function authorize<M extends RbacModule>(module: M, action: RbacAction | 
       };
       // 010 P3 — one enforcement point for field masks: strip hidden keys from
       // every JSON response on this request, refuse writes that carry one.
-      const hidden = hiddenClassesFor(authScope);
-      if (hidden.length) {
+      const { hidden, masked } = resolveSensitivityMasks(authScope);
+      if (hidden.length || masked.length) {
         if (action !== 'read' && action !== '*') {
-          const key = findHiddenKey(req.body, hidden);
+          const key = findHiddenKey(req.body, hidden, masked);
           if (key) return res.status(403).json({ error: `Field "${key}" is not permitted for this role` });
         }
         const json = res.json.bind(res);
         // Services often hand Mongoose documents to res.json; serialise first so
         // the walker sees plain objects (express stringifies anyway).
-        res.json = ((body: unknown) => json(maskFields(body === undefined ? body : JSON.parse(JSON.stringify(body)), hidden))) as typeof res.json;
+        res.json = ((body: unknown) => json(maskFields(body === undefined ? body : JSON.parse(JSON.stringify(body)), hidden, masked))) as typeof res.json;
       }
       if (authScope.assignedVia) {
         authScope.assigned = await resolveAssigned(collegeId || '', userScope.personId, authScope.assignedVia);
