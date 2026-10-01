@@ -1,3 +1,7 @@
+import 'package:juvi_api/src/model/ack_request.dart';
+import 'package:juvi_api/src/model/ack_result.dart';
+import 'package:juvi_api/src/model/attention.dart';
+import 'package:juvi_api/src/model/attention_items_inner.dart';
 import 'package:juvi_api/src/model/change_password_request.dart';
 import 'package:juvi_api/src/model/channel_detail.dart';
 import 'package:juvi_api/src/model/channel_detail_linked_object.dart';
@@ -8,8 +12,11 @@ import 'package:juvi_api/src/model/config_quiet_hours_default.dart';
 import 'package:juvi_api/src/model/config_support_contact.dart';
 import 'package:juvi_api/src/model/devices.dart';
 import 'package:juvi_api/src/model/devices_items_inner.dart';
+import 'package:juvi_api/src/model/dismiss_result.dart';
 import 'package:juvi_api/src/model/error_envelope.dart';
 import 'package:juvi_api/src/model/error_envelope_error.dart';
+import 'package:juvi_api/src/model/error_envelope_error_ack.dart';
+import 'package:juvi_api/src/model/error_envelope_error_reminders.dart';
 import 'package:juvi_api/src/model/institution_lookup.dart';
 import 'package:juvi_api/src/model/me.dart';
 import 'package:juvi_api/src/model/me_account.dart';
@@ -21,12 +28,34 @@ import 'package:juvi_api/src/model/me_settings_quiet_hours.dart';
 import 'package:juvi_api/src/model/me_settings_tiers.dart';
 import 'package:juvi_api/src/model/me_student.dart';
 import 'package:juvi_api/src/model/mute_result.dart';
+import 'package:juvi_api/src/model/notice_attachment.dart';
+import 'package:juvi_api/src/model/notice_attachment_url.dart';
+import 'package:juvi_api/src/model/notice_card.dart';
+import 'package:juvi_api/src/model/notice_detail.dart';
+import 'package:juvi_api/src/model/notice_detail_attachments_inner.dart';
+import 'package:juvi_api/src/model/notice_list.dart';
+import 'package:juvi_api/src/model/notice_pending.dart';
+import 'package:juvi_api/src/model/notice_pending_groups_inner.dart';
+import 'package:juvi_api/src/model/notice_pending_items_inner.dart';
+import 'package:juvi_api/src/model/notice_reach.dart';
+import 'package:juvi_api/src/model/notice_reach_added_later.dart';
+import 'package:juvi_api/src/model/notice_reach_added_later_items_inner.dart';
+import 'package:juvi_api/src/model/notice_reach_comments_inner.dart';
+import 'package:juvi_api/src/model/notice_reach_groups_inner.dart';
+import 'package:juvi_api/src/model/notice_reach_late_acks_inner.dart';
+import 'package:juvi_api/src/model/notice_reminders.dart';
 import 'package:juvi_api/src/model/onboarding_advance.dart';
 import 'package:juvi_api/src/model/onboarding_state.dart';
+import 'package:juvi_api/src/model/pending_person.dart';
 import 'package:juvi_api/src/model/photo_result.dart';
+import 'package:juvi_api/src/model/reach_comment.dart';
+import 'package:juvi_api/src/model/reach_group.dart';
+import 'package:juvi_api/src/model/reach_person.dart';
 import 'package:juvi_api/src/model/read_result.dart';
 import 'package:juvi_api/src/model/refresh_request.dart';
+import 'package:juvi_api/src/model/remind_result.dart';
 import 'package:juvi_api/src/model/revoked_count.dart';
+import 'package:juvi_api/src/model/seen_result.dart';
 import 'package:juvi_api/src/model/settings.dart';
 import 'package:juvi_api/src/model/settings_patch.dart';
 import 'package:juvi_api/src/model/settings_patch_tiers.dart';
@@ -56,6 +85,14 @@ final _regMap = RegExp(r'^Map<String,(.*)>$');
           return (valueString == 'true' || valueString == '1') as ReturnType;
         case 'double':
           return (value is double ? value : double.parse('$value')) as ReturnType;
+        case 'AckRequest':
+          return AckRequest.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'AckResult':
+          return AckResult.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'Attention':
+          return Attention.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'AttentionItemsInner':
+          return AttentionItemsInner.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'ChangePasswordRequest':
           return ChangePasswordRequest.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'ChannelDetail':
@@ -76,10 +113,16 @@ final _regMap = RegExp(r'^Map<String,(.*)>$');
           return Devices.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'DevicesItemsInner':
           return DevicesItemsInner.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'DismissResult':
+          return DismissResult.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'ErrorEnvelope':
           return ErrorEnvelope.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'ErrorEnvelopeError':
           return ErrorEnvelopeError.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'ErrorEnvelopeErrorAck':
+          return ErrorEnvelopeErrorAck.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'ErrorEnvelopeErrorReminders':
+          return ErrorEnvelopeErrorReminders.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'InstitutionLookup':
           return InstitutionLookup.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'Me':
@@ -102,18 +145,62 @@ final _regMap = RegExp(r'^Map<String,(.*)>$');
           return MeStudent.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'MuteResult':
           return MuteResult.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'NoticeAttachment':
+          return NoticeAttachment.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'NoticeAttachmentUrl':
+          return NoticeAttachmentUrl.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'NoticeCard':
+          return NoticeCard.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'NoticeDetail':
+          return NoticeDetail.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'NoticeDetailAttachmentsInner':
+          return NoticeDetailAttachmentsInner.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'NoticeList':
+          return NoticeList.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'NoticePending':
+          return NoticePending.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'NoticePendingGroupsInner':
+          return NoticePendingGroupsInner.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'NoticePendingItemsInner':
+          return NoticePendingItemsInner.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'NoticeReach':
+          return NoticeReach.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'NoticeReachAddedLater':
+          return NoticeReachAddedLater.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'NoticeReachAddedLaterItemsInner':
+          return NoticeReachAddedLaterItemsInner.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'NoticeReachCommentsInner':
+          return NoticeReachCommentsInner.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'NoticeReachGroupsInner':
+          return NoticeReachGroupsInner.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'NoticeReachLateAcksInner':
+          return NoticeReachLateAcksInner.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'NoticeReminders':
+          return NoticeReminders.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'OnboardingAdvance':
           return OnboardingAdvance.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'OnboardingState':
           return OnboardingState.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'PendingPerson':
+          return PendingPerson.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'PhotoResult':
           return PhotoResult.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'ReachComment':
+          return ReachComment.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'ReachGroup':
+          return ReachGroup.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'ReachPerson':
+          return ReachPerson.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'ReadResult':
           return ReadResult.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'RefreshRequest':
           return RefreshRequest.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'RemindResult':
+          return RemindResult.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'RevokedCount':
           return RevokedCount.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'SeenResult':
+          return SeenResult.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'Settings':
           return Settings.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'SettingsPatch':

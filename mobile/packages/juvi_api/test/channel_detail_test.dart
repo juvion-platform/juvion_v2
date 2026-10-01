@@ -52,6 +52,11 @@ void main() {
       // TODO
     });
 
+    // List<NoticeCard> notices
+    test('to test the property `notices`', () async {
+      // TODO
+    });
+
     // String replyRule
     test('to test the property `replyRule`', () async {
       // TODO

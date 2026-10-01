@@ -3,6 +3,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:juvi_api/src/model/notice_card.dart';
 import 'package:juvi_api/src/model/channel_detail_linked_object.dart';
 import 'package:json_annotation/json_annotation.dart';
 
@@ -36,6 +37,8 @@ class ChannelDetail {
     required  this.muted,
 
     required  this.name,
+
+    required  this.notices,
 
     required  this.replyRule,
 
@@ -160,6 +163,18 @@ class ChannelDetail {
 
   @JsonKey(
     
+    name: r'notices',
+    required: true,
+    includeIfNull: false,
+  )
+
+
+  final List<NoticeCard> notices;
+
+
+
+  @JsonKey(
+    
     name: r'replyRule',
     required: true,
     includeIfNull: false,
@@ -243,6 +258,7 @@ class ChannelDetail {
       other.memberCount == memberCount &&
       other.muted == muted &&
       other.name == name &&
+      other.notices == notices &&
       other.replyRule == replyRule &&
       other.role == role &&
       other.scopeType == scopeType &&
@@ -261,6 +277,7 @@ class ChannelDetail {
         memberCount.hashCode +
         muted.hashCode +
         name.hashCode +
+        notices.hashCode +
         replyRule.hashCode +
         role.hashCode +
         scopeType.hashCode +

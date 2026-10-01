@@ -17,6 +17,7 @@ Name | Type | Description | Notes
 **memberCount** | **int** |  | 
 **muted** | **bool** |  | 
 **name** | **String** |  | 
+**notices** | [**List&lt;NoticeCard&gt;**](NoticeCard.md) |  | 
 **replyRule** | **String** |  | 
 **role** | **String** |  | 
 **scopeType** | **String** |  | 

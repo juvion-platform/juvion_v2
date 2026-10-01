@@ -7,6 +7,13 @@ void main() {
   final instance = JuviApi().getMobileApi();
 
   group(MobileApi, () {
+    // Acknowledge a notice; 409 ALREADY_ACKNOWLEDGED carries the existing record
+    //
+    //Future<AckResult> acknowledgeNotice(String id, { AckRequest ackRequest }) async
+    test('test acknowledgeNotice', () async {
+      // TODO
+    });
+
     // Complete the current onboarding step
     //
     //Future<OnboardingState> advanceOnboarding({ OnboardingAdvance onboardingAdvance }) async
@@ -18,6 +25,20 @@ void main() {
     //
     //Future changePassword({ ChangePasswordRequest changePasswordRequest }) async
     test('test changePassword', () async {
+      // TODO
+    });
+
+    // Dismiss a notice that needs no acknowledgement
+    //
+    //Future<DismissResult> dismissNotice(String id) async
+    test('test dismissNotice', () async {
+      // TODO
+    });
+
+    // Due acknowledgement notices: count and the first three
+    //
+    //Future<Attention> getAttention() async
+    test('test getAttention', () async {
       // TODO
     });
 
@@ -35,10 +56,38 @@ void main() {
       // TODO
     });
 
+    // Onboarding step 4: the welcome notice
+    //
+    //Future<NoticeDetail> getFirstNotice() async
+    test('test getFirstNotice', () async {
+      // TODO
+    });
+
     // Identity card, account state, settings, institution
     //
     //Future<Me> getMe() async
     test('test getMe', () async {
+      // TODO
+    });
+
+    // Notice detail with my state (does not mark it seen)
+    //
+    //Future<NoticeDetail> getNotice(String id) async
+    test('test getNotice', () async {
+      // TODO
+    });
+
+    // A 5-minute download URL for one attachment (key URL-encoded)
+    //
+    //Future<NoticeAttachmentUrl> getNoticeAttachmentUrl(String id, String key) async
+    test('test getNoticeAttachmentUrl', () async {
+      // TODO
+    });
+
+    // Reach for the publisher
+    //
+    //Future<NoticeReach> getNoticeReach(String id) async
+    test('test getNoticeReach', () async {
       // TODO
     });
 
@@ -53,6 +102,20 @@ void main() {
     //
     //Future<Devices> listDevices() async
     test('test listDevices', () async {
+      // TODO
+    });
+
+    // Pending members for the publisher, grouped and searchable
+    //
+    //Future<NoticePending> listNoticePending(String id, { String group, String q, String cursor, int limit }) async
+    test('test listNoticePending', () async {
+      // TODO
+    });
+
+    // Notice cards by segment (due, done, all, published), cursor-paged
+    //
+    //Future<NoticeList> listNotices({ String segment, String office, String cursor, int limit }) async
+    test('test listNotices', () async {
       // TODO
     });
 
@@ -77,6 +140,13 @@ void main() {
       // TODO
     });
 
+    // Mark a notice seen (once)
+    //
+    //Future<SeenResult> markNoticeSeen(String id) async
+    test('test markNoticeSeen', () async {
+      // TODO
+    });
+
     // Mute a channel
     //
     //Future<MuteResult> muteChannel(String id) async
@@ -88,6 +158,13 @@ void main() {
     //
     //Future<Tokens> refresh({ RefreshRequest refreshRequest }) async
     test('test refresh', () async {
+      // TODO
+    });
+
+    // Send a reminder (at most two)
+    //
+    //Future<RemindResult> remindNotice(String id) async
+    test('test remindNotice', () async {
       // TODO
     });
 
