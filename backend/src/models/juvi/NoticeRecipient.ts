@@ -79,6 +79,8 @@ schema.index({ noticeId: 1, personId: 1 }, { unique: true });
 schema.index({ collegeId: 1, accountId: 1, ackRequired: 1, 'ack.at': 1, deadline: 1 });
 schema.index({ collegeId: 1, accountId: 1, receivedAt: -1 });
 schema.index({ noticeId: 1, seenAt: 1, 'ack.at': 1 });
+// A person's rows across notices: activation (onAccountActivated) and the added-later check.
+schema.index({ collegeId: 1, personId: 1 });
 
 /** A lean read of a NoticeRecipient: fields only, no Document methods. */
 export type LeanNoticeRecipient = Omit<INoticeRecipient, keyof Document> & { _id: Types.ObjectId };

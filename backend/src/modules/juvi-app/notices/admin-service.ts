@@ -10,9 +10,9 @@ import { OutboxEvent, IOutboxEvent, retryDead, kick } from '../../../shared/outb
 import { AuditLog, createAuditLog } from '../../../shared/audit';
 import { paginate } from '../../../shared/pagination';
 import { PaginatedResult } from '../../../shared/types';
-import { noticeEventKey } from './publish-service';
+import { NOTICE_EVENTS, noticeEventKey } from './publish-service';
 import { NoticeActor, remindersView } from './reach-service';
-import { AdminNoticeListQuery } from './admin-schemas';
+import { AdminNoticeListQuery, DeadEventsQuery } from './admin-schemas';
 import { Reminders } from './schemas';
 
 export type DeliveryState = 'delivering' | 'delivered' | 'failed';
@@ -117,4 +117,21 @@ export async function retryDelivery(actor: NoticeActor, noticeId: string): Promi
   await kick();
   const event = await OutboxEvent.findOne({ collegeId: actor.collegeId, dedupeKey: key }).lean<IOutboxEvent & { updatedAt: Date }>();
   return deliveryView(n, event ?? undefined);
+}
+
+export interface DeadEventRow { id: string; type: string; noticeId: string | null; attempts: number; lastError: string | null; createdAt: string; updatedAt: string | null }
+
+/** This college's dead notice events, newest first (spec §6.2). Admin only. lastError is already capped by the outbox. */
+export async function listDeadEvents(actor: NoticeActor, q: DeadEventsQuery): Promise<PaginatedResult<DeadEventRow>> {
+  if (!actor.isAdmin) throw new AppError(403, 'Only admins can see failed deliveries');
+  const filter = { collegeId: actor.collegeId, status: 'dead', type: { $in: Object.values(NOTICE_EVENTS) } };
+  const page = await paginate(OutboxEvent, filter, q.page, q.limit, { createdAt: -1 }, undefined, { search: '' });
+  const events = page.items as unknown as (IOutboxEvent & { updatedAt?: Date })[];
+  return {
+    ...page,
+    items: events.map((e) => ({
+      id: String(e._id), type: e.type, noticeId: typeof e.payload?.noticeId === 'string' ? e.payload.noticeId : null,
+      attempts: e.attempts, lastError: e.lastError ?? null, createdAt: new Date(e.createdAt).toISOString(), updatedAt: iso(e.updatedAt),
+    })),
+  };
 }

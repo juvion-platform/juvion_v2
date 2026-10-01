@@ -23,6 +23,11 @@ const errorEnvelopeSchema = z.object({
       'NOTICE_NOT_FOUND', 'ALREADY_ACKNOWLEDGED', 'NOTICE_ARCHIVED', 'NOT_PUBLISHER', 'REMINDER_LIMIT', 'ACK_REQUIRED', 'ACK_NOT_REQUIRED',
     ]),
     message: z.string(),
+    // Optional, never null (the Dart generator cannot parse an object-or-null field).
+    /** ALREADY_ACKNOWLEDGED: the existing acknowledgement. */
+    ack: ackResponseSchema.optional(),
+    /** REMINDER_LIMIT: the notice's reminders. */
+    reminders: remindersSchema.optional(),
   }).passthrough(),
 });
 

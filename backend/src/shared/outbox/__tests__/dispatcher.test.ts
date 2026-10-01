@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const queue = vi.hoisted(() => ({ upsertJobScheduler: vi.fn().mockResolvedValue({}) }));
+const queue = vi.hoisted(() => ({ upsertJobScheduler: vi.fn().mockResolvedValue({}), add: vi.fn().mockResolvedValue({}) }));
 const queueModule = vi.hoisted(() => ({
   registerQueue: vi.fn(),
   getQueue: vi.fn(() => queue),
@@ -11,7 +11,7 @@ const outbox = vi.hoisted(() => ({ processOnce: vi.fn().mockResolvedValue(3), se
 vi.mock('../../queue', () => queueModule);
 vi.mock('../outbox', () => outbox);
 
-import { registerOutboxQueue, TICK_SCHEDULER_ID, TICK_EVERY_MS } from '../dispatcher';
+import { registerOutboxQueue, TICK_SCHEDULER_ID, TICK_EVERY_MS, KICK_JOB_ID } from '../dispatcher';
 
 beforeEach(() => { vi.clearAllMocks(); });
 
@@ -24,9 +24,19 @@ describe('registerOutboxQueue', () => {
     });
     const enqueuer = outbox.setTickEnqueuer.mock.calls[0]![0] as () => Promise<void>;
     await enqueuer();
-    expect(queueModule.addJob).toHaveBeenCalledWith('platform_outbox', 'tick', {}, { attempts: 1 });
+    expect(queue.add).toHaveBeenCalledWith('kick', {}, { jobId: KICK_JOB_ID, attempts: 1, removeOnComplete: true, removeOnFail: true });
+    expect(KICK_JOB_ID).toBe('outbox-kick');
     const processor = (queueModule.registerQueue.mock.calls[0]![0] as { processor: (j: unknown) => Promise<unknown> }).processor;
     expect(await processor({ name: 'tick' })).toEqual({ processed: 3 });
     expect(TICK_EVERY_MS).toBe(5_000);
+  });
+
+  it('sweeps on the scheduled tick only, not on a kick', async () => {
+    await registerOutboxQueue();
+    const processor = (queueModule.registerQueue.mock.calls[0]![0] as { processor: (j: unknown) => Promise<unknown> }).processor;
+    await processor({ name: 'tick' });
+    expect(outbox.processOnce).toHaveBeenLastCalledWith(undefined, { sweep: true });
+    await processor({ name: 'kick' });
+    expect(outbox.processOnce).toHaveBeenLastCalledWith(undefined, { sweep: false });
   });
 });

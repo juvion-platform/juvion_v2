@@ -70,3 +70,9 @@ export const adminNoticeListQuerySchema = z.object({
   q: z.string().trim().max(80).optional(),
 });
 export type AdminNoticeListQuery = z.infer<typeof adminNoticeListQuerySchema>;
+
+export const deadEventsQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+});
+export type DeadEventsQuery = z.infer<typeof deadEventsQuerySchema>;

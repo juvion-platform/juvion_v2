@@ -5,6 +5,7 @@
 import { Types } from 'mongoose';
 import { Notice, LeanNotice } from '../../../models/juvi/Notice';
 import { NoticeRecipient, LeanNoticeRecipient } from '../../../models/juvi/NoticeRecipient';
+import { JuviAccount } from '../../../models/juvi/JuviAccount';
 import { Person } from '../../../models/people/Person';
 import { registerConsumer, registerSweeper, emit, OutboxPayload } from '../../../shared/outbox';
 import { createAuditLog, AuditLog } from '../../../shared/audit';
@@ -60,7 +61,20 @@ export async function fanOutNotice(payload: OutboxPayload): Promise<void> {
     })), { ordered: false });
   }
 
+  // A member who activated after the graph load found no row to update (onAccountActivated
+  // saves the account before it reads rows); this reads accounts after the rows exist.
   const snapshot = { collegeId, noticeId: notice._id, addedLater: false };
+  const orphans = await NoticeRecipient.find({ ...snapshot, accountId: null }).select('personId').lean<Pick<LeanNoticeRecipient, 'personId'>[]>();
+  for (let i = 0; i < orphans.length; i += fanoutBatchSize) {
+    const personIds = orphans.slice(i, i + fanoutBatchSize).map((r) => r.personId);
+    const accounts = await JuviAccount.find({ collegeId, status: 'active', personId: { $in: personIds } }).select('_id personId').lean();
+    if (accounts.length === 0) continue;
+    const receivedAt = new Date();
+    await NoticeRecipient.bulkWrite(accounts.map((a) => ({
+      updateOne: { filter: { ...snapshot, personId: a.personId, accountId: null }, update: { $set: { accountId: a._id, receivedAt } } },
+    })), { ordered: false });
+  }
+
   const [audience, onJuvi, channelIds] = await Promise.all([
     NoticeRecipient.countDocuments(snapshot),
     NoticeRecipient.countDocuments({ ...snapshot, accountId: { $ne: null } }),

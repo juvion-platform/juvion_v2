@@ -55,6 +55,10 @@ describe('mobile OpenAPI document', () => {
     expect(doc.components.schemas.ErrorEnvelope.properties.error.properties.code.enum).toEqual(expect.arrayContaining([
       'NOTICE_NOT_FOUND', 'ALREADY_ACKNOWLEDGED', 'NOTICE_ARCHIVED', 'NOT_PUBLISHER', 'REMINDER_LIMIT', 'ACK_REQUIRED', 'ACK_NOT_REQUIRED',
     ]));
+    const errorProps = doc.components.schemas.ErrorEnvelope.properties.error;
+    expect(errorProps.properties.ack).toMatchObject({ type: 'object', properties: { ackAt: { type: 'string' } } });
+    expect(errorProps.properties.reminders).toMatchObject({ type: 'object', properties: { used: { type: 'integer' } } });
+    expect(errorProps.required).toEqual(['code', 'message']);
     for (const name of ['NoticeDetail', 'ReachComment', 'NoticeReach']) expect(doc.components.schemas[name].allOf, name).toBeUndefined();
     expect(doc.components.schemas.ChannelDetail.properties.notices.items).toEqual({ $ref: '#/components/schemas/NoticeCard' });
   });

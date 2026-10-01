@@ -14,7 +14,8 @@ import { enableJuvi, provisionTestStudent, provisionTestFaculty } from '../facto
 import { createTestCourse, createTestCourseOffering, createTestEnrollment } from '../factories/academic.factory';
 import { createTestUser } from '../factories/user.factory';
 import { adminRef, erpRef, activateAccount, createStaffPublisher, makeHod, publishTestNotice } from '../factories/notice.factory';
-import { Department, Staff, Person } from '../../models';
+import { Department, Staff, Person, Faculty } from '../../models';
+import { User } from '../../models/User';
 import { Notice } from '../../models/juvi/Notice';
 import { NoticeRecipient } from '../../models/juvi/NoticeRecipient';
 import { Channel } from '../../models/juvi/Channel';
@@ -215,6 +216,28 @@ describe('publisher scope on preview and publish (US-1.1)', () => {
     expect(await Staff.findOne({ collegeId: fx.collegeId, personId: person._id })).toBeNull();   // persona-only, no Staff row
     const scope = await resolvePublisherScope(fx.collegeId, erpRef(user));
     expect(scope).toMatchObject({ kind: 'college', office: 'Registrar', isAdmin: false });
+  });
+
+  it('an office persona on User grants nothing once every Staff row of the person is separated (R9 separation guard)', async () => {
+    const person = await Person.create({ collegeId: fx.collegeId, name: 'Former Registrar', phone: '9600066666' });
+    await Staff.create({
+      collegeId: fx.collegeId, personId: person._id, employeeCode: 'STF-SEP-0002', designation: 'Registrar',
+      staffType: 'administrative', status: 'separated',
+    });
+    const { user } = await createTestUser({
+      collegeId: fx.collegeId, role: 'staff', personaType: 'ST-REG', personas: ['ST-REG'],
+      name: person.name, email: 'former-registrar@test.com', personId: String(person._id),
+    });
+    expect((await resolvePublisherScope(fx.collegeId, erpRef(user))).kind).toBe('none');
+  });
+
+  it('a faculty member whose Faculty row is separated keeps no office from User personas (R9 separation guard)', async () => {
+    const fac = await provisionTestFaculty(fx);
+    await User.updateOne({ _id: fac.user._id }, { $set: { personaType: 'ST-EXAM', personas: ['F-FAC', 'ST-EXAM'] } });
+    const ref = { id: String(fac.user._id), role: 'faculty', personaType: 'ST-EXAM', personas: ['F-FAC', 'ST-EXAM'] };
+    expect(await resolvePublisherScope(fx.collegeId, ref)).toMatchObject({ kind: 'college', office: 'Exam Section' });   // active: the office holds
+    await Faculty.updateOne({ _id: fac.faculty._id }, { $set: { status: 'separated' } });
+    expect((await resolvePublisherScope(fx.collegeId, ref)).kind).toBe('none');
   });
 
   it('the same shape of user with role student gets no publisher scope (R8)', async () => {

@@ -49,6 +49,11 @@ const auditLogSchema = new Schema<IAuditLog>({
 });
 
 auditLogSchema.index({ entityType: 1, entityId: 1, timestamp: -1 });
+// Juvi notices: one acknowledgement entry per recipient row (recordAcknowledgement's dedupe check).
+auditLogSchema.index(
+  { collegeId: 1, entityType: 1, entityId: 1, 'changes.newValue.recipientId': 1 },
+  { partialFilterExpression: { entityType: 'NoticeAcknowledgement' } },
+);
 
 export const AuditLog = model<IAuditLog>('AuditLog', auditLogSchema);
 

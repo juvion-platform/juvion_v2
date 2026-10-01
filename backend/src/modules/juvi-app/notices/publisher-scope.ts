@@ -26,6 +26,10 @@
  * contributes nothing, even if a stale `User.personaType` still names the
  * same office). Trusting `User.personaType`/`personas` only fires once the
  * role gate has already passed, so a student or parent can never reach it.
+ *
+ * Separation guard (R9): HR separation does not touch `User`, so a persona on
+ * `User` grants no office when the person has Staff or Faculty rows and none
+ * of them is active. A person with no Staff or Faculty rows at all keeps R8.
  */
 import { AppError } from '../../../middleware/errorHandler';
 import { User } from '../../../models/User';
@@ -49,6 +53,18 @@ const OFFICE_ELIGIBLE_ROLES: ReadonlySet<string> = new Set(['staff', 'hod', 'fac
 
 const activeStatus = { status: { $in: AUDIENCE_EMPLOYEE_STATUSES } };
 
+/** True when the person has Staff or Faculty rows and none of them is active (they have left). */
+async function hasSeparated(collegeId: string, personId: string | undefined): Promise<boolean> {
+  if (!personId) return false;
+  const [activeStaff, activeFaculty, anyStaff, anyFaculty] = await Promise.all([
+    Staff.exists({ collegeId, personId, ...activeStatus }),
+    Faculty.exists({ collegeId, personId, ...activeStatus }),
+    Staff.exists({ collegeId, personId }),
+    Faculty.exists({ collegeId, personId }),
+  ]);
+  return !activeStaff && !activeFaculty && Boolean(anyStaff || anyFaculty);
+}
+
 export async function resolvePublisherScope(collegeId: string, user: ErpUserRef, officeOverride?: string): Promise<PublisherScope> {
   const row = await User.findOne({ _id: user.id, collegeId }).select('personId personaType personas').lean();
   const personId = row?.personId ? String(row.personId) : undefined;
@@ -71,7 +87,7 @@ export async function resolvePublisherScope(collegeId: string, user: ErpUserRef,
   const codes = [...new Set([user.personaType, ...(user.personas ?? []), row?.personaType, ...(row?.personas ?? [])].filter((c): c is string => Boolean(c)))];
   const staff = personId ? await Staff.findOne({ collegeId, personId, ...activeStatus }).select('personaCode').lean() : null;
   const office = officeForPersonas(staff?.personaCode ? [...codes, staff.personaCode] : codes);
-  if (office) return { ...base, kind: 'college', office };
+  if (office && (staff || !(await hasSeparated(collegeId, personId)))) return { ...base, kind: 'college', office };
 
   if (user.role !== 'hod' && user.role !== 'faculty') return none;
 

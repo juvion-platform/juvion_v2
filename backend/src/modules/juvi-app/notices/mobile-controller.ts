@@ -32,22 +32,31 @@ export async function dismiss(req: MobileRequest, res: Response, next: NextFunct
   try { res.json(await acks.dismiss(requireMobile(req), id(req))); } catch (e) { next(e); }
 }
 
+// Reach, pending and remind check the caller's role first: a student or parent is refused (and audited) even for a notice that does not exist.
 export async function reach(req: MobileRequest, res: Response, next: NextFunction) {
   try {
     const ctx = requireMobile(req);
-    const notice = await reachSvc.manageableNotice(await reachSvc.mobileActor(ctx), id(req), 'reach');
+    const actor = await reachSvc.mobileActor(ctx);
+    await reachSvc.refuseNonPublisher(actor, id(req), 'reach');
+    const notice = await reachSvc.manageableNotice(actor, id(req), 'reach');
     res.json(await reachSvc.buildReach(ctx.collegeId, notice));
   } catch (e) { next(e); }
 }
 export async function pending(req: MobileRequest, res: Response, next: NextFunction) {
   try {
     const ctx = requireMobile(req);
-    const notice = await reachSvc.manageableNotice(await reachSvc.mobileActor(ctx), id(req), 'reach');
+    const actor = await reachSvc.mobileActor(ctx);
+    await reachSvc.refuseNonPublisher(actor, id(req), 'reach');
+    const notice = await reachSvc.manageableNotice(actor, id(req), 'reach');
     res.json(await reachSvc.pendingPage(ctx.collegeId, notice, pendingQuerySchema.parse(req.query)));
   } catch (e) { next(e); }
 }
 export async function remind(req: MobileRequest, res: Response, next: NextFunction) {
-  try { res.json(await remindNotice(await reachSvc.mobileActor(requireMobile(req)), id(req))); } catch (e) { next(e); }
+  try {
+    const actor = await reachSvc.mobileActor(requireMobile(req));
+    await reachSvc.refuseNonPublisher(actor, id(req), 'remind');
+    res.json(await remindNotice(actor, id(req)));
+  } catch (e) { next(e); }
 }
 
 export async function firstNotice(req: MobileRequest, res: Response, next: NextFunction) {

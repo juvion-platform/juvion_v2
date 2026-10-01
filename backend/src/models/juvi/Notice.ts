@@ -106,6 +106,10 @@ schema.pre('validate', function (next) {
 schema.index({ collegeId: 1, status: 1, publishedAt: -1 });
 schema.index({ collegeId: 1, 'publisher.userId': 1, publishedAt: -1 });
 schema.index({ collegeId: 1, channelIds: 1 });
+// The mobile `published` segment and the admin list sort by createdAt.
+schema.index({ collegeId: 1, 'publisher.userId': 1, createdAt: -1 });
+// The stuck-publishing sweeper scans across colleges.
+schema.index({ status: 1, createdAt: 1 });
 
 /** A lean read of a Notice: fields only, no Document methods. */
 export type LeanNotice = Omit<INotice, keyof Document> & { _id: Types.ObjectId };

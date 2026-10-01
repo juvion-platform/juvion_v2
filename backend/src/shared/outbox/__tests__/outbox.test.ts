@@ -136,6 +136,17 @@ describe('processOnce, kick and drain', () => {
     expect(await OutboxEvent.countDocuments({ status: 'done' })).toBe(2);
   });
 
+  it('skips the sweepers when asked (kick-triggered dispatcher runs)', async () => {
+    let swept = 0;
+    registerSweeper(async () => { swept += 1; });
+    registerConsumer('t.s', async () => {});
+    await emit('t.s', { collegeId: cid }, 's1');
+    expect(await processOnce(500, { sweep: false })).toBe(1);
+    expect(swept).toBe(0);
+    await processOnce();
+    expect(swept).toBe(1);
+  });
+
   it('kick uses the enqueuer when one is installed and falls back to inline processing otherwise', async () => {
     const handled: string[] = [];
     registerConsumer('t.k', async (_p, ev) => { handled.push(ev.dedupeKey); });

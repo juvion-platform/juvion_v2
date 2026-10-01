@@ -502,6 +502,47 @@
         "properties": {
           "error": {
             "properties": {
+              "ack": {
+                "properties": {
+                  "ackAt": {
+                    "type": "string"
+                  },
+                  "clientAt": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "comment": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "late": {
+                    "type": "boolean"
+                  },
+                  "method": {
+                    "enum": [
+                      "hold",
+                      "confirm"
+                    ],
+                    "type": "string"
+                  },
+                  "offline": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "ackAt",
+                  "late",
+                  "method",
+                  "offline",
+                  "comment",
+                  "clientAt"
+                ],
+                "type": "object"
+              },
               "code": {
                 "enum": [
                   "VALIDATION_FAILED",
@@ -528,6 +569,28 @@
               },
               "message": {
                 "type": "string"
+              },
+              "reminders": {
+                "properties": {
+                  "lastAt": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "max": {
+                    "type": "integer"
+                  },
+                  "used": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "used",
+                  "max",
+                  "lastAt"
+                ],
+                "type": "object"
               }
             },
             "required": [

@@ -11,9 +11,11 @@ export const noticesAdminRouter = Router();
 
 noticesAdminRouter.get('/', authorize('notices', 'read'), ctrl.list);
 noticesAdminRouter.get('/targets', authorize('notices', 'create'), ctrl.targets);
+noticesAdminRouter.get('/dead-events', authorize('notices', 'read'), ctrl.deadEvents);   // admin only (service check)
 noticesAdminRouter.get('/:id', authorize('notices', 'read'), ctrl.detail);
-noticesAdminRouter.get('/:id/reach', authorize('notices', 'read'), ctrl.reach);
-noticesAdminRouter.get('/:id/reach/pending', authorize('notices', 'read'), ctrl.pending);
+// auditReachRefusal runs before authorize() so a student's or parent's refused attempt is audited (RCH-02).
+noticesAdminRouter.get('/:id/reach', ctrl.auditReachRefusal, authorize('notices', 'read'), ctrl.reach);
+noticesAdminRouter.get('/:id/reach/pending', ctrl.auditReachRefusal, authorize('notices', 'read'), ctrl.pending);
 noticesAdminRouter.get('/:id/reach.csv', authorize('notices', 'read'), ctrl.csv);   // admin only (service check)
 noticesAdminRouter.get('/:id/audit', authorize('notices', 'read'), ctrl.audit);
 

@@ -83,10 +83,16 @@ export async function processEvent(event: IOutboxEvent): Promise<void> {
   }
 }
 
-/** Runs every sweeper, then processes claimable events until none is left (or `limit`). Returns the number processed. */
-export async function processOnce(limit = 500): Promise<number> {
-  for (const sweep of sweepers) {
-    try { await sweep(); } catch (err) { console.error('[outbox] sweeper failed', err); }
+/**
+ * Runs every sweeper (unless `sweep` is false), then processes claimable events
+ * until none is left (or `limit`). Returns the number processed. The dispatcher
+ * sweeps on its scheduled tick only; the inline path has no tick, so it sweeps.
+ */
+export async function processOnce(limit = 500, opts: { sweep?: boolean } = {}): Promise<number> {
+  if (opts.sweep !== false) {
+    for (const sweep of sweepers) {
+      try { await sweep(); } catch (err) { console.error('[outbox] sweeper failed', err); }
+    }
   }
   let n = 0;
   while (n < limit) {

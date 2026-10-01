@@ -7,9 +7,9 @@ import { resolvePublisherScope, ErpUserRef } from './publisher-scope';
 import { loadAudienceGraph } from './audience-graph';
 import { allowedTargets } from './scope';
 import { uploadAttachment, previewAudience, publishNotice, remindNotice, archiveNotice } from './publish-service';
-import { erpActor, manageableNotice, buildReach, pendingPage, reachCsv } from './reach-service';
-import { listAdminNotices, getAdminNotice, auditTrail, retryDelivery } from './admin-service';
-import { publishSchema, audiencePreviewSchema, adminNoticeListQuerySchema } from './admin-schemas';
+import { erpActor, manageableNotice, buildReach, pendingPage, reachCsv, auditNonPublisher, NON_PUBLISHER_ROLES, notPublisher } from './reach-service';
+import { listAdminNotices, getAdminNotice, auditTrail, retryDelivery, listDeadEvents } from './admin-service';
+import { publishSchema, audiencePreviewSchema, adminNoticeListQuerySchema, deadEventsQuerySchema } from './admin-schemas';
 import { pendingQuerySchema } from './schemas';
 
 const UNSUPPORTED = 'Unsupported file type. Use PDF, PNG, JPEG, WEBP, DOCX, XLSX or PPTX.';
@@ -47,14 +47,33 @@ export async function targets(req: AuthRequest, res: Response, next: NextFunctio
     res.json({ office: scope.office, ...allowedTargets(scope, await loadAudienceGraph(cid(req))) });
   } catch (e) { next(e); }
 }
+export async function deadEvents(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await listDeadEvents(actor(req), deadEventsQuerySchema.parse(req.query))); } catch (e) { next(e); }
+}
 export async function detail(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await getAdminNotice(actor(req), id(req))); } catch (e) { next(e); }
 }
+/**
+ * Runs ahead of authorize() on the reach routes: a student or parent is
+ * audited here (RCH-02), then authorize() refuses as before. The refusal is
+ * written once, so the handlers below refuse such a caller without auditing.
+ */
+export async function auditReachRefusal(req: AuthRequest, _res: Response, next: NextFunction) {
+  try { await auditNonPublisher(actor(req), id(req), 'reach'); next(); } catch (e) { next(e); }
+}
+const assertNotNonPublisher = (req: AuthRequest) => { if (NON_PUBLISHER_ROLES.has(req.user!.role)) throw notPublisher(); };
+
 export async function reach(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await buildReach(cid(req), await manageableNotice(actor(req), id(req), 'reach'))); } catch (e) { next(e); }
+  try {
+    assertNotNonPublisher(req);
+    res.json(await buildReach(cid(req), await manageableNotice(actor(req), id(req), 'reach')));
+  } catch (e) { next(e); }
 }
 export async function pending(req: AuthRequest, res: Response, next: NextFunction) {
-  try { res.json(await pendingPage(cid(req), await manageableNotice(actor(req), id(req), 'reach'), pendingQuerySchema.parse(req.query))); } catch (e) { next(e); }
+  try {
+    assertNotNonPublisher(req);
+    res.json(await pendingPage(cid(req), await manageableNotice(actor(req), id(req), 'reach'), pendingQuerySchema.parse(req.query)));
+  } catch (e) { next(e); }
 }
 export async function csv(req: AuthRequest, res: Response, next: NextFunction) {
   try {

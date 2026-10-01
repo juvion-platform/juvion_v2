@@ -20,8 +20,12 @@ export async function onAccountActivated(collegeId: string, accountId: string, p
     { collegeId, _id: { $in: rows.map((r) => r._id) }, accountId: null },
     { $set: { accountId: new Types.ObjectId(accountId), receivedAt: now } },
   );
-  const snapshotNotices = rows.filter((r) => !r.addedLater).map((r) => r.noticeId);
-  if (snapshotNotices.length) await Notice.updateMany({ collegeId, _id: { $in: snapshotNotices } }, { $inc: { 'counts.onJuvi': 1 } });
+  // Recounted from the rows, not $inc: an increment landing after the fan-out's own count would over-count.
+  const snapshotNotices = [...new Set(rows.filter((r) => !r.addedLater).map((r) => String(r.noticeId)))];
+  for (const noticeId of snapshotNotices) {
+    const onJuvi = await NoticeRecipient.countDocuments({ collegeId, noticeId, addedLater: false, accountId: { $ne: null } });
+    await Notice.updateOne({ _id: noticeId, collegeId }, { $set: { 'counts.onJuvi': onJuvi } });
+  }
   return res.modifiedCount;
 }
 

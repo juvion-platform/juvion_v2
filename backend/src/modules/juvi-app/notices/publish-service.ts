@@ -12,7 +12,7 @@ import {
 } from '../../../models/juvi/Notice';
 import { Channel } from '../../../models/juvi/Channel';
 import { createAuditLog } from '../../../shared/audit';
-import { emit, kick } from '../../../shared/outbox';
+import { OutboxEvent, emit, kick } from '../../../shared/outbox';
 import { isS3Configured, putObject } from '../../../shared/s3/s3-client';
 import { loadAudienceGraph } from './audience-graph';
 import { resolveAudience, ruleChannelRefs, audienceLine, groupLabel } from './audience';
@@ -158,11 +158,18 @@ export async function remindNotice(actor: NoticeActor, noticeId: string, now = n
   return { reminders: remindersView(updated) };
 }
 
-/** published → archived; the only change a published notice allows (US-1.4). Reach data is kept. */
+/**
+ * published → archived; the only change a published notice allows (US-1.4). Reach data is kept.
+ * A notice still `publishing` whose notice.published event is dead can be archived too, so a
+ * fan-out that always fails can be cleaned up.
+ */
 export async function archiveNotice(actor: NoticeActor, noticeId: string, now = new Date()): Promise<{ status: 'archived'; archivedAt: string }> {
   const notice = await manageableNotice(actor, noticeId, 'archive');
+  const deadDelivery = notice.status === 'publishing'
+    && Boolean(await OutboxEvent.exists({ collegeId: actor.collegeId, dedupeKey: noticeEventKey.published(String(notice._id)), status: 'dead' }));
+  const from = deadDelivery ? 'publishing' : 'published';
   const updated = await Notice.findOneAndUpdate(
-    { _id: notice._id, collegeId: actor.collegeId, status: 'published' },
+    { _id: notice._id, collegeId: actor.collegeId, status: from },
     { $set: { status: 'archived', archivedAt: now } },
     { new: true },
   ).lean<LeanNotice>();
@@ -170,7 +177,7 @@ export async function archiveNotice(actor: NoticeActor, noticeId: string, now = 
   await emit(NOTICE_EVENTS.archived, { collegeId: actor.collegeId, noticeId: String(notice._id) }, noticeEventKey.archived(String(notice._id)));
   await createAuditLog({
     collegeId: actor.collegeId, entityType: 'Notice', entityId: String(notice._id), entityName: `Notice from ${notice.publisher.office}`,
-    action: 'archive', changes: [{ field: 'status', displayName: 'Status', oldValue: 'published', newValue: 'archived' }], performedBy: actor.name,
+    action: 'archive', changes: [{ field: 'status', displayName: 'Status', oldValue: from, newValue: 'archived' }], performedBy: actor.name,
   });
   await kick();
   return { status: 'archived', archivedAt: now.toISOString() };

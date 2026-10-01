@@ -37,20 +37,46 @@ export function erpActor(collegeId: string, user: { id: string; name?: string; r
   return { collegeId, userId: user.id, name: user.name || 'System', role: user.role, isAdmin: ADMIN_ROLES.has(user.role), via: 'erp' };
 }
 
+export type ManageAction = 'reach' | 'remind' | 'archive';
+
+/** Roles that never publish: refused before the notice is even looked up, and audited (US-4.5, RCH-02). */
+export const NON_PUBLISHER_ROLES: ReadonlySet<string> = new Set(['student', 'parent']);
+
+export const notPublisher = () => new MobileApiError(403, 'NOT_PUBLISHER', 'Only the publisher of this notice can do that.');
+
+async function auditRefusal(actor: NoticeActor, noticeId: string, action: ManageAction, office?: string): Promise<void> {
+  await createAuditLog({
+    collegeId: actor.collegeId, entityType: 'NoticeReach', entityId: noticeId.slice(0, 64), entityName: office ? `Notice from ${office}` : 'Notice',
+    action: 'access_denied',
+    changes: [{ field: action, displayName: 'Refused: not the publisher', oldValue: null, newValue: { action, via: actor.via, role: actor.role, userId: actor.userId } }],
+    performedBy: actor.name,
+  });
+}
+
+/** Writes the refusal audit entry for a student or parent, whether or not the notice exists. Returns true when the actor was one. */
+export async function auditNonPublisher(actor: NoticeActor, noticeId: string, action: ManageAction): Promise<boolean> {
+  if (!NON_PUBLISHER_ROLES.has(actor.role)) return false;
+  const notice = Types.ObjectId.isValid(noticeId)
+    ? await Notice.findOne({ _id: noticeId, collegeId: actor.collegeId }).select('publisher.office').lean<Pick<LeanNotice, 'publisher'>>()
+    : null;
+  await auditRefusal(actor, noticeId, action, notice?.publisher.office);
+  return true;
+}
+
+/** A student or parent gets an audited 403 NOT_PUBLISHER before anything else. */
+export async function refuseNonPublisher(actor: NoticeActor, noticeId: string, action: ManageAction): Promise<void> {
+  if (await auditNonPublisher(actor, noticeId, action)) throw notPublisher();
+}
+
 /** The notice, when the actor published it or has ERP admin rights; otherwise an audited 403 (RCH-02). */
-export async function manageableNotice(actor: NoticeActor, noticeId: string, action: 'reach' | 'remind' | 'archive'): Promise<LeanNotice> {
+export async function manageableNotice(actor: NoticeActor, noticeId: string, action: ManageAction): Promise<LeanNotice> {
   if (!Types.ObjectId.isValid(noticeId)) throw noticeNotFound();
   const notice = await Notice.findOne({ _id: noticeId, collegeId: actor.collegeId }).lean<LeanNotice>();
   if (!notice) throw noticeNotFound();
   const isPublisher = Boolean(notice.publisher.userId) && String(notice.publisher.userId) === actor.userId;
   if (actor.isAdmin || isPublisher) return notice;
-  await createAuditLog({
-    collegeId: actor.collegeId, entityType: 'NoticeReach', entityId: String(notice._id), entityName: `Notice from ${notice.publisher.office}`,
-    action: 'access_denied',
-    changes: [{ field: action, displayName: 'Refused: not the publisher', oldValue: null, newValue: { action, via: actor.via, role: actor.role, userId: actor.userId } }],
-    performedBy: actor.name,
-  });
-  throw new MobileApiError(403, 'NOT_PUBLISHER', 'Only the publisher of this notice can do that.');
+  await auditRefusal(actor, String(notice._id), action, notice.publisher.office);
+  throw notPublisher();
 }
 
 export function reachBucket(r: Pick<LeanNoticeRecipient, 'ack' | 'seenAt' | 'accountId'>): ReachBucket {
@@ -134,7 +160,7 @@ export async function buildReach(collegeId: string, notice: LeanNotice, now = ne
   return {
     noticeId: String(notice._id), title: notice.title, status: notice.status, ackRequired: notice.ackRequired,
     deadline: iso(notice.ackDeadline), publishedAt: iso(notice.publishedAt),
-    audience: notice.counts.audience, ...totals,
+    audience: snapshot.length, ...totals,
     dismissed: snapshot.filter((r) => r.dismissedAt).length,
     late: snapshot.filter((r) => r.ack?.late).length,
     reminders: remindersView(notice),

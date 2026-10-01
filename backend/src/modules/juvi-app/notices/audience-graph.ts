@@ -2,7 +2,10 @@
  * Loads the AudienceGraph from ERP people (spec §1: members without an active
  * Juvi account are still in the audience, as "Not on Juvi"). College metadata
  * is always loaded whole (it is small); `personIds` narrows the people, which
- * is how the added-later check (Task 10) evaluates a single account.
+ * is how the added-later check (Task 10) evaluates a single account. It also
+ * narrows the offerings (and their enrolment counts) to those the people can
+ * match: their sections' offerings, the offerings they are enrolled in, and the
+ * offerings they teach.
  */
 import { Types } from 'mongoose';
 import { College } from '../../../models/College';
@@ -58,7 +61,27 @@ export async function loadAudienceGraph(collegeId: string, opts: { personIds?: s
     for (const sid of sec.studentIds ?? []) push(sectionsByStudent, s(sid), s(sec._id));
   }
 
-  const offeringDocs = await CourseOffering.find({ collegeId, status: 'active', semesterId: { $in: semesters.map((x) => x._id) } })
+  const [students, faculty, staff] = await Promise.all([
+    Student.find({ collegeId, status: { $in: AUDIENCE_STUDENT_STATUSES }, ...byPerson }).select('_id personId batchId branchId').lean(),
+    Faculty.find({ collegeId, status: { $in: AUDIENCE_EMPLOYEE_STATUSES }, ...byPerson }).select('_id personId departmentId').lean(),
+    Staff.find({ collegeId, status: { $in: AUDIENCE_EMPLOYEE_STATUSES }, ...byPerson }).select('_id personId departmentId personaCode').lean(),
+  ]);
+  const studentIds = students.map((x) => x._id);
+
+  const offeringFilter: Record<string, unknown> = { collegeId, status: 'active', semesterId: { $in: semesters.map((x) => x._id) } };
+  if (opts.personIds) {
+    const facultyIds = faculty.map((x) => x._id);
+    const enrolledIds = studentIds.length
+      ? await Enrollment.distinct('courseOfferingId', { collegeId, status: 'enrolled', studentId: { $in: studentIds } })
+      : [];
+    offeringFilter.$or = [
+      { sectionId: { $in: students.flatMap((st) => sectionsByStudent.get(s(st._id)) ?? []).map((id) => new Types.ObjectId(id)) } },
+      { _id: { $in: enrolledIds } },
+      { facultyId: { $in: facultyIds } },
+      { coFacultyIds: { $in: facultyIds } },
+    ];
+  }
+  const offeringDocs = await CourseOffering.find(offeringFilter)
     .select('_id sectionId facultyId coFacultyIds courseId').lean<OfferingLean[]>();
   const offeringIds = offeringDocs.map((o) => o._id);
   const courses = await Course.find({ collegeId, _id: { $in: offeringDocs.map((o) => o.courseId) } }).select('_id code').lean();
@@ -71,13 +94,7 @@ export async function loadAudienceGraph(collegeId: string, opts: { personIds?: s
     for (const f of facultyIds) push(offeringsByFaculty, f, s(o._id));
   }
 
-  const [students, faculty, staff] = await Promise.all([
-    Student.find({ collegeId, status: { $in: AUDIENCE_STUDENT_STATUSES }, ...byPerson }).select('_id personId batchId branchId').lean(),
-    Faculty.find({ collegeId, status: { $in: AUDIENCE_EMPLOYEE_STATUSES }, ...byPerson }).select('_id personId departmentId').lean(),
-    Staff.find({ collegeId, status: { $in: AUDIENCE_EMPLOYEE_STATUSES }, ...byPerson }).select('_id personId departmentId personaCode').lean(),
-  ]);
   const personIds = [...students, ...faculty, ...staff].map((x) => x.personId);
-  const studentIds = students.map((x) => x._id);
   const [users, accounts, enrollments, allocations, enrolCounts] = await Promise.all([
     User.find({ collegeId, personId: { $in: personIds } }).select('personId personaType personas').lean(),
     JuviAccount.find({ collegeId, status: 'active', personId: { $in: personIds } }).select('_id personId').lean(),

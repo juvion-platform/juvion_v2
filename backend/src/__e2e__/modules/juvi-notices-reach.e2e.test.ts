@@ -139,7 +139,8 @@ describe('reach is for the publisher only (RCH-01, RCH-02, US-4.5)', () => {
     expect(audit[0]).toMatchObject({ performedBy: s1.person.name });
     expect(audit.map((a) => (a.changes[0]!.newValue as { action: string; via: string }).action).sort()).toEqual(['reach', 'reach', 'remind']);
     expect((audit[0]!.changes[0]!.newValue as { via: string; role: string })).toMatchObject({ via: 'mobile', role: 'student' });
-    expect((await mobileClient(app, s1.token).get(`${V1}/notices/000000000000000000000000/reach`).expect(404)).body.error.code).toBe('NOTICE_NOT_FOUND');
+    // The role is checked first: a missing notice is refused (and audited) the same way.
+    expect((await mobileClient(app, s1.token).get(`${V1}/notices/000000000000000000000000/reach`).expect(403)).body.error.code).toBe('NOT_PUBLISHER');
   });
 });
 
