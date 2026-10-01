@@ -22,6 +22,9 @@ export default function DeadEventsPanel() {
         <AlertTriangle size={16} aria-hidden="true" /> Failed deliveries ({data.total})
       </h3>
       <p className="mt-1 text-red-700">These background steps stopped after repeated failures.</p>
+      {data.total > data.items.length && (
+        <p className="mt-1 text-xs text-red-700">Showing {data.items.length} of {data.total}.</p>
+      )}
       <ul className="mt-2 divide-y divide-red-100">
         {data.items.map((e) => (
           <li key={e.id} className="flex flex-wrap items-center justify-between gap-2 py-1.5">

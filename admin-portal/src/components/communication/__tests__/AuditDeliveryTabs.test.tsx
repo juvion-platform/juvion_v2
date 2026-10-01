@@ -2,15 +2,21 @@ import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest';
 import { screen, fireEvent, waitFor, within } from '@testing-library/react';
 import AuditTab from '../AuditTab';
 import DeliveryTab from '../DeliveryTab';
+import DeadEventsPanel from '../DeadEventsPanel';
 import { renderWithProviders } from '../../../__tests__/test-utils';
+import { formatWhen } from '../../../lib/notices';
 import type { NoticeDetail } from '../../../services/notices';
 
 const auth = vi.hoisted(() => ({ role: 'admin' }));
 vi.mock('../../../stores/authStore', () => ({ useAuthStore: (sel: (s: unknown) => unknown) => sel({ user: { role: auth.role } }) }));
 vi.mock('../../../stores/toastStore', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
-vi.mock('../../../services/notices', () => ({ getNoticeAudit: vi.fn(), retryNoticeDelivery: vi.fn() }));
-import { getNoticeAudit, retryNoticeDelivery } from '../../../services/notices';
+vi.mock('../../../services/notices', () => ({ getNoticeAudit: vi.fn(), retryNoticeDelivery: vi.fn(), listDeadEvents: vi.fn() }));
+import { getNoticeAudit, retryNoticeDelivery, listDeadEvents } from '../../../services/notices';
 import { toast } from '../../../stores/toastStore';
+
+/** 24-hex Mongo ObjectId shape — audit fixtures below use real-looking ids to prove they never render. */
+const anId = (n: number) => `66f1a2b3c4d5e6f7a8b9c0d${n}`;
+const ACK_AT = '2026-09-30T05:00:00.000Z';
 
 const NOTICE = {
   id: 'n1', title: 'Exam timetable', office: 'Exam Section', audienceLine: 'Sent to 2024 Batch', status: 'published', purpose: 'standard',
@@ -25,11 +31,16 @@ beforeEach(() => {
   vi.clearAllMocks(); auth.role = 'admin';
   (getNoticeAudit as Mock).mockResolvedValue({
     items: [
-      { action: 'acknowledge', entityType: 'NoticeAcknowledgement', performedBy: 'Asha Rao', at: '2026-09-30T05:00:00.000Z', changes: [{ field: 'ack', displayName: 'Acknowledged', oldValue: null, newValue: { late: false, method: 'hold' } }] },
+      // Real shape from consumers.ts recordAcknowledgement: recipientId and sessionId must never render.
+      { action: 'acknowledge', entityType: 'NoticeAcknowledgement', performedBy: 'Asha Rao', at: ACK_AT, changes: [{
+        field: 'ack', displayName: 'Acknowledged', oldValue: null,
+        newValue: { recipientId: anId(1), name: 'Asha Rao', at: ACK_AT, late: false, method: 'hold', offline: false, sessionId: anId(2), hasComment: false },
+      }] },
       { action: 'publish', entityType: 'Notice', performedBy: 'Exam Officer', at: '2026-09-30T04:00:00.000Z', changes: [{ field: 'status', displayName: 'Status', oldValue: null, newValue: 'publishing' }] },
     ],
   });
   (retryNoticeDelivery as Mock).mockResolvedValue({ state: 'delivering', attempts: 0, lastError: null, updatedAt: null });
+  (listDeadEvents as Mock).mockResolvedValue({ items: [], total: 0, page: 1, pages: 0 });
 });
 
 describe('AuditTab', () => {
@@ -39,10 +50,61 @@ describe('AuditTab', () => {
     const rows = within(table).getAllByRole('row').slice(1);
     expect(rows[0]).toHaveTextContent('Acknowledged');
     expect(rows[0]).toHaveTextContent('Asha Rao');
-    expect(rows[0]).toHaveTextContent('Acknowledged: — → late: false, method: hold');
+    expect(rows[0]).toHaveTextContent(`Asha Rao acknowledged ${formatWhen(ACK_AT)} · by hold`);
     expect(rows[1]).toHaveTextContent('Published');
     expect(rows[1]).toHaveTextContent('Status: — → publishing');
     expect(getNoticeAudit).toHaveBeenCalledWith('n1');
+    expect(table.textContent).not.toMatch(/[a-f0-9]{24}/i);
+  });
+
+  // Important (fix round 1): acknowledge and access_denied audit entries carry internal ids
+  // (recipientId, sessionId, userId) alongside the fields worth showing. Both must summarize
+  // into plain language and never leak an id, built from the exact shapes the writers record.
+  it('summarizes a late, offline acknowledgement with a comment, and never shows its ids', async () => {
+    (getNoticeAudit as Mock).mockResolvedValue({
+      items: [{
+        action: 'acknowledge', entityType: 'NoticeAcknowledgement', performedBy: 'Vikram Rao', at: ACK_AT,
+        changes: [{
+          field: 'ack', displayName: 'Acknowledged', oldValue: null,
+          newValue: { recipientId: anId(1), name: 'Vikram Rao', at: ACK_AT, late: true, method: 'confirm', offline: true, sessionId: anId(2), hasComment: true },
+        }],
+      }],
+    });
+    renderWithProviders(<AuditTab noticeId="n1" />);
+    const table = await screen.findByRole('table', { name: 'Audit trail' });
+    expect(table).toHaveTextContent(`Vikram Rao acknowledged ${formatWhen(ACK_AT)}, late · by confirm · offline · with a comment`);
+    expect(table.textContent).not.toMatch(/[a-f0-9]{24}/i);
+  });
+
+  it('labels a refused reach attempt as "Reach refused" and never shows the user id', async () => {
+    (getNoticeAudit as Mock).mockResolvedValue({
+      items: [{
+        // Real shape from reach-service.ts auditRefusal: userId must never render.
+        action: 'access_denied', entityType: 'NoticeReach', performedBy: 'Ravi Student', at: '2026-09-30T05:10:00.000Z',
+        changes: [{ field: 'remind', displayName: 'Refused: not the publisher', oldValue: null, newValue: { action: 'remind', via: 'mobile', role: 'student', userId: anId(3) } }],
+      }],
+    });
+    renderWithProviders(<AuditTab noticeId="n1" />);
+    const table = await screen.findByRole('table', { name: 'Audit trail' });
+    const row = within(table).getAllByRole('row')[1];
+    expect(row).toHaveTextContent('Reach refused');
+    expect(row).toHaveTextContent('Reach refused for a student (mobile)');
+    expect(table.textContent).not.toMatch(/[a-f0-9]{24}/i);
+  });
+
+  it('labels an archive entry as "Archived"', async () => {
+    (getNoticeAudit as Mock).mockResolvedValue({
+      items: [{
+        // Real shape from publish-service.ts archiveNotice.
+        action: 'archive', entityType: 'Notice', performedBy: 'Exam Officer', at: '2026-09-30T05:20:00.000Z',
+        changes: [{ field: 'status', displayName: 'Status', oldValue: 'published', newValue: 'archived' }],
+      }],
+    });
+    renderWithProviders(<AuditTab noticeId="n1" />);
+    const table = await screen.findByRole('table', { name: 'Audit trail' });
+    const row = within(table).getAllByRole('row')[1];
+    expect(row).toHaveTextContent('Archived');
+    expect(row).toHaveTextContent('Status: published → archived');
   });
 
   // R1: the backend writes `action: 'update'` for both a sent reminder (publish-service.ts
@@ -110,5 +172,26 @@ describe('DeliveryTab', () => {
     renderWithProviders(<DeliveryTab notice={FAILED} />);
     expect(screen.queryByRole('button', { name: 'Retry delivery' })).toBeNull();
     expect(screen.getByText('Ask a college admin to retry delivery.')).toBeInTheDocument();
+  });
+});
+
+describe('DeadEventsPanel', () => {
+  // Minor (fix round 1): the panel fetches only the first page (limit 20), so once there
+  // are more dead events than that it must say so rather than imply the list is complete.
+  it('shows how many of the total are displayed when there are more than the page', async () => {
+    const items = Array.from({ length: 20 }, (_, i) => ({
+      id: `e${i}`, type: 'notice.published', noticeId: `n${i}`, attempts: 8, lastError: 'Mongo timeout', createdAt: '2026-09-30T04:00:00.000Z', updatedAt: null,
+    }));
+    (listDeadEvents as Mock).mockResolvedValue({ items, total: 23, page: 1, pages: 2 });
+    renderWithProviders(<DeadEventsPanel />);
+    await screen.findByRole('region', { name: /failed deliveries \(23\)/i });
+    expect(screen.getByText('Showing 20 of 23.')).toBeInTheDocument();
+  });
+
+  it('says nothing about a partial page when every dead event is shown', async () => {
+    (listDeadEvents as Mock).mockResolvedValue({ items: [{ id: 'e1', type: 'notice.published', noticeId: 'n1', attempts: 8, lastError: 'boom', createdAt: '2026-09-30T04:00:00.000Z', updatedAt: null }], total: 1, page: 1, pages: 1 });
+    renderWithProviders(<DeadEventsPanel />);
+    await screen.findByRole('region', { name: /failed deliveries \(1\)/i });
+    expect(screen.queryByText(/^Showing /)).toBeNull();
   });
 });

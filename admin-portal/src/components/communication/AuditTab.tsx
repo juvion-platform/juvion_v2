@@ -8,9 +8,20 @@ const ACTION_LABELS: Record<string, string> = {
   publish: 'Published', archive: 'Archived', acknowledge: 'Acknowledged', access_denied: 'Reach refused',
 };
 
+/** A Mongo ObjectId string — never shown, wherever it turns up. */
+const HEX24 = /^[a-f0-9]{24}$/i;
+/** `id`, anything ending in `Id` (recipientId, userId, …), and `sessionId` — internal references, never display data. */
+const isIdKey = (k: string): boolean => k === 'id' || k === 'sessionId' || /Id$/.test(k);
+
+/** Generic change rendering for actions with no dedicated summary below: flattens an object
+ *  value to "key: value" pairs, dropping id-shaped keys and any raw id value outright. */
 function show(v: unknown): string {
   if (v === null || v === undefined || v === '') return '—';
-  if (typeof v === 'object') return Object.entries(v as Record<string, unknown>).map(([k, x]) => `${k}: ${show(x)}`).join(', ');
+  if (typeof v === 'string' && HEX24.test(v)) return '—';
+  if (typeof v === 'object' && !Array.isArray(v)) {
+    const entries = Object.entries(v as Record<string, unknown>).filter(([k, x]) => !isIdKey(k) && !(typeof x === 'string' && HEX24.test(x)));
+    return entries.length > 0 ? entries.map(([k, x]) => `${k}: ${show(x)}`).join(', ') : '—';
+  }
   return String(v);
 }
 const change = (c: AuditChange) => `${c.displayName ?? c.field}: ${show(c.oldValue)} → ${show(c.newValue)}`;
@@ -27,6 +38,41 @@ function actionLabel(e: AuditEntry): string {
   if (e.changes.some((c) => c.field === 'reminders')) return 'Reminder sent';
   if (e.changes.some((c) => c.field === 'delivery')) return 'Delivery retried';
   return 'Updated';
+}
+
+/**
+ * Human summary for an `acknowledge` entry's `changes[0].newValue`
+ * (consumers.ts recordAcknowledgement: `{ recipientId, name, at, late, method,
+ * offline, sessionId, hasComment }`). Built only from named, non-identifying
+ * fields — `recipientId` and `sessionId` never reach the screen.
+ */
+function ackSummary(v: Record<string, unknown>): string {
+  const name = typeof v.name === 'string' ? v.name : 'Someone';
+  const at = typeof v.at === 'string' ? formatWhen(v.at) : '—';
+  let s = `${name} acknowledged ${at}`;
+  if (v.late) s += ', late';
+  s += ` · by ${v.method === 'confirm' ? 'confirm' : 'hold'}`;
+  if (v.offline) s += ' · offline';
+  if (v.hasComment) s += ' · with a comment';
+  return s;
+}
+
+/**
+ * Human summary for an `access_denied` entry's `changes[0].newValue`
+ * (reach-service.ts auditRefusal: `{ action, via, role, userId }`). `userId`
+ * never reaches the screen.
+ */
+function refusalSummary(v: Record<string, unknown>): string {
+  const role = typeof v.role === 'string' ? v.role : 'user';
+  const via = typeof v.via === 'string' ? v.via : 'erp';
+  return `Reach refused for a ${role} (${via})`;
+}
+
+function details(e: AuditEntry): string {
+  const first = e.changes[0]?.newValue;
+  if (e.action === 'acknowledge' && first && typeof first === 'object') return ackSummary(first as Record<string, unknown>);
+  if (e.action === 'access_denied' && first && typeof first === 'object') return refusalSummary(first as Record<string, unknown>);
+  return e.changes.map(change).join('; ');
 }
 
 /** The notice's ERP audit trail (spec §8 Audit; ADM-06): publish, reminders, archive, acknowledgements, refused reach. */
@@ -47,7 +93,7 @@ export default function AuditTab({ noticeId }: { noticeId: string }) {
               <td className={`${td} whitespace-nowrap`}>{formatWhen(e.at)}</td>
               <td className={td}>{actionLabel(e)}</td>
               <td className={td}>{e.performedBy}</td>
-              <td className={`${td} text-gray-600`}>{e.changes.map(change).join('; ')}</td>
+              <td className={`${td} text-gray-600`}>{details(e)}</td>
             </tr>
           ))}
         </tbody>
