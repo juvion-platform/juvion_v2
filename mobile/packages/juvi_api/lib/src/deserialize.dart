@@ -17,6 +17,9 @@ import 'package:juvi_api/src/model/error_envelope.dart';
 import 'package:juvi_api/src/model/error_envelope_error.dart';
 import 'package:juvi_api/src/model/error_envelope_error_ack.dart';
 import 'package:juvi_api/src/model/error_envelope_error_reminders.dart';
+import 'package:juvi_api/src/model/events_request.dart';
+import 'package:juvi_api/src/model/events_request_events_inner.dart';
+import 'package:juvi_api/src/model/events_result.dart';
 import 'package:juvi_api/src/model/institution_lookup.dart';
 import 'package:juvi_api/src/model/me.dart';
 import 'package:juvi_api/src/model/me_account.dart';
@@ -48,16 +51,21 @@ import 'package:juvi_api/src/model/onboarding_advance.dart';
 import 'package:juvi_api/src/model/onboarding_state.dart';
 import 'package:juvi_api/src/model/pending_person.dart';
 import 'package:juvi_api/src/model/photo_result.dart';
+import 'package:juvi_api/src/model/push_token_request.dart';
 import 'package:juvi_api/src/model/reach_comment.dart';
 import 'package:juvi_api/src/model/reach_group.dart';
 import 'package:juvi_api/src/model/reach_person.dart';
 import 'package:juvi_api/src/model/read_result.dart';
+import 'package:juvi_api/src/model/receipts_request.dart';
+import 'package:juvi_api/src/model/receipts_request_items_inner.dart';
+import 'package:juvi_api/src/model/receipts_result.dart';
 import 'package:juvi_api/src/model/refresh_request.dart';
 import 'package:juvi_api/src/model/remind_result.dart';
 import 'package:juvi_api/src/model/revoked_count.dart';
 import 'package:juvi_api/src/model/seen_result.dart';
 import 'package:juvi_api/src/model/settings.dart';
 import 'package:juvi_api/src/model/settings_patch.dart';
+import 'package:juvi_api/src/model/settings_patch_quiet_hours.dart';
 import 'package:juvi_api/src/model/settings_patch_tiers.dart';
 import 'package:juvi_api/src/model/sign_in_request.dart';
 import 'package:juvi_api/src/model/sign_in_request_device.dart';
@@ -123,6 +131,12 @@ final _regMap = RegExp(r'^Map<String,(.*)>$');
           return ErrorEnvelopeErrorAck.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'ErrorEnvelopeErrorReminders':
           return ErrorEnvelopeErrorReminders.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'EventsRequest':
+          return EventsRequest.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'EventsRequestEventsInner':
+          return EventsRequestEventsInner.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'EventsResult':
+          return EventsResult.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'InstitutionLookup':
           return InstitutionLookup.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'Me':
@@ -185,6 +199,8 @@ final _regMap = RegExp(r'^Map<String,(.*)>$');
           return PendingPerson.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'PhotoResult':
           return PhotoResult.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'PushTokenRequest':
+          return PushTokenRequest.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'ReachComment':
           return ReachComment.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'ReachGroup':
@@ -193,6 +209,12 @@ final _regMap = RegExp(r'^Map<String,(.*)>$');
           return ReachPerson.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'ReadResult':
           return ReadResult.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'ReceiptsRequest':
+          return ReceiptsRequest.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'ReceiptsRequestItemsInner':
+          return ReceiptsRequestItemsInner.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'ReceiptsResult':
+          return ReceiptsResult.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'RefreshRequest':
           return RefreshRequest.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'RemindResult':
@@ -205,6 +227,8 @@ final _regMap = RegExp(r'^Map<String,(.*)>$');
           return Settings.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'SettingsPatch':
           return SettingsPatch.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'SettingsPatchQuietHours':
+          return SettingsPatchQuietHours.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'SettingsPatchTiers':
           return SettingsPatchTiers.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'SignInRequest':

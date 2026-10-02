@@ -17,7 +17,7 @@ SettingsPatch _$SettingsPatchFromJson(Map<String, dynamic> json) =>
           'quietHours',
           (v) => v == null
               ? null
-              : MeSettingsQuietHours.fromJson(v as Map<String, dynamic>),
+              : SettingsPatchQuietHours.fromJson(v as Map<String, dynamic>),
         ),
         tiers: $checkedConvert(
           'tiers',

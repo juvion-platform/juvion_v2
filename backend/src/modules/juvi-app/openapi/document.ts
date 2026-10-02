@@ -12,6 +12,9 @@ import {
   remindersSchema, reachPersonSchema, reachCommentSchema, reachGroupSchema, reachResponseSchema,
   pendingQuerySchema, pendingPersonSchema, pendingResponseSchema, remindResponseSchema,
 } from '../notices/schemas';
+import {
+  pushTokenRequestSchema, receiptsRequestSchema, receiptsResponseSchema, eventsRequestSchema, eventsResponseSchema,
+} from '../notifications/schemas';
 
 extendZodWithOpenApi(z);
 
@@ -21,6 +24,8 @@ const errorEnvelopeSchema = z.object({
       'VALIDATION_FAILED', 'INVALID_CREDENTIALS', 'TOKEN_EXPIRED', 'SESSION_INVALIDATED', 'ACCOUNT_DEACTIVATED', 'FORBIDDEN', 'NOT_FOUND', 'GONE', 'UPDATE_REQUIRED', 'COOLDOWN', 'INSTITUTION_PAUSED', 'INTERNAL',
       // Juvi notices
       'NOTICE_NOT_FOUND', 'ALREADY_ACKNOWLEDGED', 'NOTICE_ARCHIVED', 'NOT_PUBLISHER', 'REMINDER_LIMIT', 'ACK_REQUIRED', 'ACK_NOT_REQUIRED',
+      // Juvi notifications
+      'RECEIPT_INVALID',
     ]),
     message: z.string(),
     // Optional, never null (the Dart generator cannot parse an object-or-null field).
@@ -95,6 +100,11 @@ export function buildOpenApiDocument(): OpenApiDocument {
     NoticeReach: registry.register('NoticeReach', reachResponseSchema),
     NoticePending: registry.register('NoticePending', pendingResponseSchema),
     RemindResult: registry.register('RemindResult', remindResponseSchema),
+    PushTokenRequest: registry.register('PushTokenRequest', pushTokenRequestSchema),
+    ReceiptsRequest: registry.register('ReceiptsRequest', receiptsRequestSchema),
+    ReceiptsResult: registry.register('ReceiptsResult', receiptsResponseSchema),
+    EventsRequest: registry.register('EventsRequest', eventsRequestSchema),
+    EventsResult: registry.register('EventsResult', eventsResponseSchema),
   };
 
   const routes: RouteDef[] = [
@@ -127,6 +137,10 @@ export function buildOpenApiDocument(): OpenApiDocument {
     { operationId: 'getNoticeReach', method: 'get', path: '/notices/{id}/reach', summary: 'Reach for the publisher', auth: true, params: ['id'], response: C.NoticeReach, errors: [401, 403, 404] },
     { operationId: 'listNoticePending', method: 'get', path: '/notices/{id}/reach/pending', summary: 'Pending members for the publisher, grouped and searchable', auth: true, params: ['id'], query: pendingQuerySchema, response: C.NoticePending, errors: [400, 401, 403, 404] },
     { operationId: 'remindNotice', method: 'post', path: '/notices/{id}/remind', summary: 'Send a reminder (at most two)', auth: true, params: ['id'], response: C.RemindResult, errors: [401, 403, 404, 409] },
+    { operationId: 'registerPushToken', method: 'put', path: '/me/devices/current/push-token', summary: 'Register this device\'s FCM token (cleared from any other session first)', auth: true, body: C.PushTokenRequest, status: 204, errors: [400, 401] },
+    { operationId: 'clearPushToken', method: 'delete', path: '/me/devices/current/push-token', summary: 'Remove this device\'s FCM token', auth: true, status: 204, errors: [401] },
+    { operationId: 'postNotificationReceipts', method: 'post', path: '/notifications/receipts', summary: 'Delivered and opened receipts; each item is authorised by its HMAC receipt, not a session', auth: false, body: C.ReceiptsRequest, response: C.ReceiptsResult, errors: [400, 401, 429] },
+    { operationId: 'postEvents', method: 'post', path: '/events', summary: 'Product analytics: allow-listed names, id-like props; invalid events are dropped one by one', auth: true, body: C.EventsRequest, response: C.EventsResult, errors: [400, 401] },
     { operationId: 'getFirstNotice', method: 'get', path: '/onboarding/first-notice', summary: 'Onboarding step 4: the welcome notice', auth: true, response: C.NoticeDetail, errors: [401] },
   ];
 

@@ -70,6 +70,7 @@ Class | Method | HTTP request | Description
 [*MobileApi*](doc/MobileApi.md) | [**acknowledgeNotice**](doc/MobileApi.md#acknowledgenotice) | **POST** /notices/{id}/ack | Acknowledge a notice; 409 ALREADY_ACKNOWLEDGED carries the existing record
 [*MobileApi*](doc/MobileApi.md) | [**advanceOnboarding**](doc/MobileApi.md#advanceonboarding) | **POST** /me/onboarding/advance | Complete the current onboarding step
 [*MobileApi*](doc/MobileApi.md) | [**changePassword**](doc/MobileApi.md#changepassword) | **POST** /auth/change-password | Change password; revokes other sessions
+[*MobileApi*](doc/MobileApi.md) | [**clearPushToken**](doc/MobileApi.md#clearpushtoken) | **DELETE** /me/devices/current/push-token | Remove this device&#39;s FCM token
 [*MobileApi*](doc/MobileApi.md) | [**dismissNotice**](doc/MobileApi.md#dismissnotice) | **POST** /notices/{id}/dismiss | Dismiss a notice that needs no acknowledgement
 [*MobileApi*](doc/MobileApi.md) | [**getAttention**](doc/MobileApi.md#getattention) | **GET** /attention | Due acknowledgement notices: count and the first three
 [*MobileApi*](doc/MobileApi.md) | [**getChannel**](doc/MobileApi.md#getchannel) | **GET** /channels/{id} | Channel header and About
@@ -88,7 +89,10 @@ Class | Method | HTTP request | Description
 [*MobileApi*](doc/MobileApi.md) | [**markChannelRead**](doc/MobileApi.md#markchannelread) | **POST** /channels/{id}/read | Mark a channel read
 [*MobileApi*](doc/MobileApi.md) | [**markNoticeSeen**](doc/MobileApi.md#marknoticeseen) | **POST** /notices/{id}/seen | Mark a notice seen (once)
 [*MobileApi*](doc/MobileApi.md) | [**muteChannel**](doc/MobileApi.md#mutechannel) | **PUT** /channels/{id}/mute | Mute a channel
+[*MobileApi*](doc/MobileApi.md) | [**postEvents**](doc/MobileApi.md#postevents) | **POST** /events | Product analytics: allow-listed names, id-like props; invalid events are dropped one by one
+[*MobileApi*](doc/MobileApi.md) | [**postNotificationReceipts**](doc/MobileApi.md#postnotificationreceipts) | **POST** /notifications/receipts | Delivered and opened receipts; each item is authorised by its HMAC receipt, not a session
 [*MobileApi*](doc/MobileApi.md) | [**refresh**](doc/MobileApi.md#refresh) | **POST** /auth/refresh | Rotate the refresh token
+[*MobileApi*](doc/MobileApi.md) | [**registerPushToken**](doc/MobileApi.md#registerpushtoken) | **PUT** /me/devices/current/push-token | Register this device&#39;s FCM token (cleared from any other session first)
 [*MobileApi*](doc/MobileApi.md) | [**remindNotice**](doc/MobileApi.md#remindnotice) | **POST** /notices/{id}/remind | Send a reminder (at most two)
 [*MobileApi*](doc/MobileApi.md) | [**revokeDevice**](doc/MobileApi.md#revokedevice) | **DELETE** /me/devices/{id} | Sign out one device
 [*MobileApi*](doc/MobileApi.md) | [**revokeOtherDevices**](doc/MobileApi.md#revokeotherdevices) | **POST** /me/devices/revoke-others | Sign out every other device
@@ -120,6 +124,9 @@ Class | Method | HTTP request | Description
  - [ErrorEnvelopeError](doc/ErrorEnvelopeError.md)
  - [ErrorEnvelopeErrorAck](doc/ErrorEnvelopeErrorAck.md)
  - [ErrorEnvelopeErrorReminders](doc/ErrorEnvelopeErrorReminders.md)
+ - [EventsRequest](doc/EventsRequest.md)
+ - [EventsRequestEventsInner](doc/EventsRequestEventsInner.md)
+ - [EventsResult](doc/EventsResult.md)
  - [InstitutionLookup](doc/InstitutionLookup.md)
  - [Me](doc/Me.md)
  - [MeAccount](doc/MeAccount.md)
@@ -151,16 +158,21 @@ Class | Method | HTTP request | Description
  - [OnboardingState](doc/OnboardingState.md)
  - [PendingPerson](doc/PendingPerson.md)
  - [PhotoResult](doc/PhotoResult.md)
+ - [PushTokenRequest](doc/PushTokenRequest.md)
  - [ReachComment](doc/ReachComment.md)
  - [ReachGroup](doc/ReachGroup.md)
  - [ReachPerson](doc/ReachPerson.md)
  - [ReadResult](doc/ReadResult.md)
+ - [ReceiptsRequest](doc/ReceiptsRequest.md)
+ - [ReceiptsRequestItemsInner](doc/ReceiptsRequestItemsInner.md)
+ - [ReceiptsResult](doc/ReceiptsResult.md)
  - [RefreshRequest](doc/RefreshRequest.md)
  - [RemindResult](doc/RemindResult.md)
  - [RevokedCount](doc/RevokedCount.md)
  - [SeenResult](doc/SeenResult.md)
  - [Settings](doc/Settings.md)
  - [SettingsPatch](doc/SettingsPatch.md)
+ - [SettingsPatchQuietHours](doc/SettingsPatchQuietHours.md)
  - [SettingsPatchTiers](doc/SettingsPatchTiers.md)
  - [SignInRequest](doc/SignInRequest.md)
  - [SignInRequestDevice](doc/SignInRequestDevice.md)

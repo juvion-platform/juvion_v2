@@ -11,6 +11,7 @@ const EXPECTED_PATHS = [
   '/attention', '/notices', '/notices/{id}', '/notices/{id}/seen', '/notices/{id}/ack', '/notices/{id}/dismiss',
   '/notices/{id}/attachments/{key}', '/notices/{id}/reach', '/notices/{id}/reach/pending', '/notices/{id}/remind',
   '/onboarding/first-notice',
+  '/me/devices/current/push-token', '/notifications/receipts', '/events',
 ];
 
 describe('mobile OpenAPI document', () => {
@@ -33,10 +34,10 @@ describe('mobile OpenAPI document', () => {
   it('names every component and operation so the Dart client is predictable', () => {
     expect(Object.keys(doc.components.schemas).sort()).toEqual([
       'AckRequest', 'AckResult', 'Attention', 'ChangePasswordRequest', 'ChannelDetail', 'Config', 'Devices', 'DismissResult',
-      'ErrorEnvelope', 'InstitutionLookup', 'Me', 'MuteResult', 'NoticeAttachment', 'NoticeAttachmentUrl', 'NoticeCard',
+      'ErrorEnvelope', 'EventsRequest', 'EventsResult', 'InstitutionLookup', 'Me', 'MuteResult', 'NoticeAttachment', 'NoticeAttachmentUrl', 'NoticeCard',
       'NoticeDetail', 'NoticeList', 'NoticePending', 'NoticeReach', 'NoticeReminders', 'OnboardingAdvance', 'OnboardingState',
-      'PendingPerson', 'PhotoResult', 'ReachComment', 'ReachGroup', 'ReachPerson', 'ReadResult', 'RefreshRequest', 'RemindResult',
-      'RevokedCount', 'SeenResult', 'SettingsPatch', 'Settings', 'SignInRequest', 'SignInResponse', 'Spaces', 'Tokens',
+      'PendingPerson', 'PhotoResult', 'PushTokenRequest', 'ReachComment', 'ReachGroup', 'ReachPerson', 'ReadResult', 'ReceiptsRequest', 'ReceiptsResult',
+      'RefreshRequest', 'RemindResult', 'RevokedCount', 'SeenResult', 'SettingsPatch', 'Settings', 'SignInRequest', 'SignInResponse', 'Spaces', 'Tokens',
     ].sort());
     expect(doc.paths['/auth/sign-in'].post.operationId).toBe('signIn');
     expect(doc.paths['/channels/{id}/mute'].delete.operationId).toBe('unmuteChannel');
@@ -61,6 +62,16 @@ describe('mobile OpenAPI document', () => {
     expect(errorProps.required).toEqual(['code', 'message']);
     for (const name of ['NoticeDetail', 'ReachComment', 'NoticeReach']) expect(doc.components.schemas[name].allOf, name).toBeUndefined();
     expect(doc.components.schemas.ChannelDetail.properties.notices.items).toEqual({ $ref: '#/components/schemas/NoticeCard' });
+  });
+
+  it('describes the notification endpoints: the receipts route has no session', () => {
+    expect(doc.paths['/notifications/receipts'].post.security).toBeUndefined();
+    expect(doc.paths['/notifications/receipts'].post.operationId).toBe('postNotificationReceipts');
+    expect(doc.paths['/me/devices/current/push-token'].put.operationId).toBe('registerPushToken');
+    expect(doc.paths['/me/devices/current/push-token'].delete.responses['204']).toBeDefined();
+    expect(doc.paths['/events'].post.security).toEqual([{ bearerAuth: [] }]);
+    expect(doc.components.schemas.ErrorEnvelope.properties.error.properties.code.enum).toContain('RECEIPT_INVALID');
+    expect(doc.components.schemas.EventsRequest.properties.events.items.properties.props).toMatchObject({ type: 'object', additionalProperties: {} });
   });
 
   it('stableStringify orders keys so the file is deterministic', () => {

@@ -12,7 +12,7 @@ void main() {
       // TODO
     });
 
-    // MeSettingsQuietHours quietHours
+    // SettingsPatchQuietHours quietHours
     test('to test the property `quietHours`', () async {
       // TODO
     });
