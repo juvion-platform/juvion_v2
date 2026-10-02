@@ -1263,6 +1263,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Only the publisher can see who has read this notice.'**
   String get reachNotPublisher;
+
+  /// Channel screen section: notices whose audience matches this channel (spec §4 US-6).
+  ///
+  /// In en, this message translates to:
+  /// **'Notices'**
+  String get channelNotices;
 }
 
 class _AppLocalizationsDelegate

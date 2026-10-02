@@ -273,5 +273,7 @@
   "reachAddedLater": "Added after publishing",
   "reachAddedLaterLine": "{total} people · {acknowledged} acknowledged · {seen} seen",
   "@reachAddedLaterLine": { "placeholders": { "total": { "type": "int" }, "acknowledged": { "type": "int" }, "seen": { "type": "int" } } },
-  "reachNotPublisher": "Only the publisher can see who has read this notice."
+  "reachNotPublisher": "Only the publisher can see who has read this notice.",
+  "channelNotices": "Notices",
+  "@channelNotices": { "description": "Channel screen section: notices whose audience matches this channel (spec §4 US-6)." }
 }

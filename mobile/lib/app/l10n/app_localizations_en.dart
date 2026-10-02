@@ -680,4 +680,7 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get reachNotPublisher =>
       'Only the publisher can see who has read this notice.';
+
+  @override
+  String get channelNotices => 'Notices';
 }
