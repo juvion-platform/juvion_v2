@@ -1,15 +1,23 @@
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http_mock_adapter/http_mock_adapter.dart';
 import 'package:juvi/core/http/api_failure.dart';
+import 'package:juvi/core/http/api_providers.dart';
+import 'package:juvi/core/models/models.dart';
 import 'package:juvi/core/models/notices.dart';
 import 'package:juvi/core/repos/notices_repository.dart';
 import 'package:juvi/core/storage/app_database.dart';
-import 'package:juvi_api/juvi_api.dart';
+// `NoticeDetail` is ambiguous with the app model of the same name from
+// `juvi/core/models/notices.dart`; this file only needs `JuviApi` from here.
+import 'package:juvi_api/juvi_api.dart' hide NoticeDetail;
+import 'package:mocktail/mocktail.dart';
 
 import 'notices_fixtures.dart';
+
+class _Notices extends Mock implements NoticesRepository {}
 
 void main() {
   late Dio dio;
@@ -194,5 +202,51 @@ void main() {
     expect(d.purpose, 'welcome');
     expect(d.deadline, isNull);
     expect((await repo.cachedDetail('w1'))?.data.title, 'Welcome to Juvi');
+  });
+
+  test('noticeDetail drops the cached doc and errors when the refresh is NOTICE_NOT_FOUND', () async {
+    final mock = _Notices();
+    await db.writeDoc(ApiNoticesRepository.detailKey('n1'), detailJson('n1'), DateTime.utc(2026, 10));
+    when(() => mock.cachedDetail('n1')).thenAnswer((_) async {
+      final doc = await db.readDoc(ApiNoticesRepository.detailKey('n1'));
+      return doc == null ? null : Cached(NoticeDetail.fromJson(doc.json), doc.asOf);
+    });
+    when(() => mock.detail('n1')).thenThrow(const ApiFailure(ApiErrorCode.noticeNotFound, 'This notice is not available.'));
+
+    final c = ProviderContainer(retry: (_, _) => null, overrides: [
+      noticesRepositoryProvider.overrideWith((_) async => mock),
+      appDatabaseProvider.overrideWith((_) async => db),
+    ]);
+    addTearDown(c.dispose);
+    c.listen(noticeDetailProvider('n1'), (_, _) {});
+    await pumpEventQueue();
+
+    final state = c.read(noticeDetailProvider('n1'));
+    expect(state.hasError, isTrue);
+    expect((state.error! as ApiFailure).code, ApiErrorCode.noticeNotFound);
+    expect(await db.readDoc(ApiNoticesRepository.detailKey('n1')), isNull);
+  });
+
+  test('noticeDetail still serves the stale cached doc when the refresh is offline', () async {
+    final mock = _Notices();
+    await db.writeDoc(ApiNoticesRepository.detailKey('n1'), detailJson('n1'), DateTime.utc(2026, 10));
+    when(() => mock.cachedDetail('n1')).thenAnswer((_) async {
+      final doc = await db.readDoc(ApiNoticesRepository.detailKey('n1'));
+      return doc == null ? null : Cached(NoticeDetail.fromJson(doc.json), doc.asOf);
+    });
+    when(() => mock.detail('n1')).thenThrow(const ApiFailure(ApiErrorCode.offline, "You're offline."));
+
+    final c = ProviderContainer(retry: (_, _) => null, overrides: [
+      noticesRepositoryProvider.overrideWith((_) async => mock),
+      appDatabaseProvider.overrideWith((_) async => db),
+    ]);
+    addTearDown(c.dispose);
+    c.listen(noticeDetailProvider('n1'), (_, _) {});
+    await pumpEventQueue();
+
+    final value = c.read(noticeDetailProvider('n1')).value;
+    expect(value?.stale, isTrue);
+    expect(value?.data.id, 'n1');
+    expect(await db.readDoc(ApiNoticesRepository.detailKey('n1')), isNotNull);
   });
 }

@@ -231,6 +231,12 @@ Stream<Cached<AttentionData>> attention(Ref ref) async* {
   }
 }
 
+/// `NOTICE_NOT_FOUND`/`forbidden` mean the caller can no longer see this notice (it
+/// wasn't addressed to them, or access was revoked) — unlike a transient failure, the
+/// cached copy must not keep rendering, so the doc is dropped and the stream errors
+/// instead of falling back to [Cached.markStale] (spec US-2.5).
+const Set<ApiErrorCode> _goneNoticeCodes = {ApiErrorCode.noticeNotFound, ApiErrorCode.forbidden};
+
 @riverpod
 Stream<Cached<NoticeDetail>> noticeDetail(Ref ref, String id) async* {
   final repo = await ref.read(noticesRepositoryProvider.future);
@@ -239,6 +245,11 @@ Stream<Cached<NoticeDetail>> noticeDetail(Ref ref, String id) async* {
   try {
     yield await repo.detail(id);
   } on ApiFailure catch (f) {
+    if (_goneNoticeCodes.contains(f.code)) {
+      final db = await ref.read(appDatabaseProvider.future);
+      await db.deleteDoc(ApiNoticesRepository.detailKey(id));
+      rethrow;
+    }
     if (c == null) rethrow;
     yield c.markStale(f);
   }
