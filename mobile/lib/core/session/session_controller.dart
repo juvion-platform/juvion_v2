@@ -125,6 +125,13 @@ class SessionController extends _$SessionController {
       case ApiErrorCode.gone:
       case ApiErrorCode.cooldown:
       case ApiErrorCode.internal:
+      case ApiErrorCode.noticeNotFound:
+      case ApiErrorCode.alreadyAcknowledged:
+      case ApiErrorCode.noticeArchived:
+      case ApiErrorCode.notPublisher:
+      case ApiErrorCode.reminderLimit:
+      case ApiErrorCode.ackRequired:
+      case ApiErrorCode.ackNotRequired:
       case ApiErrorCode.offline:
       case ApiErrorCode.unknown:
         break;

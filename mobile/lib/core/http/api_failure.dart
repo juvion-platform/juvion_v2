@@ -2,7 +2,10 @@ import 'package:dio/dio.dart';
 
 enum ApiErrorCode {
   validationFailed, invalidCredentials, tokenExpired, sessionInvalidated, accountDeactivated,
-  forbidden, notFound, gone, updateRequired, cooldown, institutionPaused, internal, offline, unknown;
+  forbidden, notFound, gone, updateRequired, cooldown, institutionPaused, internal,
+  // Juvi notices (notices spec §7.1).
+  noticeNotFound, alreadyAcknowledged, noticeArchived, notPublisher, reminderLimit, ackRequired, ackNotRequired,
+  offline, unknown;
 
   static ApiErrorCode fromWire(String? code) => switch (code) {
         'VALIDATION_FAILED' => validationFailed,
@@ -17,6 +20,13 @@ enum ApiErrorCode {
         'COOLDOWN' => cooldown,
         'INSTITUTION_PAUSED' => institutionPaused,
         'INTERNAL' => internal,
+        'NOTICE_NOT_FOUND' => noticeNotFound,
+        'ALREADY_ACKNOWLEDGED' => alreadyAcknowledged,
+        'NOTICE_ARCHIVED' => noticeArchived,
+        'NOT_PUBLISHER' => notPublisher,
+        'REMINDER_LIMIT' => reminderLimit,
+        'ACK_REQUIRED' => ackRequired,
+        'ACK_NOT_REQUIRED' => ackNotRequired,
         _ => unknown,
       };
 }
@@ -67,6 +77,17 @@ class ApiFailure implements Exception {
   int? get retryAfterSeconds => detail['retryAfterSeconds'] as int?;
   String? get reason => detail['reason'] as String?;
   List<Map<String, dynamic>> get fields => (detail['fields'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+
+  /// The existing acknowledgement on a 409 `ALREADY_ACKNOWLEDGED` (`error.ack`), raw.
+  Map<String, dynamic>? get ackRecord => _object('ack');
+
+  /// The reminder budget on a 409 `REMINDER_LIMIT` (`error.reminders`), raw.
+  Map<String, dynamic>? get reminders => _object('reminders');
+
+  Map<String, dynamic>? _object(String key) {
+    final v = detail[key];
+    return v is Map ? Map<String, dynamic>.from(v) : null;
+  }
 
   @override
   String toString() => 'ApiFailure(${code.name}, $message)';
