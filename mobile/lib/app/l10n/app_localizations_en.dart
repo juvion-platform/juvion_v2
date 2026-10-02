@@ -570,4 +570,103 @@ class AppLocalizationsEn extends AppLocalizations {
   String dueBadgeLabel(int count) {
     return '$count due';
   }
+
+  @override
+  String get reachTitle => 'Reach';
+
+  @override
+  String get reachSeenNotAcked => 'Seen, not acknowledged';
+
+  @override
+  String get reachSeen => 'Seen';
+
+  @override
+  String get reachNotSeen => 'Not seen';
+
+  @override
+  String get reachNotOnJuvi => 'Not on Juvi';
+
+  @override
+  String reachOfAudience(int count) {
+    return 'of $count in the audience';
+  }
+
+  @override
+  String get reachSparkline => 'Acknowledgements over time';
+
+  @override
+  String reachReminders(int used, int max) {
+    return 'Reminders sent: $used of $max';
+  }
+
+  @override
+  String get reachSendReminder => 'Send reminder';
+
+  @override
+  String get reachRemindConfirmTitle => 'Send a reminder?';
+
+  @override
+  String get reachRemindConfirmBody =>
+      'Everyone who has not acknowledged yet gets this notice again.';
+
+  @override
+  String get reachRemindSent => 'Reminder sent';
+
+  @override
+  String get reachByGroup => 'By group';
+
+  @override
+  String reachGroupLine(int acknowledged, int total) {
+    return '$acknowledged of $total acknowledged';
+  }
+
+  @override
+  String reachPending(int count) {
+    return 'Pending ($count)';
+  }
+
+  @override
+  String get reachAllGroups => 'All groups';
+
+  @override
+  String get reachSearchHint => 'Search by name or roll number';
+
+  @override
+  String get reachCopy => 'Copy list';
+
+  @override
+  String reachCopied(int count) {
+    return 'Copied $count names';
+  }
+
+  @override
+  String reachLastInApp(String when) {
+    return 'Last in app $when';
+  }
+
+  @override
+  String get reachNeverInApp => 'Not in the app yet';
+
+  @override
+  String get reachNoPending => 'No one is pending';
+
+  @override
+  String reachLate(int count) {
+    return 'Late acknowledgements ($count)';
+  }
+
+  @override
+  String get reachComments => 'Comments';
+
+  @override
+  String get reachAddedLater => 'Added after publishing';
+
+  @override
+  String reachAddedLaterLine(int total, int acknowledged, int seen) {
+    return '$total people · $acknowledged acknowledged · $seen seen';
+  }
+
+  @override
+  String get reachNotPublisher =>
+      'Only the publisher can see who has read this notice.';
 }

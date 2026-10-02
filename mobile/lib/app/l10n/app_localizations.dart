@@ -1083,6 +1083,168 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count} due'**
   String dueBadgeLabel(int count);
+
+  /// S11 app bar: who has seen and acknowledged a notice I published.
+  ///
+  /// In en, this message translates to:
+  /// **'Reach'**
+  String get reachTitle;
+
+  /// No description provided for @reachSeenNotAcked.
+  ///
+  /// In en, this message translates to:
+  /// **'Seen, not acknowledged'**
+  String get reachSeenNotAcked;
+
+  /// No description provided for @reachSeen.
+  ///
+  /// In en, this message translates to:
+  /// **'Seen'**
+  String get reachSeen;
+
+  /// No description provided for @reachNotSeen.
+  ///
+  /// In en, this message translates to:
+  /// **'Not seen'**
+  String get reachNotSeen;
+
+  /// Audience members without an active Juvi account (spec §1).
+  ///
+  /// In en, this message translates to:
+  /// **'Not on Juvi'**
+  String get reachNotOnJuvi;
+
+  /// No description provided for @reachOfAudience.
+  ///
+  /// In en, this message translates to:
+  /// **'of {count} in the audience'**
+  String reachOfAudience(int count);
+
+  /// No description provided for @reachSparkline.
+  ///
+  /// In en, this message translates to:
+  /// **'Acknowledgements over time'**
+  String get reachSparkline;
+
+  /// No description provided for @reachReminders.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminders sent: {used} of {max}'**
+  String reachReminders(int used, int max);
+
+  /// No description provided for @reachSendReminder.
+  ///
+  /// In en, this message translates to:
+  /// **'Send reminder'**
+  String get reachSendReminder;
+
+  /// No description provided for @reachRemindConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Send a reminder?'**
+  String get reachRemindConfirmTitle;
+
+  /// No description provided for @reachRemindConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Everyone who has not acknowledged yet gets this notice again.'**
+  String get reachRemindConfirmBody;
+
+  /// No description provided for @reachRemindSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminder sent'**
+  String get reachRemindSent;
+
+  /// No description provided for @reachByGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'By group'**
+  String get reachByGroup;
+
+  /// No description provided for @reachGroupLine.
+  ///
+  /// In en, this message translates to:
+  /// **'{acknowledged} of {total} acknowledged'**
+  String reachGroupLine(int acknowledged, int total);
+
+  /// No description provided for @reachPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending ({count})'**
+  String reachPending(int count);
+
+  /// No description provided for @reachAllGroups.
+  ///
+  /// In en, this message translates to:
+  /// **'All groups'**
+  String get reachAllGroups;
+
+  /// No description provided for @reachSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search by name or roll number'**
+  String get reachSearchHint;
+
+  /// No description provided for @reachCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy list'**
+  String get reachCopy;
+
+  /// No description provided for @reachCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied {count} names'**
+  String reachCopied(int count);
+
+  /// No description provided for @reachLastInApp.
+  ///
+  /// In en, this message translates to:
+  /// **'Last in app {when}'**
+  String reachLastInApp(String when);
+
+  /// No description provided for @reachNeverInApp.
+  ///
+  /// In en, this message translates to:
+  /// **'Not in the app yet'**
+  String get reachNeverInApp;
+
+  /// No description provided for @reachNoPending.
+  ///
+  /// In en, this message translates to:
+  /// **'No one is pending'**
+  String get reachNoPending;
+
+  /// No description provided for @reachLate.
+  ///
+  /// In en, this message translates to:
+  /// **'Late acknowledgements ({count})'**
+  String reachLate(int count);
+
+  /// No description provided for @reachComments.
+  ///
+  /// In en, this message translates to:
+  /// **'Comments'**
+  String get reachComments;
+
+  /// No description provided for @reachAddedLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Added after publishing'**
+  String get reachAddedLater;
+
+  /// No description provided for @reachAddedLaterLine.
+  ///
+  /// In en, this message translates to:
+  /// **'{total} people · {acknowledged} acknowledged · {seen} seen'**
+  String reachAddedLaterLine(int total, int acknowledged, int seen);
+
+  /// No description provided for @reachNotPublisher.
+  ///
+  /// In en, this message translates to:
+  /// **'Only the publisher can see who has read this notice.'**
+  String get reachNotPublisher;
 }
 
 class _AppLocalizationsDelegate

@@ -15,6 +15,7 @@ import 'package:juvi/features/me/me_screen.dart';
 import 'package:juvi/features/me/settings_screen.dart';
 import 'package:juvi/features/notices/attention_sheet.dart';
 import 'package:juvi/features/notices/notice_detail_screen.dart';
+import 'package:juvi/features/notices/reach_screen.dart';
 import 'package:juvi/features/onboarding/onboarding_screen.dart';
 import 'package:juvi/features/spaces/channel_screen.dart';
 import 'package:juvi/features/spaces/spaces_screen.dart';
@@ -47,7 +48,11 @@ GoRouter buildRouter(Ref ref) {
       GoRoute(path: '/update-required', builder: (_, _) => const UpdateRequiredScreen()),
       // Notices sit above the tab shell: pushed from Today, Teaching, a channel or the
       // attention sheet, and popped back to wherever they were opened from.
-      GoRoute(path: '/notices/:id', builder: (_, s) => NoticeDetailScreen(noticeId: s.pathParameters['id']!)),
+      GoRoute(
+        path: '/notices/:id',
+        builder: (_, s) => NoticeDetailScreen(noticeId: s.pathParameters['id']!),
+        routes: [GoRoute(path: 'reach', builder: (_, s) => ReachScreen(noticeId: s.pathParameters['id']!))],
+      ),
       // S05 is a modal sheet that returns to the calling screen (spec §9).
       GoRoute(path: '/attention', pageBuilder: (_, s) => SheetPage<void>(key: s.pageKey, child: const AttentionSheet())),
       StatefulShellRoute.indexedStack(
