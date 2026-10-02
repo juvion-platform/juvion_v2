@@ -8,7 +8,9 @@ export type MobileErrorCode =
   | 'COOLDOWN' | 'INSTITUTION_PAUSED' | 'INTERNAL'
   // Juvi notices (notices spec §7.1)
   | 'NOTICE_NOT_FOUND' | 'ALREADY_ACKNOWLEDGED' | 'NOTICE_ARCHIVED' | 'NOT_PUBLISHER'
-  | 'REMINDER_LIMIT' | 'ACK_REQUIRED' | 'ACK_NOT_REQUIRED';
+  | 'REMINDER_LIMIT' | 'ACK_REQUIRED' | 'ACK_NOT_REQUIRED'
+  // Juvi notifications (notifications spec §7.2): every receipt in the request failed verification
+  | 'RECEIPT_INVALID';
 
 /**
  * Mobile-facing error. `detail` keys are spread into the envelope next to
