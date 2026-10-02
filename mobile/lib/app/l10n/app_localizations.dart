@@ -867,6 +867,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Deadline passed {when}'**
   String deadlinePassed(String when);
+
+  /// Priority label on a notice card.
+  ///
+  /// In en, this message translates to:
+  /// **'Urgent'**
+  String get noticeUrgent;
+
+  /// Priority label on a notice card.
+  ///
+  /// In en, this message translates to:
+  /// **'Important'**
+  String get noticeImportant;
+
+  /// A notice acknowledged offline, waiting in the queue (spec §4 US-3.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Will send when online'**
+  String get noticeWillSendWhenOnline;
+
+  /// No description provided for @noticeAcknowledgedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Acknowledged {when}'**
+  String noticeAcknowledgedAt(String when);
+
+  /// No description provided for @noticeAcknowledged.
+  ///
+  /// In en, this message translates to:
+  /// **'Acknowledged'**
+  String get noticeAcknowledged;
+
+  /// An acknowledgement made after the deadline (spec §4 US-2.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Late'**
+  String get noticeLate;
+
+  /// No description provided for @noticeArchived.
+  ///
+  /// In en, this message translates to:
+  /// **'Archived'**
+  String get noticeArchived;
+
+  /// A notice received but not yet opened.
+  ///
+  /// In en, this message translates to:
+  /// **'New'**
+  String get noticeNew;
+
+  /// No description provided for @noticeDue.
+  ///
+  /// In en, this message translates to:
+  /// **'Due'**
+  String get noticeDue;
+
+  /// Pill under the attention stack: due items beyond the three shown.
+  ///
+  /// In en, this message translates to:
+  /// **'+{count} more'**
+  String attentionMore(int count);
 }
 
 class _AppLocalizationsDelegate

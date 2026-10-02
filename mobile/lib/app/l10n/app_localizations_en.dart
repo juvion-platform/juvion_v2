@@ -447,4 +447,38 @@ class AppLocalizationsEn extends AppLocalizations {
   String deadlinePassed(String when) {
     return 'Deadline passed $when';
   }
+
+  @override
+  String get noticeUrgent => 'Urgent';
+
+  @override
+  String get noticeImportant => 'Important';
+
+  @override
+  String get noticeWillSendWhenOnline => 'Will send when online';
+
+  @override
+  String noticeAcknowledgedAt(String when) {
+    return 'Acknowledged $when';
+  }
+
+  @override
+  String get noticeAcknowledged => 'Acknowledged';
+
+  @override
+  String get noticeLate => 'Late';
+
+  @override
+  String get noticeArchived => 'Archived';
+
+  @override
+  String get noticeNew => 'New';
+
+  @override
+  String get noticeDue => 'Due';
+
+  @override
+  String attentionMore(int count) {
+    return '+$count more';
+  }
 }

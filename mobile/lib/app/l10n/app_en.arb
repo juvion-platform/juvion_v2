@@ -177,5 +177,22 @@
   "deadlineDueBy": "Acknowledge by {when}",
   "@deadlineDueBy": { "placeholders": { "when": { "type": "String" } } },
   "deadlinePassed": "Deadline passed {when}",
-  "@deadlinePassed": { "placeholders": { "when": { "type": "String" } } }
+  "@deadlinePassed": { "placeholders": { "when": { "type": "String" } } },
+  "noticeUrgent": "Urgent",
+  "@noticeUrgent": { "description": "Priority label on a notice card." },
+  "noticeImportant": "Important",
+  "@noticeImportant": { "description": "Priority label on a notice card." },
+  "noticeWillSendWhenOnline": "Will send when online",
+  "@noticeWillSendWhenOnline": { "description": "A notice acknowledged offline, waiting in the queue (spec §4 US-3.4)." },
+  "noticeAcknowledgedAt": "Acknowledged {when}",
+  "@noticeAcknowledgedAt": { "placeholders": { "when": { "type": "String" } } },
+  "noticeAcknowledged": "Acknowledged",
+  "noticeLate": "Late",
+  "@noticeLate": { "description": "An acknowledgement made after the deadline (spec §4 US-2.4)." },
+  "noticeArchived": "Archived",
+  "noticeNew": "New",
+  "@noticeNew": { "description": "A notice received but not yet opened." },
+  "noticeDue": "Due",
+  "attentionMore": "+{count} more",
+  "@attentionMore": { "description": "Pill under the attention stack: due items beyond the three shown.", "placeholders": { "count": { "type": "int" } } }
 }
