@@ -927,6 +927,90 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'+{count} more'**
   String attentionMore(int count);
+
+  /// S04 when the notice was not sent to this person (404 NOTICE_NOT_FOUND, spec §4 US-2.5).
+  ///
+  /// In en, this message translates to:
+  /// **'This notice is not available'**
+  String get noticeNotAvailable;
+
+  /// No description provided for @noticeNotAvailableHint.
+  ///
+  /// In en, this message translates to:
+  /// **'It may not have been sent to you.'**
+  String get noticeNotAvailableHint;
+
+  /// No description provided for @noticeArchivedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This notice was archived. It no longer needs any action.'**
+  String get noticeArchivedBody;
+
+  /// No description provided for @noticeAttachments.
+  ///
+  /// In en, this message translates to:
+  /// **'Attachments'**
+  String get noticeAttachments;
+
+  /// An attachment while the device is offline.
+  ///
+  /// In en, this message translates to:
+  /// **'Available when online'**
+  String get noticeAvailableWhenOnline;
+
+  /// No description provided for @noticeCommentLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a comment (optional)'**
+  String get noticeCommentLabel;
+
+  /// No description provided for @noticeYourComment.
+  ///
+  /// In en, this message translates to:
+  /// **'Your comment: {comment}'**
+  String noticeYourComment(String comment);
+
+  /// No description provided for @noticeSentOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent while offline'**
+  String get noticeSentOffline;
+
+  /// No description provided for @noticeDismiss.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss'**
+  String get noticeDismiss;
+
+  /// No description provided for @noticeDismissed.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismissed'**
+  String get noticeDismissed;
+
+  /// No description provided for @noticeNeedsConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'This needs a connection.'**
+  String get noticeNeedsConnection;
+
+  /// S04 button for the notice's publisher: opens reach (S11).
+  ///
+  /// In en, this message translates to:
+  /// **'See who has read it'**
+  String get noticeSeeReach;
+
+  /// No description provided for @fileSizeKb.
+  ///
+  /// In en, this message translates to:
+  /// **'{size} KB'**
+  String fileSizeKb(int size);
+
+  /// No description provided for @fileSizeMb.
+  ///
+  /// In en, this message translates to:
+  /// **'{size} MB'**
+  String fileSizeMb(String size);
 }
 
 class _AppLocalizationsDelegate

@@ -12,6 +12,7 @@ import 'package:juvi/features/me/change_password_screen.dart';
 import 'package:juvi/features/me/devices_screen.dart';
 import 'package:juvi/features/me/me_screen.dart';
 import 'package:juvi/features/me/settings_screen.dart';
+import 'package:juvi/features/notices/notice_detail_screen.dart';
 import 'package:juvi/features/onboarding/onboarding_screen.dart';
 import 'package:juvi/features/spaces/channel_screen.dart';
 import 'package:juvi/features/spaces/spaces_screen.dart';
@@ -42,6 +43,9 @@ GoRouter buildRouter(Ref ref) {
       GoRoute(path: '/deactivated', builder: (_, _) => const DeactivatedScreen()),
       GoRoute(path: '/paused', builder: (_, _) => const PausedScreen()),
       GoRoute(path: '/update-required', builder: (_, _) => const UpdateRequiredScreen()),
+      // Notices sit above the tab shell: pushed from Today, Teaching, a channel or the
+      // attention sheet, and popped back to wherever they were opened from.
+      GoRoute(path: '/notices/:id', builder: (_, s) => NoticeDetailScreen(noticeId: s.pathParameters['id']!)),
       StatefulShellRoute.indexedStack(
         builder: (context, state, shell) {
           final session = ref.read(sessionControllerProvider);

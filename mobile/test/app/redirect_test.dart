@@ -38,6 +38,13 @@ void main() {
       expect(redirect(SessionState.signedIn(acct()), '/spaces/abc'), isNull);
       expect(redirect(SessionState.signedIn(acct()), '/me/settings'), isNull);
     });
+    test('notice routes are app routes once onboarding is complete', () {
+      for (final path in ['/notices/n1', '/notices/n1/reach', '/attention']) {
+        expect(redirect(SessionState.signedIn(acct()), path), isNull);
+        expect(redirect(SessionState.signedIn(acct(kind: 'faculty')), path), isNull);
+        expect(redirect(SessionState.signedIn(acct(step: 1, complete: false)), path), '/onboarding/1');
+      }
+    });
     test("I1: the wrong kind is bounced off the other kind's home tab", () {
       expect(redirect(SessionState.signedIn(acct(kind: 'faculty')), '/today'), '/teaching');
       expect(redirect(SessionState.signedIn(acct()), '/teaching'), '/today');

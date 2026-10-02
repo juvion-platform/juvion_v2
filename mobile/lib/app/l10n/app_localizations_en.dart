@@ -481,4 +481,53 @@ class AppLocalizationsEn extends AppLocalizations {
   String attentionMore(int count) {
     return '+$count more';
   }
+
+  @override
+  String get noticeNotAvailable => 'This notice is not available';
+
+  @override
+  String get noticeNotAvailableHint => 'It may not have been sent to you.';
+
+  @override
+  String get noticeArchivedBody =>
+      'This notice was archived. It no longer needs any action.';
+
+  @override
+  String get noticeAttachments => 'Attachments';
+
+  @override
+  String get noticeAvailableWhenOnline => 'Available when online';
+
+  @override
+  String get noticeCommentLabel => 'Add a comment (optional)';
+
+  @override
+  String noticeYourComment(String comment) {
+    return 'Your comment: $comment';
+  }
+
+  @override
+  String get noticeSentOffline => 'Sent while offline';
+
+  @override
+  String get noticeDismiss => 'Dismiss';
+
+  @override
+  String get noticeDismissed => 'Dismissed';
+
+  @override
+  String get noticeNeedsConnection => 'This needs a connection.';
+
+  @override
+  String get noticeSeeReach => 'See who has read it';
+
+  @override
+  String fileSizeKb(int size) {
+    return '$size KB';
+  }
+
+  @override
+  String fileSizeMb(String size) {
+    return '$size MB';
+  }
 }
