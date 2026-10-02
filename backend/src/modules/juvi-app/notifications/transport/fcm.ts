@@ -14,7 +14,8 @@ export const FCM_MULTICAST_MAX = 500;
 const CODES: Record<string, PushErrorCode> = {
   'messaging/registration-token-not-registered': 'UNREGISTERED',
   'messaging/invalid-registration-token': 'INVALID_ARGUMENT',
-  'messaging/invalid-argument': 'INVALID_ARGUMENT',
+  // A payload problem, not a bad token: never clears the token.
+  'messaging/invalid-argument': 'INVALID_MESSAGE',
   'messaging/server-unavailable': 'UNAVAILABLE',
   'messaging/unavailable': 'UNAVAILABLE',
   'messaging/internal-error': 'INTERNAL',
@@ -51,9 +52,10 @@ export class FcmPushTransport implements PushTransport {
           out.push(r.success ? { token, ok: true } : { token, ok: false, error: mapFcmError(r.error?.code) });
         });
       } catch (err) {
-        // The whole call failed (network, auth): every token in the chunk is retried later.
-        const code = mapFcmError((err as { code?: string } | null)?.code);
-        for (const token of chunk) out.push({ token, ok: false, error: code === 'UNKNOWN' ? 'UNAVAILABLE' : code });
+        // The whole call failed (network, auth, a malformed message): every token in the chunk is
+        // retried later. Only transient codes here, so a call-level error never clears a token.
+        const code = mapFcmError((err as { code?: string } | null)?.code) === 'INTERNAL' ? 'INTERNAL' : 'UNAVAILABLE';
+        for (const token of chunk) out.push({ token, ok: false, error: code });
       }
     }
     return out;

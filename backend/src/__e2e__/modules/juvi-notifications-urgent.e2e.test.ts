@@ -8,6 +8,8 @@ import { activateAccount, createStaffPublisher, makeHod } from '../factories/not
 import { Notice } from '../../models/juvi/Notice';
 import { AuditLog } from '../../shared/audit';
 import { drainOutbox } from '../../shared/outbox';
+import { Policy } from '../../models/platform/Policy';
+import { invalidatePolicies } from '../../shared/rbac/cache';
 
 process.env.E2E_TESTING = '1';
 
@@ -41,6 +43,29 @@ describe('the Urgent gate (notifications spec §6.5)', () => {
     await api.as(hod.token).post(A).send(body({ priority: 'urgent', urgentReason: REASON, audience: { rules: [{ kind: 'department', ids: [String(fx.cse._id)] }] } })).expect(403);
   });
 
+  // seedBase snapshots the college, so only its own rows count. These are the rows an
+  // older snapshot carries, before the HOD split and the rollout script (review I1).
+  it('refuses an HOD whose college snapshot still holds the old hod|notices|* row', async () => {
+    await Policy.deleteMany({ collegeId: fx.collegeId, role: 'hod', module: 'notices' });
+    await Policy.create({ collegeId: fx.collegeId, role: 'hod', module: 'notices', action: '*', effect: 'allow', priority: 800, isActive: true, createdBy: 'snapshot' });
+    await invalidatePolicies(fx.collegeId);
+    const hod = await makeHod(fx, fx.cse);
+    const dept = { audience: { rules: [{ kind: 'department', ids: [String(fx.cse._id)] }] } };
+    const res = await api.as(hod.token).post(A).send(body({ priority: 'urgent', urgentReason: REASON, ...dept })).expect(403);
+    expect(res.body.detail).toEqual({ code: 'URGENT_NOT_ALLOWED' });
+    expect((await api.as(hod.token).get(`${A}/targets`).expect(200)).body.canPublishUrgent).toBe(false);
+    // The wildcard still grants the HOD everything else.
+    await api.as(hod.token).post(A).send(body({ priority: 'important', ...dept })).expect(201);
+  });
+
+  it('a wildcard never grants Urgent: a principal holding only notices:* is refused', async () => {
+    await Policy.deleteMany({ collegeId: fx.collegeId, role: 'principal', module: 'notices', action: 'urgent' });
+    await invalidatePolicies(fx.collegeId);
+    expect(await Policy.exists({ collegeId: fx.collegeId, role: 'principal', module: 'notices', action: '*' })).not.toBeNull();
+    await api.as(fx.principal.token).post(A).send(body({ priority: 'urgent', urgentReason: REASON })).expect(403);
+    expect((await api.as(fx.principal.token).get(`${A}/targets`).expect(200)).body.canPublishUrgent).toBe(false);
+  });
+
   it('needs a reason of 10–300 characters', async () => {
     await api.as(fx.admin.token).post(A).send(body({ priority: 'urgent' })).expect(400);
     await api.as(fx.admin.token).post(A).send(body({ priority: 'urgent', urgentReason: 'Too short' })).expect(400);
@@ -60,7 +85,8 @@ describe('the Urgent gate (notifications spec §6.5)', () => {
     ]));
   });
 
-  it('a principal may publish Urgent; a reason sent with another priority is dropped', async () => {
+  it('a principal may publish Urgent (the explicit principal|notices|urgent row); a reason sent with another priority is dropped', async () => {
+    expect(await Policy.exists({ collegeId: fx.collegeId, role: 'principal', module: 'notices', action: 'urgent', effect: 'allow' })).not.toBeNull();
     await api.as(fx.principal.token).post(A).send(body({ priority: 'urgent', urgentReason: REASON })).expect(201);
     const routine = await api.as(fx.admin.token).post(A).send(body({ priority: 'routine', urgentReason: REASON })).expect(201);
     expect(routine.body).toMatchObject({ priority: 'routine', urgentReason: null, confidential: false });

@@ -11,8 +11,12 @@ export interface PushMessage {
   collapseKey: string;
 }
 
-/** FCM's error codes, normalised. UNKNOWN is treated as transient. */
-export type PushErrorCode = 'UNREGISTERED' | 'INVALID_ARGUMENT' | 'UNAVAILABLE' | 'INTERNAL' | 'QUOTA_EXCEEDED' | 'UNKNOWN';
+/**
+ * FCM's error codes, normalised. Only UNREGISTERED and INVALID_ARGUMENT (an invalid
+ * registration token) mean the token is dead; INVALID_MESSAGE (FCM refused the
+ * message itself) and UNKNOWN are treated as transient.
+ */
+export type PushErrorCode = 'UNREGISTERED' | 'INVALID_ARGUMENT' | 'INVALID_MESSAGE' | 'UNAVAILABLE' | 'INTERNAL' | 'QUOTA_EXCEEDED' | 'UNKNOWN';
 
 export interface PushResult { token: string; ok: boolean; error?: PushErrorCode }
 

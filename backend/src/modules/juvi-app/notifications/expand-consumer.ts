@@ -98,15 +98,16 @@ async function expandBatch(
   const settingsBy = new Map(accounts.map((a) => [String(a._id), a.settings]));
   await NotificationDelivery.bulkWrite(accountIds.map((accountId) => {
     const id = String(accountId);
-    const d = decide({ tier, settings: settingsOf(settingsBy.get(id)), mutedAllMatchingChannels: muted.has(id), now, collegeTimezone: timezone });
-    const common = { collegeId: new Types.ObjectId(collegeId), tier, batchKey, groupKey, sentAt: null, deliveredAt: null, openedAt: null, attempts: 0, lastError: null, lockedUntil: null, createdAt: now, updatedAt: now };
+    const settings = settingsOf(settingsBy.get(id));
+    const d = decide({ tier, settings, mutedAllMatchingChannels: muted.has(id), now, collegeTimezone: timezone });
+    const common = { tier, batchKey, groupKey, sentAt: null, deliveredAt: null, openedAt: null, attempts: 0, lastError: null, lockedUntil: null, createdAt: now, updatedAt: now };
     const row = d.status === 'suppressed'
       ? { ...common, status: 'suppressed' as const, reason: d.reason, sendAfter: now }
-      : { ...common, status: 'scheduled' as const, reason: null, sendAfter: tier === 'routine' ? digestSendAfter(d.sendAfter, windows.get(id) ?? null, now) : d.sendAfter };
+      : { ...common, status: 'scheduled' as const, reason: null, sendAfter: tier === 'routine' ? digestSendAfter(d.sendAfter, windows.get(id) ?? null, now, settings, timezone) : d.sendAfter };
     return {
       updateOne: {
-        // `source` and `accountId` are written from the filter on insert. No automatic timestamps: a re-run must not touch updatedAt.
-        filter: { 'source.type': 'notice', 'source.id': notice._id, 'source.kind': kind, accountId },
+        // `collegeId`, `source` and `accountId` are written from the filter on insert. No automatic timestamps: a re-run must not touch updatedAt.
+        filter: { collegeId: new Types.ObjectId(collegeId), 'source.type': 'notice', 'source.id': notice._id, 'source.kind': kind, accountId },
         update: { $setOnInsert: row },
         upsert: true,
         timestamps: false,

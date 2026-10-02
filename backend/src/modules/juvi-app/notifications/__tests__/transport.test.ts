@@ -9,7 +9,7 @@ const fb = vi.hoisted(() => ({
 vi.mock('firebase-admin/app', () => ({ initializeApp: fb.initializeApp, cert: fb.cert, getApps: () => fb.apps }));
 vi.mock('firebase-admin/messaging', () => ({ getMessaging: () => ({ sendEachForMulticast: fb.sendEachForMulticast }) }));
 
-import { FakePushTransport, getPushTransport, setPushTransport, pushTransportWarning, PushMessage } from '../transport';
+import { FakePushTransport, getPushTransport, setPushTransport, pushTransportWarning, PushMessage, TOKEN_ERRORS } from '../transport';
 import { FcmPushTransport, mapFcmError, FCM_MULTICAST_MAX } from '../transport/fcm';
 
 const SA = JSON.stringify({ project_id: 'juvi-test', client_email: 'push@juvi-test.iam.gserviceaccount.com', private_key: 'k' });
@@ -59,9 +59,37 @@ describe('FcmPushTransport', () => {
     expect(await t.send(['x'], msg)).toEqual([{ token: 'x', ok: false, error: 'UNAVAILABLE' }]);
   });
 
+  it('never reports a dead token for a whole-call failure: a malformed message must not clear every device', async () => {
+    const t = new FcmPushTransport(SA);
+    const fail = (code: string) => fb.sendEachForMulticast.mockRejectedValueOnce(Object.assign(new Error(code), { code }));
+    fail('messaging/invalid-argument');
+    expect(await t.send(['x', 'y'], msg)).toEqual([{ token: 'x', ok: false, error: 'UNAVAILABLE' }, { token: 'y', ok: false, error: 'UNAVAILABLE' }]);
+    fail('messaging/registration-token-not-registered');
+    expect(await t.send(['x'], msg)).toEqual([{ token: 'x', ok: false, error: 'UNAVAILABLE' }]);
+    fail('messaging/invalid-registration-token');
+    expect(await t.send(['x'], msg)).toEqual([{ token: 'x', ok: false, error: 'UNAVAILABLE' }]);
+    fail('messaging/internal-error');
+    expect(await t.send(['x'], msg)).toEqual([{ token: 'x', ok: false, error: 'INTERNAL' }]);
+    fail('messaging/quota-exceeded');
+    expect(await t.send(['x'], msg)).toEqual([{ token: 'x', ok: false, error: 'UNAVAILABLE' }]);
+  });
+
+  it('counts only an unregistered or invalid registration token as dead; a per-token invalid-argument is transient', async () => {
+    fb.sendEachForMulticast.mockResolvedValue({
+      responses: [
+        { success: false, error: { code: 'messaging/registration-token-not-registered' } },
+        { success: false, error: { code: 'messaging/invalid-registration-token' } },
+        { success: false, error: { code: 'messaging/invalid-argument' } },
+      ],
+    });
+    const res = await new FcmPushTransport(SA).send(['a', 'b', 'c'], msg);
+    expect(res.map((r) => TOKEN_ERRORS.has(r.error!))).toEqual([true, true, false]);
+    expect(res[2]).toEqual({ token: 'c', ok: false, error: 'INVALID_MESSAGE' });
+  });
+
   it('maps the FCM codes the sender cares about', () => {
     expect(mapFcmError('messaging/invalid-registration-token')).toBe('INVALID_ARGUMENT');
-    expect(mapFcmError('messaging/invalid-argument')).toBe('INVALID_ARGUMENT');
+    expect(mapFcmError('messaging/invalid-argument')).toBe('INVALID_MESSAGE');
     expect(mapFcmError('messaging/internal-error')).toBe('INTERNAL');
     expect(mapFcmError('messaging/quota-exceeded')).toBe('QUOTA_EXCEEDED');
     expect(mapFcmError('messaging/third-party-auth-error')).toBe('UNKNOWN');

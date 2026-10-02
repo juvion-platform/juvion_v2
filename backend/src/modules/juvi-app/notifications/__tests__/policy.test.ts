@@ -79,14 +79,25 @@ describe('quiet hours in the college timezone', () => {
 describe('digestSendAfter (NTF-04, spec §6.4)', () => {
   const now = DAY;
   it('opens a window 15 minutes out', () => {
-    expect(digestSendAfter(now, null, now)).toEqual(new Date(now.getTime() + DIGEST_WINDOW_MS));
+    expect(digestSendAfter(now, null, now, ON, IST)).toEqual(new Date(now.getTime() + DIGEST_WINDOW_MS));
   });
   it('joins an open window', () => {
     const open = new Date(now.getTime() + 5 * 60_000);
-    expect(digestSendAfter(now, open, now)).toEqual(open);
+    expect(digestSendAfter(now, open, now, ON, IST)).toEqual(open);
   });
   it('keeps a later policy time (quiet hours) instead of the window', () => {
-    expect(digestSendAfter(NEXT_7AM_IST, null, now)).toEqual(NEXT_7AM_IST);
-    expect(digestSendAfter(NEXT_7AM_IST, new Date(now.getTime() + 60_000), now)).toEqual(NEXT_7AM_IST);
+    expect(digestSendAfter(NEXT_7AM_IST, null, now, ON, IST)).toEqual(NEXT_7AM_IST);
+    expect(digestSendAfter(NEXT_7AM_IST, new Date(now.getTime() + 60_000), now, ON, IST)).toEqual(NEXT_7AM_IST);
+  });
+
+  // 16:20Z = 21:50 IST: outside quiet hours, but the window would open at 22:05 IST.
+  const cases: { name: string; now: Date; open: Date | null; settings: PolicySettings; expected: Date }[] = [
+    { name: '21:50 → the 22:05 window moves to 07:00', now: at('2026-10-02T16:20:00Z'), open: null, settings: ON, expected: NEXT_7AM_IST },
+    { name: '21:40 → the 21:55 window stays', now: at('2026-10-02T16:10:00Z'), open: null, settings: ON, expected: at('2026-10-02T16:25:00Z') },
+    { name: '21:50 joining a window open at 22:01 → 07:00', now: at('2026-10-02T16:20:00Z'), open: at('2026-10-02T16:31:00Z'), settings: ON, expected: NEXT_7AM_IST },
+    { name: '21:50 with no quiet hours (start == end) → 22:05', now: at('2026-10-02T16:20:00Z'), open: null, settings: { ...ON, quietHours: { start: '00:00', end: '00:00' } }, expected: at('2026-10-02T16:35:00Z') },
+  ];
+  it.each(cases)('never opens a window inside quiet hours: $name', ({ now: t, open, settings, expected }) => {
+    expect(digestSendAfter(t, open, t, settings, IST)).toEqual(expected);
   });
 });

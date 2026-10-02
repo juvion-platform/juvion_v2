@@ -9,7 +9,6 @@ import { noticesRouter } from './notices/mobile-routes';
 import { registerNotificationConsumers } from './notifications';
 import { notificationsRouter } from './notifications/routes';
 
-
 // Outbox consumers for notices and notifications; the dispatcher (server.ts) and inline kick() both run them.
 registerNoticeConsumers();
 registerNotificationConsumers();

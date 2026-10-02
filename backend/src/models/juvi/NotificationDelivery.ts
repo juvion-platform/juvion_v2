@@ -67,6 +67,8 @@ const schema = new Schema<INotificationDelivery>(
 // Expansion idempotency, the sender's scan, Reach, and digest windows (spec §4.1).
 schema.index({ 'source.type': 1, 'source.id': 1, 'source.kind': 1, accountId: 1 }, { unique: true });
 schema.index({ status: 1, sendAfter: 1 });
+// The sender's Urgent-first claim, which must not walk a backlog of overdue Important rows.
+schema.index({ status: 1, tier: 1, sendAfter: 1 });
 schema.index({ collegeId: 1, 'source.id': 1, status: 1 });
 schema.index({ accountId: 1, batchKey: 1, status: 1 });
 

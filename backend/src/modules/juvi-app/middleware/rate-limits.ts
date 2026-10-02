@@ -21,5 +21,9 @@ function limiter(max: number): RequestHandler {
 export const signInLimiter = limiter(10);
 /** 20 institution lookups per minute per IP. */
 export const institutionLookupLimiter = limiter(20);
-/** 60 notification receipt posts per minute per IP: the endpoint has no session (notifications spec §7.2). */
-export const receiptsLimiter = limiter(60);
+/**
+ * 1,200 notification receipt posts per minute per IP: the endpoint has no session
+ * (notifications spec §7.2), and an Urgent push to a campus behind one NAT answers
+ * in a burst. The global per-IP limit skips this path (middleware/globalRateLimit.ts).
+ */
+export const receiptsLimiter = limiter(1200);

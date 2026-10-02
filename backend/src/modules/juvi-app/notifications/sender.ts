@@ -1,13 +1,15 @@
 /**
  * The sender (notifications spec §5.3). Registered as an `afterEvents` outbox
  * sweeper, so it runs on the 5 s dispatcher tick and after every kick. It claims
- * due `scheduled` rows one at a time under a 60 s lease (up to 500 a pass),
- * re-checks the notice, gathers a Routine digest, sends one data message to the
- * account's devices, prunes dead tokens and backs off transient failures.
+ * due `scheduled` rows one at a time under a 60 s lease (up to 500 a pass, Urgent
+ * first), and works through up to 16 account groups at once: re-checks the notice,
+ * gathers a Routine digest, sends one data message to the account's devices,
+ * prunes dead tokens and backs off transient failures.
  *
  * Rows are claimed across colleges, like outbox events; every later read and
  * write is scoped by the row's collegeId.
  */
+import { Types } from 'mongoose';
 import { NotificationDelivery, LeanNotificationDelivery, DeliveryReason } from '../../../models/juvi/NotificationDelivery';
 import { Notice, LeanNotice } from '../../../models/juvi/Notice';
 import { NoticeRecipient, LeanNoticeRecipient } from '../../../models/juvi/NoticeRecipient';
@@ -17,6 +19,8 @@ import { signReceipt, RECEIPT_TTL_MS } from './receipts';
 import { buildNoticePush } from './payload';
 
 export const SEND_BATCH_MAX = 500;
+/** Account groups in flight at once within a pass; claims are atomic, so workers never share a row. */
+export const SENDER_CONCURRENCY = 16;
 export const LEASE_MS = 60_000;
 export const MAX_SEND_ATTEMPTS = 5;
 export const BACKOFF_BASE_MS = 30_000;
@@ -33,6 +37,10 @@ type Row = LeanNotificationDelivery;
 /** The wall clock; a pass reads it at every claim so the lease runs from the claim, not from the pass start. */
 export type Clock = () => Date;
 const leaseFree = (now: Date) => ({ $or: [{ lockedUntil: null }, { lockedUntil: { $lt: now } }] });
+
+let senderConcurrency = SENDER_CONCURRENCY;
+/** Test-only: run a pass with one worker, so claims happen strictly one after another. */
+export function __setSenderConcurrencyForTesting(n: number | null): void { senderConcurrency = n ?? SENDER_CONCURRENCY; }
 
 /** `now` is only the due cut-off for `sendAfter`; the lease is measured on `clock()` at the moment of the claim. */
 async function claim(filter: Record<string, unknown>, now: Date, clock: Clock): Promise<Row | null> {
@@ -57,10 +65,15 @@ async function claimDigest(primary: Row, now: Date, clock: Clock): Promise<Row[]
   return out;
 }
 
-async function settle(rows: Row[], set: Record<string, unknown>): Promise<void> {
+/**
+ * Writes only rows this pass still holds: each row is matched on the `lockedUntil`
+ * its claim set, so a pass whose lease expired (and another pass re-claimed the
+ * row) writes nothing.
+ */
+export async function settle(rows: Row[], set: Record<string, unknown>): Promise<void> {
   if (rows.length === 0) return;
   await NotificationDelivery.updateMany(
-    { _id: { $in: rows.map((r) => r._id) }, collegeId: rows[0]!.collegeId, status: 'scheduled' },
+    { $or: rows.map((r) => ({ _id: r._id, lockedUntil: r.lockedUntil })), collegeId: rows[0]!.collegeId, status: 'scheduled' },
     { $set: { ...set, lockedUntil: null } },
   );
 }
@@ -151,19 +164,52 @@ async function sendGroup(primary: Row, transport: PushTransport, now: Date, cloc
   }
 }
 
-/** One sender pass. A row whose processing throws keeps its lease and is retried once the lease expires (spec §11). */
+/**
+ * One sender pass: SENDER_CONCURRENCY workers, each claiming and sending one group
+ * at a time. Claims are taken one after another and skip accounts another worker
+ * holds, so an account's Routine digest is gathered by one worker, never split
+ * across messages. Urgent rows are claimed first, so a fresh Urgent row never waits
+ * behind a backlog of overdue Important rows; the 500-row cap covers both. A row
+ * whose processing throws keeps its lease and is retried once the lease expires
+ * (spec §11).
+ */
 export async function runSender(now: Date = new Date(), transport?: PushTransport, clock: Clock = () => new Date()): Promise<SenderStats> {
   const t = transport ?? (await getPushTransport());
   const stats: SenderStats = { claimed: 0, sent: 0, cancelled: 0, noDevice: 0, retried: 0, failed: 0 };
-  while (stats.claimed < SEND_BATCH_MAX) {
-    const row = await claim({}, now, clock);
-    if (!row) break;
-    stats.claimed += 1;
-    try {
-      await sendGroup(row, t, now, clock, stats);
-    } catch (err) {
-      console.error('[juvi-push] send failed for delivery', String(row._id), err instanceof Error ? err.message : err);
+  const busy = new Map<string, Types.ObjectId>();
+  let urgentLeft = true;
+  let claiming: Promise<unknown> = Promise.resolve();
+  const claimNext = async (): Promise<Row | null> => {
+    if (stats.claimed >= SEND_BATCH_MAX) return null;
+    const free = { accountId: { $nin: [...busy.values()] } };
+    let row: Row | null = null;
+    if (urgentLeft) {
+      row = await claim({ ...free, tier: 'urgent' }, now, clock);
+      if (!row && busy.size === 0) urgentLeft = false;
     }
-  }
+    row ??= await claim(free, now, clock);
+    if (row) {
+      stats.claimed += 1;
+      busy.set(String(row.accountId), row.accountId);
+    }
+    return row;
+  };
+  const next = (): Promise<Row | null> => {
+    const run = claiming.then(claimNext);
+    claiming = run.catch(() => undefined);
+    return run;
+  };
+  const worker = async (): Promise<void> => {
+    for (let row = await next(); row; row = await next()) {
+      try {
+        await sendGroup(row, t, now, clock, stats);
+      } catch (err) {
+        console.error('[juvi-push] send failed for delivery', String(row._id), err instanceof Error ? err.message : err);
+      } finally {
+        busy.delete(String(row.accountId));
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: senderConcurrency }, worker));
   return stats;
 }

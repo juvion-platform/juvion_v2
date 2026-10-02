@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import type { Express } from 'express';
 import { getTestApp, cleanupTestApp } from '../setup/test-app';
 import { seedBase, BaseFixtures } from '../setup/seed-base';
@@ -12,7 +12,7 @@ import { drainOutbox } from '../../shared/outbox';
 import { remindNotice } from '../../modules/juvi-app/notices/publish-service';
 import { erpActor } from '../../modules/juvi-app/notices/reach-service';
 import { FakePushTransport, PushTransport, setPushTransport } from '../../modules/juvi-app/notifications/transport';
-import { runSender, MAX_SEND_ATTEMPTS } from '../../modules/juvi-app/notifications/sender';
+import { runSender, MAX_SEND_ATTEMPTS, __setSenderConcurrencyForTesting } from '../../modules/juvi-app/notifications/sender';
 import { verifyReceipt } from '../../modules/juvi-app/notifications/receipts';
 import { DIGEST_WINDOW_MS } from '../../modules/juvi-app/notifications/policy';
 
@@ -150,7 +150,12 @@ describe('Routine batching (NTF-04, spec §6.4)', () => {
 });
 
 describe('the lease runs from the claim, not from the pass start (spec §11)', () => {
+  afterEach(() => { __setSenderConcurrencyForTesting(null); });
+
   it('a row claimed late in a long pass keeps a live lease and is not re-sent by a concurrent pass', async () => {
+    // One worker, so the second row is claimed only after the first send's 90 s; with
+    // concurrency both rows are claimed at the start of the pass.
+    __setSenderConcurrencyForTesting(1);
     await studentOnJuvi(app, fx, { pushToken: 'tok-l1' });
     await studentOnJuvi(app, fx, { pushToken: 'tok-l2' });
     fake.failToken('tok-l1', 'UNAVAILABLE'); fake.failToken('tok-l2', 'UNAVAILABLE');

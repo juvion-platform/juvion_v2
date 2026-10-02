@@ -14,7 +14,6 @@ import { resolveAudience, PersonNode } from './audience';
 import { channelIdsForRules, NOTICE_EVENTS, noticeEventKey } from './publish-service';
 import { requestNoticeNotification } from '../notifications';
 
-
 export const FANOUT_BATCH_SIZE = 1000;
 export const STUCK_PUBLISHING_MS = 120_000;
 

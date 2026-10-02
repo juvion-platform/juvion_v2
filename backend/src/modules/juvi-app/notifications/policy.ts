@@ -94,8 +94,12 @@ export function decide(input: PolicyInput): PolicyDecision {
  * §6.4: a Routine row joins the open window for its (account, batch key) or opens
  * a new one at least 15 minutes out. A row whose policy time is later than the
  * open window (quiet hours began after the window opened) keeps the later time.
+ * A window never opens inside quiet hours: a time that lands there (a notice at
+ * 21:50 would open at 22:05) moves to the next end of quiet hours.
  */
-export function digestSendAfter(policySendAfter: Date, openWindow: Date | null, now: Date): Date {
-  if (openWindow) return new Date(Math.max(openWindow.getTime(), policySendAfter.getTime()));
-  return new Date(Math.max(policySendAfter.getTime(), now.getTime() + DIGEST_WINDOW_MS));
+export function digestSendAfter(policySendAfter: Date, openWindow: Date | null, now: Date, settings: PolicySettings, timeZone: string): Date {
+  const at = openWindow
+    ? new Date(Math.max(openWindow.getTime(), policySendAfter.getTime()))
+    : new Date(Math.max(policySendAfter.getTime(), now.getTime() + DIGEST_WINDOW_MS));
+  return inQuietHours(at, settings.quietHours, timeZone) ? nextOccurrence(at, settings.quietHours.end, timeZone) : at;
 }
