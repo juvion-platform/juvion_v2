@@ -12,6 +12,8 @@ import { createAuditLog, AuditLog } from '../../../shared/audit';
 import { loadAudienceGraph } from './audience-graph';
 import { resolveAudience, PersonNode } from './audience';
 import { channelIdsForRules, NOTICE_EVENTS, noticeEventKey } from './publish-service';
+import { requestNoticeNotification } from '../notifications';
+
 
 export const FANOUT_BATCH_SIZE = 1000;
 export const STUCK_PUBLISHING_MS = 120_000;
@@ -39,14 +41,18 @@ function snapshotRow(notice: LeanNotice, p: PersonNode, now: Date) {
 /**
  * notice.published: resolve the audience, upsert one NoticeRecipient per member in
  * batches of 1,000 (`ordered: false`, upsert on the unique (noticeId, personId)),
- * then set counts, channelIds, status and publishedAt. Idempotent: a notice that is
+ * then set counts, channelIds, status and publishedAt, and request the push
+ * (notification.requested, notifications spec §5.1). Idempotent: a notice that is
  * no longer `publishing` is left alone, and a retry only inserts the missing rows.
  */
 export async function fanOutNotice(payload: OutboxPayload): Promise<void> {
   const collegeId = payload.collegeId;
   const noticeId = String(payload.noticeId);
   const notice = await Notice.findOne({ _id: noticeId, collegeId }).lean<LeanNotice>();
-  if (!notice || notice.status !== 'publishing') return;
+  if (!notice) return;
+  // A retry after the status write: the push request may not have been recorded yet (emit is idempotent).
+  if (notice.status === 'published') { await requestNoticeNotification(collegeId, noticeId, 'published'); return; }
+  if (notice.status !== 'publishing') return;
 
   const people = resolveAudience(notice.audience.rules, await loadAudienceGraph(collegeId));
   const now = new Date();
@@ -84,6 +90,7 @@ export async function fanOutNotice(payload: OutboxPayload): Promise<void> {
     { _id: notice._id, collegeId, status: 'publishing' },
     { $set: { counts: { audience, onJuvi }, channelIds, status: 'published', publishedAt: now } },
   );
+  await requestNoticeNotification(collegeId, noticeId, 'published');
   console.log(`[juvi-notices] fan-out ${noticeId}: ${audience} recipients, ${onJuvi} on Juvi`);
 }
 
@@ -134,12 +141,22 @@ export async function recordAcknowledgement(payload: OutboxPayload): Promise<voi
   });
 }
 
-/** notice.reminder: stamp remindedAt on members who have neither acknowledged nor dismissed. */
+/**
+ * notice.reminder: stamp remindedAt on members who have neither acknowledged nor dismissed,
+ * then request the reminder push. `n` is in the payload from notifications onwards; an event
+ * recorded before that falls back to the notice's reminder count.
+ */
 export async function markReminded(payload: OutboxPayload): Promise<void> {
+  const collegeId = payload.collegeId;
+  const noticeId = String(payload.noticeId);
   await NoticeRecipient.updateMany(
-    { collegeId: payload.collegeId, noticeId: String(payload.noticeId), ack: null, dismissedAt: null, archived: false },
+    { collegeId, noticeId, ack: null, dismissedAt: null, archived: false },
     { $set: { remindedAt: new Date() } },
   );
+  const n = typeof payload.n === 'number'
+    ? payload.n
+    : (await Notice.findOne({ _id: noticeId, collegeId }).select('reminders').lean<Pick<LeanNotice, 'reminders'>>())?.reminders.length ?? 0;
+  if (n === 1 || n === 2) await requestNoticeNotification(collegeId, noticeId, `reminder-${n}`);
 }
 
 /** notice.archived: mirror the archive onto every row (it drives the Due filter). */

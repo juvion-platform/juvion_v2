@@ -6,9 +6,12 @@ import { spacesRouter } from './spaces/routes';
 import { adminRouter } from './admin/routes';
 import { registerNoticeConsumers } from './notices/consumers';
 import { noticesRouter } from './notices/mobile-routes';
+import { registerNotificationConsumers } from './notifications';
 
-// Outbox consumers for notices; the dispatcher (server.ts) and inline kick() both run them.
+
+// Outbox consumers for notices and notifications; the dispatcher (server.ts) and inline kick() both run them.
 registerNoticeConsumers();
+registerNotificationConsumers();
 
 export const v1Router = Router();
 v1Router.use(configRouter);

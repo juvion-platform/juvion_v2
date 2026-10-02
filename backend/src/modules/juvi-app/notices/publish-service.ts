@@ -160,7 +160,7 @@ export async function remindNotice(actor: NoticeActor, noticeId: string, now = n
     throw new MobileApiError(409, 'REMINDER_LIMIT', 'A notice can have at most two reminders.', { reminders: remindersView(current) });
   }
   const n = updated.reminders.length;
-  await emit(NOTICE_EVENTS.reminder, { collegeId: actor.collegeId, noticeId: String(notice._id) }, noticeEventKey.reminder(String(notice._id), n));
+  await emit(NOTICE_EVENTS.reminder, { collegeId: actor.collegeId, noticeId: String(notice._id), n }, noticeEventKey.reminder(String(notice._id), n));
   await createAuditLog({
     collegeId: actor.collegeId, entityType: 'Notice', entityId: String(notice._id), entityName: `Notice from ${notice.publisher.office}`,
     action: 'update', changes: [{ field: 'reminders', displayName: 'Reminders sent', oldValue: n - 1, newValue: n }], performedBy: actor.name,
