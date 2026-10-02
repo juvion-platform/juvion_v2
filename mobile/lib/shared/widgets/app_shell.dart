@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:juvi/app/l10n/l10n.dart';
+import 'package:juvi/features/notices/widgets/due_badge.dart';
 import 'package:juvi/features/system/offline_banner.dart';
 
-/// Three tabs; the fourth slot is reserved for the Companion (Release 3).
+/// Three tabs; the fourth slot is reserved for the Companion (Release 3). The home tab
+/// carries the Due badge (notices spec §4 US-3.2).
 class AppShell extends StatelessWidget {
   const AppShell({required this.navigationShell, required this.kind, super.key});
   final StatefulNavigationShell navigationShell;
@@ -19,7 +21,11 @@ class AppShell extends StatelessWidget {
         selectedIndex: navigationShell.currentIndex,
         onDestinationSelected: (i) => navigationShell.goBranch(i, initialLocation: i == navigationShell.currentIndex),
         destinations: [
-          NavigationDestination(icon: Icon(isStudent ? Icons.today_outlined : Icons.school_outlined), selectedIcon: Icon(isStudent ? Icons.today : Icons.school), label: isStudent ? l.tabToday : l.tabTeaching),
+          NavigationDestination(
+            icon: DueBadge(child: Icon(isStudent ? Icons.today_outlined : Icons.school_outlined)),
+            selectedIcon: DueBadge(child: Icon(isStudent ? Icons.today : Icons.school)),
+            label: isStudent ? l.tabToday : l.tabTeaching,
+          ),
           NavigationDestination(icon: const Icon(Icons.forum_outlined), selectedIcon: const Icon(Icons.forum), label: l.tabSpaces),
           NavigationDestination(icon: const Icon(Icons.person_outline), selectedIcon: const Icon(Icons.person), label: l.tabMe),
         ],

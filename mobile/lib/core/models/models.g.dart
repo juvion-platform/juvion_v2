@@ -345,6 +345,11 @@ _ChannelDetail _$ChannelDetailFromJson(Map<String, dynamic> json) =>
       canPost: json['canPost'] as bool,
       canReply: json['canReply'] as bool,
       whoCanPost: json['whoCanPost'] as String,
+      notices:
+          (json['notices'] as List<dynamic>?)
+              ?.map((e) => NoticeItem.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          const <NoticeItem>[],
     );
 
 Map<String, dynamic> _$ChannelDetailToJson(_ChannelDetail instance) =>
@@ -363,4 +368,5 @@ Map<String, dynamic> _$ChannelDetailToJson(_ChannelDetail instance) =>
       'canPost': instance.canPost,
       'canReply': instance.canReply,
       'whoCanPost': instance.whoCanPost,
+      'notices': instance.notices.map((e) => e.toJson()).toList(),
     };

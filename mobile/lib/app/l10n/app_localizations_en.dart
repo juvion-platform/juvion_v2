@@ -369,6 +369,17 @@ class AppLocalizationsEn extends AppLocalizations {
       'One more thing from your college is on its way. Continue for now.';
 
   @override
+  String get onboardingFirstNoticeTitle => 'Your first notice';
+
+  @override
+  String get onboardingFirstNoticeBody =>
+      'This is how your college reaches you. Hold the button, or tap and confirm, to acknowledge it.';
+
+  @override
+  String get onboardingFirstNoticeOffline =>
+      'Your welcome notice will be waiting on Today once you are online.';
+
+  @override
   String get onboardingIdentityTitle => 'Your college has set you up';
 
   @override
@@ -400,4 +411,280 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get onboardingNotificationsTitle => 'Stay informed, not overwhelmed';
+
+  @override
+  String get cancel => 'Cancel';
+
+  @override
+  String get ackHoldLabel => 'Hold to acknowledge';
+
+  @override
+  String get ackHoldHint => 'or tap to confirm';
+
+  @override
+  String get ackButton => 'Acknowledge';
+
+  @override
+  String get ackOpensConfirmation => 'Opens a confirmation';
+
+  @override
+  String get ackConfirmTitle => 'Acknowledge this notice?';
+
+  @override
+  String get ackConfirmBody =>
+      'The office will see that you have read it, and when.';
+
+  @override
+  String deadlineDaysShort(int days) {
+    return '${days}d';
+  }
+
+  @override
+  String deadlineHoursShort(int hours) {
+    return '${hours}h';
+  }
+
+  @override
+  String deadlineMinutesShort(int minutes) {
+    return '${minutes}m';
+  }
+
+  @override
+  String deadlineDueBy(String when) {
+    return 'Acknowledge by $when';
+  }
+
+  @override
+  String deadlinePassed(String when) {
+    return 'Deadline passed $when';
+  }
+
+  @override
+  String get noticeUrgent => 'Urgent';
+
+  @override
+  String get noticeImportant => 'Important';
+
+  @override
+  String get noticeWillSendWhenOnline => 'Will send when online';
+
+  @override
+  String noticeAcknowledgedAt(String when) {
+    return 'Acknowledged $when';
+  }
+
+  @override
+  String get noticeAcknowledged => 'Acknowledged';
+
+  @override
+  String get noticeLate => 'Late';
+
+  @override
+  String get noticeArchived => 'Archived';
+
+  @override
+  String get noticeNew => 'New';
+
+  @override
+  String get noticeDue => 'Due';
+
+  @override
+  String attentionMore(int count) {
+    return '+$count more';
+  }
+
+  @override
+  String get noticeNotAvailable => 'This notice is not available';
+
+  @override
+  String get noticeNotAvailableHint => 'It may not have been sent to you.';
+
+  @override
+  String get noticeArchivedBody =>
+      'This notice was archived. It no longer needs any action.';
+
+  @override
+  String get noticeAttachments => 'Attachments';
+
+  @override
+  String get noticeAvailableWhenOnline => 'Available when online';
+
+  @override
+  String get noticeCommentLabel => 'Add a comment (optional)';
+
+  @override
+  String noticeYourComment(String comment) {
+    return 'Your comment: $comment';
+  }
+
+  @override
+  String get noticeSentOffline => 'Sent while offline';
+
+  @override
+  String get noticeDismiss => 'Dismiss';
+
+  @override
+  String get noticeDismissed => 'Dismissed';
+
+  @override
+  String get noticeNeedsConnection => 'This needs a connection.';
+
+  @override
+  String get noticeSeeReach => 'See who has read it';
+
+  @override
+  String fileSizeKb(int size) {
+    return '$size KB';
+  }
+
+  @override
+  String fileSizeMb(String size) {
+    return '$size MB';
+  }
+
+  @override
+  String get attentionSheetTitle => 'Notices';
+
+  @override
+  String get attentionSeeAll => 'See all';
+
+  @override
+  String segmentDue(int count) {
+    return 'Due ($count)';
+  }
+
+  @override
+  String get segmentDone => 'Done';
+
+  @override
+  String get segmentAll => 'All';
+
+  @override
+  String get segmentPublished => 'Published by me';
+
+  @override
+  String get officeAll => 'All offices';
+
+  @override
+  String get showMore => 'Show more';
+
+  @override
+  String get noticesNoneDone => 'Nothing acknowledged yet';
+
+  @override
+  String get noticesNoneAll => 'No notices yet';
+
+  @override
+  String get noticesNonePublished => 'You haven\'t published any notices';
+
+  @override
+  String dueBadgeLabel(int count) {
+    return '$count due';
+  }
+
+  @override
+  String get reachTitle => 'Reach';
+
+  @override
+  String get reachSeenNotAcked => 'Seen, not acknowledged';
+
+  @override
+  String get reachSeen => 'Seen';
+
+  @override
+  String get reachNotSeen => 'Not seen';
+
+  @override
+  String get reachNotOnJuvi => 'Not on Juvi';
+
+  @override
+  String reachOfAudience(int count) {
+    return 'of $count in the audience';
+  }
+
+  @override
+  String get reachSparkline => 'Acknowledgements over time';
+
+  @override
+  String reachReminders(int used, int max) {
+    return 'Reminders sent: $used of $max';
+  }
+
+  @override
+  String get reachSendReminder => 'Send reminder';
+
+  @override
+  String get reachRemindConfirmTitle => 'Send a reminder?';
+
+  @override
+  String get reachRemindConfirmBody =>
+      'Everyone who has not acknowledged yet gets this notice again.';
+
+  @override
+  String get reachRemindSent => 'Reminder sent';
+
+  @override
+  String get reachByGroup => 'By group';
+
+  @override
+  String reachGroupLine(int acknowledged, int total) {
+    return '$acknowledged of $total acknowledged';
+  }
+
+  @override
+  String reachPending(int count) {
+    return 'Pending ($count)';
+  }
+
+  @override
+  String get reachAllGroups => 'All groups';
+
+  @override
+  String get reachSearchHint => 'Search by name or roll number';
+
+  @override
+  String get reachCopy => 'Copy list';
+
+  @override
+  String reachCopied(int count) {
+    return 'Copied $count names';
+  }
+
+  @override
+  String reachLastInApp(String when) {
+    return 'Last in app $when';
+  }
+
+  @override
+  String get reachNeverInApp => 'Not in the app yet';
+
+  @override
+  String get reachNoPending => 'No one is pending';
+
+  @override
+  String reachLate(int count) {
+    return 'Late acknowledgements ($count)';
+  }
+
+  @override
+  String get reachComments => 'Comments';
+
+  @override
+  String get reachAddedLater => 'Added after publishing';
+
+  @override
+  String reachAddedLaterLine(int total, int acknowledged, int seen) {
+    return '$total people · $acknowledged acknowledged · $seen seen';
+  }
+
+  @override
+  String get reachNotPublisher =>
+      'Only the publisher can see who has read this notice.';
+
+  @override
+  String get reachRemindNotPublished =>
+      'You can send a reminder once this notice is published.';
+
+  @override
+  String get channelNotices => 'Notices';
 }

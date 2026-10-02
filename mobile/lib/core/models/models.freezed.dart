@@ -5197,7 +5197,7 @@ as String,
 /// @nodoc
 mixin _$ChannelDetail {
 
- String get id; String get name; String get about; String get scopeType; String get templateCode; String get status; int get memberCount; String get replyRule; String get defaultPriority; String get role; bool get muted; bool get canPost; bool get canReply; String get whoCanPost;
+ String get id; String get name; String get about; String get scopeType; String get templateCode; String get status; int get memberCount; String get replyRule; String get defaultPriority; String get role; bool get muted; bool get canPost; bool get canReply; String get whoCanPost; List<NoticeItem> get notices;
 /// Create a copy of ChannelDetail
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -5210,16 +5210,16 @@ $ChannelDetailCopyWith<ChannelDetail> get copyWith => _$ChannelDetailCopyWithImp
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is ChannelDetail&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.about, about) || other.about == about)&&(identical(other.scopeType, scopeType) || other.scopeType == scopeType)&&(identical(other.templateCode, templateCode) || other.templateCode == templateCode)&&(identical(other.status, status) || other.status == status)&&(identical(other.memberCount, memberCount) || other.memberCount == memberCount)&&(identical(other.replyRule, replyRule) || other.replyRule == replyRule)&&(identical(other.defaultPriority, defaultPriority) || other.defaultPriority == defaultPriority)&&(identical(other.role, role) || other.role == role)&&(identical(other.muted, muted) || other.muted == muted)&&(identical(other.canPost, canPost) || other.canPost == canPost)&&(identical(other.canReply, canReply) || other.canReply == canReply)&&(identical(other.whoCanPost, whoCanPost) || other.whoCanPost == whoCanPost));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ChannelDetail&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.about, about) || other.about == about)&&(identical(other.scopeType, scopeType) || other.scopeType == scopeType)&&(identical(other.templateCode, templateCode) || other.templateCode == templateCode)&&(identical(other.status, status) || other.status == status)&&(identical(other.memberCount, memberCount) || other.memberCount == memberCount)&&(identical(other.replyRule, replyRule) || other.replyRule == replyRule)&&(identical(other.defaultPriority, defaultPriority) || other.defaultPriority == defaultPriority)&&(identical(other.role, role) || other.role == role)&&(identical(other.muted, muted) || other.muted == muted)&&(identical(other.canPost, canPost) || other.canPost == canPost)&&(identical(other.canReply, canReply) || other.canReply == canReply)&&(identical(other.whoCanPost, whoCanPost) || other.whoCanPost == whoCanPost)&&const DeepCollectionEquality().equals(other.notices, notices));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,name,about,scopeType,templateCode,status,memberCount,replyRule,defaultPriority,role,muted,canPost,canReply,whoCanPost);
+int get hashCode => Object.hash(runtimeType,id,name,about,scopeType,templateCode,status,memberCount,replyRule,defaultPriority,role,muted,canPost,canReply,whoCanPost,const DeepCollectionEquality().hash(notices));
 
 @override
 String toString() {
-  return 'ChannelDetail(id: $id, name: $name, about: $about, scopeType: $scopeType, templateCode: $templateCode, status: $status, memberCount: $memberCount, replyRule: $replyRule, defaultPriority: $defaultPriority, role: $role, muted: $muted, canPost: $canPost, canReply: $canReply, whoCanPost: $whoCanPost)';
+  return 'ChannelDetail(id: $id, name: $name, about: $about, scopeType: $scopeType, templateCode: $templateCode, status: $status, memberCount: $memberCount, replyRule: $replyRule, defaultPriority: $defaultPriority, role: $role, muted: $muted, canPost: $canPost, canReply: $canReply, whoCanPost: $whoCanPost, notices: $notices)';
 }
 
 
@@ -5230,7 +5230,7 @@ abstract mixin class $ChannelDetailCopyWith<$Res>  {
   factory $ChannelDetailCopyWith(ChannelDetail value, $Res Function(ChannelDetail) _then) = _$ChannelDetailCopyWithImpl;
 @useResult
 $Res call({
- String id, String name, String about, String scopeType, String templateCode, String status, int memberCount, String replyRule, String defaultPriority, String role, bool muted, bool canPost, bool canReply, String whoCanPost
+ String id, String name, String about, String scopeType, String templateCode, String status, int memberCount, String replyRule, String defaultPriority, String role, bool muted, bool canPost, bool canReply, String whoCanPost, List<NoticeItem> notices
 });
 
 
@@ -5247,7 +5247,7 @@ class _$ChannelDetailCopyWithImpl<$Res>
 
 /// Create a copy of ChannelDetail
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? about = null,Object? scopeType = null,Object? templateCode = null,Object? status = null,Object? memberCount = null,Object? replyRule = null,Object? defaultPriority = null,Object? role = null,Object? muted = null,Object? canPost = null,Object? canReply = null,Object? whoCanPost = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? about = null,Object? scopeType = null,Object? templateCode = null,Object? status = null,Object? memberCount = null,Object? replyRule = null,Object? defaultPriority = null,Object? role = null,Object? muted = null,Object? canPost = null,Object? canReply = null,Object? whoCanPost = null,Object? notices = null,}) {
   return _then(ChannelDetail(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
@@ -5263,7 +5263,8 @@ as String,muted: null == muted ? _self.muted : muted // ignore: cast_nullable_to
 as bool,canPost: null == canPost ? _self.canPost : canPost // ignore: cast_nullable_to_non_nullable
 as bool,canReply: null == canReply ? _self.canReply : canReply // ignore: cast_nullable_to_non_nullable
 as bool,whoCanPost: null == whoCanPost ? _self.whoCanPost : whoCanPost // ignore: cast_nullable_to_non_nullable
-as String,
+as String,notices: null == notices ? _self.notices : notices // ignore: cast_nullable_to_non_nullable
+as List<NoticeItem>,
   ));
 }
 
@@ -5348,10 +5349,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String name,  String about,  String scopeType,  String templateCode,  String status,  int memberCount,  String replyRule,  String defaultPriority,  String role,  bool muted,  bool canPost,  bool canReply,  String whoCanPost)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String name,  String about,  String scopeType,  String templateCode,  String status,  int memberCount,  String replyRule,  String defaultPriority,  String role,  bool muted,  bool canPost,  bool canReply,  String whoCanPost,  List<NoticeItem> notices)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _ChannelDetail() when $default != null:
-return $default(_that.id,_that.name,_that.about,_that.scopeType,_that.templateCode,_that.status,_that.memberCount,_that.replyRule,_that.defaultPriority,_that.role,_that.muted,_that.canPost,_that.canReply,_that.whoCanPost);case _:
+return $default(_that.id,_that.name,_that.about,_that.scopeType,_that.templateCode,_that.status,_that.memberCount,_that.replyRule,_that.defaultPriority,_that.role,_that.muted,_that.canPost,_that.canReply,_that.whoCanPost,_that.notices);case _:
   return orElse();
 
 }
@@ -5369,10 +5370,10 @@ return $default(_that.id,_that.name,_that.about,_that.scopeType,_that.templateCo
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String name,  String about,  String scopeType,  String templateCode,  String status,  int memberCount,  String replyRule,  String defaultPriority,  String role,  bool muted,  bool canPost,  bool canReply,  String whoCanPost)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String name,  String about,  String scopeType,  String templateCode,  String status,  int memberCount,  String replyRule,  String defaultPriority,  String role,  bool muted,  bool canPost,  bool canReply,  String whoCanPost,  List<NoticeItem> notices)  $default,) {final _that = this;
 switch (_that) {
 case _ChannelDetail():
-return $default(_that.id,_that.name,_that.about,_that.scopeType,_that.templateCode,_that.status,_that.memberCount,_that.replyRule,_that.defaultPriority,_that.role,_that.muted,_that.canPost,_that.canReply,_that.whoCanPost);case _:
+return $default(_that.id,_that.name,_that.about,_that.scopeType,_that.templateCode,_that.status,_that.memberCount,_that.replyRule,_that.defaultPriority,_that.role,_that.muted,_that.canPost,_that.canReply,_that.whoCanPost,_that.notices);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -5389,10 +5390,10 @@ return $default(_that.id,_that.name,_that.about,_that.scopeType,_that.templateCo
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String name,  String about,  String scopeType,  String templateCode,  String status,  int memberCount,  String replyRule,  String defaultPriority,  String role,  bool muted,  bool canPost,  bool canReply,  String whoCanPost)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String name,  String about,  String scopeType,  String templateCode,  String status,  int memberCount,  String replyRule,  String defaultPriority,  String role,  bool muted,  bool canPost,  bool canReply,  String whoCanPost,  List<NoticeItem> notices)?  $default,) {final _that = this;
 switch (_that) {
 case _ChannelDetail() when $default != null:
-return $default(_that.id,_that.name,_that.about,_that.scopeType,_that.templateCode,_that.status,_that.memberCount,_that.replyRule,_that.defaultPriority,_that.role,_that.muted,_that.canPost,_that.canReply,_that.whoCanPost);case _:
+return $default(_that.id,_that.name,_that.about,_that.scopeType,_that.templateCode,_that.status,_that.memberCount,_that.replyRule,_that.defaultPriority,_that.role,_that.muted,_that.canPost,_that.canReply,_that.whoCanPost,_that.notices);case _:
   return null;
 
 }
@@ -5404,7 +5405,7 @@ return $default(_that.id,_that.name,_that.about,_that.scopeType,_that.templateCo
 @JsonSerializable()
 
 class _ChannelDetail implements ChannelDetail {
-  const _ChannelDetail({required this.id, required this.name, required this.about, required this.scopeType, required this.templateCode, required this.status, required this.memberCount, required this.replyRule, required this.defaultPriority, required this.role, required this.muted, required this.canPost, required this.canReply, required this.whoCanPost});
+  const _ChannelDetail({required this.id, required this.name, required this.about, required this.scopeType, required this.templateCode, required this.status, required this.memberCount, required this.replyRule, required this.defaultPriority, required this.role, required this.muted, required this.canPost, required this.canReply, required this.whoCanPost,  List<NoticeItem> notices = const <NoticeItem>[]}): _notices = notices;
   factory _ChannelDetail.fromJson(Map<String, dynamic> json) => _$ChannelDetailFromJson(json);
 
 @override final  String id;
@@ -5421,6 +5422,13 @@ class _ChannelDetail implements ChannelDetail {
 @override final  bool canPost;
 @override final  bool canReply;
 @override final  String whoCanPost;
+ final  List<NoticeItem> _notices;
+@override@JsonKey() List<NoticeItem> get notices {
+  if (_notices is EqualUnmodifiableListView) return _notices;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_notices);
+}
+
 
 /// Create a copy of ChannelDetail
 /// with the given fields replaced by the non-null parameter values.
@@ -5435,16 +5443,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ChannelDetail&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.about, about) || other.about == about)&&(identical(other.scopeType, scopeType) || other.scopeType == scopeType)&&(identical(other.templateCode, templateCode) || other.templateCode == templateCode)&&(identical(other.status, status) || other.status == status)&&(identical(other.memberCount, memberCount) || other.memberCount == memberCount)&&(identical(other.replyRule, replyRule) || other.replyRule == replyRule)&&(identical(other.defaultPriority, defaultPriority) || other.defaultPriority == defaultPriority)&&(identical(other.role, role) || other.role == role)&&(identical(other.muted, muted) || other.muted == muted)&&(identical(other.canPost, canPost) || other.canPost == canPost)&&(identical(other.canReply, canReply) || other.canReply == canReply)&&(identical(other.whoCanPost, whoCanPost) || other.whoCanPost == whoCanPost));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ChannelDetail&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.about, about) || other.about == about)&&(identical(other.scopeType, scopeType) || other.scopeType == scopeType)&&(identical(other.templateCode, templateCode) || other.templateCode == templateCode)&&(identical(other.status, status) || other.status == status)&&(identical(other.memberCount, memberCount) || other.memberCount == memberCount)&&(identical(other.replyRule, replyRule) || other.replyRule == replyRule)&&(identical(other.defaultPriority, defaultPriority) || other.defaultPriority == defaultPriority)&&(identical(other.role, role) || other.role == role)&&(identical(other.muted, muted) || other.muted == muted)&&(identical(other.canPost, canPost) || other.canPost == canPost)&&(identical(other.canReply, canReply) || other.canReply == canReply)&&(identical(other.whoCanPost, whoCanPost) || other.whoCanPost == whoCanPost)&&const DeepCollectionEquality().equals(other._notices, _notices));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,name,about,scopeType,templateCode,status,memberCount,replyRule,defaultPriority,role,muted,canPost,canReply,whoCanPost);
+int get hashCode => Object.hash(runtimeType,id,name,about,scopeType,templateCode,status,memberCount,replyRule,defaultPriority,role,muted,canPost,canReply,whoCanPost,const DeepCollectionEquality().hash(_notices));
 
 @override
 String toString() {
-  return 'ChannelDetail(id: $id, name: $name, about: $about, scopeType: $scopeType, templateCode: $templateCode, status: $status, memberCount: $memberCount, replyRule: $replyRule, defaultPriority: $defaultPriority, role: $role, muted: $muted, canPost: $canPost, canReply: $canReply, whoCanPost: $whoCanPost)';
+  return 'ChannelDetail(id: $id, name: $name, about: $about, scopeType: $scopeType, templateCode: $templateCode, status: $status, memberCount: $memberCount, replyRule: $replyRule, defaultPriority: $defaultPriority, role: $role, muted: $muted, canPost: $canPost, canReply: $canReply, whoCanPost: $whoCanPost, notices: $notices)';
 }
 
 
@@ -5455,7 +5463,7 @@ abstract mixin class _$ChannelDetailCopyWith<$Res> implements $ChannelDetailCopy
   factory _$ChannelDetailCopyWith(_ChannelDetail value, $Res Function(_ChannelDetail) _then) = __$ChannelDetailCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String name, String about, String scopeType, String templateCode, String status, int memberCount, String replyRule, String defaultPriority, String role, bool muted, bool canPost, bool canReply, String whoCanPost
+ String id, String name, String about, String scopeType, String templateCode, String status, int memberCount, String replyRule, String defaultPriority, String role, bool muted, bool canPost, bool canReply, String whoCanPost, List<NoticeItem> notices
 });
 
 
@@ -5472,7 +5480,7 @@ class __$ChannelDetailCopyWithImpl<$Res>
 
 /// Create a copy of ChannelDetail
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? about = null,Object? scopeType = null,Object? templateCode = null,Object? status = null,Object? memberCount = null,Object? replyRule = null,Object? defaultPriority = null,Object? role = null,Object? muted = null,Object? canPost = null,Object? canReply = null,Object? whoCanPost = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? about = null,Object? scopeType = null,Object? templateCode = null,Object? status = null,Object? memberCount = null,Object? replyRule = null,Object? defaultPriority = null,Object? role = null,Object? muted = null,Object? canPost = null,Object? canReply = null,Object? whoCanPost = null,Object? notices = null,}) {
   return _then(_ChannelDetail(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
@@ -5488,7 +5496,8 @@ as String,muted: null == muted ? _self.muted : muted // ignore: cast_nullable_to
 as bool,canPost: null == canPost ? _self.canPost : canPost // ignore: cast_nullable_to_non_nullable
 as bool,canReply: null == canReply ? _self.canReply : canReply // ignore: cast_nullable_to_non_nullable
 as bool,whoCanPost: null == whoCanPost ? _self.whoCanPost : whoCanPost // ignore: cast_nullable_to_non_nullable
-as String,
+as String,notices: null == notices ? _self._notices : notices // ignore: cast_nullable_to_non_nullable
+as List<NoticeItem>,
   ));
 }
 

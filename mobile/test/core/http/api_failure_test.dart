@@ -31,4 +31,27 @@ void main() {
     expect(ApiFailure.of(wrapped), same(inner));
     expect(ApiFailure.of(StateError('boom')).code, ApiErrorCode.unknown);
   });
+
+  test('notice codes map, and error.ack / error.reminders are read from the raw envelope', () {
+    final ack = ApiFailure.fromDio(_dio(409, {
+      'error': {'code': 'ALREADY_ACKNOWLEDGED', 'message': 'Already', 'ack': {'ackAt': '2026-10-01T05:00:00.000Z', 'late': false, 'method': 'hold', 'offline': false, 'comment': null, 'clientAt': null}},
+    }));
+    expect(ack.code, ApiErrorCode.alreadyAcknowledged);
+    expect(ack.ackRecord?['method'], 'hold');
+    expect(ack.reminders, isNull);
+    final limit = ApiFailure.fromDio(_dio(409, {
+      'error': {'code': 'REMINDER_LIMIT', 'message': 'At most two', 'reminders': {'used': 2, 'max': 2, 'lastAt': null}},
+    }));
+    expect(limit.code, ApiErrorCode.reminderLimit);
+    expect(limit.reminders?['used'], 2);
+    for (final (wire, code) in [
+      ('NOTICE_NOT_FOUND', ApiErrorCode.noticeNotFound),
+      ('NOTICE_ARCHIVED', ApiErrorCode.noticeArchived),
+      ('NOT_PUBLISHER', ApiErrorCode.notPublisher),
+      ('ACK_REQUIRED', ApiErrorCode.ackRequired),
+      ('ACK_NOT_REQUIRED', ApiErrorCode.ackNotRequired),
+    ]) {
+      expect(ApiErrorCode.fromWire(wire), code);
+    }
+  });
 }

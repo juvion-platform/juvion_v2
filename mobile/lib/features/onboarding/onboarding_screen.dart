@@ -9,6 +9,7 @@ import 'package:juvi/core/repos/me_repository.dart';
 import 'package:juvi/core/repos/spaces_repository.dart';
 import 'package:juvi/core/session/session_controller.dart';
 import 'package:juvi/core/session/session_state.dart';
+import 'package:juvi/features/onboarding/steps/first_notice_step.dart';
 import 'package:juvi/features/onboarding/steps/identity_step.dart';
 import 'package:juvi/features/onboarding/steps/notifications_step.dart';
 import 'package:juvi/features/onboarding/steps/spaces_step.dart';
@@ -16,7 +17,7 @@ import 'package:juvi/shared/widgets/failure_view.dart';
 import 'package:juvi/shared/widgets/skeleton.dart';
 
 /// S02: server-driven onboarding. `account.onboardingSteps[step]` names the step to
-/// render (identity, spaces, notifications); an unrecognised name renders a generic
+/// render (identity, spaces, notifications, first_notice); an unrecognised name renders a generic
 /// continue card so a future server-added step never bricks the app. `lib/app/redirect.dart`
 /// is the routing brain (R54): it holds a signed-in-but-incomplete account on
 /// `/onboarding/<step>` and only forces the location forward once `account.onboardingStep`
@@ -124,6 +125,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   'identity' => IdentityStep(c.data),
                   'spaces' => SpacesStep(c.data),
                   'notifications' => NotificationsStep(c.data),
+                  'first_notice' => const FirstNoticeStep(),
                   _ => Center(
                     child: Padding(padding: const EdgeInsets.all(24), child: Text(l.onboardingUnknownStepBody)),
                   ),

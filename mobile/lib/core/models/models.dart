@@ -1,5 +1,6 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:juvi/core/http/api_failure.dart';
+import 'package:juvi/core/models/notices.dart';
 
 part 'models.freezed.dart';
 part 'models.g.dart';
@@ -184,9 +185,12 @@ abstract class SpacesData with _$SpacesData {
   factory SpacesData.fromJson(Map<String, dynamic> json) => _$SpacesDataFromJson(json);
 }
 
-/// The channel header + About payload. The contract's `ChannelDetail` also carries a
-/// `linkedObject` field (the scope object the channel is bound to); it's not surfaced in
-/// the app yet, so `fromJson` ignores it like the other extra wire fields (R48).
+/// The channel header + About payload, plus the notices published to the channel's
+/// scope that this person received (notices spec §4 US-6). The contract's
+/// `ChannelDetail` also carries a `linkedObject` field (the scope object the channel is
+/// bound to); it's not surfaced in the app yet, so `fromJson` ignores it like the other
+/// extra wire fields (R48). A channel document cached before notices existed has no
+/// `notices` key and reads as an empty list.
 @freezed
 abstract class ChannelDetail with _$ChannelDetail {
   const factory ChannelDetail({
@@ -204,6 +208,7 @@ abstract class ChannelDetail with _$ChannelDetail {
     required bool canPost,
     required bool canReply,
     required String whoCanPost,
+    @Default(<NoticeItem>[]) List<NoticeItem> notices,
   }) = _ChannelDetail;
   factory ChannelDetail.fromJson(Map<String, dynamic> json) => _$ChannelDetailFromJson(json);
 }

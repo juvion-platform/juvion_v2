@@ -742,6 +742,24 @@ abstract class AppLocalizations {
   /// **'One more thing from your college is on its way. Continue for now.'**
   String get onboardingUnknownStepBody;
 
+  /// Onboarding step 4 heading (spec §4 US-5).
+  ///
+  /// In en, this message translates to:
+  /// **'Your first notice'**
+  String get onboardingFirstNoticeTitle;
+
+  /// No description provided for @onboardingFirstNoticeBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This is how your college reaches you. Hold the button, or tap and confirm, to acknowledge it.'**
+  String get onboardingFirstNoticeBody;
+
+  /// Onboarding step 4 when the welcome notice cannot be loaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Your welcome notice will be waiting on Today once you are online.'**
+  String get onboardingFirstNoticeOffline;
+
   /// Onboarding identity step heading.
   ///
   /// In en, this message translates to:
@@ -795,6 +813,468 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Stay informed, not overwhelmed'**
   String get onboardingNotificationsTitle;
+
+  /// No description provided for @cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get cancel;
+
+  /// AckControl: the press-and-hold control's label (spec §4 US-2.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Hold to acknowledge'**
+  String get ackHoldLabel;
+
+  /// AckControl: second line under the hold label; a short tap opens the confirmation instead.
+  ///
+  /// In en, this message translates to:
+  /// **'or tap to confirm'**
+  String get ackHoldHint;
+
+  /// AckControl under a screen reader (confirm path forced), and the confirm dialog's action.
+  ///
+  /// In en, this message translates to:
+  /// **'Acknowledge'**
+  String get ackButton;
+
+  /// Accessible hint on the acknowledge control.
+  ///
+  /// In en, this message translates to:
+  /// **'Opens a confirmation'**
+  String get ackOpensConfirmation;
+
+  /// No description provided for @ackConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Acknowledge this notice?'**
+  String get ackConfirmTitle;
+
+  /// No description provided for @ackConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The office will see that you have read it, and when.'**
+  String get ackConfirmBody;
+
+  /// DeadlineRing centre: whole days left.
+  ///
+  /// In en, this message translates to:
+  /// **'{days}d'**
+  String deadlineDaysShort(int days);
+
+  /// DeadlineRing centre: whole hours left.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours}h'**
+  String deadlineHoursShort(int hours);
+
+  /// DeadlineRing centre: minutes left.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes}m'**
+  String deadlineMinutesShort(int minutes);
+
+  /// No description provided for @deadlineDueBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Acknowledge by {when}'**
+  String deadlineDueBy(String when);
+
+  /// No description provided for @deadlinePassed.
+  ///
+  /// In en, this message translates to:
+  /// **'Deadline passed {when}'**
+  String deadlinePassed(String when);
+
+  /// Priority label on a notice card.
+  ///
+  /// In en, this message translates to:
+  /// **'Urgent'**
+  String get noticeUrgent;
+
+  /// Priority label on a notice card.
+  ///
+  /// In en, this message translates to:
+  /// **'Important'**
+  String get noticeImportant;
+
+  /// A notice acknowledged offline, waiting in the queue (spec §4 US-3.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Will send when online'**
+  String get noticeWillSendWhenOnline;
+
+  /// No description provided for @noticeAcknowledgedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Acknowledged {when}'**
+  String noticeAcknowledgedAt(String when);
+
+  /// No description provided for @noticeAcknowledged.
+  ///
+  /// In en, this message translates to:
+  /// **'Acknowledged'**
+  String get noticeAcknowledged;
+
+  /// An acknowledgement made after the deadline (spec §4 US-2.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Late'**
+  String get noticeLate;
+
+  /// No description provided for @noticeArchived.
+  ///
+  /// In en, this message translates to:
+  /// **'Archived'**
+  String get noticeArchived;
+
+  /// A notice received but not yet opened.
+  ///
+  /// In en, this message translates to:
+  /// **'New'**
+  String get noticeNew;
+
+  /// No description provided for @noticeDue.
+  ///
+  /// In en, this message translates to:
+  /// **'Due'**
+  String get noticeDue;
+
+  /// Pill under the attention stack: due items beyond the three shown.
+  ///
+  /// In en, this message translates to:
+  /// **'+{count} more'**
+  String attentionMore(int count);
+
+  /// S04 when the notice was not sent to this person (404 NOTICE_NOT_FOUND, spec §4 US-2.5).
+  ///
+  /// In en, this message translates to:
+  /// **'This notice is not available'**
+  String get noticeNotAvailable;
+
+  /// No description provided for @noticeNotAvailableHint.
+  ///
+  /// In en, this message translates to:
+  /// **'It may not have been sent to you.'**
+  String get noticeNotAvailableHint;
+
+  /// No description provided for @noticeArchivedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This notice was archived. It no longer needs any action.'**
+  String get noticeArchivedBody;
+
+  /// No description provided for @noticeAttachments.
+  ///
+  /// In en, this message translates to:
+  /// **'Attachments'**
+  String get noticeAttachments;
+
+  /// An attachment while the device is offline.
+  ///
+  /// In en, this message translates to:
+  /// **'Available when online'**
+  String get noticeAvailableWhenOnline;
+
+  /// No description provided for @noticeCommentLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a comment (optional)'**
+  String get noticeCommentLabel;
+
+  /// No description provided for @noticeYourComment.
+  ///
+  /// In en, this message translates to:
+  /// **'Your comment: {comment}'**
+  String noticeYourComment(String comment);
+
+  /// No description provided for @noticeSentOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent while offline'**
+  String get noticeSentOffline;
+
+  /// No description provided for @noticeDismiss.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss'**
+  String get noticeDismiss;
+
+  /// No description provided for @noticeDismissed.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismissed'**
+  String get noticeDismissed;
+
+  /// No description provided for @noticeNeedsConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'This needs a connection.'**
+  String get noticeNeedsConnection;
+
+  /// S04 button for the notice's publisher: opens reach (S11).
+  ///
+  /// In en, this message translates to:
+  /// **'See who has read it'**
+  String get noticeSeeReach;
+
+  /// No description provided for @fileSizeKb.
+  ///
+  /// In en, this message translates to:
+  /// **'{size} KB'**
+  String fileSizeKb(int size);
+
+  /// No description provided for @fileSizeMb.
+  ///
+  /// In en, this message translates to:
+  /// **'{size} MB'**
+  String fileSizeMb(String size);
+
+  /// S05 attention sheet heading.
+  ///
+  /// In en, this message translates to:
+  /// **'Notices'**
+  String get attentionSheetTitle;
+
+  /// Attention section header action on Today and Teaching: opens the attention sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'See all'**
+  String get attentionSeeAll;
+
+  /// S05 Due segment; the count equals the tab badge (spec §4 US-3.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Due ({count})'**
+  String segmentDue(int count);
+
+  /// No description provided for @segmentDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get segmentDone;
+
+  /// No description provided for @segmentAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get segmentAll;
+
+  /// No description provided for @segmentPublished.
+  ///
+  /// In en, this message translates to:
+  /// **'Published by me'**
+  String get segmentPublished;
+
+  /// S05 office filter: no filter.
+  ///
+  /// In en, this message translates to:
+  /// **'All offices'**
+  String get officeAll;
+
+  /// No description provided for @showMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Show more'**
+  String get showMore;
+
+  /// No description provided for @noticesNoneDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing acknowledged yet'**
+  String get noticesNoneDone;
+
+  /// No description provided for @noticesNoneAll.
+  ///
+  /// In en, this message translates to:
+  /// **'No notices yet'**
+  String get noticesNoneAll;
+
+  /// No description provided for @noticesNonePublished.
+  ///
+  /// In en, this message translates to:
+  /// **'You haven\'t published any notices'**
+  String get noticesNonePublished;
+
+  /// Accessible label for the Today / Teaching tab badge.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} due'**
+  String dueBadgeLabel(int count);
+
+  /// S11 app bar: who has seen and acknowledged a notice I published.
+  ///
+  /// In en, this message translates to:
+  /// **'Reach'**
+  String get reachTitle;
+
+  /// No description provided for @reachSeenNotAcked.
+  ///
+  /// In en, this message translates to:
+  /// **'Seen, not acknowledged'**
+  String get reachSeenNotAcked;
+
+  /// No description provided for @reachSeen.
+  ///
+  /// In en, this message translates to:
+  /// **'Seen'**
+  String get reachSeen;
+
+  /// No description provided for @reachNotSeen.
+  ///
+  /// In en, this message translates to:
+  /// **'Not seen'**
+  String get reachNotSeen;
+
+  /// Audience members without an active Juvi account (spec §1).
+  ///
+  /// In en, this message translates to:
+  /// **'Not on Juvi'**
+  String get reachNotOnJuvi;
+
+  /// No description provided for @reachOfAudience.
+  ///
+  /// In en, this message translates to:
+  /// **'of {count} in the audience'**
+  String reachOfAudience(int count);
+
+  /// No description provided for @reachSparkline.
+  ///
+  /// In en, this message translates to:
+  /// **'Acknowledgements over time'**
+  String get reachSparkline;
+
+  /// No description provided for @reachReminders.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminders sent: {used} of {max}'**
+  String reachReminders(int used, int max);
+
+  /// No description provided for @reachSendReminder.
+  ///
+  /// In en, this message translates to:
+  /// **'Send reminder'**
+  String get reachSendReminder;
+
+  /// No description provided for @reachRemindConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Send a reminder?'**
+  String get reachRemindConfirmTitle;
+
+  /// No description provided for @reachRemindConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Everyone who has not acknowledged yet gets this notice again.'**
+  String get reachRemindConfirmBody;
+
+  /// No description provided for @reachRemindSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminder sent'**
+  String get reachRemindSent;
+
+  /// No description provided for @reachByGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'By group'**
+  String get reachByGroup;
+
+  /// No description provided for @reachGroupLine.
+  ///
+  /// In en, this message translates to:
+  /// **'{acknowledged} of {total} acknowledged'**
+  String reachGroupLine(int acknowledged, int total);
+
+  /// No description provided for @reachPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending ({count})'**
+  String reachPending(int count);
+
+  /// No description provided for @reachAllGroups.
+  ///
+  /// In en, this message translates to:
+  /// **'All groups'**
+  String get reachAllGroups;
+
+  /// No description provided for @reachSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search by name or roll number'**
+  String get reachSearchHint;
+
+  /// No description provided for @reachCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy list'**
+  String get reachCopy;
+
+  /// No description provided for @reachCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied {count} names'**
+  String reachCopied(int count);
+
+  /// No description provided for @reachLastInApp.
+  ///
+  /// In en, this message translates to:
+  /// **'Last in app {when}'**
+  String reachLastInApp(String when);
+
+  /// No description provided for @reachNeverInApp.
+  ///
+  /// In en, this message translates to:
+  /// **'Not in the app yet'**
+  String get reachNeverInApp;
+
+  /// No description provided for @reachNoPending.
+  ///
+  /// In en, this message translates to:
+  /// **'No one is pending'**
+  String get reachNoPending;
+
+  /// No description provided for @reachLate.
+  ///
+  /// In en, this message translates to:
+  /// **'Late acknowledgements ({count})'**
+  String reachLate(int count);
+
+  /// No description provided for @reachComments.
+  ///
+  /// In en, this message translates to:
+  /// **'Comments'**
+  String get reachComments;
+
+  /// No description provided for @reachAddedLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Added after publishing'**
+  String get reachAddedLater;
+
+  /// No description provided for @reachAddedLaterLine.
+  ///
+  /// In en, this message translates to:
+  /// **'{total} people · {acknowledged} acknowledged · {seen} seen'**
+  String reachAddedLaterLine(int total, int acknowledged, int seen);
+
+  /// No description provided for @reachNotPublisher.
+  ///
+  /// In en, this message translates to:
+  /// **'Only the publisher can see who has read this notice.'**
+  String get reachNotPublisher;
+
+  /// S11: why Send reminder is disabled while the notice is still publishing (queued item 8). Archived already explains itself via the banner above; an exhausted budget or a reminder in flight both say so elsewhere too.
+  ///
+  /// In en, this message translates to:
+  /// **'You can send a reminder once this notice is published.'**
+  String get reachRemindNotPublished;
+
+  /// Channel screen section: notices whose audience matches this channel (spec §4 US-6).
+  ///
+  /// In en, this message translates to:
+  /// **'Notices'**
+  String get channelNotices;
 }
 
 class _AppLocalizationsDelegate

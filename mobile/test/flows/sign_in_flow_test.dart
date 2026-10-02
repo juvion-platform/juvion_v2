@@ -13,10 +13,12 @@ import 'package:juvi/core/http/juvi_http.dart';
 import 'package:juvi/core/session/session_controller.dart';
 import 'package:juvi/core/storage/app_database.dart';
 import 'package:juvi/core/storage/secure_store.dart';
+import 'package:juvi/features/notices/widgets/ack_control.dart';
 import 'package:juvi_api/juvi_api.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/repos/me_repository_test.dart' show meJson;
+import '../core/repos/notices_fixtures.dart';
 import '../features/spaces/spaces_screen_test.dart' show spacesJson;
 
 class _Storage extends Mock implements FlutterSecureStorage {}
@@ -29,7 +31,7 @@ class _NoopAnalytics implements Analytics {
 }
 
 void main() {
-  testWidgets('sign in → set password → onboarding → Today', (t) async {
+  testWidgets('sign in → set password → onboarding with the first notice → Today → acknowledge → clear', (t) async {
     SharedPreferences.setMockInitialValues({});
     final mem = <String, String>{};
     final storage = _Storage();
@@ -64,15 +66,21 @@ void main() {
     final adapter = DioAdapter(dio: dio);
     var step = 0;
     var mustChange = true;
+    // The welcome notice (onboarding step 4) stays Due until it is acknowledged.
+    var acked = false;
+    const steps = ['identity', 'spaces', 'notifications', 'first_notice'];
     Map<String, dynamic> account() => {
           'id': 'a',
           'kind': 'student',
-          'status': step >= 3 ? 'active' : 'onboarding',
+          'status': step >= steps.length ? 'active' : 'onboarding',
           'onboardingStep': step,
-          'onboardingSteps': ['identity', 'spaces', 'notifications'],
-          'onboardingComplete': step >= 3,
+          'onboardingSteps': steps,
+          'onboardingComplete': step >= steps.length,
           'mustChangePassword': mustChange,
         };
+    Map<String, dynamic> welcome() => acked
+        ? detailJson('w1', title: 'Welcome to Juvi', office: 'Juvi', deadline: null, purpose: 'welcome', state: 'acknowledged', ackAt: '2026-10-01T05:00:00.000Z')
+        : detailJson('w1', title: 'Welcome to Juvi', office: 'Juvi', deadline: null, purpose: 'welcome');
 
     // `/institutions/{code}` and `/config` send `minAppVersion`/`supportContact` as
     // `null` here because that's what the real server sends whenever there's no
@@ -140,15 +148,28 @@ void main() {
           'timezone': 'Asia/Kolkata',
           'featureFlags': {'languageRoadmap': false},
           'minAppVersion': null,
-          'onboardingSteps': ['identity', 'spaces', 'notifications'],
+          'onboardingSteps': steps,
         }),
       )
       ..onGet('/spaces', (s) => s.reply(200, spacesJson))
+      ..onGet('/onboarding/first-notice', (s) => s.replyCallback(200, (_) => welcome()))
+      ..onGet(
+        '/attention',
+        (s) => s.replyCallback(200, (_) => attentionJson([if (!acked) cardJson('w1', title: 'Welcome to Juvi', office: 'Juvi', deadline: null, purpose: 'welcome')])),
+      )
+      ..onPost(
+        '/notices/w1/ack',
+        (s) => s.replyCallback(200, (_) {
+          acked = true;
+          return ackJson();
+        }),
+        data: Matchers.any,
+      )
       ..onPost(
         '/me/onboarding/advance',
         (s) => s.replyCallback(200, (_) {
           step++;
-          return {'onboardingStep': step, 'onboardingSteps': ['identity', 'spaces', 'notifications'], 'onboardingComplete': step >= 3};
+          return {'onboardingStep': step, 'onboardingSteps': steps, 'onboardingComplete': step >= steps.length};
         }),
         data: Matchers.any,
       );
@@ -196,7 +217,7 @@ void main() {
     await t.tap(find.text('Save password'));
     await t.pumpAndSettle();
 
-    // Onboarding ×3
+    // Onboarding ×4
     expect(find.text('Your college has set you up'), findsOneWidget);
     await t.tap(find.text('Continue'));
     await t.pumpAndSettle();
@@ -204,11 +225,32 @@ void main() {
     await t.tap(find.text('Continue'));
     await t.pumpAndSettle();
     expect(find.text('Stay informed, not overwhelmed'), findsOneWidget);
+    await t.tap(find.text('Continue'));
+    await t.pumpAndSettle();
+    // Step 4: the real welcome notice. Finishing without acknowledging leaves it Due.
+    expect(find.text('Your first notice'), findsOneWidget);
+    expect(find.text('Welcome to Juvi'), findsOneWidget);
+    expect(find.byType(AckControl), findsOneWidget);
     await t.tap(find.text('Finish'));
     await t.pumpAndSettle();
 
-    // Today
+    // Today: the welcome notice is the one due item, and the tab badge says 1.
+    expect(find.text('Welcome to Juvi'), findsOneWidget);
+    expect(find.descendant(of: find.byType(Badge), matching: find.text('1')), findsWidgets);
+    expect(find.text("You're clear"), findsNothing);
+
+    // Acknowledge with a 1.2 s hold (the press is recognised after kPressTimeout).
+    final hold = await t.startGesture(t.getCenter(find.byType(AckControl)));
+    await t.pump();
+    await t.pump(const Duration(milliseconds: 150));
+    await t.pump(const Duration(milliseconds: 1250));
+    await hold.up();
+    await t.pumpAndSettle();
+
+    expect(acked, isTrue);
+    expect(find.text('Welcome to Juvi'), findsNothing);
     expect(find.text("You're clear"), findsOneWidget);
+    expect(find.descendant(of: find.byType(Badge), matching: find.text('1')), findsNothing);
     expect(find.text('No classes today'), findsOneWidget);
     expect(mem['juvi.access'], 'a');
   });

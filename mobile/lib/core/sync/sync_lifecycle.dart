@@ -6,8 +6,10 @@ import 'package:juvi/core/analytics/analytics.dart';
 import 'package:juvi/core/connectivity/connectivity_provider.dart';
 import 'package:juvi/core/http/api_providers.dart';
 import 'package:juvi/core/repos/me_repository.dart';
+import 'package:juvi/core/repos/notices_repository.dart';
 import 'package:juvi/core/repos/spaces_repository.dart';
 import 'package:juvi/core/sync/sync_worker.dart';
+import 'package:juvi/features/notices/notice_actions.dart';
 
 /// Drains queued writes when connectivity returns or the app resumes; records
 /// `app.opened`. Wraps `MaterialApp.router` in `JuviApp` (`lib/app/app.dart`).
@@ -59,8 +61,18 @@ class _SyncLifecycleState extends ConsumerState<SyncLifecycle> with WidgetsBindi
       final db = await ref.read(appDatabaseProvider.future);
       final me = await ref.read(meRepositoryProvider.future);
       final spaces = await ref.read(spacesRepositoryProvider.future);
-      final result = await SyncWorker(db, me, spaces).drain();
-      if (result.sent > 0) ref..invalidate(meProvider)..invalidate(spacesProvider);
+      final notices = await ref.read(noticesRepositoryProvider.future);
+      final result = await SyncWorker(db, me, spaces, notices).drain();
+      // Sent or dropped, a drained `notice.ack` no longer shows "Will send when online".
+      ref.invalidate(pendingAcksProvider);
+      if (result.sent > 0) ref..invalidate(meProvider)..invalidate(spacesProvider)..invalidate(attentionProvider);
+      // I2/M8: a replayed notice.ack changes what S04, the attention sheet and a
+      // channel's tiles show for it, whether it was sent or dropped (e.g. a replayed
+      // 404 NOTICE_NOT_FOUND). Routed through `NoticeActions.refresh` (its own
+      // container-scoped `Ref`, captured when the keepAlive provider was built) rather
+      // than calling `refreshNotices(ref)` directly: this `ref` is `SyncLifecycle`'s
+      // `WidgetRef`, a different type than the `Ref` `refreshNotices` takes.
+      if (result.ackedNoticeIds.isNotEmpty) ref.read(noticeActionsProvider).refresh();
     } on Object catch (_) {
       // Nothing to drain, or storage not ready yet — the next trigger tries again.
     }
