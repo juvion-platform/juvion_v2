@@ -6,7 +6,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:juvi/core/analytics/analytics.dart';
 import 'package:juvi/core/connectivity/connectivity_provider.dart';
 import 'package:juvi/core/http/api_providers.dart';
+import 'package:juvi/core/models/notices.dart';
 import 'package:juvi/core/repos/me_repository.dart';
+import 'package:juvi/core/repos/notices_repository.dart';
 import 'package:juvi/core/repos/spaces_repository.dart';
 import 'package:juvi/core/storage/app_database.dart';
 import 'package:juvi/core/sync/pending_action.dart';
@@ -17,6 +19,8 @@ class _Me extends Mock implements MeRepository {}
 
 class _Spaces extends Mock implements SpacesRepository {}
 
+class _Notices extends Mock implements NoticesRepository {}
+
 /// A spy in place of `ConsoleAnalytics` — records every tracked event name.
 class _SpyAnalytics implements Analytics {
   final events = <String>[];
@@ -24,13 +28,21 @@ class _SpyAnalytics implements Analytics {
   void track(String event, [Map<String, Object?> props = const {}]) => events.add(event);
 }
 
-Widget host({required AppDatabase db, required MeRepository me, required SpacesRepository spaces, required Analytics analytics, required Stream<bool> online}) =>
+Widget host({
+  required AppDatabase db,
+  required MeRepository me,
+  required SpacesRepository spaces,
+  required Analytics analytics,
+  required Stream<bool> online,
+  NoticesRepository? notices,
+}) =>
     ProviderScope(
       retry: (_, _) => null,
       overrides: [
         appDatabaseProvider.overrideWith((_) async => db),
         meRepositoryProvider.overrideWith((_) async => me),
         spacesRepositoryProvider.overrideWith((_) async => spaces),
+        noticesRepositoryProvider.overrideWith((_) async => notices ?? _Notices()),
         analyticsProvider.overrideWithValue(analytics),
         isOnlineProvider.overrideWith((_) => online),
       ],
@@ -116,6 +128,22 @@ void main() {
     await t.pumpAndSettle();
 
     verify(() => spaces.setMuted('c1', true)).called(1);
+    expect(await db.pendingActions(), isEmpty);
+  });
+
+  testWidgets('a notice.ack queued before launch is replayed at startup', (t) async {
+    registerFallbackValue(const AckInput(method: AckMethod.hold));
+    final notices = _Notices();
+    await db.enqueueAction(PendingAction.create('notice.ack', {'noticeId': 'n1', 'method': 'hold', 'comment': null, 'clientAt': '2026-10-01T04:59:00.000Z', 'offline': true}));
+    when(() => notices.acknowledge('n1', any()))
+        .thenAnswer((_) async => AckRecord(ackAt: DateTime.utc(2026, 10, 1, 5), isLate: false, method: 'hold', offline: true));
+    final controller = StreamController<bool>();
+    addTearDown(controller.close);
+
+    await t.pumpWidget(host(db: db, me: me, spaces: spaces, analytics: analytics, online: controller.stream, notices: notices));
+    await t.pumpAndSettle();
+
+    verify(() => notices.acknowledge('n1', any())).called(1);
     expect(await db.pendingActions(), isEmpty);
   });
 }

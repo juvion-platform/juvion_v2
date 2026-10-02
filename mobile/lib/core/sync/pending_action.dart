@@ -17,7 +17,7 @@ class PendingAction {
         createdAt: DateTime.now(),
       );
   final String id;
-  final String type; // settings.patch | channel.mute | channel.unmute | channel.read
+  final String type; // settings.patch | channel.mute | channel.unmute | channel.read | notice.ack
   final Map<String, dynamic> payload;
   final DateTime createdAt;
   final int attempts;

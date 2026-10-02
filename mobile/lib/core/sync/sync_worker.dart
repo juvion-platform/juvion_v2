@@ -1,5 +1,7 @@
 import 'package:juvi/core/http/api_failure.dart';
+import 'package:juvi/core/models/notices.dart';
 import 'package:juvi/core/repos/me_repository.dart';
+import 'package:juvi/core/repos/notices_repository.dart';
 import 'package:juvi/core/repos/spaces_repository.dart';
 import 'package:juvi/core/storage/app_database.dart';
 import 'package:juvi/core/sync/pending_action.dart';
@@ -31,6 +33,9 @@ class DrainResult {
 /// down its retry budget); a non-offline failure counts an attempt and moves on to the
 /// next item; ten attempts or a 4xx that is not a cooldown drops the action (spec §11).
 ///
+/// A replayed `notice.ack` that gets a 409 is sent, not dropped: the server already
+/// holds an acknowledgement for it, or the notice no longer takes one (notices spec §9).
+///
 /// The queue is re-read, not iterated from a snapshot: an action whose row is gone by the
 /// time its turn comes (a sign-out wiped the queue mid-drain) is skipped, so it can never
 /// go out under the next account's token; and actions enqueued mid-drain are picked up by
@@ -44,10 +49,11 @@ class DrainResult {
 /// (`lib/core/sync/sync_lifecycle.dart`), which holds the in-flight `Future` itself
 /// rather than relying on a guard here.
 class SyncWorker {
-  SyncWorker(this._db, this._me, this._spaces);
+  SyncWorker(this._db, this._me, this._spaces, this._notices);
   final AppDatabase _db;
   final MeRepository _me;
   final SpacesRepository _spaces;
+  final NoticesRepository _notices;
   static const maxAttempts = 10;
   static const maxPasses = 5;
 
@@ -76,6 +82,11 @@ class SyncWorker {
             wentOffline = true;
             break;
           }
+          if (a.type == 'notice.ack' && f.status == 409) {
+            await _db.removeAction(a.id);
+            sent++;
+            continue;
+          }
           final permanent = (f.status ?? 500) >= 400 && (f.status ?? 500) < 500 && f.code != ApiErrorCode.cooldown;
           if (permanent || a.attempts + 1 >= maxAttempts) {
             await _db.removeAction(a.id);
@@ -97,6 +108,7 @@ class SyncWorker {
       case 'channel.mute': await _spaces.setMuted(a.payload['channelId'] as String, true);
       case 'channel.unmute': await _spaces.setMuted(a.payload['channelId'] as String, false);
       case 'channel.read': await _spaces.markRead(a.payload['channelId'] as String);
+      case 'notice.ack': await _notices.acknowledge(a.payload['noticeId'] as String, AckInput.fromQueued(a.payload));
       default: throw const ApiFailure(ApiErrorCode.unknown, 'unknown action', status: 400); // dropped as permanent
     }
   }

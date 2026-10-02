@@ -6,6 +6,7 @@ import 'package:juvi/core/analytics/analytics.dart';
 import 'package:juvi/core/connectivity/connectivity_provider.dart';
 import 'package:juvi/core/http/api_providers.dart';
 import 'package:juvi/core/repos/me_repository.dart';
+import 'package:juvi/core/repos/notices_repository.dart';
 import 'package:juvi/core/repos/spaces_repository.dart';
 import 'package:juvi/core/sync/sync_worker.dart';
 
@@ -59,8 +60,11 @@ class _SyncLifecycleState extends ConsumerState<SyncLifecycle> with WidgetsBindi
       final db = await ref.read(appDatabaseProvider.future);
       final me = await ref.read(meRepositoryProvider.future);
       final spaces = await ref.read(spacesRepositoryProvider.future);
-      final result = await SyncWorker(db, me, spaces).drain();
-      if (result.sent > 0) ref..invalidate(meProvider)..invalidate(spacesProvider);
+      final notices = await ref.read(noticesRepositoryProvider.future);
+      final result = await SyncWorker(db, me, spaces, notices).drain();
+      // Sent or dropped, a drained `notice.ack` no longer shows "Will send when online".
+      ref.invalidate(pendingAcksProvider);
+      if (result.sent > 0) ref..invalidate(meProvider)..invalidate(spacesProvider)..invalidate(attentionProvider);
     } on Object catch (_) {
       // Nothing to drain, or storage not ready yet — the next trigger tries again.
     }
