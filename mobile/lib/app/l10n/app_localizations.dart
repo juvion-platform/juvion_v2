@@ -795,6 +795,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Stay informed, not overwhelmed'**
   String get onboardingNotificationsTitle;
+
+  /// No description provided for @cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get cancel;
+
+  /// AckControl: the press-and-hold control's label (spec §4 US-2.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Hold to acknowledge'**
+  String get ackHoldLabel;
+
+  /// AckControl: second line under the hold label; a short tap opens the confirmation instead.
+  ///
+  /// In en, this message translates to:
+  /// **'or tap to confirm'**
+  String get ackHoldHint;
+
+  /// AckControl under a screen reader (confirm path forced), and the confirm dialog's action.
+  ///
+  /// In en, this message translates to:
+  /// **'Acknowledge'**
+  String get ackButton;
+
+  /// Accessible hint on the acknowledge control.
+  ///
+  /// In en, this message translates to:
+  /// **'Opens a confirmation'**
+  String get ackOpensConfirmation;
+
+  /// No description provided for @ackConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Acknowledge this notice?'**
+  String get ackConfirmTitle;
+
+  /// No description provided for @ackConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The office will see that you have read it, and when.'**
+  String get ackConfirmBody;
+
+  /// DeadlineRing centre: whole days left.
+  ///
+  /// In en, this message translates to:
+  /// **'{days}d'**
+  String deadlineDaysShort(int days);
+
+  /// DeadlineRing centre: whole hours left.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours}h'**
+  String deadlineHoursShort(int hours);
+
+  /// DeadlineRing centre: minutes left.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes}m'**
+  String deadlineMinutesShort(int minutes);
+
+  /// No description provided for @deadlineDueBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Acknowledge by {when}'**
+  String deadlineDueBy(String when);
+
+  /// No description provided for @deadlinePassed.
+  ///
+  /// In en, this message translates to:
+  /// **'Deadline passed {when}'**
+  String deadlinePassed(String when);
 }
 
 class _AppLocalizationsDelegate

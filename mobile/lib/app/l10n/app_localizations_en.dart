@@ -400,4 +400,51 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get onboardingNotificationsTitle => 'Stay informed, not overwhelmed';
+
+  @override
+  String get cancel => 'Cancel';
+
+  @override
+  String get ackHoldLabel => 'Hold to acknowledge';
+
+  @override
+  String get ackHoldHint => 'or tap to confirm';
+
+  @override
+  String get ackButton => 'Acknowledge';
+
+  @override
+  String get ackOpensConfirmation => 'Opens a confirmation';
+
+  @override
+  String get ackConfirmTitle => 'Acknowledge this notice?';
+
+  @override
+  String get ackConfirmBody =>
+      'The office will see that you have read it, and when.';
+
+  @override
+  String deadlineDaysShort(int days) {
+    return '${days}d';
+  }
+
+  @override
+  String deadlineHoursShort(int hours) {
+    return '${hours}h';
+  }
+
+  @override
+  String deadlineMinutesShort(int minutes) {
+    return '${minutes}m';
+  }
+
+  @override
+  String deadlineDueBy(String when) {
+    return 'Acknowledge by $when';
+  }
+
+  @override
+  String deadlinePassed(String when) {
+    return 'Deadline passed $when';
+  }
 }
