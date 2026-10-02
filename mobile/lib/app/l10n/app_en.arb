@@ -214,5 +214,22 @@
   "fileSizeKb": "{size} KB",
   "@fileSizeKb": { "placeholders": { "size": { "type": "int" } } },
   "fileSizeMb": "{size} MB",
-  "@fileSizeMb": { "placeholders": { "size": { "type": "String" } } }
+  "@fileSizeMb": { "placeholders": { "size": { "type": "String" } } },
+  "attentionSheetTitle": "Notices",
+  "@attentionSheetTitle": { "description": "S05 attention sheet heading." },
+  "attentionSeeAll": "See all",
+  "@attentionSeeAll": { "description": "Attention section header action on Today and Teaching: opens the attention sheet." },
+  "segmentDue": "Due ({count})",
+  "@segmentDue": { "description": "S05 Due segment; the count equals the tab badge (spec §4 US-3.2).", "placeholders": { "count": { "type": "int" } } },
+  "segmentDone": "Done",
+  "segmentAll": "All",
+  "segmentPublished": "Published by me",
+  "officeAll": "All offices",
+  "@officeAll": { "description": "S05 office filter: no filter." },
+  "showMore": "Show more",
+  "noticesNoneDone": "Nothing acknowledged yet",
+  "noticesNoneAll": "No notices yet",
+  "noticesNonePublished": "You haven't published any notices",
+  "dueBadgeLabel": "{count} due",
+  "@dueBadgeLabel": { "description": "Accessible label for the Today / Teaching tab badge.", "placeholders": { "count": { "type": "int" } } }
 }

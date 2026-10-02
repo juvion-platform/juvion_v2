@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:juvi/app/l10n/l10n.dart';
 import 'package:juvi/core/http/api_failure.dart';
 import 'package:juvi/core/repos/me_repository.dart';
+import 'package:juvi/core/repos/notices_repository.dart';
+import 'package:juvi/features/notices/widgets/attention_stack.dart';
 import 'package:juvi/shared/format.dart';
 import 'package:juvi/shared/widgets/as_of_line.dart';
 import 'package:juvi/shared/widgets/empty_state.dart';
@@ -10,7 +13,8 @@ import 'package:juvi/shared/widgets/failure_view.dart';
 import 'package:juvi/shared/widgets/section_header.dart';
 import 'package:juvi/shared/widgets/skeleton.dart';
 
-/// Faculty home shell (S10). Post-to-class and the department/college feeds arrive in
+/// Faculty home shell (S10): my acknowledgements (the attention stack, notices spec
+/// §4 US-3.1) first. Post-to-class and the department/college feeds arrive in
 /// sub-projects 4 and 5.
 class TeachingShellScreen extends ConsumerWidget {
   const TeachingShellScreen({super.key});
@@ -21,7 +25,7 @@ class TeachingShellScreen extends ConsumerWidget {
     return Scaffold(
       body: SafeArea(
         child: RefreshIndicator(
-          onRefresh: () async => ref.refresh(meProvider.future),
+          onRefresh: () => Future.wait([ref.refresh(meProvider.future), ref.refresh(attentionProvider.future)]),
           child: me.when(
             loading: () => ListView(
               children: const [Padding(padding: EdgeInsets.all(16), child: Skeleton(height: 28, width: 160)), SkeletonList(count: 3)],
@@ -43,8 +47,11 @@ class TeachingShellScreen extends ConsumerWidget {
                   ),
                 ),
                 if (c.stale) AsOfLine(c.asOf),
-                SectionHeader(l.teachingAcknowledgementsSection),
-                EmptyState(icon: Icons.check_circle_outline, title: l.youreClear, hint: l.youreClearHint),
+                SectionHeader(
+                  l.teachingAcknowledgementsSection,
+                  trailing: TextButton(onPressed: () => GoRouter.maybeOf(context)?.push('/attention'), child: Text(l.attentionSeeAll)),
+                ),
+                const AttentionStack(),
                 SectionHeader(l.teachingTodaySection),
                 EmptyState(icon: Icons.event_available_outlined, title: l.noClassesToday),
                 SectionHeader(l.teachingDepartmentSection),

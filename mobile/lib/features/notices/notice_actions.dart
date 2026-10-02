@@ -5,6 +5,7 @@ import 'package:juvi/core/http/api_providers.dart';
 import 'package:juvi/core/models/notices.dart';
 import 'package:juvi/core/repos/notices_repository.dart';
 import 'package:juvi/core/sync/pending_action.dart';
+import 'package:juvi/features/notices/notice_list_controller.dart';
 
 enum AckOutcome { sent, queued }
 
@@ -55,5 +56,6 @@ Future<void> dismissNotice(WidgetRef ref, String noticeId) async {
 void refreshNotice(WidgetRef ref, String noticeId) {
   ref
     ..invalidate(attentionProvider)
-    ..invalidate(noticeDetailProvider(noticeId));
+    ..invalidate(noticeDetailProvider(noticeId))
+    ..invalidate(noticeListProvider);
 }

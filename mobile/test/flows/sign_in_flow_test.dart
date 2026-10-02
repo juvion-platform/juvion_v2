@@ -144,6 +144,7 @@ void main() {
         }),
       )
       ..onGet('/spaces', (s) => s.reply(200, spacesJson))
+      ..onGet('/attention', (s) => s.reply(200, {'dueCount': 0, 'items': <Map<String, dynamic>>[]}))
       ..onPost(
         '/me/onboarding/advance',
         (s) => s.replyCallback(200, (_) {

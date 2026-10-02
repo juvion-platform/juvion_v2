@@ -1011,6 +1011,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{size} MB'**
   String fileSizeMb(String size);
+
+  /// S05 attention sheet heading.
+  ///
+  /// In en, this message translates to:
+  /// **'Notices'**
+  String get attentionSheetTitle;
+
+  /// Attention section header action on Today and Teaching: opens the attention sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'See all'**
+  String get attentionSeeAll;
+
+  /// S05 Due segment; the count equals the tab badge (spec §4 US-3.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Due ({count})'**
+  String segmentDue(int count);
+
+  /// No description provided for @segmentDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get segmentDone;
+
+  /// No description provided for @segmentAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get segmentAll;
+
+  /// No description provided for @segmentPublished.
+  ///
+  /// In en, this message translates to:
+  /// **'Published by me'**
+  String get segmentPublished;
+
+  /// S05 office filter: no filter.
+  ///
+  /// In en, this message translates to:
+  /// **'All offices'**
+  String get officeAll;
+
+  /// No description provided for @showMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Show more'**
+  String get showMore;
+
+  /// No description provided for @noticesNoneDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing acknowledged yet'**
+  String get noticesNoneDone;
+
+  /// No description provided for @noticesNoneAll.
+  ///
+  /// In en, this message translates to:
+  /// **'No notices yet'**
+  String get noticesNoneAll;
+
+  /// No description provided for @noticesNonePublished.
+  ///
+  /// In en, this message translates to:
+  /// **'You haven\'t published any notices'**
+  String get noticesNonePublished;
+
+  /// Accessible label for the Today / Teaching tab badge.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} due'**
+  String dueBadgeLabel(int count);
 }
 
 class _AppLocalizationsDelegate

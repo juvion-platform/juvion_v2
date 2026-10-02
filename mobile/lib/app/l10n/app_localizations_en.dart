@@ -530,4 +530,44 @@ class AppLocalizationsEn extends AppLocalizations {
   String fileSizeMb(String size) {
     return '$size MB';
   }
+
+  @override
+  String get attentionSheetTitle => 'Notices';
+
+  @override
+  String get attentionSeeAll => 'See all';
+
+  @override
+  String segmentDue(int count) {
+    return 'Due ($count)';
+  }
+
+  @override
+  String get segmentDone => 'Done';
+
+  @override
+  String get segmentAll => 'All';
+
+  @override
+  String get segmentPublished => 'Published by me';
+
+  @override
+  String get officeAll => 'All offices';
+
+  @override
+  String get showMore => 'Show more';
+
+  @override
+  String get noticesNoneDone => 'Nothing acknowledged yet';
+
+  @override
+  String get noticesNoneAll => 'No notices yet';
+
+  @override
+  String get noticesNonePublished => 'You haven\'t published any notices';
+
+  @override
+  String dueBadgeLabel(int count) {
+    return '$count due';
+  }
 }
