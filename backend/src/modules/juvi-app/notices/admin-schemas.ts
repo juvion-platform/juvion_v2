@@ -54,6 +54,8 @@ export const publishSchema = z.object({
   if (b.ackDeadline && !b.ackRequired) ctx.addIssue({ code: 'custom', path: ['ackDeadline'], message: 'A deadline requires acknowledgement' });
   if (b.ackDeadline && new Date(b.ackDeadline).getTime() <= Date.now()) ctx.addIssue({ code: 'custom', path: ['ackDeadline'], message: 'The deadline must be in the future' });
   if (b.ackCommentAllowed && !b.ackRequired) ctx.addIssue({ code: 'custom', path: ['ackCommentAllowed'], message: 'Comments are collected with an acknowledgement only' });
+  // Welcome rows are created at onboarding with the notice's deadline, so a fixed date would make late joiners late on arrival.
+  if (b.ackDeadline && b.purpose === 'welcome') ctx.addIssue({ code: 'custom', path: ['ackDeadline'], message: 'A welcome notice cannot have a deadline: each person sees it when they join' });
 });
 export type PublishInput = z.infer<typeof publishSchema>;
 
@@ -66,10 +68,17 @@ export const adminNoticeListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
   status: z.enum(['publishing', 'published', 'archived']).optional(),
+  purpose: z.enum(tuple(NOTICE_PURPOSES)).optional(),
   office: z.string().trim().min(1).max(60).optional(),
   q: z.string().trim().max(80).optional(),
 });
 export type AdminNoticeListQuery = z.infer<typeof adminNoticeListQuerySchema>;
+
+/** The composer's People picker (`custom` rules). */
+export const targetPeopleQuerySchema = z.object({
+  q: z.string().trim().max(80).default(''),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+});
 
 export const deadEventsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),

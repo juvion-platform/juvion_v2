@@ -9,7 +9,10 @@ vi.mock('../../../../stores/authStore', () => ({
 }));
 vi.mock('../../../../stores/toastStore', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('../../../../services/juvi-app', () => ({ getJuviSettings: vi.fn(), updateJuviSettings: vi.fn(), reconcileNow: vi.fn() }));
+// The Welcome notice section (its own tests: WelcomeNoticeSection.test.tsx) lists welcome notices.
+vi.mock('../../../../services/notices', () => ({ listNotices: vi.fn() }));
 import { getJuviSettings, updateJuviSettings, reconcileNow } from '../../../../services/juvi-app';
+import { listNotices } from '../../../../services/notices';
 import { toast } from '../../../../stores/toastStore';
 
 const VIEW = {
@@ -23,6 +26,7 @@ beforeEach(() => {
   (getJuviSettings as Mock).mockResolvedValue(VIEW);
   (updateJuviSettings as Mock).mockImplementation(async (patch: any) => ({ ...VIEW, juvi: { ...VIEW.juvi, ...patch } }));
   (reconcileNow as Mock).mockResolvedValue({ queued: true });
+  (listNotices as Mock).mockResolvedValue({ items: [], total: 0, page: 1, pages: 1 });
 });
 
 describe('SettingsTab', () => {

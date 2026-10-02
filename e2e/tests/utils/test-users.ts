@@ -10,7 +10,7 @@
  * the shared password.
  */
 
-export type E2ERole = 'super_admin' | 'principal' | 'registrar';
+export type E2ERole = 'super_admin' | 'principal' | 'registrar' | 'hod';
 
 export interface E2EUser {
   /** Email used in the login form. */
@@ -47,6 +47,14 @@ export const TEST_USERS: Record<E2ERole, E2EUser> = {
   // permission gate from an absent one.
   registrar: {
     email: 'e2e_registrar@juvion.test',
+    password: E2E_TEST_PASSWORD,
+    landingUrl: '/',
+  },
+  // DB role `hod`, persona F-HOD, heading the seeded "E2E Computer Science"
+  // department (seedE2ENoticeAudience). The notices spec uses it to prove an
+  // HOD's audience stops at their own department.
+  hod: {
+    email: 'e2e_hod@juvion.test',
     password: E2E_TEST_PASSWORD,
     landingUrl: '/',
   },

@@ -4,6 +4,7 @@ import { RefreshCw, Save } from 'lucide-react';
 import { getJuviSettings, updateJuviSettings, reconcileNow, type JuviSettings, type JuviSettingsPatch } from '../../../services/juvi-app';
 import { useAuthStore } from '../../../stores/authStore';
 import { toast } from '../../../stores/toastStore';
+import WelcomeNoticeSection from './WelcomeNoticeSection';
 
 const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default';
 const lbl = 'block text-sm font-medium text-gray-700 mb-1';
@@ -210,6 +211,10 @@ export default function SettingsTab() {
           <RefreshCw size={14} /> Reconcile now
         </button>
       </aside>
+
+      <div className="lg:col-span-2">
+        <WelcomeNoticeSection canUpdate={canUpdate} />
+      </div>
     </div>
   );
 }

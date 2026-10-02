@@ -10,7 +10,7 @@ import { Notice } from '../../models/juvi/Notice';
 import { NoticeRecipient } from '../../models/juvi/NoticeRecipient';
 import { Channel } from '../../models/juvi/Channel';
 import { AuditLog } from '../../shared/audit';
-import { drainOutbox } from '../../shared/outbox';
+import { OutboxEvent, drainOutbox } from '../../shared/outbox';
 import { reconcileCollege } from '../../modules/juvi-app/spaces/reconcile-service';
 
 process.env.E2E_TESTING = '1';
@@ -81,10 +81,40 @@ describe('GET /onboarding/first-notice (US-5, spec §6.5)', () => {
     expect(reach.acknowledged + reach.seen + reach.notSeen + reach.notOnJuvi).toBe(reach.audience);
   });
 
-  it('uses the configured welcome notice, attaching the account to a row fanned out while onboarding', async () => {
+  it('publishing a welcome notice fans out to nobody: published at once, no event, no rows, counts at zero', async () => {
+    await onboardingStudent('device-a');
+    const w = await publishTestNotice(fx, { title: 'Welcome to JIT', purpose: 'welcome', ackRequired: true, audience: { rules: [{ kind: 'role', ids: ['student'] }] } });
+    expect(w).toMatchObject({ status: 'published', counts: { audience: 0, onJuvi: 0 } });
+    expect(w.publishedAt).toBeInstanceOf(Date);
+    expect(await NoticeRecipient.countDocuments({ noticeId: w._id })).toBe(0);
+    expect(await OutboxEvent.countDocuments({ collegeId: fx.collegeId, dedupeKey: `notice:${String(w._id)}:published` })).toBe(0);
+    const audit = (await AuditLog.findOne({ collegeId: fx.collegeId, entityType: 'Notice', entityId: String(w._id), action: 'publish' }).lean())!;
+    expect(audit.changes.find((c) => c.field === 'status')?.newValue).toBe('published');
+  });
+
+  it('refuses a deadline on a welcome notice with a 400, but keeps acknowledgement and comments', async () => {
+    const future = new Date(Date.now() + 86_400_000).toISOString();
+    const base = { title: 'Welcome to JIT', body: 'Hello.', purpose: 'welcome', ackRequired: true, audience: { rules: [{ kind: 'role', ids: ['student'] }] } };
+    const res = await api.as(fx.admin.token).post(`${ADMIN}/notices`).send({ ...base, ackDeadline: future }).expect(400);
+    expect(res.body.error).toBe('Validation failed');
+    expect(res.body.details.map((d: { message: string }) => d.message)).toContain('A welcome notice cannot have a deadline: each person sees it when they join');
+    expect(await Notice.countDocuments({ collegeId: fx.collegeId, purpose: 'welcome' })).toBe(0);
+
+    const ok = await api.as(fx.admin.token).post(`${ADMIN}/notices`).send({ ...base, ackCommentAllowed: true }).expect(201);
+    expect((await Notice.findById(ok.body.id).lean())!).toMatchObject({ status: 'published', ackRequired: true, ackCommentAllowed: true, ackDeadline: null });
+  });
+
+  it('a welcome notice publishes even when nobody matches its rules yet', async () => {
+    // No student is provisioned yet, so the batch rule (the factory default) matches nobody.
+    const w = await publishTestNotice(fx, { title: 'Welcome, batch', purpose: 'welcome' });
+    expect(w).toMatchObject({ status: 'published', counts: { audience: 0, onJuvi: 0 } });
+  });
+
+  it('uses the configured welcome notice, creating the onboarding account its row on demand', async () => {
     const a = await onboardingStudent('device-a');
     const configured = await publishTestNotice(fx, { title: 'Welcome to JIT', purpose: 'welcome', ackRequired: true, audience: { rules: [{ kind: 'role', ids: ['student'] }] } });
-    expect(configured.counts).toEqual({ audience: 1, onJuvi: 0 });
+    expect(configured.counts).toEqual({ audience: 0, onJuvi: 0 });
+    expect(await NoticeRecipient.countDocuments({ noticeId: configured._id })).toBe(0);
     const plain = await publishTestNotice(fx, { title: 'Not a welcome' });
     await api.as(fx.admin.token).put(`${ADMIN}/settings`).send({ welcomeNotice: { studentNoticeId: String(plain._id) } }).expect(400);
     await api.as(fx.admin.token).put(`${ADMIN}/settings`).send({ welcomeNotice: { studentNoticeId: String(configured._id) } }).expect(200);

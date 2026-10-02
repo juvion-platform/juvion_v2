@@ -11,6 +11,7 @@ export const noticesAdminRouter = Router();
 
 noticesAdminRouter.get('/', authorize('notices', 'read'), ctrl.list);
 noticesAdminRouter.get('/targets', authorize('notices', 'create'), ctrl.targets);
+noticesAdminRouter.get('/targets/people', authorize('notices', 'create'), ctrl.targetPeople);
 noticesAdminRouter.get('/dead-events', authorize('notices', 'read'), ctrl.deadEvents);   // admin only (service check)
 noticesAdminRouter.get('/:id', authorize('notices', 'read'), ctrl.detail);
 // auditReachRefusal runs before authorize() so a student's or parent's refused attempt is audited (RCH-02).

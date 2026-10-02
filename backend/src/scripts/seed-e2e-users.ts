@@ -7,6 +7,10 @@
  *   - e2e_principal@juvion.test   (principal, collegeId = DEV_COLLEGE_ID)
  *   - e2e_registrar@juvion.test   (staff / ST-REG, collegeId = DEV_COLLEGE_ID)
  *
+ * The CLI also seeds the Juvi notices audience (seedE2ENoticeAudience): two
+ * departments, one faculty member in each, and e2e_hod@juvion.test heading
+ * the first.
+ *
  * All three share a known password: E2ETestPassword!
  *
  * The script is safe to re-run. It upserts by email so:
@@ -39,6 +43,9 @@ import bcrypt from 'bcryptjs';
 import { User } from '../models/User';
 import { College } from '../models/College';
 import { AcademicYear } from '../models/academic-structure/AcademicYear';
+import { Department } from '../models/academic-structure/Department';
+import { Person } from '../models/people/Person';
+import { Faculty } from '../models/people/Faculty';
 import { seedPolicies } from '../shared/seed/policies';
 import { seedPersonas } from '../shared/seed/personas';
 
@@ -88,6 +95,54 @@ export async function seedE2EAcademicYear(): Promise<void> {
         endDate: new Date('2026-05-31'),
         isCurrent: true,
         status: 'active',
+      },
+    },
+    { upsert: true },
+  );
+}
+
+export const E2E_HOD_EMAIL = 'e2e_hod@juvion.test';
+
+/**
+ * The Juvi notices e2e audience (e2e/tests/juvi-notices.spec.ts). The HOD heads
+ * the first department; the second is the one their scope must refuse. Codes
+ * are E2E-prefixed so they never collide with a dev seed in the same college.
+ */
+export const E2E_NOTICE_DEPARTMENTS = [
+  { code: 'E2E-CSE', name: 'E2E Computer Science', facultyCode: 'E2E-F1', person: { name: 'E2E HOD Rao', phone: '9000000101', email: E2E_HOD_EMAIL } },
+  { code: 'E2E-ECE', name: 'E2E Electronics', facultyCode: 'E2E-F2', person: { name: 'E2E Faculty Iyer', phone: '9000000102', email: 'e2e_faculty_ece@juvion.test' } },
+] as const;
+
+/**
+ * Two departments with one active faculty member each, and an `hod` login
+ * (persona F-HOD) linked to the first faculty member, who heads that
+ * department through Department.hodId. That is exactly what
+ * resolvePublisherScope reads, so the HOD gets a real department scope and
+ * the Registrar a real one-person audience. Idempotent: everything upserts
+ * on a natural key.
+ */
+export async function seedE2ENoticeAudience(passwordHash: string): Promise<void> {
+  const collegeId = new mongoose.Types.ObjectId(E2E_COLLEGE_ID);
+  let hodPersonId: mongoose.Types.ObjectId | undefined;
+  for (const [i, d] of E2E_NOTICE_DEPARTMENTS.entries()) {
+    const dept = (await Department.findOneAndUpdate({ collegeId, code: d.code }, { $set: { name: d.name, isActive: true } }, { upsert: true, new: true }))!;
+    const person = (await Person.findOneAndUpdate({ collegeId, email: d.person.email }, { $set: { name: d.person.name, phone: d.person.phone } }, { upsert: true, new: true }))!;
+    const faculty = (await Faculty.findOneAndUpdate(
+      { collegeId, employeeCode: d.facultyCode },
+      { $set: { personId: person._id, designation: 'Professor', departmentId: dept._id, status: 'active' } },
+      { upsert: true, new: true },
+    ))!;
+    if (i === 0) {
+      await Department.updateOne({ _id: dept._id }, { $set: { hodId: faculty._id } });
+      hodPersonId = person._id as mongoose.Types.ObjectId;
+    }
+  }
+  await User.updateOne(
+    { collegeId, email: E2E_HOD_EMAIL },
+    {
+      $set: {
+        email: E2E_HOD_EMAIL, name: 'E2E HOD Rao', role: 'hod', personaType: 'F-HOD', personas: ['F-HOD'],
+        password: passwordHash, isActive: true, collegeId, personId: hodPersonId,
       },
     },
     { upsert: true },
@@ -218,6 +273,8 @@ async function main() {
   await mongoose.connect(mongoUri);
   try {
     const userResult = await seedE2EUsers();
+    // The Juvi notices spec's audience and HOD login (kept out of seedE2EUsers, whose callers count three users).
+    await seedE2ENoticeAudience(await bcrypt.hash(E2E_TEST_PASSWORD, 10));
     // RBAC default policies are required for `authorize()` to grant access.
     // Without them every authenticated request 403s and the e2e suite fails
     // on the post-login fetches (admissions, governance, platform, etc.).

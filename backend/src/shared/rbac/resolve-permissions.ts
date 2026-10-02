@@ -15,6 +15,7 @@ export const ALL_MODULES = [
   'governance',
   'platform',
   'juvi',
+  'notices',
 ] as const;
 
 /**

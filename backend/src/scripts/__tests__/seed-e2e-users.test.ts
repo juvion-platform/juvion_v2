@@ -11,8 +11,13 @@ import { DEFAULT_POLICIES } from '../../shared/rbac/defaults';
 import {
   E2E_USER_DEFINITIONS,
   E2E_TEST_PASSWORD,
+  E2E_HOD_EMAIL,
   seedE2EUsers,
+  seedE2ENoticeAudience,
 } from '../seed-e2e-users';
+import { Department } from '../../models/academic-structure/Department';
+import { Faculty } from '../../models/people/Faculty';
+import { resolvePublisherScope } from '../../modules/juvi-app/notices/publisher-scope';
 
 /**
  * Tests for `seed-e2e-users.ts` (Playwright E2E spec — Phase A, T2).
@@ -149,5 +154,23 @@ describe('seed-e2e-users', () => {
     // Password was reset to the canonical one.
     const valid = await bcrypt.compare(E2E_TEST_PASSWORD, fixed!.password);
     expect(valid).toBe(true);
+  });
+
+  // The Juvi notices Playwright spec (e2e/tests/juvi-notices.spec.ts) relies on
+  // this producing a real HOD scope, not just rows that look right.
+  it('seeds the notices audience: an HOD heading E2E-CSE, and E2E-ECE outside their scope', async () => {
+    const hash = await bcrypt.hash(E2E_TEST_PASSWORD, 4);
+    await seedE2ENoticeAudience(hash);
+    await seedE2ENoticeAudience(hash);   // idempotent
+
+    expect(await Department.countDocuments({ code: { $in: ['E2E-CSE', 'E2E-ECE'] } })).toBe(2);
+    expect(await Faculty.countDocuments({ employeeCode: { $in: ['E2E-F1', 'E2E-F2'] }, status: 'active' })).toBe(2);
+    const hod = (await User.findOne({ email: E2E_HOD_EMAIL }).lean())!;
+    expect(hod).toMatchObject({ role: 'hod', personaType: 'F-HOD', personas: ['F-HOD'] });
+    expect(await bcrypt.compare(E2E_TEST_PASSWORD, hod.password)).toBe(true);
+
+    const cse = (await Department.findOne({ code: 'E2E-CSE' }).lean())!;
+    const scope = await resolvePublisherScope(String(hod.collegeId), { id: String(hod._id), role: 'hod', personaType: 'F-HOD', personas: ['F-HOD'] });
+    expect(scope).toMatchObject({ kind: 'department', departmentId: String(cse._id), office: 'HOD, E2E Computer Science' });
   });
 });

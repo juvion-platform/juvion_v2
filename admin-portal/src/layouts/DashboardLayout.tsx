@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   LayoutDashboard, UserPlus, Users, GraduationCap, IndianRupee,
   Briefcase, Heart, Building2, TrendingUp, Shield, Landmark,
-  Settings, Bot, ChevronLeft, Menu, BookOpen, LogOut, ArrowLeftRight, ChevronDown, ChevronRight, Database
+  Settings, Bot, ChevronLeft, Menu, BookOpen, LogOut, ArrowLeftRight, ChevronDown, ChevronRight, Database, Megaphone
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuthStore } from '../stores/authStore';
@@ -26,6 +26,12 @@ interface NavItem {
   iconColor: string;
   module: string | null;
   children?: NavChild[];
+  /**
+   * Shown to anyone with `<module>:read`, whatever the persona's
+   * `accessibleModules` lists. For tools every office uses (Juvi notices),
+   * which no persona's module list names.
+   */
+  crossCutting?: boolean;
 }
 
 export const NAV_ITEMS: NavItem[] = [
@@ -57,6 +63,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/student-dev', icon: BookOpen, label: 'Student Dev', iconColor: 'text-teal-400', module: 'student-dev' },
   { to: '/compliance', icon: Shield, label: 'Compliance', iconColor: 'text-red-400', module: 'compliance' },
   { to: '/governance', icon: Landmark, label: 'Governance', iconColor: 'text-indigo-400', module: 'governance' },
+  { to: '/communication/notices', icon: Megaphone, label: 'Notices', iconColor: 'text-sky-300', module: 'notices', crossCutting: true },
   { to: '/platform', icon: Settings, label: 'Platform', iconColor: 'text-gray-400', module: 'platform' },
   { to: '/juvi', icon: Bot, label: 'Juvi AI', iconColor: 'text-purple-400', module: 'juvi' },
 ];
@@ -70,7 +77,7 @@ export function getVisibleNavItems(
     if (!item.module) return true;
     if (!canRead(item.module)) return false;
     if (accessibleModules && accessibleModules.length > 0) {
-      return accessibleModules.includes(item.module);
+      return item.crossCutting === true || accessibleModules.includes(item.module);
     }
     return true;
   });

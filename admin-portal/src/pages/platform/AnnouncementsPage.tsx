@@ -10,6 +10,7 @@ import { confirmAction } from '../../stores/confirmStore';
 import Pagination from '../../components/ui/Pagination';
 import { useListControls } from '../../hooks/useListControls';
 import SearchInput from '../../components/ui/SearchInput';
+import LegacyNoticesBanner from '../../components/communication/LegacyNoticesBanner';
 
 const CATEGORIES = ['general', 'academic', 'exam', 'placement', 'event', 'hostel', 'sports', 'other'] as const;
 const PRIORITIES = ['low', 'normal', 'high', 'urgent'] as const;
@@ -81,6 +82,7 @@ export default function AnnouncementsPage() {
 
   return (
     <div>
+      <LegacyNoticesBanner kind="announcements" />
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-xl font-bold text-navy">Announcements</h2>
         <div className="flex items-center gap-3">

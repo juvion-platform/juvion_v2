@@ -1,6 +1,8 @@
 /**
  * Publishing (spec §6.1): validate → scope check → write `publishing` →
  * emit notice.published → kick → 201. The fan-out runs in consumers.ts.
+ * A welcome notice is the exception (spec §6.5): it is written `published`
+ * with no fan-out, and welcome-service.ts creates its rows at onboarding.
  * No transactions (the test harness is not a replica set, as in Foundation).
  */
 import { randomUUID } from 'node:crypto';
@@ -105,14 +107,17 @@ export async function publishNotice(collegeId: string, scope: PublisherScope, in
   const rules = narrowToScope(scope, input.audience.rules);
   const graph = await loadAudienceGraph(collegeId);
   assertAudienceInScope(scope, rules, graph);
-  if (resolveAudience(rules, graph).length === 0) throw new AppError(400, 'This audience has no members');
+  // A welcome notice reaches accounts as they onboard (spec §6.5), so today's members don't matter.
+  const welcome = input.purpose === 'welcome';
+  if (!welcome && resolveAudience(rules, graph).length === 0) throw new AppError(400, 'This audience has no members');
 
   const notice = await Notice.create({
     collegeId, title: input.title, body: input.body, attachments: input.attachments,
     publisher: { personId: scope.personId, userId: scope.userId, office: scope.office },
     audience: { rules, line: audienceLine(rules, graph) },
     ackRequired: input.ackRequired, ackDeadline: input.ackDeadline ? new Date(input.ackDeadline) : null,
-    ackCommentAllowed: input.ackCommentAllowed, priority: input.priority, purpose: input.purpose, status: 'publishing',
+    ackCommentAllowed: input.ackCommentAllowed, priority: input.priority, purpose: input.purpose,
+    ...(welcome ? { status: 'published', publishedAt: new Date(), counts: { audience: 0, onJuvi: 0 } } : { status: 'publishing' }),
   });
   const noticeId = String(notice._id);
   // Audit before emit: a failed audit write must never leave a notice already
@@ -121,11 +126,12 @@ export async function publishNotice(collegeId: string, scope: PublisherScope, in
   await createAuditLog({
     collegeId, entityType: 'Notice', entityId: noticeId, entityName: `Notice from ${scope.office}`, action: 'publish',
     changes: [
-      { field: 'status', displayName: 'Status', oldValue: null, newValue: 'publishing' },
+      { field: 'status', displayName: 'Status', oldValue: null, newValue: notice.status },
       { field: 'audience', displayName: 'Audience', oldValue: null, newValue: notice.audience.line },
     ],
     performedBy,
   });
+  if (welcome) return notice.toObject() as unknown as LeanNotice;
   await emit(NOTICE_EVENTS.published, { collegeId, noticeId }, noticeEventKey.published(noticeId));
   await kick();
   return notice.toObject() as unknown as LeanNotice;

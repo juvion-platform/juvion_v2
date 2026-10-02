@@ -23,6 +23,7 @@ const Compliance = lazy(() => import('./pages/Compliance'));
 const Governance = lazy(() => import('./pages/Governance'));
 const Platform = lazy(() => import('./pages/Platform'));
 const Juvi = lazy(() => import('./pages/Juvi'));
+const Communication = lazy(() => import('./pages/Communication'));
 const MasterData = lazy(() => import('./pages/MasterData'));
 const SearchResults = lazy(() => import('./pages/SearchResults'));
 const NotFound = lazy(() => import('./pages/NotFound'));
@@ -122,6 +123,7 @@ export default function App() {
           <Route path="/governance/*" element={gated('governance', <Governance />)} />
           <Route path="/platform/*" element={gated('platform', <Platform />)} />
           <Route path="/juvi/*" element={gated('juvi', <Juvi />)} />
+          <Route path="/communication/*" element={gated('notices', <Communication />)} />
           <Route path="/master-data/*" element={gated('academics', <MasterData />)} />
           <Route path="/search" element={renderLazyPage(<SearchResults />)} />
           {/* Show an explicit 404 rather than silently bouncing typos to the

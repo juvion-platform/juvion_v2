@@ -17,6 +17,7 @@ vi.mock('../persona-registry', async (importOriginal) => {
 
 import { loadPolicies } from '../engine';
 import { resolvePermissions } from '../resolve-permissions';
+import { DEFAULT_POLICIES } from '../defaults';
 
 const mockedLoadPolicies = vi.mocked(loadPolicies);
 
@@ -38,16 +39,17 @@ describe('resolvePermissions', () => {
 
     const result = await resolvePermissions('college1', 'super_admin', 'SA');
 
-    // 13 modules x 5 actions = 65 permissions. `approve` joined the CRUD
+    // 14 modules x 5 actions = 70 permissions. `approve` joined the CRUD
     // four so the frontend can detect grants on routes that gate on it —
     // re-pin and bulk-pin both do, and while it was unemitted those buttons
     // had to fall back to role checks that disagreed with the backend.
-    expect(result).toHaveLength(65);
+    expect(result).toHaveLength(70);
     expect(result).toContain('admissions:read');
     expect(result).toContain('admissions:create');
     expect(result).toContain('admissions:update');
     expect(result).toContain('admissions:delete');
     expect(result).toContain('juvi:read');
+    expect(result).toContain('notices:create');
     expect(result).toContain('platform:delete');
     expect(result).toContain('finance:approve');
     expect(mockedLoadPolicies).toHaveBeenCalledTimes(1);
@@ -107,8 +109,8 @@ describe('resolvePermissions', () => {
 
     const result = await resolvePermissions('college1', 'admin', 'ADM');
 
-    // 65 total minus 1 denied = 64
-    expect(result).toHaveLength(64);
+    // 70 total minus 1 denied = 69
+    expect(result).toHaveLength(69);
     expect(result).toContain('governance:read');
     expect(result).toContain('governance:create');
     expect(result).toContain('governance:update');
@@ -148,6 +150,29 @@ describe('resolvePermissions', () => {
     const facResult = await resolvePermissions('college1', 'faculty', 'F-FAC');
     expect(facResult).toContain('academics:read');
     expect(facResult).not.toContain('academics:update');
+  });
+});
+
+describe('resolvePermissions — Juvi notices', () => {
+  it('emits notices grants, so the portal can show the Notices area to the personas that publish', async () => {
+    mockedLoadPolicies.mockResolvedValue([
+      { role: 'staff', personaType: 'ST-REG', module: 'notices', action: 'create', effect: 'allow', priority: 750, isActive: true },
+      { role: 'staff', module: 'notices', action: 'read', effect: 'allow', priority: 700, isActive: true },
+    ]);
+    const result = await resolvePermissions('c1', 'staff', ['ST-REG']);
+    expect(result).toEqual(expect.arrayContaining(['notices:read', 'notices:create']));
+    expect(result).not.toContain('notices:update');
+  });
+
+  it.each([
+    ['student', 'L-STU'],
+    ['parent', 'L-PAR'],
+  ])('gives the %s role no notices grant under DEFAULT_POLICIES', async (role, persona) => {
+    // loadPolicies keeps the rows for this role and for '*'.
+    mockedLoadPolicies.mockResolvedValue(DEFAULT_POLICIES.filter((p) => p.role === role || p.role === '*') as PolicyDoc[]);
+    const result = await resolvePermissions('c1', role, [persona]);
+    expect(result.length).toBeGreaterThan(0);
+    expect(result.filter((p) => p.startsWith('notices'))).toEqual([]);
   });
 });
 
