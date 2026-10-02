@@ -58,6 +58,13 @@ describe('Notice.confidential and Notice.urgentReason (spec §4.2, §6.5)', () =
     expect(doc.confidential).toBe(false);
     expect(doc.urgentReason).toBeNull();
   });
+
+  it('a new Urgent notice needs a reason of 10 to 300 characters', async () => {
+    await expect(new Notice(notice({ priority: 'urgent' })).validate()).rejects.toThrow(/needs a reason/);
+    await expect(new Notice(notice({ priority: 'urgent', urgentReason: 'too short' })).validate()).rejects.toThrow(/needs a reason/);
+    await expect(new Notice(notice({ priority: 'urgent', urgentReason: 'x'.repeat(301) })).validate()).rejects.toThrow();
+    await expect(new Notice(notice({ priority: 'urgent', urgentReason: 'Exam postponed by the university' })).validate()).resolves.toBeUndefined();
+  });
 });
 
 describe('MobileSession.pushToken (spec §4.2)', () => {

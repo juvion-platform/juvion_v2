@@ -109,6 +109,10 @@ const schema = new Schema<INotice>(
 // A deadline only makes sense on an acknowledgement notice (spec §5).
 schema.pre('validate', function (next) {
   if (this.ackDeadline && !this.ackRequired) this.invalidate('ackDeadline', 'A deadline requires ackRequired');
+  // New Urgent notices carry a reason; Urgent notices published before the gate are left alone (spec §6.5).
+  if (this.isNew && this.priority === 'urgent' && (this.urgentReason ?? '').length < URGENT_REASON_MIN) {
+    this.invalidate('urgentReason', `An Urgent notice needs a reason of at least ${URGENT_REASON_MIN} characters`);
+  }
   next();
 });
 

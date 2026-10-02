@@ -117,6 +117,7 @@ export async function publishNotice(collegeId: string, scope: PublisherScope, in
     audience: { rules, line: audienceLine(rules, graph) },
     ackRequired: input.ackRequired, ackDeadline: input.ackDeadline ? new Date(input.ackDeadline) : null,
     ackCommentAllowed: input.ackCommentAllowed, priority: input.priority, purpose: input.purpose,
+    confidential: input.confidential, urgentReason: input.priority === 'urgent' ? input.urgentReason ?? null : null,
     ...(welcome ? { status: 'published', publishedAt: new Date(), counts: { audience: 0, onJuvi: 0 } } : { status: 'publishing' }),
   });
   const noticeId = String(notice._id);
@@ -128,6 +129,10 @@ export async function publishNotice(collegeId: string, scope: PublisherScope, in
     changes: [
       { field: 'status', displayName: 'Status', oldValue: null, newValue: notice.status },
       { field: 'audience', displayName: 'Audience', oldValue: null, newValue: notice.audience.line },
+      { field: 'priority', displayName: 'Priority', oldValue: null, newValue: notice.priority },
+      // The Urgent reason and the Confidential flag are shown on the portal's Audit tab (notifications spec §6.5, §9).
+      ...(notice.urgentReason ? [{ field: 'urgentReason', displayName: 'Urgent reason', oldValue: null, newValue: notice.urgentReason }] : []),
+      ...(notice.confidential ? [{ field: 'confidential', displayName: 'Confidential', oldValue: null, newValue: true }] : []),
     ],
     performedBy,
   });

@@ -24,7 +24,7 @@ export interface AdminNoticeRow {
 }
 export interface AdminNoticeDetail extends AdminNoticeRow {
   body: string; attachments: INoticeAttachment[]; audience: { rules: IAudienceRule[]; line: string };
-  ackCommentAllowed: boolean; priority: LeanNotice['priority']; archivedAt: string | null; canManage: boolean;
+  ackCommentAllowed: boolean; priority: LeanNotice['priority']; confidential: boolean; urgentReason: string | null; archivedAt: string | null; canManage: boolean;
 }
 
 const iso = (d?: Date | null): string | null => (d ? new Date(d).toISOString() : null);
@@ -94,7 +94,8 @@ export async function getAdminNotice(actor: NoticeActor, noticeId: string): Prom
     ...row(actor, n, events.get(noticeEventKey.published(String(n._id))), stats),
     body: n.body, attachments: n.attachments.map(({ key, name, mime, size }) => ({ key, name, mime, size })),
     audience: { rules: n.audience.rules.map((r) => ({ kind: r.kind, ids: [...r.ids], ...(r.departmentId ? { departmentId: r.departmentId } : {}) })), line: n.audience.line },
-    ackCommentAllowed: n.ackCommentAllowed, priority: n.priority, archivedAt: iso(n.archivedAt),
+    ackCommentAllowed: n.ackCommentAllowed, priority: n.priority, confidential: n.confidential ?? false, urgentReason: n.urgentReason ?? null,
+    archivedAt: iso(n.archivedAt),
     canManage: actor.isAdmin || isMine(actor, n),
   };
 }
