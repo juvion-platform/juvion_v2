@@ -32,9 +32,9 @@ class _AttentionStackState extends ConsumerState<AttentionStack> {
   Future<void> _acknowledge(NoticeItem notice, AckMethod method) async {
     setState(() => _busy.add(notice.id));
     try {
-      final outcome = await acknowledgeNotice(ref, notice.id, method);
+      final outcome = await ref.read(noticeActionsProvider).acknowledge(notice.id, method);
       // Online, the card stays (busy) until the refreshed attention list drops it.
-      if (outcome == AckOutcome.sent) await ref.read(attentionProvider.future);
+      if (outcome == AckOutcome.sent && mounted) await ref.read(attentionProvider.future);
     } on ApiFailure catch (f) {
       if (mounted) ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(f.message)));
     } finally {
@@ -47,8 +47,10 @@ class _AttentionStackState extends ConsumerState<AttentionStack> {
     final l = context.l10n;
     // Forces a rebuild at least once a minute (Task 3 review R4), same reason
     // notice_card.dart watches it: in production widget.now is null, so each
-    // NoticeCard below also watches it directly and repaints its own ring.
-    ref.watch(minuteClockProvider);
+    // NoticeCard below also watches it directly and repaints its own ring. Skipped
+    // when widget.now is fixed (tests/goldens, queued item 4): there is nothing to
+    // tick, and watching would needlessly keep the provider alive.
+    if (widget.now == null) ref.watch(minuteClockProvider);
     final attention = ref.watch(attentionProvider);
     final pending = ref.watch(pendingAcksProvider).value ?? const <String>{};
     return attention.when(

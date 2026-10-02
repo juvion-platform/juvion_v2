@@ -1264,6 +1264,12 @@ abstract class AppLocalizations {
   /// **'Only the publisher can see who has read this notice.'**
   String get reachNotPublisher;
 
+  /// S11: why Send reminder is disabled while the notice is still publishing (queued item 8). Archived already explains itself via the banner above; an exhausted budget or a reminder in flight both say so elsewhere too.
+  ///
+  /// In en, this message translates to:
+  /// **'You can send a reminder once this notice is published.'**
+  String get reachRemindNotPublished;
+
   /// Channel screen section: notices whose audience matches this channel (spec §4 US-6).
   ///
   /// In en, this message translates to:

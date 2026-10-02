@@ -208,7 +208,7 @@ final class NoticeDetailProvider
   }
 }
 
-String _$noticeDetailHash() => r'87b30414ada0ea38c86f3b73a5ff64ce830454c3';
+String _$noticeDetailHash() => r'd5d415349489784d33f6396282e12ae48a312cf7';
 
 final class NoticeDetailFamily extends $Family
     with $FunctionalFamilyOverride<Stream<Cached<NoticeDetail>>, String> {

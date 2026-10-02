@@ -10,6 +10,7 @@ import 'package:juvi/core/http/api_failure.dart';
 import 'package:juvi/core/models/models.dart';
 import 'package:juvi/core/models/notices.dart';
 import 'package:juvi/core/repos/notices_repository.dart';
+import 'package:juvi/features/notices/minute_clock.dart';
 import 'package:juvi/features/notices/notice_actions.dart';
 import 'package:juvi/features/notices/widgets/ack_control.dart';
 import 'package:juvi/features/notices/widgets/deadline_ring.dart';
@@ -57,8 +58,16 @@ class _NoticeDetailScreenState extends ConsumerState<NoticeDetailScreen> {
   }
 
   Future<void> _markSeen() async {
+    // Captured before any `await` (I2/I1 pattern): `actions` holds its own
+    // container-scoped `Ref`, so calling `.refresh` on it after the awaits below never
+    // risks `ref` (this widget's `WidgetRef`) having been disposed in the meantime.
+    final actions = ref.read(noticeActionsProvider);
     try {
       await (await ref.read(noticesRepositoryProvider.future)).markSeen(widget.noticeId);
+      // includeDetail: false — this screen's own noticeDetailProvider(id) can still be
+      // mid-flight on its first (cached-then-network) resolution right now; invalidating
+      // it from here would tear that down mid-request (see refreshNotices's doc).
+      actions.refresh(noticeId: widget.noticeId, includeDetail: false);
     } on ApiFailure {
       // Offline or gone: seen is best-effort; the next open tries again.
       _seenSent = false;
@@ -70,7 +79,7 @@ class _NoticeDetailScreenState extends ConsumerState<NoticeDetailScreen> {
   Future<void> _acknowledge(AckMethod method) async {
     setState(() => _busy = true);
     try {
-      await acknowledgeNotice(ref, widget.noticeId, method, comment: _comment.text);
+      await ref.read(noticeActionsProvider).acknowledge(widget.noticeId, method, comment: _comment.text);
     } on ApiFailure catch (f) {
       if (mounted) _toast(f.message);
     } finally {
@@ -81,7 +90,7 @@ class _NoticeDetailScreenState extends ConsumerState<NoticeDetailScreen> {
   Future<void> _dismiss() async {
     final l = context.l10n;
     try {
-      await dismissNotice(ref, widget.noticeId);
+      await ref.read(noticeActionsProvider).dismiss(widget.noticeId);
       if (mounted) await Navigator.of(context).maybePop();
     } on ApiFailure catch (f) {
       if (mounted) _toast(f.isOffline ? l.noticeNeedsConnection : f.message);
@@ -114,7 +123,11 @@ class _NoticeDetailScreenState extends ConsumerState<NoticeDetailScreen> {
         loading: () => const SkeletonList(count: 3),
         error: (e, _) {
           final f = ApiFailure.of(e);
-          if (f.code == ApiErrorCode.noticeNotFound || f.code == ApiErrorCode.notFound) {
+          // M1: `forbidden` is one of the repository's `goneNoticeCodes` — it already
+          // drops the cache and rethrows (notices_repository.dart) — so it belongs with
+          // `noticeNotFound` here too, not the generic retry branch below (whose retry
+          // could never succeed for either).
+          if (goneNoticeCodes.contains(f.code) || f.code == ApiErrorCode.notFound) {
             return EmptyState(icon: Icons.search_off, title: l.noticeNotAvailable, hint: l.noticeNotAvailableHint);
           }
           return FailureView(f, onRetry: () => ref.invalidate(noticeDetailProvider(widget.noticeId)));
@@ -133,7 +146,11 @@ class _NoticeDetailScreenState extends ConsumerState<NoticeDetailScreen> {
     final queued = (ref.watch(pendingAcksProvider).value ?? const <String>{}).contains(d.id);
     final deadline = d.deadline;
     final published = d.publishedAt;
-    final overdue = deadline != null && !(widget.now ?? DateTime.now()).isBefore(deadline);
+    // M6: matches NoticeCard's clock (widgets/notice_card.dart) — ticks at least once a
+    // minute via the shared provider when widget.now (tests/goldens) is null, instead of
+    // freezing at the time the screen opened.
+    final clock = widget.now ?? ref.watch(minuteClockProvider).value ?? DateTime.now();
+    final overdue = deadline != null && !clock.isBefore(deadline);
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
       children: [
@@ -157,7 +174,7 @@ class _NoticeDetailScreenState extends ConsumerState<NoticeDetailScreen> {
         if (deadline != null && d.ackRequired) ...[
           const SizedBox(height: 12),
           Row(children: [
-            if (d.needsAck) ...[DeadlineRing(deadline: deadline, start: published, now: widget.now), const SizedBox(width: 12)],
+            if (d.needsAck) ...[DeadlineRing(deadline: deadline, start: published, now: clock), const SizedBox(width: 12)],
             Expanded(
               child: Text(
                 overdue ? l.deadlinePassed(dayMonthTime(deadline)) : l.deadlineDueBy(dayMonthTime(deadline)),

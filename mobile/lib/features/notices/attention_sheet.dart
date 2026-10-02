@@ -105,11 +105,14 @@ class _AttentionSheetState extends ConsumerState<AttentionSheet> {
                     if (i == 0) return s.stale ? AsOfLine(s.asOf!) : const SizedBox.shrink();
                     if (i == s.items.length + 1) {
                       if (s.nextCursor == null) return const SizedBox(height: 24);
+                      final notifier = ref.read(noticeListProvider(_segment, _office).notifier);
+                      if (s.loadingMore) return const Padding(padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator()));
+                      // I3/queued item 6: a failed "Show more" (NoticeListState.failure) must
+                      // say so, with a retry — not silently reoffer the same button.
+                      if (s.failure != null) return FailureView(s.failure!, onRetry: notifier.loadMore);
                       return Padding(
                         padding: const EdgeInsets.all(16),
-                        child: s.loadingMore
-                            ? const Center(child: CircularProgressIndicator())
-                            : OutlinedButton(onPressed: () => ref.read(noticeListProvider(_segment, _office).notifier).loadMore(), child: Text(l.showMore)),
+                        child: OutlinedButton(onPressed: notifier.loadMore, child: Text(l.showMore)),
                       );
                     }
                     final n = s.items[i - 1];

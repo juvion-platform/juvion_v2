@@ -13,6 +13,7 @@ import 'package:juvi/core/models/models.dart';
 import 'package:juvi/core/models/notices.dart';
 import 'package:juvi/core/repos/notices_repository.dart';
 import 'package:juvi/core/storage/app_database.dart';
+import 'package:juvi/features/notices/minute_clock.dart';
 import 'package:juvi/features/notices/widgets/ack_control.dart';
 import 'package:juvi/features/notices/widgets/attention_stack.dart';
 import 'package:mocktail/mocktail.dart';
@@ -166,5 +167,26 @@ void main() {
     when(repo.attention).thenThrow(const ApiFailure(ApiErrorCode.internal, 'Something went wrong.'));
     await pumpStack(t);
     expect(find.text('Try again'), findsOneWidget);
+  });
+
+  // Queued item 4: with a fixed `now` (tests and goldens), the stack has nothing to
+  // tick and must not watch minuteClockProvider — unlike NoticeCard's `now ?? ref.watch(...)`,
+  // the old `ref.watch(minuteClockProvider);` statement ran unconditionally.
+  testWidgets('queued item 4: with a fixed now, the stack does not watch the shared minute clock', (t) async {
+    served = attentionJson([cardJson('n1')]);
+    final container = ProviderContainer(retry: (_, _) => null, overrides: overrides());
+    addTearDown(container.dispose);
+    await t.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: AttentionStack(now: now),
+      ),
+    ));
+    await t.pump();
+    await t.pump();
+
+    expect(container.exists(minuteClockProvider), isFalse);
   });
 }

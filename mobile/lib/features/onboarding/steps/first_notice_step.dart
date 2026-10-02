@@ -37,7 +37,11 @@ class _FirstNoticeStepState extends ConsumerState<FirstNoticeStep> {
   Future<void> _acknowledge(String id, AckMethod method) async {
     setState(() => _busy = true);
     try {
-      if (await acknowledgeNotice(ref, id, method) == AckOutcome.sent) ref.invalidate(firstNoticeProvider);
+      final sent = await ref.read(noticeActionsProvider).acknowledge(id, method) == AckOutcome.sent;
+      // I1: `ref` here is this widget's `WidgetRef` — guard it the same way `_busy` is
+      // guarded below, so popping mid-request (Finish does not wait for this) never
+      // throws trying to invalidate on an unmounted element.
+      if (sent && mounted) ref.invalidate(firstNoticeProvider);
     } on ApiFailure catch (f) {
       if (mounted) ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(f.message)));
     } finally {

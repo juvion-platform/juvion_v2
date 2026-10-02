@@ -92,6 +92,31 @@ void main() {
     expect(find.text('Show more'), findsNothing);
   });
 
+  // I3/queued item 6: NoticeListState.failure used to be computed but never shown, so a
+  // failed "Show more" silently reoffered the same button with no explanation.
+  testWidgets('a failed Show more shows a message with Retry, and Retry then appends the new items', (t) async {
+    when(() => repo.list(NoticeSegment.all)).thenAnswer((_) async => NoticePage(items: [item('a')], nextCursor: 'c1'));
+    when(() => repo.list(NoticeSegment.all, cursor: 'c1')).thenThrow(const ApiFailure(ApiErrorCode.internal, 'Something went wrong.', status: 500));
+    await pumpSheet(t);
+    await t.tap(find.text('All'));
+    await t.pump();
+    await t.pump();
+
+    await t.tap(find.text('Show more'));
+    await t.pump();
+    await t.pump();
+    expect(find.text('Something went wrong.'), findsOneWidget);
+    expect(find.byType(NoticeTile), findsOneWidget);
+    expect(t.takeException(), isNull);
+
+    when(() => repo.list(NoticeSegment.all, cursor: 'c1')).thenAnswer((_) async => NoticePage(items: [item('b')]));
+    await t.tap(find.text('Try again'));
+    await t.pump();
+    await t.pump();
+    expect(find.byType(NoticeTile), findsNWidgets(2));
+    expect(find.text('Something went wrong.'), findsNothing);
+  });
+
   testWidgets('Published by me is not offered to students', (t) async {
     await pumpSheet(t);
     expect(find.text('Published by me'), findsNothing);

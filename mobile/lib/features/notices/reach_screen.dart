@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -22,17 +23,25 @@ part 'reach_screen.g.dart';
 Future<NoticeReachData> noticeReach(Ref ref, String id) async => (await ref.read(noticesRepositoryProvider.future)).reach(id);
 
 class PendingState {
-  const PendingState({required this.page, this.group, this.query, this.loadingMore = false});
+  const PendingState({required this.page, this.group, this.query, this.loadingMore = false, this.failure});
   final PendingPage page;
   final String? group;
   final String? query;
   final bool loadingMore;
+
+  /// The last "Show more" failure, if any (I3/queued item 6, mirroring NoticeListState).
+  final ApiFailure? failure;
 }
 
 /// The pending list (spec §4 US-4.2): grouped by batch or section, searchable, paged.
 @riverpod
 class PendingController extends _$PendingController {
   static const _copyPagesMax = 25;
+
+  /// M7: guards `_reload` against a slow response for an older filter/search
+  /// overwriting a newer one — bumped on every call, and a completion is applied only
+  /// if it is still the most recent one when it lands.
+  var _generation = 0;
 
   @override
   Future<PendingState> build(String noticeId) async {
@@ -42,16 +51,21 @@ class PendingController extends _$PendingController {
 
   /// Keeps showing the current list until the filtered one arrives.
   Future<void> _reload({String? group, String? query}) async {
-    state = await AsyncValue.guard(() async {
+    final generation = ++_generation;
+    final next = await AsyncValue.guard(() async {
       final repo = await ref.read(noticesRepositoryProvider.future);
       return PendingState(page: await repo.pending(noticeId, group: group, q: query), group: group, query: query);
     });
+    if (generation == _generation) state = next;
   }
 
   Future<void> selectGroup(String? group) => _reload(group: group, query: state.value?.query);
 
   Future<void> search(String text) => _reload(group: state.value?.group, query: text.trim().isEmpty ? null : text.trim());
 
+  /// I3: on failure this must not rethrow into a bare `onPressed: () => ... loadMore()`
+  /// (an unhandled, uncaught async error) — the failure is kept in state instead, the
+  /// same shape `NoticeListState` already uses, so the UI can show it with a retry.
   Future<void> loadMore() async {
     final s = state.value;
     final cursor = s?.page.nextCursor;
@@ -65,9 +79,8 @@ class PendingController extends _$PendingController {
         group: s.group,
         query: s.query,
       ));
-    } on ApiFailure {
-      state = AsyncData(s);
-      rethrow;
+    } on ApiFailure catch (f) {
+      state = AsyncData(PendingState(page: s.page, group: s.group, query: s.query, failure: f));
     }
   }
 
@@ -125,8 +138,12 @@ class _ReachScreenState extends ConsumerState<ReachScreen> {
       // A third reminder is refused with the server's reason (spec §4 US-4.4).
       if (mounted) _toast(f.isOffline ? l.noticeNeedsConnection : f.message);
     } finally {
-      if (mounted) setState(() => _reminding = false);
-      ref.invalidate(noticeReachProvider(widget.noticeId));
+      // M2: both were outside the `mounted` guard; invalidating a disposed widget's
+      // `ref` throws `StateError` the same way an unmounted ack caller does (I1).
+      if (mounted) {
+        setState(() => _reminding = false);
+        ref.invalidate(noticeReachProvider(widget.noticeId));
+      }
     }
   }
 
@@ -235,10 +252,25 @@ class _ReachScreenState extends ConsumerState<ReachScreen> {
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Text(l.reachReminders(r.reminders.used, r.reminders.max), style: t.bodyMedium),
-              FilledButton.tonal(onPressed: canRemind ? _remind : null, child: Text(l.reachSendReminder)),
+              // Queued item 8: only "still publishing" gets a reason — an exhausted
+              // budget or a reminder already in flight both say so elsewhere already
+              // (the counter above, and the button's own spinner), and an archived
+              // notice already explains itself via the banner above.
+              if (r.status == 'publishing')
+                Tooltip(
+                  message: l.reachRemindNotPublished,
+                  child: FilledButton.tonal(onPressed: canRemind ? _remind : null, child: Text(l.reachSendReminder)),
+                )
+              else
+                FilledButton.tonal(onPressed: canRemind ? _remind : null, child: Text(l.reachSendReminder)),
             ],
           ),
         ),
+        if (r.status == 'publishing')
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+            child: Text(l.reachRemindNotPublished, style: t.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
+          ),
         if (r.groups.isNotEmpty) ...[
           SectionHeader(l.reachByGroup),
           for (final g in r.groups)
@@ -296,10 +328,27 @@ class _PendingSection extends ConsumerStatefulWidget {
 class _PendingSectionState extends ConsumerState<_PendingSection> {
   final _search = TextEditingController();
 
+  /// Queued item 7: debounces as-you-type search by ~300 ms; submitting (the search
+  /// action on the keyboard) searches right away and cancels any pending debounce.
+  Timer? _debounce;
+
   @override
   void dispose() {
+    _debounce?.cancel();
     _search.dispose();
     super.dispose();
+  }
+
+  void _onChanged(String text) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      unawaited(ref.read(pendingControllerProvider(widget.noticeId).notifier).search(text));
+    });
+  }
+
+  void _onSubmitted(String text) {
+    _debounce?.cancel();
+    unawaited(ref.read(pendingControllerProvider(widget.noticeId).notifier).search(text));
   }
 
   @override
@@ -321,7 +370,8 @@ class _PendingSectionState extends ConsumerState<_PendingSection> {
             controller: _search,
             textInputAction: TextInputAction.search,
             decoration: InputDecoration(prefixIcon: const Icon(Icons.search), hintText: l.reachSearchHint, border: const OutlineInputBorder()),
-            onSubmitted: (v) => ref.read(provider.notifier).search(v),
+            onChanged: _onChanged,
+            onSubmitted: _onSubmitted,
           ),
         ),
         if (s != null && s.page.groups.length > 1)
@@ -352,12 +402,18 @@ class _PendingSectionState extends ConsumerState<_PendingSection> {
                 ].join(' · ')),
               ),
             if (s.page.nextCursor != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: s.loadingMore
-                    ? const Center(child: CircularProgressIndicator())
-                    : OutlinedButton(onPressed: () => ref.read(provider.notifier).loadMore(), child: Text(l.showMore)),
-              ),
+              if (s.loadingMore)
+                const Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: Center(child: CircularProgressIndicator()))
+              else if (s.failure != null)
+                // I3: a failed "Show more" used to rethrow into a dropped Future
+                // (an uncaught async error) with no feedback; it's kept in state
+                // instead and shown here with a retry.
+                FailureView(s.failure!, onRetry: () => ref.read(provider.notifier).loadMore())
+              else
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: OutlinedButton(onPressed: () => ref.read(provider.notifier).loadMore(), child: Text(l.showMore)),
+                ),
           ],
         ),
       ],

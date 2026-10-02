@@ -122,6 +122,35 @@ void main() {
     expect(await db.pendingActions(), isEmpty);
   });
 
+  // M8: only a generic 4xx drop case existed before; a replayed notice.ack specifically
+  // is reported in ackedNoticeIds either way (sent or dropped), which is what
+  // SyncLifecycle uses to re-read S04/the sheet/the channel tiles for it (I2).
+  test('a replayed notice.ack that gets a 404 NOTICE_NOT_FOUND is dropped, and reported for the I2 refresh', () async {
+    await db.enqueueAction(PendingAction.create('notice.ack', queuedAck('n1')));
+    when(() => notices.acknowledge('n1', any()))
+        .thenThrow(const ApiFailure(ApiErrorCode.noticeNotFound, 'This notice is not available.', status: 404));
+    final r = await w.drain();
+    expect(r.dropped, 1);
+    expect(r.sent, 0);
+    expect(await db.pendingActions(), isEmpty);
+    expect(r.ackedNoticeIds, {'n1'});
+  });
+
+  test('a sent (409-replayed) notice.ack is also reported in ackedNoticeIds', () async {
+    await db.enqueueAction(PendingAction.create('notice.ack', queuedAck('n1')));
+    when(() => notices.acknowledge('n1', any()))
+        .thenThrow(const ApiFailure(ApiErrorCode.noticeArchived, 'This notice has been archived.', status: 409));
+    final r = await w.drain();
+    expect(r.ackedNoticeIds, {'n1'});
+  });
+
+  test('a notice.ack still queued while offline is not reported in ackedNoticeIds', () async {
+    await db.enqueueAction(PendingAction.create('notice.ack', queuedAck('n1')));
+    when(() => notices.acknowledge('n1', any())).thenThrow(const ApiFailure(ApiErrorCode.offline, 'off'));
+    final r = await w.drain();
+    expect(r.ackedNoticeIds, isEmpty);
+  });
+
   test('a queued notice.ack stays queued while offline', () async {
     await db.enqueueAction(PendingAction.create('notice.ack', queuedAck('n1')));
     when(() => notices.acknowledge('n1', any())).thenThrow(const ApiFailure(ApiErrorCode.offline, 'off'));

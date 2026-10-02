@@ -137,7 +137,7 @@ final class PendingControllerProvider
   }
 }
 
-String _$pendingControllerHash() => r'45a4a24f31b5fedf2a12c7ea4bf43a44bde6ffe3';
+String _$pendingControllerHash() => r'e5fc8911a9f6b1e77507bb7369cd7a1c240c02a2';
 
 /// The pending list (spec §4 US-4.2): grouped by batch or section, searchable, paged.
 

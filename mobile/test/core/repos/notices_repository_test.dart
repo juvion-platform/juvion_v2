@@ -109,6 +109,23 @@ void main() {
     expect(attention.dueCount, 3);
   });
 
+  test('acknowledge drops the item from the cached due page and patches it in the cached all page (M5)', () async {
+    adapter
+      ..onGet('/notices', (s) => s.reply(200, {'items': [cardJson('n1'), cardJson('n2')], 'nextCursor': null}), queryParameters: {'segment': 'due'})
+      ..onGet('/notices', (s) => s.reply(200, {'items': [cardJson('n1'), cardJson('n2')], 'nextCursor': null}), queryParameters: {'segment': 'all'})
+      ..onPost('/notices/n1/ack', (s) => s.reply(200, ackJson()), data: Matchers.any);
+    await repo.list(NoticeSegment.due);
+    await repo.list(NoticeSegment.all);
+
+    await repo.acknowledge('n1', const AckInput(method: AckMethod.confirm));
+
+    final due = (await repo.cachedList(NoticeSegment.due))!.data;
+    expect(due.items.map((i) => i.id), ['n2']);
+    final all = (await repo.cachedList(NoticeSegment.all))!.data;
+    expect(all.items.firstWhere((i) => i.id == 'n1').state, 'acknowledged');
+    expect(all.items.firstWhere((i) => i.id == 'n2').state, 'received');
+  });
+
   test('a 409 ALREADY_ACKNOWLEDGED returns the existing record from error.ack', () async {
     adapter.onPost(
       '/notices/n1/ack',

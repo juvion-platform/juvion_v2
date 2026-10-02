@@ -1,6 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
+import 'package:juvi/app/l10n/l10n.dart';
 import 'package:juvi/core/analytics/analytics.dart';
 import 'package:juvi/core/connectivity/connectivity_provider.dart';
 import 'package:juvi/core/http/api_failure.dart';
@@ -9,8 +14,10 @@ import 'package:juvi/core/models/models.dart';
 import 'package:juvi/core/models/notices.dart';
 import 'package:juvi/core/repos/notices_repository.dart';
 import 'package:juvi/core/storage/app_database.dart';
+import 'package:juvi/features/notices/minute_clock.dart';
 import 'package:juvi/features/notices/notice_detail_screen.dart';
 import 'package:juvi/features/notices/widgets/ack_control.dart';
+import 'package:juvi/features/notices/widgets/deadline_ring.dart';
 import 'package:juvi/features/notices/widgets/linked_text.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -83,6 +90,97 @@ void main() {
     expect(find.text('Try again'), findsNothing);
   });
 
+  // M1: `forbidden` is one of the repository's goneNoticeCodes (notices_repository.dart)
+  // just like noticeNotFound, so the screen must treat it the same way instead of
+  // falling to the generic FailureView, whose retry could never succeed for either.
+  testWidgets('access revoked (forbidden) is also not available, with no retry (M1)', (t) async {
+    when(() => repo.detail('n1')).thenThrow(const ApiFailure(ApiErrorCode.forbidden, 'You no longer have access.', status: 403));
+    await open(t);
+    expect(find.text('This notice is not available'), findsOneWidget);
+    expect(find.text('Try again'), findsNothing);
+  });
+
+  // Queued item 5: a screen-level pass at R3 with a populated cache, complementing the
+  // repository-level test in notices_repository_test.dart.
+  testWidgets('a cached notice is dropped from view when the refresh comes back NOTICE_NOT_FOUND (R3, screen-level)', (t) async {
+    await db.writeDoc(ApiNoticesRepository.detailKey('n1'), detailJson('n1'), DateTime.utc(2026, 9, 30));
+    when(() => repo.cachedDetail('n1')).thenAnswer((_) async {
+      final doc = await db.readDoc(ApiNoticesRepository.detailKey('n1'));
+      return doc == null ? null : Cached(NoticeDetail.fromJson(doc.json), doc.asOf);
+    });
+    when(() => repo.detail('n1')).thenThrow(const ApiFailure(ApiErrorCode.noticeNotFound, 'This notice is not available.', status: 404));
+
+    await open(t);
+
+    expect(find.text('This notice is not available'), findsOneWidget);
+    expect(find.text('Try again'), findsNothing);
+    expect(await db.readDoc(ApiNoticesRepository.detailKey('n1')), isNull);
+  });
+
+  // M6: S04's deadline ring used to freeze at the time the screen opened; it must now
+  // tick the same way NoticeCard's does (notice_card_test.dart has the identical case).
+  testWidgets('without an explicit clock, the deadline ring watches the shared minute clock so it ticks (M6)', (t) async {
+    final controller = StreamController<DateTime>();
+    addTearDown(controller.close);
+    await t.pumpWidget(noticeHost(
+      const NoticeDetailScreen(noticeId: 'n1'),
+      overrides: [...overrides(), minuteClockProvider.overrideWith((_) => controller.stream)],
+      scroll: false,
+    ));
+    await t.pump();
+    await t.pump();
+
+    controller.add(DateTime.utc(2026, 10, 1, 6));
+    await t.pump();
+    await t.pump();
+    expect(find.descendant(of: find.byType(DeadlineRing), matching: find.text('2d')), findsOneWidget);
+
+    controller.add(DateTime.utc(2026, 10, 3, 10));
+    await t.pump();
+    await t.pump();
+    expect(find.descendant(of: find.byType(DeadlineRing), matching: find.text('1h')), findsOneWidget);
+  });
+
+  // I1: `_acknowledge` used to call back into its own WidgetRef after the acknowledge
+  // await resolved; popping the screen mid-request made that throw an uncaught
+  // StateError, and — worse — the offline enqueue never happened either, since
+  // notice_actions.dart's old refreshNotice/invalidate calls ran first and threw.
+  testWidgets('I1: popping S04 while an offline acknowledgement is pending still queues exactly one notice.ack, with no uncaught error', (t) async {
+    final ready = Completer<AckRecord>();
+    when(() => repo.acknowledge('n1', any())).thenAnswer((_) => ready.future);
+    final router = GoRouter(routes: [
+      GoRoute(path: '/', builder: (_, _) => const Scaffold(body: Text('Today'))),
+      GoRoute(path: '/notices/:id', builder: (_, s) => NoticeDetailScreen(noticeId: s.pathParameters['id']!, now: now)),
+    ]);
+    addTearDown(router.dispose);
+    await t.pumpWidget(ProviderScope(
+      retry: (_, _) => null,
+      overrides: overrides(),
+      child: MaterialApp.router(localizationsDelegates: AppLocalizations.localizationsDelegates, supportedLocales: AppLocalizations.supportedLocales, routerConfig: router),
+    ));
+    unawaited(router.push('/notices/n1'));
+    await t.pumpAndSettle();
+
+    await t.tap(find.byType(AckControl));
+    await t.pumpAndSettle();
+    await t.tap(find.descendant(of: find.byType(AlertDialog), matching: find.text('Acknowledge')));
+    await t.pump();
+
+    router.pop();
+    await t.pumpAndSettle();
+    expect(find.text('Today'), findsOneWidget);
+
+    ready.completeError(const ApiFailure(ApiErrorCode.offline, "You're offline."));
+    await t.pump();
+    await t.pump();
+
+    expect(t.takeException(), isNull);
+    final queued = await db.pendingActions();
+    expect(queued, hasLength(1));
+    expect(queued.single.type, 'notice.ack');
+    expect(queued.single.payload['noticeId'], 'n1');
+  });
+
   testWidgets('acknowledging with a comment sends it, then shows the acknowledgement', (t) async {
     served = detailJson('n1', ackCommentAllowed: true);
     when(() => repo.acknowledge('n1', any())).thenAnswer((_) async {
@@ -148,6 +246,20 @@ void main() {
     await t.pump();
     verify(() => repo.dismiss('n1')).called(1);
     expect(analytics.events.map((e) => e.$1), contains('notice.dismissed'));
+  });
+
+  // Queued item 2: dismiss (unlike acknowledge) has no offline queue — it is existing,
+  // online-only behaviour that a failure, offline included, is rethrown for the caller
+  // to show, not silently dropped.
+  testWidgets('offline, dismiss is refused with a message and nothing is tracked', (t) async {
+    served = detailJson('n1', ackRequired: false, deadline: null);
+    when(() => repo.dismiss('n1')).thenThrow(const ApiFailure(ApiErrorCode.offline, "You're offline."));
+    await open(t);
+    await t.tap(find.text('Dismiss'));
+    await t.pump();
+    expect(find.text('This needs a connection.'), findsOneWidget);
+    expect(find.text('Dismiss'), findsOneWidget);
+    expect(analytics.events.map((e) => e.$1), isNot(contains('notice.dismissed')));
   });
 
   testWidgets('the publisher sees the reach button', (t) async {

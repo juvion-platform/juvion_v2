@@ -120,6 +120,34 @@ class ApiNoticesRepository implements NoticesRepository {
     await _db.writeDoc(attentionKey, {...doc.json, 'items': kept, 'dueCount': due < 0 ? 0 : due}, doc.asOf);
   }
 
+  /// Drops [id] from the cached `notices:due` page (M5): once acknowledged it is no
+  /// longer due, and offline this cache is otherwise the only thing that still lists it.
+  Future<void> _dropFromDuePage(String id) async {
+    final doc = await _db.readDoc(listKey(NoticeSegment.due));
+    if (doc == null) return;
+    final items = (doc.json['items'] as List).cast<Map<String, dynamic>>();
+    final kept = items.where((i) => i['id'] != id).toList();
+    if (kept.length == items.length) return;
+    await _db.writeDoc(listKey(NoticeSegment.due), {...doc.json, 'items': kept}, doc.asOf);
+  }
+
+  /// Patches [id]'s row inside the cached `notices:all` page (M5), the same fields
+  /// [_patchDetail] writes to the detail document, so an offline-cached All segment
+  /// reflects the acknowledgement instead of still showing the hold control.
+  Future<void> _patchInAllPage(String id, Map<String, dynamic> Function(Map<String, dynamic> json) patch) async {
+    final doc = await _db.readDoc(listKey(NoticeSegment.all));
+    if (doc == null) return;
+    final items = (doc.json['items'] as List).cast<Map<String, dynamic>>();
+    var changed = false;
+    final patched = items.map((i) {
+      if (i['id'] != id) return i;
+      changed = true;
+      return {...i, ...patch(i)};
+    }).toList();
+    if (!changed) return;
+    await _db.writeDoc(listKey(NoticeSegment.all), {...doc.json, 'items': patched}, doc.asOf);
+  }
+
   @override
   Future<DateTime> markSeen(String id) => _guard(() async {
         final seenAt = (await _api.markNoticeSeen(id: id)).data!.seenAt;
@@ -162,6 +190,13 @@ class ApiNoticesRepository implements NoticesRepository {
               'ackClientAt': record.clientAt?.toIso8601String(),
             });
         await _dropFromAttention(id);
+        await _dropFromDuePage(id);
+        await _patchInAllPage(id, (j) => {
+              'state': 'acknowledged',
+              'late': record.isLate,
+              'ackAt': record.ackAt.toIso8601String(),
+              'seenAt': j['seenAt'] ?? record.ackAt.toIso8601String(),
+            });
         return record;
       });
 
@@ -234,8 +269,10 @@ Stream<Cached<AttentionData>> attention(Ref ref) async* {
 /// `NOTICE_NOT_FOUND`/`forbidden` mean the caller can no longer see this notice (it
 /// wasn't addressed to them, or access was revoked) — unlike a transient failure, the
 /// cached copy must not keep rendering, so the doc is dropped and the stream errors
-/// instead of falling back to [Cached.markStale] (spec US-2.5).
-const Set<ApiErrorCode> _goneNoticeCodes = {ApiErrorCode.noticeNotFound, ApiErrorCode.forbidden};
+/// instead of falling back to [Cached.markStale] (spec US-2.5). Public (M1) so
+/// `notice_detail_screen.dart`'s "not available" branch uses the same set instead of
+/// drifting from it.
+const Set<ApiErrorCode> goneNoticeCodes = {ApiErrorCode.noticeNotFound, ApiErrorCode.forbidden};
 
 @riverpod
 Stream<Cached<NoticeDetail>> noticeDetail(Ref ref, String id) async* {
@@ -245,7 +282,7 @@ Stream<Cached<NoticeDetail>> noticeDetail(Ref ref, String id) async* {
   try {
     yield await repo.detail(id);
   } on ApiFailure catch (f) {
-    if (_goneNoticeCodes.contains(f.code)) {
+    if (goneNoticeCodes.contains(f.code)) {
       final db = await ref.read(appDatabaseProvider.future);
       await db.deleteDoc(ApiNoticesRepository.detailKey(id));
       rethrow;

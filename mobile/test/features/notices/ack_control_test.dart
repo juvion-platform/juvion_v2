@@ -56,6 +56,23 @@ void main() {
     expect(acks, [AckMethod.confirm]);
   });
 
+  // Queued item 3: two fast taps (e.g. a double-tap, or the pointer bouncing) must not
+  // stack two confirm dialogs — the second tap while one is already open is a no-op.
+  testWidgets('two fast taps push only one confirm dialog', (t) async {
+    await t.pumpWidget(control());
+    await t.tap(find.byType(AckControl));
+    // By now the first tap's dialog may already be claiming this offset via its modal
+    // barrier (itself a correct reason the second tap can't reach the control); the
+    // `_confirmOpen` guard this test is really about covers the narrower race where the
+    // second tap's gesture resolves before that barrier mounts.
+    await t.tap(find.byType(AckControl), warnIfMissed: false);
+    await t.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsOneWidget);
+    await t.tap(dialogButton('Acknowledge'));
+    await t.pumpAndSettle();
+    expect(acks, [AckMethod.confirm]);
+  });
+
   testWidgets('under a screen reader a hold never acknowledges; only the confirm path does', (t) async {
     await t.pumpWidget(control(a11y: true));
     expect(find.text('Hold to acknowledge'), findsNothing);

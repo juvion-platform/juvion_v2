@@ -11,10 +11,17 @@ import 'package:juvi/core/sync/pending_action.dart';
 // practice even without the `@immutable` annotation (which would need an extra
 // `package:meta` import for a Dart-only file).
 class DrainResult {
-  const DrainResult({required this.sent, required this.deferred, required this.dropped});
+  const DrainResult({required this.sent, required this.deferred, required this.dropped, this.ackedNoticeIds = const {}});
   final int sent;
   final int deferred;
   final int dropped;
+
+  /// I2/M8: notice ids whose `notice.ack` was sent or dropped this drain (a 409 reply
+  /// counts as sent) — not merely deferred, which changes nothing the UI shows. Left
+  /// out of `==`/`hashCode` on purpose: it widens the brief's fixed three-`int` shape
+  /// only for `SyncLifecycle` to read, and every existing `DrainResult(...)` equality
+  /// check in `sync_worker_test.dart` compares just `sent`/`deferred`/`dropped`.
+  final Set<String> ackedNoticeIds;
   @override
   // Every field is final; the class is immutable in practice without `@immutable`.
   // ignore: avoid_equals_and_hash_code_on_mutable_classes
@@ -24,7 +31,7 @@ class DrainResult {
   // ignore: avoid_equals_and_hash_code_on_mutable_classes
   int get hashCode => Object.hash(sent, deferred, dropped);
   @override
-  String toString() => 'DrainResult(sent: $sent, deferred: $deferred, dropped: $dropped)';
+  String toString() => 'DrainResult(sent: $sent, deferred: $deferred, dropped: $dropped, ackedNoticeIds: $ackedNoticeIds)';
 }
 
 /// Replays queued writes FIFO. Offline stops the drain (the remaining queue, including
@@ -61,6 +68,7 @@ class SyncWorker {
     var sent = 0;
     var deferred = 0;
     var dropped = 0;
+    final ackedNoticeIds = <String>{};
     final tried = <String>{};
     for (var pass = 0; pass < maxPasses; pass++) {
       final actions = (await _db.pendingActions()).where((a) => !tried.contains(a.id)).toList();
@@ -74,6 +82,7 @@ class SyncWorker {
           await _apply(a);
           await _db.removeAction(a.id);
           sent++;
+          if (a.type == 'notice.ack') ackedNoticeIds.add(a.payload['noticeId'] as String);
         } on ApiFailure catch (f) {
           if (f.isOffline) {
             // R60: record the error for diagnostics, but not as a counted attempt.
@@ -85,12 +94,17 @@ class SyncWorker {
           if (a.type == 'notice.ack' && f.status == 409) {
             await _db.removeAction(a.id);
             sent++;
+            ackedNoticeIds.add(a.payload['noticeId'] as String);
             continue;
           }
           final permanent = (f.status ?? 500) >= 400 && (f.status ?? 500) < 500 && f.code != ApiErrorCode.cooldown;
           if (permanent || a.attempts + 1 >= maxAttempts) {
             await _db.removeAction(a.id);
             dropped++;
+            // I2/M8: a dropped notice.ack (e.g. a replayed 404 NOTICE_NOT_FOUND) still
+            // changes what S04/the stack show for it — it must stop offering "Will
+            // send when online" for an acknowledgement that is never going out.
+            if (a.type == 'notice.ack') ackedNoticeIds.add(a.payload['noticeId'] as String);
           } else {
             await _db.recordAttempt(a.id, f.message);
             deferred++;
@@ -99,7 +113,7 @@ class SyncWorker {
       }
       if (wentOffline) break;
     }
-    return DrainResult(sent: sent, deferred: deferred, dropped: dropped);
+    return DrainResult(sent: sent, deferred: deferred, dropped: dropped, ackedNoticeIds: ackedNoticeIds);
   }
 
   Future<void> _apply(PendingAction a) async {

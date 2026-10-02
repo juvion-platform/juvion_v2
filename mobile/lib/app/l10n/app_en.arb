@@ -274,6 +274,8 @@
   "reachAddedLaterLine": "{total} people · {acknowledged} acknowledged · {seen} seen",
   "@reachAddedLaterLine": { "placeholders": { "total": { "type": "int" }, "acknowledged": { "type": "int" }, "seen": { "type": "int" } } },
   "reachNotPublisher": "Only the publisher can see who has read this notice.",
+  "reachRemindNotPublished": "You can send a reminder once this notice is published.",
+  "@reachRemindNotPublished": { "description": "S11: why Send reminder is disabled while the notice is still publishing (queued item 8). Archived already explains itself via the banner above; an exhausted budget or a reminder in flight both say so elsewhere too." },
   "channelNotices": "Notices",
   "@channelNotices": { "description": "Channel screen section: notices whose audience matches this channel (spec §4 US-6)." }
 }

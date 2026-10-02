@@ -33,6 +33,12 @@ class _AckControlState extends State<AckControl> with SingleTickerProviderStateM
   late final AnimationController _hold;
   bool _held = false;
 
+  /// Queued item 3: true while the confirmation dialog from a tap is open, guarding
+  /// against two fast taps pushing two stacked dialogs — the second `_confirm` call
+  /// (from a second tap, or the control's own semantic tap under a screen reader)
+  /// becomes a no-op until the first dialog is dismissed.
+  bool _confirmOpen = false;
+
   @override
   void initState() {
     super.initState();
@@ -63,19 +69,25 @@ class _AckControlState extends State<AckControl> with SingleTickerProviderStateM
   }
 
   Future<void> _confirm() async {
+    if (_confirmOpen) return;
+    _confirmOpen = true;
     final l = context.l10n;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
-        title: Text(l.ackConfirmTitle),
-        content: Text(l.ackConfirmBody),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(c).pop(false), child: Text(l.cancel)),
-          FilledButton(onPressed: () => Navigator.of(c).pop(true), child: Text(l.ackButton)),
-        ],
-      ),
-    );
-    if ((ok ?? false) && mounted && !widget.busy) widget.onAcknowledge(AckMethod.confirm);
+    try {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: Text(l.ackConfirmTitle),
+          content: Text(l.ackConfirmBody),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(c).pop(false), child: Text(l.cancel)),
+            FilledButton(onPressed: () => Navigator.of(c).pop(true), child: Text(l.ackButton)),
+          ],
+        ),
+      );
+      if ((ok ?? false) && mounted && !widget.busy) widget.onAcknowledge(AckMethod.confirm);
+    } finally {
+      _confirmOpen = false;
+    }
   }
 
   @override

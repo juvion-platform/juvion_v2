@@ -682,5 +682,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'Only the publisher can see who has read this notice.';
 
   @override
+  String get reachRemindNotPublished =>
+      'You can send a reminder once this notice is published.';
+
+  @override
   String get channelNotices => 'Notices';
 }
