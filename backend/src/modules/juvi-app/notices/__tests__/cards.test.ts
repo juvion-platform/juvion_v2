@@ -10,7 +10,7 @@ const notice = (over: Partial<LeanNotice> = {}): LeanNotice => ({
   attachments: [{ key: 'colleges/c/notices/u', name: 'a.pdf', mime: 'application/pdf', size: 10 }],
   publisher: { userId: publisherUser, office: 'Exam Section' }, audience: { rules: [], line: 'Sent to 2024 Batch' },
   channelIds: [], ackRequired: true, ackDeadline: new Date('2026-10-01T10:00:00.000Z'), ackCommentAllowed: true,
-  priority: 'important', purpose: 'standard', status: 'published', counts: { audience: 2, onJuvi: 1 }, reminders: [],
+  priority: 'important', confidential: false, urgentReason: null, purpose: 'standard', status: 'published', counts: { audience: 2, onJuvi: 1 }, reminders: [],
   publishedAt: new Date('2026-09-26T10:00:00.000Z'), createdAt: new Date(), updatedAt: new Date(), ...over,
 });
 const row = (over: Partial<LeanNoticeRecipient> = {}): LeanNoticeRecipient => ({

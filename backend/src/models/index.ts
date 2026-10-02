@@ -416,6 +416,8 @@ export { JuviProvisioningRun } from './juvi/JuviProvisioningRun';
 export { JuviProvisionedCredential } from './juvi/JuviProvisionedCredential';
 export { Notice } from './juvi/Notice';
 export { NoticeRecipient } from './juvi/NoticeRecipient';
+export { NotificationDelivery } from './juvi/NotificationDelivery';
+export { JuviEvent } from './juvi/JuviEvent';
 
 // === Workflow ===
 export { ClearanceWorkflow } from './workflow/ClearanceWorkflow';
