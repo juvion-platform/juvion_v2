@@ -30,24 +30,28 @@ export function sendBackoffMs(attempts: number): number {
 export interface SenderStats { claimed: number; sent: number; cancelled: number; noDevice: number; retried: number; failed: number }
 
 type Row = LeanNotificationDelivery;
+/** The wall clock; a pass reads it at every claim so the lease runs from the claim, not from the pass start. */
+export type Clock = () => Date;
 const leaseFree = (now: Date) => ({ $or: [{ lockedUntil: null }, { lockedUntil: { $lt: now } }] });
 
-async function claim(filter: Record<string, unknown>, now: Date): Promise<Row | null> {
+/** `now` is only the due cut-off for `sendAfter`; the lease is measured on `clock()` at the moment of the claim. */
+async function claim(filter: Record<string, unknown>, now: Date, clock: Clock): Promise<Row | null> {
+  const claimedAt = clock();
   return NotificationDelivery.findOneAndUpdate(
-    { ...filter, status: 'scheduled', sendAfter: { $lte: now }, ...leaseFree(now) },
-    { $set: { lockedUntil: new Date(now.getTime() + LEASE_MS) } },
+    { ...filter, status: 'scheduled', sendAfter: { $lte: now }, ...leaseFree(claimedAt) },
+    { $set: { lockedUntil: new Date(claimedAt.getTime() + LEASE_MS) } },
     { new: true, sort: { sendAfter: 1 } },
   ).lean<Row>();
 }
 
 /** Every other due Routine row in the same digest window: same account and batch key (spec §6.4). */
-async function claimDigest(primary: Row, now: Date): Promise<Row[]> {
+async function claimDigest(primary: Row, now: Date, clock: Clock): Promise<Row[]> {
   const scope = { collegeId: primary.collegeId, accountId: primary.accountId, batchKey: primary.batchKey, tier: 'routine' };
-  const ids = await NotificationDelivery.find({ ...scope, _id: { $ne: primary._id }, status: 'scheduled', sendAfter: { $lte: now }, ...leaseFree(now) })
+  const ids = await NotificationDelivery.find({ ...scope, _id: { $ne: primary._id }, status: 'scheduled', sendAfter: { $lte: now }, ...leaseFree(clock()) })
     .select('_id').lean();
   const out: Row[] = [];
   for (const { _id } of ids) {
-    const row = await claim({ ...scope, _id }, now);
+    const row = await claim({ ...scope, _id }, now, clock);
     if (row) out.push(row);
   }
   return out;
@@ -68,8 +72,8 @@ const cancelReason = (notice: LeanNotice | undefined, row: LeanNoticeRecipient |
   return null;
 };
 
-async function sendGroup(primary: Row, transport: PushTransport, now: Date, stats: SenderStats): Promise<void> {
-  const rows = primary.tier === 'routine' ? [primary, ...(await claimDigest(primary, now))] : [primary];
+async function sendGroup(primary: Row, transport: PushTransport, now: Date, clock: Clock, stats: SenderStats): Promise<void> {
+  const rows = primary.tier === 'routine' ? [primary, ...(await claimDigest(primary, now, clock))] : [primary];
   stats.claimed += rows.length - 1;
   const collegeId = primary.collegeId;
   const noticeIds = rows.map((r) => r.source.id);
@@ -148,15 +152,15 @@ async function sendGroup(primary: Row, transport: PushTransport, now: Date, stat
 }
 
 /** One sender pass. A row whose processing throws keeps its lease and is retried once the lease expires (spec §11). */
-export async function runSender(now: Date = new Date(), transport?: PushTransport): Promise<SenderStats> {
+export async function runSender(now: Date = new Date(), transport?: PushTransport, clock: Clock = () => new Date()): Promise<SenderStats> {
   const t = transport ?? (await getPushTransport());
   const stats: SenderStats = { claimed: 0, sent: 0, cancelled: 0, noDevice: 0, retried: 0, failed: 0 };
   while (stats.claimed < SEND_BATCH_MAX) {
-    const row = await claim({}, now);
+    const row = await claim({}, now, clock);
     if (!row) break;
     stats.claimed += 1;
     try {
-      await sendGroup(row, t, now, stats);
+      await sendGroup(row, t, now, clock, stats);
     } catch (err) {
       console.error('[juvi-push] send failed for delivery', String(row._id), err instanceof Error ? err.message : err);
     }

@@ -7,10 +7,11 @@ import { publishTestNotice } from '../factories/notice.factory';
 import { studentOnJuvi, quietHoursAround, deliveriesFor, deliveryOf } from '../factories/notification.factory';
 import { JuviAccount } from '../../models/juvi/JuviAccount';
 import { MobileSession } from '../../models/juvi/MobileSession';
+import { NotificationDelivery } from '../../models/juvi/NotificationDelivery';
 import { drainOutbox } from '../../shared/outbox';
 import { remindNotice } from '../../modules/juvi-app/notices/publish-service';
 import { erpActor } from '../../modules/juvi-app/notices/reach-service';
-import { FakePushTransport, setPushTransport } from '../../modules/juvi-app/notifications/transport';
+import { FakePushTransport, PushTransport, setPushTransport } from '../../modules/juvi-app/notifications/transport';
 import { runSender, MAX_SEND_ATTEMPTS } from '../../modules/juvi-app/notifications/sender';
 import { verifyReceipt } from '../../modules/juvi-app/notifications/receipts';
 import { DIGEST_WINDOW_MS } from '../../modules/juvi-app/notifications/policy';
@@ -145,5 +146,40 @@ describe('Routine batching (NTF-04, spec §6.4)', () => {
     const next = (await deliveriesFor(eleventh._id))[0]!;
     expect(next.status).toBe('scheduled');
     expect(next.sendAfter.getTime()).toBeGreaterThanOrEqual(before + DIGEST_WINDOW_MS);
+  });
+});
+
+describe('the lease runs from the claim, not from the pass start (spec §11)', () => {
+  it('a row claimed late in a long pass keeps a live lease and is not re-sent by a concurrent pass', async () => {
+    await studentOnJuvi(app, fx, { pushToken: 'tok-l1' });
+    await studentOnJuvi(app, fx, { pushToken: 'tok-l2' });
+    fake.failToken('tok-l1', 'UNAVAILABLE'); fake.failToken('tok-l2', 'UNAVAILABLE');
+    const n = await publishTestNotice(fx, { priority: 'urgent', urgentReason: REASON });
+    expect((await deliveriesFor(n._id)).map((r) => r.status)).toEqual(['scheduled', 'scheduled']);
+
+    await NotificationDelivery.updateMany({ 'source.id': n._id }, { $set: { sendAfter: new Date(Date.now() - 1_000) } });   // due now, so the pass can run at the real time
+    let skew = 0;
+    const clock = () => new Date(Date.now() + skew);
+    const calls: number[] = [];
+    const nested: number[] = [];
+    let leaseAtSecond = 0; let clockAtSecond = 0;
+    const slow: PushTransport = {
+      name: 'fake',
+      async send(tokens) {
+        calls.push(calls.length);
+        if (calls.length === 1) skew += 90_000;            // the first send takes 90 s: past the 60 s lease of the pass start
+        else {
+          const held = await NotificationDelivery.findOne({ lockedUntil: { $ne: null } }).lean();
+          leaseAtSecond = held!.lockedUntil!.getTime(); clockAtSecond = clock().getTime();
+          nested.push((await runSender(new Date(), slow, clock)).claimed);
+        }
+        return tokens.map((token) => ({ token, ok: true }));
+      },
+    };
+    const stats = await runSender(new Date(), slow, clock);
+    expect(stats.sent).toBe(2);
+    expect(leaseAtSecond).toBeGreaterThan(clockAtSecond);
+    expect(nested).toEqual([0]);
+    expect(calls).toHaveLength(2);
   });
 });
