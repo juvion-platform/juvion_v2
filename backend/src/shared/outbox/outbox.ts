@@ -6,6 +6,8 @@
  * at a time with a two-minute lock, backs off on failure and dead-letters after
  * eight attempts. `kick()` wakes the dispatcher; with no queue installed
  * (dev/test without Redis) it processes inline, the way `enqueueReconcile` does.
+ * Sweepers run before the events on the scheduled tick; an `afterEvents` sweeper
+ * (the notification sender) runs after them on every pass, tick or kick.
  */
 import { OutboxEvent, IOutboxEvent } from './OutboxEvent';
 
@@ -20,13 +22,16 @@ export const MAX_DELAY_MS = 600_000;
 
 const consumers = new Map<string, OutboxConsumer>();
 const sweepers: OutboxSweeper[] = [];
+const afterSweepers: OutboxSweeper[] = [];
 /** Installed by the dispatcher; null means "no queue, run inline". */
 let enqueueTick: (() => Promise<void>) | null = null;
 /** The one inline run in flight for this process, if any. */
 let inflight: Promise<number> | null = null;
 
 export function registerConsumer(type: string, handler: OutboxConsumer): void { consumers.set(type, handler); }
-export function registerSweeper(fn: OutboxSweeper): void { sweepers.push(fn); }
+export function registerSweeper(fn: OutboxSweeper, opts: { afterEvents?: boolean } = {}): void {
+  (opts.afterEvents ? afterSweepers : sweepers).push(fn);
+}
 export function setTickEnqueuer(fn: (() => Promise<void>) | null): void { enqueueTick = fn; }
 
 /** Upsert on dedupeKey. Returns true when a new event was recorded, false when it already existed. */
@@ -85,8 +90,9 @@ export async function processEvent(event: IOutboxEvent): Promise<void> {
 
 /**
  * Runs every sweeper (unless `sweep` is false), then processes claimable events
- * until none is left (or `limit`). Returns the number processed. The dispatcher
- * sweeps on its scheduled tick only; the inline path has no tick, so it sweeps.
+ * until none is left (or `limit`), then every `afterEvents` sweeper. Returns the
+ * number processed. The dispatcher sweeps on its scheduled tick only; the inline
+ * path has no tick, so it sweeps. `afterEvents` sweepers run on every pass.
  */
 export async function processOnce(limit = 500, opts: { sweep?: boolean } = {}): Promise<number> {
   if (opts.sweep !== false) {
@@ -100,6 +106,9 @@ export async function processOnce(limit = 500, opts: { sweep?: boolean } = {}): 
     if (!event) break;
     await processEvent(event);
     n += 1;
+  }
+  for (const sweep of afterSweepers) {
+    try { await sweep(); } catch (err) { console.error('[outbox] sweeper failed', err); }
   }
   return n;
 }
@@ -144,6 +153,7 @@ export async function retryDead(collegeId: string, dedupeKey: string): Promise<b
 export function __resetOutboxForTesting(): void {
   consumers.clear();
   sweepers.length = 0;
+  afterSweepers.length = 0;
   enqueueTick = null;
   inflight = null;
 }
