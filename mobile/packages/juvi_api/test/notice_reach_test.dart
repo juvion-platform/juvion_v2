@@ -42,6 +42,11 @@ void main() {
       // TODO
     });
 
+    // NoticeReachDelivery delivery
+    test('to test the property `delivery`', () async {
+      // TODO
+    });
+
     // int dismissed
     test('to test the property `dismissed`', () async {
       // TODO

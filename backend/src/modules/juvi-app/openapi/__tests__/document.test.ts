@@ -74,6 +74,14 @@ describe('mobile OpenAPI document', () => {
     expect(doc.components.schemas.EventsRequest.properties.events.items.properties.props).toMatchObject({ type: 'object', additionalProperties: {} });
   });
 
+  it('Reach carries the delivery block, and each pending member its delivery state', () => {
+    expect(doc.components.schemas.NoticeReach.required).toContain('delivery');
+    expect(doc.components.schemas.NoticeReach.properties.delivery.properties.suppressed.required).toEqual(['muted', 'tierOff', 'noDevice']);
+    expect(doc.components.schemas.PendingPerson.properties.delivery.enum).toEqual(
+      ['not_delivered', 'delivered', 'opened', 'muted', 'tier_off', 'no_device', 'scheduled', 'none'],
+    );
+  });
+
   it('stableStringify orders keys so the file is deterministic', () => {
     expect(stableStringify({ b: 1, a: { d: 2, c: [3, { f: 1, e: 2 }] } })).toBe('{\n  "a": {\n    "c": [\n      3,\n      {\n        "e": 2,\n        "f": 1\n      }\n    ],\n    "d": 2\n  },\n  "b": 1\n}');
   });

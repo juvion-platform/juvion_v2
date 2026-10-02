@@ -1506,6 +1506,19 @@
           "items": {
             "items": {
               "properties": {
+                "delivery": {
+                  "enum": [
+                    "not_delivered",
+                    "delivered",
+                    "opened",
+                    "muted",
+                    "tier_off",
+                    "no_device",
+                    "scheduled",
+                    "none"
+                  ],
+                  "type": "string"
+                },
                 "group": {
                   "type": "string"
                 },
@@ -1538,7 +1551,8 @@
                 "identifier",
                 "group",
                 "state",
-                "lastSeenInApp"
+                "lastSeenInApp",
+                "delivery"
               ],
               "type": "object"
             },
@@ -1683,6 +1697,57 @@
               "string",
               "null"
             ]
+          },
+          "delivery": {
+            "properties": {
+              "cancelled": {
+                "type": "integer"
+              },
+              "delivered": {
+                "type": "integer"
+              },
+              "failed": {
+                "type": "integer"
+              },
+              "opened": {
+                "type": "integer"
+              },
+              "scheduled": {
+                "type": "integer"
+              },
+              "sent": {
+                "type": "integer"
+              },
+              "suppressed": {
+                "properties": {
+                  "muted": {
+                    "type": "integer"
+                  },
+                  "noDevice": {
+                    "type": "integer"
+                  },
+                  "tierOff": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "muted",
+                  "tierOff",
+                  "noDevice"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "scheduled",
+              "sent",
+              "delivered",
+              "opened",
+              "failed",
+              "cancelled",
+              "suppressed"
+            ],
+            "type": "object"
           },
           "dismissed": {
             "type": "integer"
@@ -1834,6 +1899,7 @@
           "lateAcks",
           "comments",
           "addedLater",
+          "delivery",
           "asOf"
         ],
         "type": "object"
@@ -1897,6 +1963,19 @@
       },
       "PendingPerson": {
         "properties": {
+          "delivery": {
+            "enum": [
+              "not_delivered",
+              "delivered",
+              "opened",
+              "muted",
+              "tier_off",
+              "no_device",
+              "scheduled",
+              "none"
+            ],
+            "type": "string"
+          },
           "group": {
             "type": "string"
           },
@@ -1929,7 +2008,8 @@
           "identifier",
           "group",
           "state",
-          "lastSeenInApp"
+          "lastSeenInApp",
+          "delivery"
         ],
         "type": "object"
       },

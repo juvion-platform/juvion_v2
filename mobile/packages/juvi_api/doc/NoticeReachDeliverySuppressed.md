@@ -1,4 +1,4 @@
-# juvi_api.model.PendingPerson
+# juvi_api.model.NoticeReachDeliverySuppressed
 
 ## Load the model package
 ```dart
@@ -8,12 +8,9 @@ import 'package:juvi_api/api.dart';
 ## Properties
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
-**delivery** | **String** |  | 
-**group** | **String** |  | 
-**identifier** | **String** |  | 
-**lastSeenInApp** | **String** |  | 
-**name** | **String** |  | 
-**state** | **String** |  | 
+**muted** | **int** |  | 
+**noDevice** | **int** |  | 
+**tierOff** | **int** |  | 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
 

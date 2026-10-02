@@ -20,6 +20,7 @@ NoticeReach _$NoticeReachFromJson(Map<String, dynamic> json) => $checkedCreate(
         'audience',
         'comments',
         'deadline',
+        'delivery',
         'dismissed',
         'groups',
         'late',
@@ -54,6 +55,10 @@ NoticeReach _$NoticeReachFromJson(Map<String, dynamic> json) => $checkedCreate(
             .toList(),
       ),
       deadline: $checkedConvert('deadline', (v) => v as String?),
+      delivery: $checkedConvert(
+        'delivery',
+        (v) => NoticeReachDelivery.fromJson(v as Map<String, dynamic>),
+      ),
       dismissed: $checkedConvert('dismissed', (v) => (v as num).toInt()),
       groups: $checkedConvert(
         'groups',
@@ -106,6 +111,7 @@ Map<String, dynamic> _$NoticeReachToJson(NoticeReach instance) =>
       'audience': instance.audience,
       'comments': instance.comments.map((e) => e.toJson()).toList(),
       'deadline': instance.deadline,
+      'delivery': instance.delivery.toJson(),
       'dismissed': instance.dismissed,
       'groups': instance.groups.map((e) => e.toJson()).toList(),
       'late': instance.late_,

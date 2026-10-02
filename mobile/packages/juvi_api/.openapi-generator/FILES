@@ -50,6 +50,8 @@ doc/NoticeReach.md
 doc/NoticeReachAddedLater.md
 doc/NoticeReachAddedLaterItemsInner.md
 doc/NoticeReachCommentsInner.md
+doc/NoticeReachDelivery.md
+doc/NoticeReachDeliverySuppressed.md
 doc/NoticeReachGroupsInner.md
 doc/NoticeReachLateAcksInner.md
 doc/NoticeReminders.md
@@ -135,6 +137,8 @@ lib/src/model/notice_reach.dart
 lib/src/model/notice_reach_added_later.dart
 lib/src/model/notice_reach_added_later_items_inner.dart
 lib/src/model/notice_reach_comments_inner.dart
+lib/src/model/notice_reach_delivery.dart
+lib/src/model/notice_reach_delivery_suppressed.dart
 lib/src/model/notice_reach_groups_inner.dart
 lib/src/model/notice_reach_late_acks_inner.dart
 lib/src/model/notice_reminders.dart
@@ -212,6 +216,8 @@ test/notice_pending_test.dart
 test/notice_reach_added_later_items_inner_test.dart
 test/notice_reach_added_later_test.dart
 test/notice_reach_comments_inner_test.dart
+test/notice_reach_delivery_suppressed_test.dart
+test/notice_reach_delivery_test.dart
 test/notice_reach_groups_inner_test.dart
 test/notice_reach_late_acks_inner_test.dart
 test/notice_reach_test.dart

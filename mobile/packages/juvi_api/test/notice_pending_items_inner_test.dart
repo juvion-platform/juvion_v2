@@ -7,6 +7,11 @@ void main() {
   // TODO add properties to the entity
 
   group(NoticePendingItemsInner, () {
+    // String delivery
+    test('to test the property `delivery`', () async {
+      // TODO
+    });
+
     // String group
     test('to test the property `group`', () async {
       // TODO

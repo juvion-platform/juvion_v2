@@ -15,6 +15,7 @@ Name | Type | Description | Notes
 **audience** | **int** |  | 
 **comments** | [**List&lt;NoticeReachCommentsInner&gt;**](NoticeReachCommentsInner.md) |  | 
 **deadline** | **String** |  | 
+**delivery** | [**NoticeReachDelivery**](NoticeReachDelivery.md) |  | 
 **dismissed** | **int** |  | 
 **groups** | [**List&lt;NoticeReachGroupsInner&gt;**](NoticeReachGroupsInner.md) |  | 
 **late_** | **int** |  | 

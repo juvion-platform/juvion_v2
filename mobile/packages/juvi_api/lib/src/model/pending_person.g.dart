@@ -11,6 +11,7 @@ PendingPerson _$PendingPersonFromJson(Map<String, dynamic> json) =>
       $checkKeys(
         json,
         requiredKeys: const [
+          'delivery',
           'group',
           'identifier',
           'lastSeenInApp',
@@ -19,6 +20,10 @@ PendingPerson _$PendingPersonFromJson(Map<String, dynamic> json) =>
         ],
       );
       final val = PendingPerson(
+        delivery: $checkedConvert(
+          'delivery',
+          (v) => $enumDecode(_$PendingPersonDeliveryEnumEnumMap, v),
+        ),
         group: $checkedConvert('group', (v) => v as String),
         identifier: $checkedConvert('identifier', (v) => v as String?),
         lastSeenInApp: $checkedConvert('lastSeenInApp', (v) => v as String?),
@@ -33,12 +38,24 @@ PendingPerson _$PendingPersonFromJson(Map<String, dynamic> json) =>
 
 Map<String, dynamic> _$PendingPersonToJson(PendingPerson instance) =>
     <String, dynamic>{
+      'delivery': _$PendingPersonDeliveryEnumEnumMap[instance.delivery]!,
       'group': instance.group,
       'identifier': instance.identifier,
       'lastSeenInApp': instance.lastSeenInApp,
       'name': instance.name,
       'state': _$PendingPersonStateEnumEnumMap[instance.state]!,
     };
+
+const _$PendingPersonDeliveryEnumEnumMap = {
+  PendingPersonDeliveryEnum.notDelivered: 'not_delivered',
+  PendingPersonDeliveryEnum.delivered: 'delivered',
+  PendingPersonDeliveryEnum.opened: 'opened',
+  PendingPersonDeliveryEnum.muted: 'muted',
+  PendingPersonDeliveryEnum.tierOff: 'tier_off',
+  PendingPersonDeliveryEnum.noDevice: 'no_device',
+  PendingPersonDeliveryEnum.scheduled: 'scheduled',
+  PendingPersonDeliveryEnum.none: 'none',
+};
 
 const _$PendingPersonStateEnumEnumMap = {
   PendingPersonStateEnum.seen: 'seen',

@@ -57,6 +57,8 @@ export 'package:juvi_api/src/model/notice_reach.dart';
 export 'package:juvi_api/src/model/notice_reach_added_later.dart';
 export 'package:juvi_api/src/model/notice_reach_added_later_items_inner.dart';
 export 'package:juvi_api/src/model/notice_reach_comments_inner.dart';
+export 'package:juvi_api/src/model/notice_reach_delivery.dart';
+export 'package:juvi_api/src/model/notice_reach_delivery_suppressed.dart';
 export 'package:juvi_api/src/model/notice_reach_groups_inner.dart';
 export 'package:juvi_api/src/model/notice_reach_late_acks_inner.dart';
 export 'package:juvi_api/src/model/notice_reminders.dart';

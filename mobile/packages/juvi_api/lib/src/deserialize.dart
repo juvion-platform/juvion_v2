@@ -44,6 +44,8 @@ import 'package:juvi_api/src/model/notice_reach.dart';
 import 'package:juvi_api/src/model/notice_reach_added_later.dart';
 import 'package:juvi_api/src/model/notice_reach_added_later_items_inner.dart';
 import 'package:juvi_api/src/model/notice_reach_comments_inner.dart';
+import 'package:juvi_api/src/model/notice_reach_delivery.dart';
+import 'package:juvi_api/src/model/notice_reach_delivery_suppressed.dart';
 import 'package:juvi_api/src/model/notice_reach_groups_inner.dart';
 import 'package:juvi_api/src/model/notice_reach_late_acks_inner.dart';
 import 'package:juvi_api/src/model/notice_reminders.dart';
@@ -185,6 +187,10 @@ final _regMap = RegExp(r'^Map<String,(.*)>$');
           return NoticeReachAddedLaterItemsInner.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'NoticeReachCommentsInner':
           return NoticeReachCommentsInner.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'NoticeReachDelivery':
+          return NoticeReachDelivery.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'NoticeReachDeliverySuppressed':
+          return NoticeReachDeliverySuppressed.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'NoticeReachGroupsInner':
           return NoticeReachGroupsInner.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'NoticeReachLateAcksInner':

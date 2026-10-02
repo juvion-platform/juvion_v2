@@ -12,6 +12,7 @@ NoticePendingItemsInner _$NoticePendingItemsInnerFromJson(
   $checkKeys(
     json,
     requiredKeys: const [
+      'delivery',
       'group',
       'identifier',
       'lastSeenInApp',
@@ -20,6 +21,10 @@ NoticePendingItemsInner _$NoticePendingItemsInnerFromJson(
     ],
   );
   final val = NoticePendingItemsInner(
+    delivery: $checkedConvert(
+      'delivery',
+      (v) => $enumDecode(_$NoticePendingItemsInnerDeliveryEnumEnumMap, v),
+    ),
     group: $checkedConvert('group', (v) => v as String),
     identifier: $checkedConvert('identifier', (v) => v as String?),
     lastSeenInApp: $checkedConvert('lastSeenInApp', (v) => v as String?),
@@ -35,11 +40,23 @@ NoticePendingItemsInner _$NoticePendingItemsInnerFromJson(
 Map<String, dynamic> _$NoticePendingItemsInnerToJson(
   NoticePendingItemsInner instance,
 ) => <String, dynamic>{
+  'delivery': _$NoticePendingItemsInnerDeliveryEnumEnumMap[instance.delivery]!,
   'group': instance.group,
   'identifier': instance.identifier,
   'lastSeenInApp': instance.lastSeenInApp,
   'name': instance.name,
   'state': _$NoticePendingItemsInnerStateEnumEnumMap[instance.state]!,
+};
+
+const _$NoticePendingItemsInnerDeliveryEnumEnumMap = {
+  NoticePendingItemsInnerDeliveryEnum.notDelivered: 'not_delivered',
+  NoticePendingItemsInnerDeliveryEnum.delivered: 'delivered',
+  NoticePendingItemsInnerDeliveryEnum.opened: 'opened',
+  NoticePendingItemsInnerDeliveryEnum.muted: 'muted',
+  NoticePendingItemsInnerDeliveryEnum.tierOff: 'tier_off',
+  NoticePendingItemsInnerDeliveryEnum.noDevice: 'no_device',
+  NoticePendingItemsInnerDeliveryEnum.scheduled: 'scheduled',
+  NoticePendingItemsInnerDeliveryEnum.none: 'none',
 };
 
 const _$NoticePendingItemsInnerStateEnumEnumMap = {

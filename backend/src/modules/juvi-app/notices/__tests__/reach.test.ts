@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Types } from 'mongoose';
-import { reachBucket, sparkline, remindersView, csvCell } from '../reach-service';
+import { reachBucket, sparkline, remindersView, csvCell, deliveryState } from '../reach-service';
 
 describe('reachBucket', () => {
   const ack = { at: new Date(), late: false, method: 'hold' as const, sessionId: new Types.ObjectId(), offline: false };
@@ -38,5 +38,25 @@ describe('csvCell', () => {
     expect(csvCell('say "hi"')).toBe('"say ""hi"""');
     expect(csvCell('=HYPERLINK("x")')).toBe(`"'=HYPERLINK(""x"")"`);
     expect(csvCell('+91')).toBe("'+91");
+  });
+});
+
+describe('deliveryState (notifications spec §7.4)', () => {
+  it('maps a pending member\'s notification row to the Reach delivery column', () => {
+    expect(deliveryState(true, { status: 'sent', reason: null })).toBe('not_delivered');
+    expect(deliveryState(true, { status: 'failed', reason: null })).toBe('not_delivered');
+    expect(deliveryState(true, { status: 'delivered', reason: null })).toBe('delivered');
+    expect(deliveryState(true, { status: 'opened', reason: null })).toBe('opened');
+    expect(deliveryState(true, { status: 'scheduled', reason: null })).toBe('scheduled');
+    expect(deliveryState(true, { status: 'suppressed', reason: 'muted' })).toBe('muted');
+    expect(deliveryState(true, { status: 'suppressed', reason: 'tier_off' })).toBe('tier_off');
+    expect(deliveryState(true, { status: 'suppressed', reason: 'no_device' })).toBe('no_device');
+  });
+
+  it('is none for someone not on Juvi, a cancelled row, or no row at all', () => {
+    expect(deliveryState(false, undefined)).toBe('none');
+    expect(deliveryState(false, { status: 'sent', reason: null })).toBe('none');
+    expect(deliveryState(true, undefined)).toBe('none');
+    expect(deliveryState(true, { status: 'cancelled', reason: 'acknowledged' })).toBe('none');
   });
 });

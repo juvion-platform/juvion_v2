@@ -151,6 +151,8 @@ Class | Method | HTTP request | Description
  - [NoticeReachAddedLater](doc/NoticeReachAddedLater.md)
  - [NoticeReachAddedLaterItemsInner](doc/NoticeReachAddedLaterItemsInner.md)
  - [NoticeReachCommentsInner](doc/NoticeReachCommentsInner.md)
+ - [NoticeReachDelivery](doc/NoticeReachDelivery.md)
+ - [NoticeReachDeliverySuppressed](doc/NoticeReachDeliverySuppressed.md)
  - [NoticeReachGroupsInner](doc/NoticeReachGroupsInner.md)
  - [NoticeReachLateAcksInner](doc/NoticeReachLateAcksInner.md)
  - [NoticeReminders](doc/NoticeReminders.md)
