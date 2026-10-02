@@ -369,6 +369,17 @@ class AppLocalizationsEn extends AppLocalizations {
       'One more thing from your college is on its way. Continue for now.';
 
   @override
+  String get onboardingFirstNoticeTitle => 'Your first notice';
+
+  @override
+  String get onboardingFirstNoticeBody =>
+      'This is how your college reaches you. Hold the button, or tap and confirm, to acknowledge it.';
+
+  @override
+  String get onboardingFirstNoticeOffline =>
+      'Your welcome notice will be waiting on Today once you are online.';
+
+  @override
   String get onboardingIdentityTitle => 'Your college has set you up';
 
   @override

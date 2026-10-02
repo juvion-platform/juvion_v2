@@ -742,6 +742,24 @@ abstract class AppLocalizations {
   /// **'One more thing from your college is on its way. Continue for now.'**
   String get onboardingUnknownStepBody;
 
+  /// Onboarding step 4 heading (spec §4 US-5).
+  ///
+  /// In en, this message translates to:
+  /// **'Your first notice'**
+  String get onboardingFirstNoticeTitle;
+
+  /// No description provided for @onboardingFirstNoticeBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This is how your college reaches you. Hold the button, or tap and confirm, to acknowledge it.'**
+  String get onboardingFirstNoticeBody;
+
+  /// Onboarding step 4 when the welcome notice cannot be loaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Your welcome notice will be waiting on Today once you are online.'**
+  String get onboardingFirstNoticeOffline;
+
   /// Onboarding identity step heading.
   ///
   /// In en, this message translates to:
