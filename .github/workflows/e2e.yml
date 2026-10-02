@@ -66,6 +66,9 @@ jobs:
       # doesn't exit under NODE_ENV=production. The e2e suite never
       # decrypts a real temporary password with it.
       JUVI_CREDENTIAL_KEY: 'AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE='
+      # Dummy notification-receipt HMAC key (at least 32 characters) for the
+      # same guard. Push uses the fake transport: FIREBASE_SERVICE_ACCOUNT_JSON is unset.
+      JUVI_RECEIPT_KEY: 'ci-dummy-receipt-key-0123456789abcdef'
       E2E_BASE_URL: http://localhost:5173
       E2E_BACKEND_URL: http://localhost:3003
       # Skip rate-limiting so serial Playwright login flows do not trip
