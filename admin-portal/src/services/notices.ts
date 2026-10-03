@@ -53,6 +53,10 @@ export interface PublishNoticeInput {
   title: string; body: string; attachments: NoticeAttachment[]; audience: { rules: AudienceRule[] };
   ackRequired: boolean; ackDeadline?: string | null; ackCommentAllowed: boolean;
   priority: NoticePriority; purpose: NoticePurpose; office?: string;
+  /** Fixed once published (notifications spec §4.2). */
+  confidential: boolean;
+  /** Sent with `priority: 'urgent'` only: 10–300 characters (spec §6.5). */
+  urgentReason?: string;
 }
 
 export interface ReachGroup { label: string; total: number; acknowledged: number; seen: number; notSeen: number; notOnJuvi: number }

@@ -34,7 +34,7 @@ export const ROLE_LABELS: Record<string, string> = { student: 'All students', fa
 export const roleLabel = (id: string): string => ROLE_LABELS[id] ?? id;
 
 export const PRIORITY_LABELS: Record<NoticePriority, string> = { routine: 'Routine', important: 'Important', urgent: 'Urgent' };
-export const URGENT_NOTE = 'Urgent bypasses quiet hours once push arrives. Until then every notice reaches the app on its next refresh.';
+export const URGENT_NOTE = 'Urgent notifies everyone at once, even during quiet hours and when they have muted the channel.';
 
 export const PENDING_STATE_LABELS: Record<PendingPerson['state'], string> = { seen: 'Seen, not acknowledged', not_seen: 'Not seen', not_on_juvi: 'Not on Juvi' };
 
