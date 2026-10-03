@@ -144,11 +144,11 @@ void main() {
       expect([calls[1], calls[2]], ['Exam Section', 'Hall tickets are out']);
       final details = (calls[3] as NotificationDetails).android!;
       expect([details.channelId, details.importance, details.priority, details.groupKey, details.setAsGroupSummary],
-          ['juvi_urgent', Importance.max, Priority.max, 'notice:n00000000000000000000001', false]);
+          ['juvi_urgent', Importance.max, Priority.max, 'notice:66f1c0ffee0000000000abcd', false]);
       expect(NoticePush.fromPayload(calls[4] as String)!.deliveryId, p.deliveryId);
       expect(calls[5], summaryIdFor(p));
       final summary = (calls[8] as NotificationDetails).android!;
-      expect([summary.groupKey, summary.setAsGroupSummary, summary.groupAlertBehavior], ['notice:n00000000000000000000001', true, GroupAlertBehavior.children]);
+      expect([summary.groupKey, summary.setAsGroupSummary, summary.groupAlertBehavior], ['notice:66f1c0ffee0000000000abcd', true, GroupAlertBehavior.children]);
     });
   });
 }

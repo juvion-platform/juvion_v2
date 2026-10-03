@@ -73,26 +73,57 @@ class DeepLinkResolver {
     await open(p.location);
   }
 
+  /// Only the attention sheet and a notice by id: a payload or stored value is never a route.
+  static final _allowed = RegExp(r'^(/attention|/notices/[0-9a-f]{24})$');
+  static bool isAllowed(String location) => _allowed.hasMatch(location);
+
   Future<void> open(String location) async {
+    if (!isAllowed(location)) return;
     final session = _session();
     if (session is SignedIn && sessionReady(session)) {
       _navigate(session, location);
       return;
     }
-    final link = PendingLink(location: location, createdAt: _now().toUtc(), owner: await _store.readLastAccount());
+    // Held before the first await, so a session that turns ready while the owner is being
+    // read still finds it; the owner is filled in afterwards.
+    final early = PendingLink(location: location, createdAt: _now().toUtc());
+    _pending = early;
+    final owner = await _store.readLastAccount();
+    if (!identical(_pending, early)) return; // already used by a ready session
+    final link = PendingLink(location: location, createdAt: early.createdAt, owner: owner);
     _pending = link;
     await _store.writePendingLink(jsonEncode(link.toJson()));
+    final now = _session();
+    if (identical(_pending, link) && now is SignedIn && sessionReady(now)) await onSessionChanged(now);
   }
 
-  /// On every session change (and once at startup): a ready session uses the held
-  /// destination, if it is still fresh and meant for this account.
-  Future<void> onSessionChanged(SessionState next) async {
+  /// Uses the held destination for the session at hand (the provider calls this once at
+  /// startup, for a link held by an earlier process).
+  Future<void> start() => onSessionChanged(_session());
+
+  Future<void> _chain = Future<void>.value();
+
+  /// On every session change (and at startup): a ready session uses the held destination,
+  /// if it is still fresh and meant for this account. Runs one at a time, so two quick
+  /// emissions cannot both use it.
+  Future<void> onSessionChanged(SessionState next) {
+    final run = _chain.then((_) => _consume(next));
+    _chain = run.catchError((Object _) {});
+    return run;
+  }
+
+  Future<void> _consume(SessionState next) async {
     if (next is! SignedIn || !sessionReady(next)) return;
+    var link = _pending;
+    _pending = null;
     final owner = '${await _store.readCollegeId() ?? ''}:${next.account.id}';
-    final link = _pending ?? _decode(await _store.readPendingLink());
+    if (link == null) {
+      final raw = await _store.readPendingLink();
+      link = _decode(raw);
+      if (raw != null && link == null) await _store.clearPendingLink();
+    }
     await _store.writeLastAccount(owner);
     if (link == null) return;
-    _pending = null;
     await _store.clearPendingLink();
     if (_now().toUtc().difference(link.createdAt) > maxAge) return;
     if (link.owner != null && link.owner != owner) return;
@@ -108,7 +139,8 @@ class DeepLinkResolver {
   static PendingLink? _decode(String? raw) {
     if (raw == null) return null;
     try {
-      return PendingLink.fromJson(Map<String, dynamic>.from(jsonDecode(raw) as Map));
+      final link = PendingLink.fromJson(Map<String, dynamic>.from(jsonDecode(raw) as Map));
+      return isAllowed(link.location) ? link : null;
     } on Object {
       return null;
     }
@@ -125,5 +157,6 @@ DeepLinkResolver deepLinkResolver(Ref ref) {
     analytics: ref.read(analyticsProvider),
   );
   ref.listen<SessionState>(sessionControllerProvider, (_, next) => unawaited(resolver.onSessionChanged(next)));
+  unawaited(resolver.start());
   return resolver;
 }

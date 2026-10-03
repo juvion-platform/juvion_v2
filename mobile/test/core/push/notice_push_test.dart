@@ -12,14 +12,20 @@ void main() {
       final p = NoticePush.tryParse(pushData())!;
       expect(p.deliveryId, 'd00000000000000000000001');
       expect(p.receipt, 'sig.1760000000');
-      expect(p.noticeId, 'n00000000000000000000001');
+      expect(p.noticeId, '66f1c0ffee0000000000abcd');
       expect(p.tier, 'important');
-      expect(p.groupKey, 'notice:n00000000000000000000001');
+      expect(p.groupKey, 'notice:66f1c0ffee0000000000abcd');
       expect(p.office, 'Exam Section');
       expect(p.title, 'Hall tickets are out');
       expect(p.variant, 'published');
       expect(p.count, 1);
-      expect(p.location, '/notices/n00000000000000000000001');
+      expect(p.location, '/notices/66f1c0ffee0000000000abcd');
+    });
+
+    test('a noticeId that is not 24 hex characters is refused (it becomes a route)', () {
+      for (final bad in ['x/reach', '../x', '${'a' * 24}?q=1', 'n1', ('a' * 23), '']) {
+        expect(NoticePush.tryParse({...pushData(), 'noticeId': bad}), isNull, reason: bad);
+      }
     });
 
     test('a confidential notice has no title', () {

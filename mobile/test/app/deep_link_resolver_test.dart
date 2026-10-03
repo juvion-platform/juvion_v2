@@ -1,4 +1,5 @@
 // mobile/test/app/deep_link_resolver_test.dart
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
@@ -24,6 +25,9 @@ import 'redirect_test.dart' show acct;
 class _Storage extends Mock implements FlutterSecureStorage {}
 
 void main() {
+  const id = '66f1c0ffee0000000000abcd';
+  const id2 = '66f1c0ffee0000000000abce';
+  const id9 = '66f1c0ffee0000000000abcf';
   late Map<String, String> mem;
   late SecureStore store;
   late SessionState session;
@@ -31,6 +35,7 @@ void main() {
   late ValueNotifier<int> refresh;
   late List<String> receipts;
   late SpyAnalytics analytics;
+  Completer<String?>? gate;
   var now = DateTime.utc(2026, 10, 3, 9);
 
   final student = SessionState.signedIn(acct());
@@ -41,7 +46,11 @@ void main() {
     now = DateTime.utc(2026, 10, 3, 9);
     mem = {'juvi.college_id': 'c1'};
     final storage = _Storage();
-    when(() => storage.read(key: any(named: 'key'))).thenAnswer((i) async => mem[i.namedArguments[#key]]);
+    gate = null;
+    when(() => storage.read(key: any(named: 'key'))).thenAnswer((i) async {
+      if (i.namedArguments[#key] == 'juvi.last_account' && gate != null) return gate!.future;
+      return mem[i.namedArguments[#key]];
+    });
     when(() => storage.write(key: any(named: 'key'), value: any(named: 'value'))).thenAnswer((i) async {
       mem[i.namedArguments[#key] as String] = i.namedArguments[#value] as String;
     });
@@ -100,16 +109,16 @@ void main() {
 
   testWidgets('ready (cold start): home, then the notice on top; Back lands on Today', (t) async {
     final r = await pump(t, student);
-    await r.open('/notices/n1');
+    await r.open('/notices/$id');
     await t.pumpAndSettle();
-    expect(find.text('at /notices/n1'), findsOneWidget);
+    expect(find.text('at /notices/$id'), findsOneWidget);
     await back(t);
     expect(find.text('at /today'), findsOneWidget);
   });
 
   testWidgets('faculty: Back lands on Teaching', (t) async {
     final r = await pump(t, faculty);
-    await r.open('/notices/n1');
+    await r.open('/notices/$id');
     await t.pumpAndSettle();
     await back(t);
     expect(find.text('at /teaching'), findsOneWidget);
@@ -136,12 +145,12 @@ void main() {
   testWidgets('signed out: held through sign-in, then opened once; Back lands on Today', (t) async {
     mem['juvi.last_account'] = 'c1:a';
     final r = await pump(t, const SessionState.signedOut());
-    await r.open('/notices/n1');
+    await r.open('/notices/$id');
     await t.pumpAndSettle();
     expect(find.text('at /sign-in'), findsOneWidget);
-    expect(jsonDecode(mem['juvi.pending_link']!), {'location': '/notices/n1', 'createdAt': '2026-10-03T09:00:00.000Z', 'owner': 'c1:a'});
+    expect(jsonDecode(mem['juvi.pending_link']!), {'location': '/notices/$id', 'createdAt': '2026-10-03T09:00:00.000Z', 'owner': 'c1:a'});
     await become(t, r, student);
-    expect(find.text('at /notices/n1'), findsOneWidget);
+    expect(find.text('at /notices/$id'), findsOneWidget);
     expect(mem['juvi.pending_link'], isNull);
     await back(t);
     expect(find.text('at /today'), findsOneWidget);
@@ -152,32 +161,32 @@ void main() {
 
   testWidgets('held through the password change and onboarding', (t) async {
     final r = await pump(t, SessionState.signedIn(acct(mustChange: true)));
-    await r.open('/notices/n1');
+    await r.open('/notices/$id');
     await become(t, r, SessionState.signedIn(acct(step: 2, complete: false)));
     expect(find.text('at /onboarding/2'), findsOneWidget);
     await become(t, r, student);
-    expect(find.text('at /notices/n1'), findsOneWidget);
+    expect(find.text('at /notices/$id'), findsOneWidget);
   });
 
   testWidgets('held while the institution is paused', (t) async {
     final r = await pump(t, const SessionState.paused('Back on Monday'));
-    await r.open('/notices/n1');
+    await r.open('/notices/$id');
     await t.pumpAndSettle();
     expect(find.text('at /paused'), findsOneWidget);
     await become(t, r, student);
-    expect(find.text('at /notices/n1'), findsOneWidget);
+    expect(find.text('at /notices/$id'), findsOneWidget);
   });
 
   testWidgets('survives a restart: a new resolver uses the stored destination', (t) async {
-    mem['juvi.pending_link'] = jsonEncode(PendingLink(location: '/notices/n9', createdAt: now.subtract(const Duration(hours: 2))).toJson());
+    mem['juvi.pending_link'] = jsonEncode(PendingLink(location: '/notices/$id9', createdAt: now.subtract(const Duration(hours: 2))).toJson());
     final r = await pump(t, const SessionState.signedOut());
     await become(t, r, student);
-    expect(find.text('at /notices/n9'), findsOneWidget);
+    expect(find.text('at /notices/$id9'), findsOneWidget);
   });
 
   testWidgets('older than 24 hours: dropped', (t) async {
     final r = await pump(t, const SessionState.signedOut());
-    await r.open('/notices/n1');
+    await r.open('/notices/$id');
     now = now.add(const Duration(hours: 24, minutes: 1));
     await become(t, r, student);
     expect(find.text('at /today'), findsOneWidget);
@@ -187,15 +196,82 @@ void main() {
   testWidgets('another account, or another institution, signs in: dropped', (t) async {
     mem['juvi.last_account'] = 'c1:someone-else';
     final r = await pump(t, const SessionState.signedOut());
-    await r.open('/notices/n1');
+    await r.open('/notices/$id');
     await become(t, r, student);
     expect(find.text('at /today'), findsOneWidget);
     expect(mem['juvi.last_account'], 'c1:a');
 
     mem['juvi.college_id'] = 'c2';
     await become(t, r, const SessionState.signedOut());
-    await r.open('/notices/n2');
+    await r.open('/notices/$id2');
     await become(t, r, student);
     expect(find.text('at /today'), findsOneWidget);
+  });
+
+
+  testWidgets('only /attention and /notices/<id> open: anything else is refused', (t) async {
+    final r = await pump(t, student);
+    for (final bad in ['/notices/x/reach', '/notices/abc', '/notices/$id/reach', '/notices/$id?x=1', '/notices/../today', '/today', 'https://evil.test/']) {
+      await r.open(bad);
+      await t.pumpAndSettle();
+      expect(find.text('at /today'), findsOneWidget, reason: bad);
+      expect(router.canPop(), isFalse, reason: bad);
+    }
+    await r.open('/notices/$id');
+    await t.pumpAndSettle();
+    expect(find.text('at /notices/$id'), findsOneWidget);
+  });
+
+  testWidgets('a refused destination is not held while signed out', (t) async {
+    final r = await pump(t, const SessionState.signedOut());
+    await r.open('/notices/x/reach');
+    expect(mem['juvi.pending_link'], isNull);
+  });
+
+  testWidgets('a stored destination that fails the check is dropped and cleared', (t) async {
+    mem['juvi.pending_link'] = jsonEncode(PendingLink(location: '/notices/x/reach', createdAt: now).toJson());
+    final r = await pump(t, const SessionState.signedOut());
+    await become(t, r, student);
+    expect(find.text('at /today'), findsOneWidget);
+    expect(router.canPop(), isFalse);
+    expect(mem['juvi.pending_link'], isNull);
+  });
+
+  testWidgets('the session turns ready while open() is still reading: pushed exactly once', (t) async {
+    final r = await pump(t, const SessionState.signedOut());
+    gate = Completer<String?>();
+    final opening = r.open('/notices/$id');
+    await become(t, r, student);
+    gate!.complete('c1:a');
+    await opening;
+    await t.pumpAndSettle();
+    expect(find.text('at /notices/$id'), findsOneWidget);
+    expect(mem['juvi.pending_link'], isNull);
+    await back(t);
+    expect(find.text('at /today'), findsOneWidget);
+    expect(router.canPop(), isFalse);
+  });
+
+  testWidgets('two ready emissions back to back push the destination once', (t) async {
+    final r = await pump(t, const SessionState.signedOut());
+    await r.open('/notices/$id');
+    session = student;
+    refresh.value++;
+    await Future.wait([r.onSessionChanged(student), r.onSessionChanged(student)]);
+    await t.pumpAndSettle();
+    expect(find.text('at /notices/$id'), findsOneWidget);
+    await back(t);
+    expect(find.text('at /today'), findsOneWidget);
+    expect(router.canPop(), isFalse);
+  });
+
+  testWidgets('start(): a link held by an earlier process opens for a session that is already ready', (t) async {
+    mem['juvi.last_account'] = 'c1:a';
+    mem['juvi.pending_link'] = jsonEncode(PendingLink(location: '/notices/$id', createdAt: now, owner: 'c1:a').toJson());
+    final r = await pump(t, student);
+    await r.start();
+    await t.pumpAndSettle();
+    expect(find.text('at /notices/$id'), findsOneWidget);
+    expect(mem['juvi.pending_link'], isNull);
   });
 }

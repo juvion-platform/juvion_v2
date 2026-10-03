@@ -18,6 +18,8 @@ class NoticePush {
     this.title,
   });
 
+  static final _objectId = RegExp(r'^[0-9a-f]{24}$');
+
   /// Null for anything that is not a well-formed notice push (an unknown `kind` from a
   /// later sub-project, or a missing field), which the app then ignores.
   static NoticePush? tryParse(Map<String, dynamic> data) {
@@ -30,6 +32,8 @@ class NoticePush {
     final office = s('office');
     if (s('kind') != 'notice' || deliveryId == null || receipt == null || noticeId == null || groupKey == null || office == null) return null;
     if (!const {'urgent', 'important', 'routine'}.contains(tier)) return null;
+    // The id becomes a route (`/notices/<id>`), so only an ObjectId is accepted.
+    if (!_objectId.hasMatch(noticeId)) return null;
     return NoticePush(
       deliveryId: deliveryId,
       receipt: receipt,
