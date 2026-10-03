@@ -143,7 +143,7 @@ export function NoticeComposerForm({ initial, onPublished, onCancel, titleRef }:
     publish.mutate({
       title: title.trim(), body: body.trim(), attachments: files.attachments, audience: { rules },
       ackRequired, ackDeadline: deadlineIso, ackCommentAllowed: ackRequired && ackCommentAllowed,
-      priority: chosenPriority, purpose, confidential, ...(urgent ? { urgentReason: urgentReason.trim() } : {}),
+      priority: chosenPriority, purpose, confidential: welcome ? false : confidential, ...(urgent ? { urgentReason: urgentReason.trim() } : {}),
       ...(officeChoice ? { office: officeChoice } : {}),
     });
   }
@@ -166,7 +166,7 @@ export function NoticeComposerForm({ initial, onPublished, onCancel, titleRef }:
       {confirming && (
         <ConfirmStep
           preview={confirming} office={officeChoice} deadline={deadlineIso && `${formatInZone(deadlineIso, tz)} (${tz})`} welcome={welcome}
-          urgentReason={urgent ? urgentReason.trim() : null} confidentialOffice={confidential ? fromOffice : null}
+          urgentReason={urgent ? urgentReason.trim() : null} confidentialOffice={confidential && !welcome ? fromOffice : null}
           pending={publish.isPending} error={publish.isError && !refusal ? publishErrorMessage(publish.error) : null}
           onBack={backToEdit} onPublish={submit}
         />
@@ -254,21 +254,22 @@ export function NoticeComposerForm({ initial, onPublished, onCancel, titleRef }:
               {targets && !canUrgent && <p className="mt-1 text-xs text-gray-500">{NEED_URGENT_HINT}</p>}
               {urgent && (
                 <div className="mt-2 space-y-2">
-                  <p className="text-xs text-amber-700">{URGENT_NOTE}</p>
+                  {!welcome && <p className="text-xs text-amber-700">{URGENT_NOTE}</p>}
                   <div>
                     <label htmlFor={reasonId} className={lbl}>Reason for Urgent</label>
                     <textarea id={reasonId} className={inp} rows={2} required value={urgentReason} maxLength={URGENT_REASON_MAX}
-                      aria-describedby={`${reasonId}-count`} onChange={(e) => setUrgentReason(e.target.value)} />
+                      aria-invalid={Boolean(errors.urgentReason)}
+                      aria-describedby={errors.urgentReason ? `${reasonId}-count ${reasonId}-err` : `${reasonId}-count`} onChange={(e) => setUrgentReason(e.target.value)} />
                     <p id={`${reasonId}-count`} className="mt-1 text-right text-xs text-gray-500">
                       {urgentReason.length}/{URGENT_REASON_MAX} · at least {URGENT_REASON_MIN} · kept in the audit trail
                     </p>
-                    {err('urgentReason')}
+                    {errors.urgentReason && <p id={`${reasonId}-err`} className="mt-1 text-xs text-red-600">{errors.urgentReason}</p>}
                   </div>
                 </div>
               )}
             </fieldset>
 
-            <fieldset>
+            {!welcome && <fieldset>
               <legend className={lbl}>Phone notification</legend>
               <label className="flex items-center gap-2 text-sm">
                 <input id={confidentialId} type="checkbox" checked={confidential} aria-describedby={`${confidentialId}-help`}
@@ -276,7 +277,7 @@ export function NoticeComposerForm({ initial, onPublished, onCancel, titleRef }:
                 Confidential
               </label>
               <p id={`${confidentialId}-help`} className="mt-1 text-xs text-gray-500">{confidentialHelp(fromOffice)}</p>
-            </fieldset>
+            </fieldset>}
 
             <div className="flex justify-end gap-2 border-t pt-4">
               <button type="button" onClick={onCancel} className="rounded-lg border px-4 py-2 text-sm hover:bg-gray-50">Cancel</button>
@@ -327,6 +328,7 @@ function ConfirmStep({ preview: d, office, deadline, welcome, urgentReason, conf
             <li>Each new account sees it at onboarding step 4, once it is saved as the welcome notice.</li>
             <li>People already using Juvi do not receive it. To reach them, publish a regular notice.</li>
             {office && <li>From {office}.</li>}
+            {urgentReason && <li>Urgent. Reason: {urgentReason}</li>}
           </>
         ) : (
           <>

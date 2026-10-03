@@ -202,7 +202,7 @@ describe('ReachTab', () => {
     it('says so when no phone notification was decided for the notice', async () => {
       renderWithProviders(<ReachTab notice={NOTICE} />);
       const group = await screen.findByRole('group', { name: 'Notification delivery' });
-      expect(group).toHaveTextContent('No phone notifications for this notice.');
+      expect(group).toHaveTextContent('No phone notifications recorded yet for this notice.');
       expect(within(group).queryByText('Delivered')).toBeNull();
     });
 

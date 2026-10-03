@@ -36,7 +36,7 @@ function DeliveryRow({ d }: { d: DeliveryCounts }) {
     <div role="group" aria-label="Notification delivery" className="mt-4 border-t pt-3">
       <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Notification delivery</p>
       {deliveryTotal(d) === 0 ? (
-        <p className="mt-1 text-sm text-gray-500">No phone notifications for this notice.</p>
+        <p className="mt-1 text-sm text-gray-500">No phone notifications recorded yet for this notice.</p>
       ) : (
         <>
           <dl className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-sm">

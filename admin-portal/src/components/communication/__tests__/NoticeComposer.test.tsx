@@ -264,6 +264,37 @@ describe('NoticeComposer', () => {
       await waitFor(() => expect(publishNotice).toHaveBeenCalledWith(expect.objectContaining({ priority: 'urgent', urgentReason: 'Exam moved to today' })));
     });
 
+    it('links the reason error to the field', async () => {
+      open();
+      await fillNotice();
+      fireEvent.click(screen.getByLabelText('Urgent'));
+      const reason = screen.getByLabelText('Reason for Urgent');
+      expect(reason).not.toHaveAttribute('aria-invalid', 'true');
+      fireEvent.change(reason, { target: { value: ' Too short ' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Review and publish' }));
+      expect(reason).toHaveAttribute('aria-invalid', 'true');
+      expect(reason).toHaveAccessibleDescription(expect.stringContaining('Say why this is Urgent (at least 10 characters)'));
+      expect(reason).toHaveAccessibleDescription(expect.stringContaining('11/300'));
+    });
+
+    it('offers a welcome notice no Confidential control and no "notifies at once" note, and sends confidential false', async () => {
+      open({ purpose: 'welcome', title: 'Welcome to Juvi', ackRequired: true, audience: { role: [{ id: 'student', label: 'All students' }] } });
+      fireEvent.change(screen.getByLabelText('Notice'), { target: { value: 'Hello.' } });
+      await screen.findByText(/2 on Juvi/);
+      expect(screen.queryByLabelText('Confidential')).toBeNull();
+      expect(screen.queryByRole('group', { name: 'Phone notification' })).toBeNull();
+      fireEvent.click(await screen.findByLabelText('Urgent'));
+      expect(screen.queryByText(/notifies everyone at once/)).toBeNull();
+      fireEvent.change(screen.getByLabelText('Reason for Urgent'), { target: { value: 'Exam moved to today' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Review and publish' }));
+      expect(await screen.findByRole('heading', { name: 'Publish this welcome notice?' })).toBeInTheDocument();
+      expect(screen.getByText('Urgent. Reason: Exam moved to today')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Publish notice' }));
+      await waitFor(() => expect(publishNotice).toHaveBeenCalledWith(expect.objectContaining({
+        purpose: 'welcome', confidential: false, priority: 'urgent', urgentReason: 'Exam moved to today',
+      })));
+    });
+
     it('drops the reason when the priority goes back to Important', async () => {
       open();
       await fillNotice();
