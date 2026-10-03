@@ -296,5 +296,10 @@
   "@onboardingNotNow": { "description": "Onboarding step 3: continues without asking for the permission." },
   "settingsNotificationsBlocked": "Blocked in system settings",
   "settingsNotificationsBlockedBody": "Juvi can't show notifications. Tap to allow them.",
-  "@settingsNotificationsBlockedBody": { "description": "S12: shown while the OS permission is off; opens this app's notification settings." }
+  "@settingsNotificationsBlockedBody": { "description": "S12: shown while the OS permission is off; opens this app's notification settings." },
+  "permissionCardTitle": "Notifications are off",
+  "permissionCardBody": "You won't hear about Urgent notices, reminders or deadlines until you allow notifications.",
+  "permissionCardOpenSettings": "Open settings",
+  "permissionCardDismiss": "Not now",
+  "@permissionCardDismiss": { "description": "S14 permission-denied card on Today/Teaching (notifications spec §8.4); dismissing hides it for 30 days." }
 }

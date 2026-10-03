@@ -1341,6 +1341,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Juvi can\'t show notifications. Tap to allow them.'**
   String get settingsNotificationsBlockedBody;
+
+  /// No description provided for @permissionCardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications are off'**
+  String get permissionCardTitle;
+
+  /// No description provided for @permissionCardBody.
+  ///
+  /// In en, this message translates to:
+  /// **'You won\'t hear about Urgent notices, reminders or deadlines until you allow notifications.'**
+  String get permissionCardBody;
+
+  /// No description provided for @permissionCardOpenSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Open settings'**
+  String get permissionCardOpenSettings;
+
+  /// S14 permission-denied card on Today/Teaching (notifications spec §8.4); dismissing hides it for 30 days.
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get permissionCardDismiss;
 }
 
 class _AppLocalizationsDelegate

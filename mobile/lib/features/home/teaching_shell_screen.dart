@@ -6,6 +6,7 @@ import 'package:juvi/core/http/api_failure.dart';
 import 'package:juvi/core/repos/me_repository.dart';
 import 'package:juvi/core/repos/notices_repository.dart';
 import 'package:juvi/features/notices/widgets/attention_stack.dart';
+import 'package:juvi/features/notifications/permission_card.dart';
 import 'package:juvi/shared/format.dart';
 import 'package:juvi/shared/widgets/as_of_line.dart';
 import 'package:juvi/shared/widgets/empty_state.dart';
@@ -13,7 +14,8 @@ import 'package:juvi/shared/widgets/failure_view.dart';
 import 'package:juvi/shared/widgets/section_header.dart';
 import 'package:juvi/shared/widgets/skeleton.dart';
 
-/// Faculty home shell (S10): my acknowledgements (the attention stack, notices spec
+/// Faculty home shell (S10): the S14 permission card when notifications are off
+/// (notifications spec §8.4), then my acknowledgements (the attention stack, notices spec
 /// §4 US-3.1) first. Post-to-class and the department/college feeds arrive in
 /// sub-projects 4 and 5.
 class TeachingShellScreen extends ConsumerWidget {
@@ -47,6 +49,7 @@ class TeachingShellScreen extends ConsumerWidget {
                   ),
                 ),
                 if (c.stale) AsOfLine(c.asOf),
+                const PermissionCard(),
                 SectionHeader(
                   l.teachingAcknowledgementsSection,
                   trailing: TextButton(onPressed: () => GoRouter.maybeOf(context)?.push('/attention'), child: Text(l.attentionSeeAll)),

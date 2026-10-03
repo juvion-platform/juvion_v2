@@ -6,6 +6,7 @@ import 'package:juvi/core/http/api_failure.dart';
 import 'package:juvi/core/repos/me_repository.dart';
 import 'package:juvi/core/repos/notices_repository.dart';
 import 'package:juvi/features/notices/widgets/attention_stack.dart';
+import 'package:juvi/features/notifications/permission_card.dart';
 import 'package:juvi/shared/format.dart';
 import 'package:juvi/shared/widgets/as_of_line.dart';
 import 'package:juvi/shared/widgets/empty_state.dart';
@@ -13,8 +14,9 @@ import 'package:juvi/shared/widgets/failure_view.dart';
 import 'package:juvi/shared/widgets/section_header.dart';
 import 'package:juvi/shared/widgets/skeleton.dart';
 
-/// S03: header, the attention stack (acknowledgement notices, notices spec §4 US-3.1)
-/// and two designed empty states. Timeline and At a glance arrive in sub-project 4.
+/// S03: header, the S14 permission card when notifications are off (notifications spec
+/// §8.4), the attention stack (acknowledgement notices, notices spec §4 US-3.1) and two
+/// designed empty states. Timeline and At a glance arrive in sub-project 4.
 class TodayShellScreen extends ConsumerWidget {
   const TodayShellScreen({super.key});
   @override
@@ -34,6 +36,7 @@ class TodayShellScreen extends ConsumerWidget {
               children: [
                 _Header(firstName: c.data.person.firstName, logoUrl: c.data.institution.logoUrl),
                 if (c.stale) AsOfLine(c.asOf),
+                const PermissionCard(),
                 SectionHeader(
                   l.todayAttentionSection,
                   trailing: TextButton(onPressed: () => GoRouter.maybeOf(context)?.push('/attention'), child: Text(l.attentionSeeAll)),

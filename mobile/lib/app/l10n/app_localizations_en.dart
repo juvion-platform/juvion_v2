@@ -729,4 +729,17 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsNotificationsBlockedBody =>
       'Juvi can\'t show notifications. Tap to allow them.';
+
+  @override
+  String get permissionCardTitle => 'Notifications are off';
+
+  @override
+  String get permissionCardBody =>
+      'You won\'t hear about Urgent notices, reminders or deadlines until you allow notifications.';
+
+  @override
+  String get permissionCardOpenSettings => 'Open settings';
+
+  @override
+  String get permissionCardDismiss => 'Not now';
 }
