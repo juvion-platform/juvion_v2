@@ -66,6 +66,7 @@ export function NoticeComposerForm({ initial, onPublished, onCancel, titleRef }:
   const [urgentReason, setUrgentReason] = useState('');
   const [confidential, setConfidential] = useState(false);
   const [step, setStep] = useState<'compose' | 'confirm'>('compose');
+  const [refusal, setRefusal] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const reviewRef = useRef<HTMLButtonElement>(null);
   const backFromConfirm = useRef(false);
@@ -96,8 +97,16 @@ export function NoticeComposerForm({ initial, onPublished, onCancel, titleRef }:
     mutationFn: (input: PublishNoticeInput) => publishNotice(input),
     // The confirm step renders a failure itself; the success toast is below.
     meta: { silent: true, silentError: true },
-    // The confirm step shows the refusal; fetching /targets again takes Urgent off the form.
-    onError: (err) => { if (isUrgentNotAllowed(err)) qc.invalidateQueries({ queryKey: ['notice-targets'] }); },
+    // A refused Urgent closes the confirm step and falls back to Important, so the publisher
+    // reviews the notice again before anything goes out; /targets is fetched again to take Urgent off the form.
+    onError: (err) => {
+      if (!isUrgentNotAllowed(err)) return;
+      qc.invalidateQueries({ queryKey: ['notice-targets'] });
+      setRefusal(publishErrorMessage(err));
+      setPriority('important');
+      backFromConfirm.current = true;
+      setStep('compose');
+    },
     onSuccess: (notice) => {
       qc.invalidateQueries({ queryKey: ['notices'] });
       const total = preview.data?.total ?? 0;
@@ -126,7 +135,7 @@ export function NoticeComposerForm({ initial, onPublished, onCancel, titleRef }:
   function review() {
     const e = validate();
     setErrors(e);
-    if (Object.keys(e).length === 0) setStep('confirm');
+    if (Object.keys(e).length === 0) { setRefusal(null); publish.reset(); setStep('confirm'); }
   }
 
   function submit() {
@@ -157,7 +166,7 @@ export function NoticeComposerForm({ initial, onPublished, onCancel, titleRef }:
         <ConfirmStep
           preview={confirming} office={officeChoice} deadline={deadlineIso && `${formatInZone(deadlineIso, tz)} (${tz})`} welcome={welcome}
           urgentReason={urgent ? urgentReason.trim() : null} confidentialOffice={confidential ? fromOffice : null}
-          pending={publish.isPending} error={publish.isError ? publishErrorMessage(publish.error) : null}
+          pending={publish.isPending} error={publish.isError && !refusal ? publishErrorMessage(publish.error) : null}
           onBack={backToEdit} onPublish={submit}
         />
       )}
@@ -230,6 +239,7 @@ export function NoticeComposerForm({ initial, onPublished, onCancel, titleRef }:
               </label>
             </fieldset>
 
+            {refusal && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{refusal}</p>}
             <fieldset>
               <legend className={lbl}>Priority</legend>
               <div className="flex gap-4">

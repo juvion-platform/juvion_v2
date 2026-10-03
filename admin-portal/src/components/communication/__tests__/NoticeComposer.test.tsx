@@ -307,13 +307,21 @@ describe('NoticeComposer', () => {
       (getNoticeTargets as Mock).mockResolvedValue({ ...TARGETS, canPublishUrgent: false });
       fireEvent.click(screen.getByRole('button', { name: 'Review and publish' }));
       fireEvent.click(await screen.findByRole('button', { name: 'Publish notice' }));
+      // The refusal closes the confirm step: Publish must not be reachable, so nothing goes out as a priority the user never reviewed.
       expect(await screen.findByRole('alert')).toHaveTextContent('Your account cannot publish Urgent notices. Go back and choose Routine or Important, or ask an IT admin.');
+      expect(screen.queryByRole('heading', { name: /Publish to/ })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Publish notice' })).toBeNull();
       await waitFor(() => expect(getNoticeTargets).toHaveBeenCalledTimes(2));
-      fireEvent.click(screen.getByRole('button', { name: 'Back to edit' }));
       expect(await screen.findByText('Need Urgent? Ask an IT admin.')).toBeInTheDocument();
       expect(screen.queryByLabelText('Urgent')).toBeNull();
       expect(screen.getByLabelText('Important')).toBeChecked();
+      expect(publishNotice).toHaveBeenCalledTimes(1);
+      // Going through review again is the only way to publish, and it shows Important.
+      fireEvent.click(screen.getByRole('button', { name: 'Review and publish' }));
+      expect(await screen.findByRole('heading', { name: 'Publish to 3 people?' })).toBeInTheDocument();
+      expect(screen.queryByText(/^Urgent: phones/)).toBeNull();
       expect(screen.queryByLabelText('Reason for Urgent')).toBeNull();
+      expect(screen.queryByRole('alert')).toBeNull();
     });
   });
 });
