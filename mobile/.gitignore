@@ -43,3 +43,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Firebase config is never committed (notifications spec §10): copy the real file from the
+# Firebase console, or google-services.placeholder.json, to this path (mobile/README.md).
+/android/app/google-services.json

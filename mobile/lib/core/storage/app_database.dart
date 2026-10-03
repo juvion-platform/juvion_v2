@@ -38,6 +38,24 @@ class PendingActionRows extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Analytics events waiting for `POST /v1/events` (notifications spec §8.7). Props are
+/// stored as JSON: ids, enums, numbers and booleans only.
+@DataClassName('AnalyticsEventRow')
+class AnalyticsEvents extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get name => text()();
+  DateTimeColumn get at => dateTime()();
+  TextColumn get props => text()();
+}
+
+class QueuedEvent {
+  const QueuedEvent(this.id, this.name, this.at, this.props);
+  final int id;
+  final String name;
+  final DateTime at;
+  final Map<String, dynamic> props;
+}
+
 class CachedDoc {
   const CachedDoc(this.json, this.asOf);
   final Map<String, dynamic> json;
@@ -95,7 +113,7 @@ Future<AppDatabase> openRecovering(AppDatabase Function() open, Future<void> Fun
   return fresh;
 }
 
-@DriftDatabase(tables: [KvCache, PendingActionRows])
+@DriftDatabase(tables: [KvCache, PendingActionRows, AnalyticsEvents])
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
   AppDatabase.memory() : super(NativeDatabase.memory());
@@ -127,8 +145,20 @@ class AppDatabase extends _$AppDatabase {
     );
   }
 
+  /// 2: `analytics_events` (notifications Plan 3).
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onCreate: (m) => m.createAll(),
+        onUpgrade: (m, from, to) async {
+          if (from < 2) await m.createTable(analyticsEvents);
+        },
+      );
+
+  /// The queue keeps the newest 1,000 events; older ones are dropped first.
+  static const analyticsCap = 1000;
 
   Future<CachedDoc?> readDoc(String key) async {
     final row = await (select(kvCache)..where((t) => t.key.equals(key))).getSingleOrNull();
@@ -186,8 +216,33 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> removeAction(String id) => (delete(pendingActionRows)..where((t) => t.id.equals(id))).go();
 
+  Future<void> enqueueEvent(String name, DateTime at, Map<String, Object> props) async {
+    await into(analyticsEvents).insert(AnalyticsEventsCompanion.insert(name: name, at: at.toUtc(), props: jsonEncode(props)));
+    await customStatement(
+      'DELETE FROM analytics_events WHERE id NOT IN (SELECT id FROM analytics_events ORDER BY id DESC LIMIT $analyticsCap)',
+    );
+  }
+
+  Future<int> eventCount() async {
+    final count = analyticsEvents.id.count();
+    return (await (selectOnly(analyticsEvents)..addColumns([count])).getSingle()).read(count) ?? 0;
+  }
+
+  /// The oldest [limit] queued events.
+  Future<List<QueuedEvent>> eventBatch(int limit) async {
+    final rows = await (select(analyticsEvents)
+          ..orderBy([(t) => OrderingTerm.asc(t.id)])
+          ..limit(limit))
+        .get();
+    return [for (final r in rows) QueuedEvent(r.id, r.name, r.at.toUtc(), jsonDecode(r.props) as Map<String, dynamic>)];
+  }
+
+  Future<void> removeEvents(Iterable<int> ids) => (delete(analyticsEvents)..where((t) => t.id.isIn(ids))).go();
+
+  /// Sign-out: the cache, the queued writes and the queued analytics all go.
   Future<void> wipe() async {
     await delete(kvCache).go();
     await delete(pendingActionRows).go();
+    await delete(analyticsEvents).go();
   }
 }

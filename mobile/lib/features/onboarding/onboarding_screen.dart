@@ -5,6 +5,7 @@ import 'package:juvi/app/l10n/l10n.dart';
 import 'package:juvi/core/analytics/analytics.dart';
 import 'package:juvi/core/http/api_failure.dart';
 import 'package:juvi/core/models/models.dart';
+import 'package:juvi/core/push/notification_permission.dart';
 import 'package:juvi/core/repos/me_repository.dart';
 import 'package:juvi/core/repos/spaces_repository.dart';
 import 'package:juvi/core/session/session_controller.dart';
@@ -70,6 +71,15 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     }
   }
 
+  /// Step 3 (notifications spec §8.4): "Allow notifications" shows the Android prompt,
+  /// "Not now" does not; either way the answer is recorded and onboarding continues.
+  Future<void> _answerPermission(AccountSummary account, {required bool ask}) async {
+    setState(() => _busy = true);
+    final granted = ask && await ref.read(notificationsAllowedProvider.notifier).request();
+    ref.read(analyticsProvider).track('notification.permission', {'granted': granted});
+    if (mounted) await _advance(account);
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
@@ -85,6 +95,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     // within a single test pump(); staggered, the second needs a pump of its own.
     if (name == 'spaces') ref.watch(spacesProvider);
     final me = ref.watch(meProvider);
+    // Step 3 asks for the OS permission unless the phone already allows notifications.
+    final askPermission = name == 'notifications' && ref.watch(notificationsAllowedProvider).value != true;
 
     // `go()` leaves a single route, so without this system back at step > 0 would exit
     // the app; it goes to the previous step instead, like the app-bar back button.
@@ -138,7 +150,21 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 ),
               Padding(
                 padding: const EdgeInsets.all(24),
-                child: FilledButton(onPressed: _busy ? null : () => _advance(account), child: Text(isLast ? l.onboardingFinish : l.onboardingContinue)),
+                child: askPermission
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          FilledButton(
+                            onPressed: _busy ? null : () => _answerPermission(account, ask: true),
+                            child: Text(l.onboardingAllowNotifications),
+                          ),
+                          TextButton(
+                            onPressed: _busy ? null : () => _answerPermission(account, ask: false),
+                            child: Text(l.onboardingNotNow),
+                          ),
+                        ],
+                      )
+                    : FilledButton(onPressed: _busy ? null : () => _advance(account), child: Text(isLast ? l.onboardingFinish : l.onboardingContinue)),
               ),
             ],
           ),

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:juvi/app/l10n/l10n.dart';
 import 'package:juvi/core/http/api_failure.dart';
+import 'package:juvi/core/push/notification_permission.dart';
 import 'package:juvi/core/repos/me_repository.dart';
 import 'package:juvi/features/me/theme_preference.dart';
 import 'package:juvi/shared/widgets/section_header.dart';
@@ -27,6 +28,7 @@ class SettingsScreen extends ConsumerWidget {
     final l = context.l10n;
     final settings = ref.watch(settingsControllerProvider).value;
     final mode = ref.watch(themePreferenceProvider);
+    final blocked = ref.watch(notificationsAllowedProvider).value == false;
     if (settings == null) return Scaffold(appBar: AppBar(title: Text(l.settingsTitle)), body: const Center(child: CircularProgressIndicator()));
     final quiet = {'start': settings.quietHours.start, 'end': settings.quietHours.end};
     final ctrl = ref.read(settingsControllerProvider.notifier);
@@ -35,6 +37,15 @@ class SettingsScreen extends ConsumerWidget {
       body: ListView(
         children: [
           SectionHeader(l.settingsTiersSection),
+          // S12 (notifications spec §8.4): while the OS permission is off, nothing below reaches the tray.
+          if (blocked)
+            ListTile(
+              leading: Icon(Icons.notifications_off_outlined, color: Theme.of(context).colorScheme.error),
+              title: Text(l.settingsNotificationsBlocked),
+              subtitle: Text(l.settingsNotificationsBlockedBody),
+              trailing: const Icon(Icons.open_in_new),
+              onTap: () => unawaited(ref.read(notificationPermissionProvider).openSettings()),
+            ),
           ListTile(title: Text(l.settingsTierUrgent), subtitle: Text(l.settingsTierUrgentDesc), trailing: const Switch(value: true, onChanged: null)),
           SwitchListTile(
             title: Text(l.settingsTierImportant),

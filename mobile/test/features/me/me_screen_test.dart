@@ -5,6 +5,7 @@ import 'package:juvi/app/l10n/l10n.dart';
 import 'package:juvi/core/analytics/analytics.dart';
 import 'package:juvi/core/http/api_failure.dart';
 import 'package:juvi/core/models/models.dart';
+import 'package:juvi/core/push/notification_permission.dart';
 import 'package:juvi/core/repos/me_repository.dart';
 import 'package:juvi/features/me/devices_screen.dart';
 import 'package:juvi/features/me/me_screen.dart';
@@ -12,6 +13,7 @@ import 'package:juvi/features/me/settings_screen.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/push/push_fixtures.dart';
 import '../../core/repos/me_repository_test.dart' show meJson;
 
 class _MeRepo extends Mock implements MeRepository {}
@@ -23,9 +25,10 @@ class _NoopAnalytics implements Analytics {
 
 const _boom = ApiFailure(ApiErrorCode.internal, 'Server exploded', status: 500);
 
-Widget _host(Widget screen, MeRepository repo) => ProviderScope(
+Widget _host(Widget screen, MeRepository repo, {NotificationPermission? permission}) => ProviderScope(
       retry: (_, _) => null,
       overrides: [
+        if (permission != null) notificationPermissionProvider.overrideWithValue(permission),
         meProvider.overrideWith((_) async* {
           yield Cached(Me.fromJson(meJson), DateTime.now());
         }),
@@ -48,6 +51,22 @@ void main() {
     await t.tap(find.text('Routine'));
     await t.pumpAndSettle();
     expect(find.text('Server exploded'), findsOneWidget);
+  });
+
+  testWidgets('S12: while the OS blocks notifications a row says so and opens the system settings', (t) async {
+    final permission = FakeNotificationPermission();
+    await t.pumpWidget(_host(const SettingsScreen(), _MeRepo(), permission: permission));
+    await t.pumpAndSettle();
+    expect(find.text('Blocked in system settings'), findsOneWidget);
+    await t.tap(find.text('Blocked in system settings'));
+    expect(permission.settingsOpened, 1);
+  });
+
+  testWidgets('S12: no blocked row while notifications are allowed', (t) async {
+    await t.pumpWidget(_host(const SettingsScreen(), _MeRepo(), permission: FakeNotificationPermission(granted: true)));
+    await t.pumpAndSettle();
+    expect(find.text('Blocked in system settings'), findsNothing);
+    expect(find.text('Routine'), findsOneWidget);
   });
 
   testWidgets('a failed device sign-out says why', (t) async {

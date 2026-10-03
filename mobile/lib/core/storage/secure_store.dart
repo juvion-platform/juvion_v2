@@ -24,6 +24,8 @@ class SecureStore {
   static const _device = 'juvi.device_id';
   static const _dbKey = 'juvi.db_key';
   static const _college = 'juvi.college_id';
+  static const _pendingLink = 'juvi.pending_link';
+  static const _lastAccount = 'juvi.last_account';
 
   static String _randomHex(int bytes) {
     final r = Random.secure();
@@ -86,6 +88,17 @@ class SecureStore {
 
   Future<String?> readCollegeId() => _readOrNull(_college);
   Future<void> writeCollegeId(String id) => _s.write(key: _college, value: id);
+
+  /// A notification destination waiting for the session (`DeepLinkResolver`), as JSON.
+  /// Not part of [wipeAll]: it has to outlive the sign-out it is waiting behind.
+  Future<String?> readPendingLink() => _readOrNull(_pendingLink);
+  Future<void> writePendingLink(String json) => _s.write(key: _pendingLink, value: json);
+  Future<void> clearPendingLink() => _deleteQuietly(_pendingLink);
+
+  /// `<collegeId>:<accountId>` of the last account that was ready on this phone, so a held
+  /// destination is only used by the account it was meant for. Kept across sign-out.
+  Future<String?> readLastAccount() => _readOrNull(_lastAccount);
+  Future<void> writeLastAccount(String owner) => _s.write(key: _lastAccount, value: owner);
 
   /// Sign-out and deactivation: forget the session, keep the device identity and the DB key.
   /// Each entry is deleted best effort, so one failing delete does not keep the others.

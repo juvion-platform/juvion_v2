@@ -4,8 +4,9 @@ import 'package:juvi/app/l10n/l10n.dart';
 import 'package:juvi/core/models/models.dart';
 import 'package:juvi/core/repos/me_repository.dart';
 
-/// Step 3: an honest explanation of the three tiers and a quiet-hours toggle.
-/// The OS permission prompt itself arrives with push in sub-project 3.
+/// Step 3: an honest explanation of the three tiers and a quiet-hours toggle. The OS
+/// permission prompt is behind the screen's "Allow notifications" button
+/// (`OnboardingScreen._answerPermission`, notifications spec §8.4).
 class NotificationsStep extends ConsumerWidget {
   const NotificationsStep(this.me, {super.key});
   final Me me;

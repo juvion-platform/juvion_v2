@@ -26,7 +26,7 @@ import 'package:url_launcher/url_launcher.dart';
 /// Opens an attachment or body link outside the app; overridden in tests.
 final externalLauncherProvider = Provider<Future<bool> Function(Uri)>((_) => (uri) => launchUrl(uri, mode: LaunchMode.externalApplication));
 
-/// S04. Opening it records `notice.opened` and sets `seenAt` once (spec §4 US-2.1);
+/// S04. Opening it records `notice.seen` and sets `seenAt` once (spec §4 US-2.1);
 /// an archived notice is read-only (US-2.6); a notice that was not sent to this
 /// person is "not available" (US-2.5).
 class NoticeDetailScreen extends ConsumerStatefulWidget {
@@ -48,7 +48,7 @@ class _NoticeDetailScreenState extends ConsumerState<NoticeDetailScreen> {
   @override
   void initState() {
     super.initState();
-    ref.read(analyticsProvider).track('notice.opened', {'noticeId': widget.noticeId});
+    ref.read(analyticsProvider).track('notice.seen', {'noticeId': widget.noticeId});
     ref.listenManual<AsyncValue<Cached<NoticeDetail>>>(noticeDetailProvider(widget.noticeId), (_, next) {
       final d = next.value?.data;
       if (d == null || d.seenAt != null || _seenSent) return;

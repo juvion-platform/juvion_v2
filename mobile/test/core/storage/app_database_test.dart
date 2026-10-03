@@ -146,4 +146,18 @@ void main() {
       expect(isUnreadableDatabaseError(Exception('disk I/O error')), isFalse);
     });
   });
+
+  test('schema 2 migration: a version-1 database keeps its cache and gains analytics_events', () async {
+    final v1 = AppDatabase(NativeDatabase.memory(setup: (raw) {
+      raw
+        ..execute('CREATE TABLE kv_cache (key TEXT NOT NULL PRIMARY KEY, json TEXT NOT NULL, as_of INTEGER NOT NULL)')
+        ..execute('CREATE TABLE pending_actions (id TEXT NOT NULL PRIMARY KEY, type TEXT NOT NULL, payload TEXT NOT NULL, created_at INTEGER NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT)')
+        ..execute("INSERT INTO kv_cache VALUES ('me', '{\"a\":1}', 1759467600)")
+        ..execute('PRAGMA user_version = 1');
+    }));
+    addTearDown(v1.close);
+    expect((await v1.readDoc('me'))!.json, {'a': 1});
+    await v1.enqueueEvent('app.opened', DateTime.utc(2026, 10, 3), const {});
+    expect(await v1.eventCount(), 1);
+  });
 }

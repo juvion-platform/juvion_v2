@@ -15,6 +15,12 @@ class _NoopAnalytics implements Analytics {
   void track(String event, [Map<String, Object?> props = const {}]) {}
 }
 
+class _SpyAnalytics implements Analytics {
+  final events = <(String, Map<String, Object?>)>[];
+  @override
+  void track(String event, [Map<String, Object?> props = const {}]) => events.add((event, props));
+}
+
 const Map<String, dynamic> meJson = {
   'account': {
     'id': 'a',
@@ -95,5 +101,46 @@ void main() {
     final queued = await db.pendingActions();
     expect(queued, hasLength(1));
     expect(queued.single.type, 'settings.patch');
+  });
+
+  // The server takes one id-like `key` per event (§7.3); a comma-joined list would be dropped.
+  test('a settings patch records settings.changed once per changed key', () async {
+    const offline = ApiFailure(ApiErrorCode.offline, "You're offline.");
+    final db = AppDatabase.memory();
+    addTearDown(db.close);
+    await db.writeDoc('me', meJson, DateTime.utc(2026, 9, 23));
+    final repo = _MeRepo();
+    when(repo.cached).thenAnswer((_) async {
+      final doc = await db.readDoc('me');
+      return Cached(Me.fromJson(doc!.json), doc.asOf);
+    });
+    when(repo.refresh).thenThrow(offline);
+    when(() => repo.updateSettings(any())).thenThrow(offline);
+    final analytics = _SpyAnalytics();
+    final c = ProviderContainer(
+      retry: (_, _) => null,
+      overrides: [
+        meRepositoryProvider.overrideWith((_) async => repo),
+        appDatabaseProvider.overrideWith((_) async => db),
+        analyticsProvider.overrideWithValue(analytics),
+      ],
+    );
+    addTearDown(c.dispose);
+    c
+      ..listen(settingsControllerProvider, (_, _) {})
+      ..listen(meProvider, (_, _) {});
+    await c.read(settingsControllerProvider.future);
+
+    await c.read(settingsControllerProvider.notifier).patch({
+      'tiers': {'routine': false},
+      'quietHours': {'start': '23:00', 'end': '06:00'},
+    });
+    await pumpEventQueue();
+
+    expect([for (final (name, _) in analytics.events) name], ['settings.changed', 'settings.changed']);
+    expect([for (final (_, props) in analytics.events) props], [
+      {'key': 'tiers'},
+      {'key': 'quietHours'},
+    ]);
   });
 }

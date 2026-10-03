@@ -687,4 +687,59 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get channelNotices => 'Notices';
+
+  @override
+  String pushNewNoticeFrom(String office) {
+    return 'New notice from $office';
+  }
+
+  @override
+  String pushReminderFrom(String office) {
+    return 'Reminder from $office';
+  }
+
+  @override
+  String pushReminderTitle(String title) {
+    return 'Reminder: $title';
+  }
+
+  @override
+  String pushDigest(int count, String office) {
+    return '$count new notices from $office';
+  }
+
+  @override
+  String get pushChannelUrgent => 'Urgent notices';
+
+  @override
+  String get pushChannelImportant => 'Important notices';
+
+  @override
+  String get pushChannelRoutine => 'Routine notices';
+
+  @override
+  String get onboardingAllowNotifications => 'Allow notifications';
+
+  @override
+  String get onboardingNotNow => 'Not now';
+
+  @override
+  String get settingsNotificationsBlocked => 'Blocked in system settings';
+
+  @override
+  String get settingsNotificationsBlockedBody =>
+      'Juvi can\'t show notifications. Tap to allow them.';
+
+  @override
+  String get permissionCardTitle => 'Notifications are off';
+
+  @override
+  String get permissionCardBody =>
+      'You won\'t hear about Urgent notices, reminders or deadlines until you allow notifications.';
+
+  @override
+  String get permissionCardOpenSettings => 'Open settings';
+
+  @override
+  String get permissionCardDismiss => 'Not now';
 }

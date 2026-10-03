@@ -2,6 +2,7 @@ import 'package:juvi/core/analytics/analytics.dart';
 import 'package:juvi/core/http/api_failure.dart';
 import 'package:juvi/core/http/api_providers.dart';
 import 'package:juvi/core/models/models.dart';
+import 'package:juvi/core/push/push_registration.dart';
 import 'package:juvi/core/repos/auth_repository.dart';
 import 'package:juvi/core/session/session_state.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -18,6 +19,8 @@ const Set<ApiErrorCode> _fatalRestoreCodes = {
   ApiErrorCode.institutionPaused,
   ApiErrorCode.updateRequired,
 };
+
+const Duration _unregisterBound = Duration(seconds: 5);
 
 @Riverpod(keepAlive: true)
 class SessionController extends _$SessionController {
@@ -79,6 +82,12 @@ class SessionController extends _$SessionController {
   }
 
   Future<void> signOut() async {
+    // While the session is still valid, the server forgets this phone's push token and FCM
+    // issues the next account a fresh one (notifications spec §8.3). FCM's getToken and
+    // deleteToken have no deadline of their own (offline, no Play services), so they get
+    // 5 s: the revoke and the wipe that protect the next person on this phone never wait
+    // longer than that.
+    await ref.read(pushRegistrationProvider).unregister().timeout(_unregisterBound, onTimeout: () {});
     await ref.read(authRepositoryProvider).signOut();
     await _wipe();
     state = const SessionState.signedOut();

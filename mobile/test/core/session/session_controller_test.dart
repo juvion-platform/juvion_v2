@@ -1,19 +1,36 @@
+import 'dart:async';
+
+import 'package:dio/dio.dart';
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http_mock_adapter/http_mock_adapter.dart';
 import 'package:juvi/core/http/api_failure.dart';
 import 'package:juvi/core/http/api_providers.dart';
 import 'package:juvi/core/models/models.dart';
+import 'package:juvi/core/push/push_registration.dart';
 import 'package:juvi/core/repos/auth_repository.dart';
 import 'package:juvi/core/session/session_controller.dart';
 import 'package:juvi/core/session/session_state.dart';
 import 'package:juvi/core/storage/app_database.dart';
 import 'package:juvi/core/storage/secure_store.dart';
+import 'package:juvi_api/juvi_api.dart' show JuviApi;
 import 'package:mocktail/mocktail.dart';
+
+import '../push/push_fixtures.dart';
 
 class _Auth extends Mock implements AuthRepository {}
 
 class _Storage extends Mock implements FlutterSecureStorage {}
+
+_Storage _storageOver(Map<String, String> mem) {
+  final storage = _Storage();
+  when(() => storage.read(key: any(named: 'key'))).thenAnswer((i) async => mem[i.namedArguments[#key]]);
+  when(() => storage.write(key: any(named: 'key'), value: any(named: 'value'))).thenAnswer((i) async => mem[i.namedArguments[#key] as String] = i.namedArguments[#value] as String);
+  when(() => storage.delete(key: any(named: 'key'))).thenAnswer((i) async => mem.remove(i.namedArguments[#key]));
+  return storage;
+}
 
 const account = AccountSummary(id: 'a1', kind: 'student', status: 'onboarding', onboardingStep: 0, onboardingSteps: ['identity', 'spaces', 'notifications'], onboardingComplete: false, mustChangePassword: true);
 
@@ -115,6 +132,74 @@ void main() {
     expect(c.read(sessionControllerProvider), const SessionState.deactivated(supportContact: SupportContact(name: 'Help Desk')));
   });
 
+  test('signOut clears the push token while the session is still valid, then revokes and wipes', () async {
+    final order = <String>[];
+    final dio = Dio(BaseOptions(baseUrl: 'https://api.test/v1'));
+    dio.interceptors.add(InterceptorsWrapper(onRequest: (o, h) {
+      order.add('${o.method} ${o.path}');
+      h.next(o);
+    }));
+    DioAdapter(dio: dio).onDelete('/me/devices/current/push-token', (s) => s.reply(204, null));
+    final messaging = FakePushMessaging();
+    final local = FakeLocalNotifications();
+    final registration = PushRegistration(
+      messaging: messaging,
+      local: local,
+      api: () => JuviApi(dio: dio, basePathOverride: 'https://api.test/v1').getMobileApi(),
+      signedIn: () => true,
+      allowed: () async => true,
+    );
+    when(() => auth.signOut()).thenAnswer((_) async => order.add('sign-out'));
+    final container = ProviderContainer(retry: (_, _) => null, overrides: [
+      authRepositoryProvider.overrideWithValue(auth),
+      secureStoreProvider.overrideWithValue(SecureStore(_storageOver(mem))),
+      appDatabaseProvider.overrideWith((_) async => db),
+      pushRegistrationProvider.overrideWithValue(registration),
+    ]);
+    addTearDown(container.dispose);
+    mem['juvi.access'] = 'a';
+    await container.read(sessionControllerProvider.notifier).signOut();
+    expect(order, ['DELETE /me/devices/current/push-token', 'sign-out']);
+    expect(messaging.deletes, 1);
+    expect(local.cancelled, 1);
+    expect(mem['juvi.access'], isNull);
+    expect(container.read(sessionControllerProvider), const SessionState.signedOut());
+  });
+
+  // I2: sign-out must not wait on FCM for ever (offline, no Play services, a wedged FCM).
+  test('signOut revokes and wipes within about 5 s even when FCM deleteToken never completes', () {
+    fakeAsync((async) {
+      final order = <String>[];
+      final dio = Dio(BaseOptions(baseUrl: 'https://api.test/v1'));
+      DioAdapter(dio: dio).onDelete('/me/devices/current/push-token', (s) => s.reply(204, null));
+      final registration = PushRegistration(
+        messaging: _WedgedMessaging(),
+        local: FakeLocalNotifications(),
+        api: () => JuviApi(dio: dio, basePathOverride: 'https://api.test/v1').getMobileApi(),
+        signedIn: () => true,
+        allowed: () async => true,
+      );
+      when(() => auth.signOut()).thenAnswer((_) async => order.add('sign-out'));
+      final container = ProviderContainer(retry: (_, _) => null, overrides: [
+        authRepositoryProvider.overrideWithValue(auth),
+        secureStoreProvider.overrideWithValue(SecureStore(_storageOver(mem))),
+        appDatabaseProvider.overrideWith((_) async => db),
+        pushRegistrationProvider.overrideWithValue(registration),
+      ]);
+      addTearDown(container.dispose);
+      mem['juvi.access'] = 'a';
+      var done = false;
+      unawaited(container.read(sessionControllerProvider.notifier).signOut().then((_) => done = true));
+      async.elapse(const Duration(seconds: 4));
+      expect(done, isFalse); // still giving FCM its chance
+      async.elapse(const Duration(seconds: 2));
+      expect(done, isTrue);
+      expect(order, ['sign-out']);
+      expect(mem['juvi.access'], isNull);
+      expect(container.read(sessionControllerProvider), const SessionState.signedOut());
+    });
+  });
+
   test('refreshTokens rotates and persists; a null refresh wipes', () async {
     mem['juvi.access'] = 'a'; mem['juvi.refresh'] = 'r';
     when(() => auth.refresh('r', any())).thenAnswer((_) async => const Tokens(accessToken: 'a2', refreshToken: 'r2'));
@@ -174,4 +259,10 @@ void main() {
     expect(container.read(sessionControllerProvider), const SessionState.signedOut(reason: 'missing'));
     expect(await db.readDoc('me'), isNull);
   });
+}
+
+/// FCM that never answers `deleteToken` (offline, no Play services, a wedged FCM).
+class _WedgedMessaging extends FakePushMessaging {
+  @override
+  Future<void> deleteToken() => Completer<void>().future;
 }

@@ -1275,6 +1275,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Notices'**
   String get channelNotices;
+
+  /// Tray title for a confidential notice (notifications spec §6.6). Mirrored as a fixed string in lib/core/push/notice_push.dart.
+  ///
+  /// In en, this message translates to:
+  /// **'New notice from {office}'**
+  String pushNewNoticeFrom(String office);
+
+  /// Tray title for a reminder about a confidential notice. Mirrored in notice_push.dart.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminder from {office}'**
+  String pushReminderFrom(String office);
+
+  /// Tray text line for a reminder. Mirrored in notice_push.dart.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminder: {title}'**
+  String pushReminderTitle(String title);
+
+  /// Tray title for a Routine batch. Mirrored in notice_push.dart.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} new notices from {office}'**
+  String pushDigest(int count, String office);
+
+  /// No description provided for @pushChannelUrgent.
+  ///
+  /// In en, this message translates to:
+  /// **'Urgent notices'**
+  String get pushChannelUrgent;
+
+  /// No description provided for @pushChannelImportant.
+  ///
+  /// In en, this message translates to:
+  /// **'Important notices'**
+  String get pushChannelImportant;
+
+  /// Android notification channel names, shown in the system settings. Mirrored in notice_push.dart; the channel descriptions mirror settingsTier*Desc.
+  ///
+  /// In en, this message translates to:
+  /// **'Routine notices'**
+  String get pushChannelRoutine;
+
+  /// Onboarding step 3: shows the Android notification permission prompt, then continues (notifications spec §8.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Allow notifications'**
+  String get onboardingAllowNotifications;
+
+  /// Onboarding step 3: continues without asking for the permission.
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get onboardingNotNow;
+
+  /// No description provided for @settingsNotificationsBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Blocked in system settings'**
+  String get settingsNotificationsBlocked;
+
+  /// S12: shown while the OS permission is off; opens this app's notification settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Juvi can\'t show notifications. Tap to allow them.'**
+  String get settingsNotificationsBlockedBody;
+
+  /// No description provided for @permissionCardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications are off'**
+  String get permissionCardTitle;
+
+  /// No description provided for @permissionCardBody.
+  ///
+  /// In en, this message translates to:
+  /// **'You won\'t hear about Urgent notices, reminders or deadlines until you allow notifications.'**
+  String get permissionCardBody;
+
+  /// No description provided for @permissionCardOpenSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Open settings'**
+  String get permissionCardOpenSettings;
+
+  /// S14 permission-denied card on Today/Teaching (notifications spec §8.4); dismissing hides it for 30 days.
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get permissionCardDismiss;
 }
 
 class _AppLocalizationsDelegate

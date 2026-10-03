@@ -139,7 +139,11 @@ class SettingsController extends _$SettingsController {
     final current = state.value;
     final optimistic = current == null ? null : _merge(current, p);
     if (optimistic != null) state = AsyncData(optimistic);
-    ref.read(analyticsProvider).track('settings.changed', {'key': p.keys.join(',')});
+    // One event per key: the server takes a single id-like `key` (§7.3).
+    final analytics = ref.read(analyticsProvider);
+    for (final key in p.keys) {
+      analytics.track('settings.changed', {'key': key});
+    }
     try {
       state = AsyncData(await repo.updateSettings(p));
     } on ApiFailure catch (f) {

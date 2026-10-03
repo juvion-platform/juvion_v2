@@ -9,6 +9,7 @@ import 'package:juvi/core/http/api_failure.dart';
 import 'package:juvi/core/http/api_providers.dart';
 import 'package:juvi/core/models/models.dart';
 import 'package:juvi/core/models/notices.dart';
+import 'package:juvi/core/push/notification_permission.dart';
 import 'package:juvi/core/repos/me_repository.dart';
 import 'package:juvi/core/repos/notices_repository.dart';
 import 'package:juvi/core/repos/spaces_repository.dart';
@@ -18,6 +19,8 @@ import 'package:juvi/core/storage/app_database.dart';
 import 'package:juvi/features/notices/widgets/ack_control.dart';
 import 'package:juvi/features/onboarding/onboarding_screen.dart';
 import 'package:mocktail/mocktail.dart';
+
+import '../../core/push/push_fixtures.dart';
 import '../../core/repos/me_repository_test.dart' show meJson;
 import '../../core/repos/notices_fixtures.dart';
 import '../notices/notice_actions_test.dart' show SpyAnalytics;
@@ -85,6 +88,65 @@ void main() {
     await t.tap(find.text('Finish'));
     await t.pumpAndSettle();
     expect(session.updated?.onboardingComplete, isTrue);
+  });
+
+  group('notifications permission (step 3)', () {
+    late _Repo repo;
+    late _Session session;
+    late SpyAnalytics analytics;
+    setUp(() {
+      repo = _Repo();
+      session = _Session();
+      analytics = SpyAnalytics();
+      when(() => repo.advanceOnboarding(2)).thenAnswer((_) async => const OnboardingStateData(onboardingStep: 3, onboardingSteps: ['identity', 'spaces', 'notifications'], onboardingComplete: true));
+    });
+    List<Override> extra(NotificationPermission p) => [notificationPermissionProvider.overrideWithValue(p), analyticsProvider.overrideWithValue(analytics)];
+
+    testWidgets('Allow notifications shows the OS prompt, records the answer and continues', (t) async {
+      final permission = FakeNotificationPermission();
+      await t.pumpWidget(host(2, repo, session, extra: extra(permission)));
+      await t.pump();
+      await t.pump();
+      expect(find.text('Finish'), findsNothing);
+      await t.tap(find.text('Allow notifications'));
+      await t.pumpAndSettle();
+      expect(permission.requests, 1);
+      expect(analytics.events.first.$1, 'notification.permission');
+      expect(analytics.events.first.$2, {'granted': true});
+      expect(session.updated?.onboardingComplete, isTrue);
+    });
+
+    testWidgets('a refused prompt still continues, recorded as not granted', (t) async {
+      await t.pumpWidget(host(2, repo, session, extra: extra(FakeNotificationPermission(grantOnRequest: false))));
+      await t.pump();
+      await t.pump();
+      await t.tap(find.text('Allow notifications'));
+      await t.pumpAndSettle();
+      expect(analytics.events.first.$1, 'notification.permission');
+      expect(analytics.events.first.$2, {'granted': false});
+      expect(session.updated?.onboardingComplete, isTrue);
+    });
+
+    testWidgets('Not now continues without the prompt', (t) async {
+      final permission = FakeNotificationPermission();
+      await t.pumpWidget(host(2, repo, session, extra: extra(permission)));
+      await t.pump();
+      await t.pump();
+      await t.tap(find.text('Not now'));
+      await t.pumpAndSettle();
+      expect(permission.requests, 0);
+      expect(analytics.events.first.$1, 'notification.permission');
+      expect(analytics.events.first.$2, {'granted': false});
+      expect(session.updated?.onboardingComplete, isTrue);
+    });
+
+    testWidgets('a phone that already allows notifications just gets Finish', (t) async {
+      await t.pumpWidget(host(2, repo, session, extra: extra(FakeNotificationPermission(granted: true))));
+      await t.pump();
+      await t.pump();
+      expect(find.text('Allow notifications'), findsNothing);
+      expect(find.text('Finish'), findsOneWidget);
+    });
   });
 
   group('first_notice (step 4)', () {
