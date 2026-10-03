@@ -119,14 +119,53 @@ void main() {
   });
 
   test('without Firebase nothing is sent, not even on sign-out', () async {
-    messaging = FakePushMessaging();
+    var sent = 0;
+    final dio = Dio(BaseOptions(baseUrl: 'https://api.test/v1'));
+    dio.interceptors.add(InterceptorsWrapper(onRequest: (o, h) {
+      sent++;
+      h.next(o);
+    }));
     final c = ProviderContainer(retry: (_, _) => null, overrides: [
       notificationPermissionProvider.overrideWithValue(permission),
+      mobileApiProvider.overrideWithValue(JuviApi(dio: dio, basePathOverride: 'https://api.test/v1').getMobileApi()),
       sessionControllerProvider.overrideWith(() => _Session(const SessionState.signedIn(account))),
     ]);
     addTearDown(c.dispose);
     expect(c.read(pushMessagingProvider), isA<NoPushMessaging>());
     await c.read(pushRegistrationProvider).sync();
     await c.read(pushRegistrationProvider).unregister();
+    expect(sent, 0);
+  });
+
+  test('a forced sign-out deletes the FCM token locally and makes no request', () async {
+    final c = container();
+    await c.read(pushRegistrationProvider).sync();
+    calls.clear();
+    (c.read(sessionControllerProvider.notifier) as _Session).set(const SessionState.signedOut(reason: 'revoked'));
+    await settle();
+    expect(messaging.deletes, 1);
+    expect(calls, isEmpty);
+  });
+
+  test('a normal sign-out deletes the FCM token once, not again when the session ends', () async {
+    final c = container();
+    final registration = c.read(pushRegistrationProvider);
+    await registration.sync();
+    await registration.unregister();
+    (c.read(sessionControllerProvider.notifier) as _Session).set(const SessionState.signedOut());
+    await settle();
+    expect(messaging.deletes, 1);
+    expect(calls.where((l) => l.startsWith('DELETE')), hasLength(1));
+  });
+
+  test('an in-flight sync cannot register after unregister', () async {
+    final c = container();
+    final registration = c.read(pushRegistrationProvider);
+    final sync = registration.sync();
+    final out = registration.unregister();
+    await Future.wait([sync, out]);
+    expect(calls, ['PUT /me/devices/current/push-token {platform: android, token: fcm-token-1}', 'DELETE /me/devices/current/push-token']);
+    await registration.sync();
+    expect(calls.where((l) => l.startsWith('PUT')), hasLength(1)); // the FCM token is gone
   });
 }

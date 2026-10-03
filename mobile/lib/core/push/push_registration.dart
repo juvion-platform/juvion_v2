@@ -23,7 +23,9 @@ class PushRegistration {
     required this._api,
     required this._signedIn,
     required this._allowed,
-  });
+  }) {
+    _wasSignedIn = _signedIn();
+  }
 
   final PushMessaging _messaging;
   final wire.MobileApi Function() _api;
@@ -32,6 +34,11 @@ class PushRegistration {
 
   /// The token this process registered for the current session.
   String? _registered;
+
+  /// Whether the last session state seen was [SignedIn], and whether [unregister] already
+  /// deleted the FCM token for it (so the sign-out that follows does not delete it twice).
+  bool _wasSignedIn = false;
+  bool _tokenDeleted = false;
 
   /// Registrations run one at a time, so two triggers firing together send one PUT. A step
   /// that fails never blocks the ones after it.
@@ -51,10 +58,16 @@ class PushRegistration {
 
   void onSessionChanged(SessionState next) {
     if (next is SignedIn) {
+      _wasSignedIn = true;
+      _tokenDeleted = false;
       unawaited(sync());
-    } else {
-      _registered = null;
+      return;
     }
+    _registered = null;
+    // A forced sign-out (revoked, deactivated, refresh expired): the server already dropped
+    // the token with the session, so only the local FCM token goes, and no request is made.
+    if (_wasSignedIn && !_tokenDeleted && _messaging.available) unawaited(_serial(_deleteLocalToken));
+    _wasSignedIn = false;
   }
 
   /// Only a real denied → allowed change; the first answer is covered by [sync] itself.
@@ -63,14 +76,19 @@ class PushRegistration {
   }
 
   /// Sign-out (spec §8.3): best effort on both steps; a failure never blocks the sign-out.
-  Future<void> unregister() async {
-    _registered = null;
-    if (!_messaging.available) return;
-    try {
-      await _api().clearPushToken();
-    } on Object {
-      // Revoking the session clears its token on the server anyway.
-    }
+  Future<void> unregister() => _serial(() async {
+        _registered = null;
+        if (!_messaging.available) return;
+        _tokenDeleted = true;
+        try {
+          await _api().clearPushToken();
+        } on Object {
+          // Revoking the session clears its token on the server anyway.
+        }
+        await _deleteLocalToken();
+      });
+
+  Future<void> _deleteLocalToken() async {
     try {
       await _messaging.deleteToken();
     } on Object {
