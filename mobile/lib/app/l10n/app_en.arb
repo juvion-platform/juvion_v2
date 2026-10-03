@@ -277,5 +277,17 @@
   "reachRemindNotPublished": "You can send a reminder once this notice is published.",
   "@reachRemindNotPublished": { "description": "S11: why Send reminder is disabled while the notice is still publishing (queued item 8). Archived already explains itself via the banner above; an exhausted budget or a reminder in flight both say so elsewhere too." },
   "channelNotices": "Notices",
-  "@channelNotices": { "description": "Channel screen section: notices whose audience matches this channel (spec §4 US-6)." }
+  "@channelNotices": { "description": "Channel screen section: notices whose audience matches this channel (spec §4 US-6)." },
+  "pushNewNoticeFrom": "New notice from {office}",
+  "@pushNewNoticeFrom": { "description": "Tray title for a confidential notice (notifications spec §6.6). Mirrored as a fixed string in lib/core/push/notice_push.dart.", "placeholders": { "office": { "type": "String" } } },
+  "pushReminderFrom": "Reminder from {office}",
+  "@pushReminderFrom": { "description": "Tray title for a reminder about a confidential notice. Mirrored in notice_push.dart.", "placeholders": { "office": { "type": "String" } } },
+  "pushReminderTitle": "Reminder: {title}",
+  "@pushReminderTitle": { "description": "Tray text line for a reminder. Mirrored in notice_push.dart.", "placeholders": { "title": { "type": "String" } } },
+  "pushDigest": "{count} new notices from {office}",
+  "@pushDigest": { "description": "Tray title for a Routine batch. Mirrored in notice_push.dart.", "placeholders": { "count": { "type": "int" }, "office": { "type": "String" } } },
+  "pushChannelUrgent": "Urgent notices",
+  "pushChannelImportant": "Important notices",
+  "pushChannelRoutine": "Routine notices",
+  "@pushChannelRoutine": { "description": "Android notification channel names, shown in the system settings. Mirrored in notice_push.dart; the channel descriptions mirror settingsTier*Desc." }
 }

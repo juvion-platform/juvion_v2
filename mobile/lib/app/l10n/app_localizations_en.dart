@@ -687,4 +687,33 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get channelNotices => 'Notices';
+
+  @override
+  String pushNewNoticeFrom(String office) {
+    return 'New notice from $office';
+  }
+
+  @override
+  String pushReminderFrom(String office) {
+    return 'Reminder from $office';
+  }
+
+  @override
+  String pushReminderTitle(String title) {
+    return 'Reminder: $title';
+  }
+
+  @override
+  String pushDigest(int count, String office) {
+    return '$count new notices from $office';
+  }
+
+  @override
+  String get pushChannelUrgent => 'Urgent notices';
+
+  @override
+  String get pushChannelImportant => 'Important notices';
+
+  @override
+  String get pushChannelRoutine => 'Routine notices';
 }
