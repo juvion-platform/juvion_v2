@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart' show InterceptorsWrapper;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -10,6 +11,8 @@ import 'package:juvi/core/analytics/analytics.dart';
 import 'package:juvi/core/connectivity/connectivity_provider.dart';
 import 'package:juvi/core/http/api_providers.dart';
 import 'package:juvi/core/http/juvi_http.dart';
+import 'package:juvi/core/push/notice_push.dart';
+import 'package:juvi/core/push/push_messaging.dart';
 import 'package:juvi/core/session/session_controller.dart';
 import 'package:juvi/core/storage/app_database.dart';
 import 'package:juvi/core/storage/secure_store.dart';
@@ -17,13 +20,14 @@ import 'package:juvi/features/notices/widgets/ack_control.dart';
 import 'package:juvi_api/juvi_api.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../core/push/push_fixtures.dart';
 import '../core/repos/me_repository_test.dart' show meJson;
 import '../core/repos/notices_fixtures.dart';
 import '../features/spaces/spaces_screen_test.dart' show spacesJson;
 
 class _Storage extends Mock implements FlutterSecureStorage {}
 
-/// A no-op stand-in for `ConsoleAnalytics` — `SyncLifecycle` fires `track('app.opened')`
+/// A no-op stand-in for `BatchingAnalytics` — `SyncLifecycle` fires `track('app.opened')`
 /// on every launch/resume; this test only needs it not to throw.
 class _NoopAnalytics implements Analytics {
   @override
@@ -253,5 +257,132 @@ void main() {
     expect(find.descendant(of: find.byType(Badge), matching: find.text('1')), findsNothing);
     expect(find.text('No classes today'), findsOneWidget);
     expect(mem['juvi.access'], 'a');
+  });
+
+  // Notifications spec §12: the #105 follow-ups. A notification tapped while signed out
+  // survives sign-in, opens S04, and Back lands on Today rather than leaving the app.
+  testWidgets('a notification tapped while signed out → sign in → S04 → Back → Today', (t) async {
+    SharedPreferences.setMockInitialValues({});
+    // The phone's last account, which the notification was for.
+    final mem = <String, String>{'juvi.last_account': 'c1:a'};
+    final storage = _Storage();
+    when(() => storage.read(key: any(named: 'key'))).thenAnswer((i) async => mem[i.namedArguments[#key]]);
+    when(() => storage.write(key: any(named: 'key'), value: any(named: 'value'))).thenAnswer((i) async {
+      mem[i.namedArguments[#key] as String] = i.namedArguments[#value] as String;
+    });
+    when(() => storage.delete(key: any(named: 'key'))).thenAnswer((i) async => mem.remove(i.namedArguments[#key]));
+    final store = SecureStore(storage);
+    late final ProviderContainer container;
+    final dio = buildDio(
+      baseUrl: 'https://api.test/v1',
+      accessToken: () async => (await store.readTokens())?.accessToken,
+      refresh: () async => null,
+      deviceId: store.deviceId,
+      appVersion: '1.0.0',
+      platform: 'android',
+      onFatal: (f) => unawaited(container.read(sessionControllerProvider.notifier).handleFailure(f)),
+    );
+    final requests = <String>[];
+    dio.interceptors.add(InterceptorsWrapper(onRequest: (o, h) {
+      requests.add('${o.method} ${o.path}');
+      h.next(o);
+    }));
+    // pushData()'s notice id: 24 hex characters, the only shape DeepLinkResolver accepts.
+    const noticeId = '66f1c0ffee0000000000abcd';
+    const account = {
+      'id': 'a',
+      'kind': 'student',
+      'status': 'active',
+      'onboardingStep': 3,
+      'onboardingSteps': ['identity', 'spaces', 'notifications'],
+      'onboardingComplete': true,
+      'mustChangePassword': false,
+    };
+    DioAdapter(dio: dio)
+      ..onGet(
+        '/institutions/JIT',
+        (s) => s.reply(200, {'collegeId': 'c1', 'name': 'JIT College', 'logoUrl': null, 'accentColor': '#0B5FA5', 'paused': false, 'pausedMessage': null, 'minAppVersion': null}),
+      )
+      ..onPost(
+        '/auth/sign-in',
+        (s) => s.reply(200, {'accessToken': 'a', 'accessExpiresIn': 900, 'refreshToken': 'r' * 43, 'account': account}),
+        data: Matchers.any,
+      )
+      ..onGet('/me', (s) => s.reply(200, {...meJson, 'account': account}))
+      ..onGet('/config', (s) => s.reply(401, {'error': {'code': 'SESSION_INVALIDATED', 'message': 'Please sign in again.', 'reason': 'missing'}}))
+      ..onGet(
+        '/config',
+        headers: {'Authorization': Matchers.pattern('^Bearer .+')},
+        (s) => s.reply(200, {
+          'name': 'JIT College',
+          'code': 'JIT',
+          'logoUrl': null,
+          'accentColor': '#0B5FA5',
+          'supportContact': null,
+          'quietHoursDefault': {'start': '22:00', 'end': '07:00'},
+          'timezone': 'Asia/Kolkata',
+          'featureFlags': {'languageRoadmap': false},
+          'minAppVersion': null,
+          'onboardingSteps': ['identity', 'spaces', 'notifications'],
+        }),
+      )
+      ..onGet('/spaces', (s) => s.reply(200, spacesJson))
+      ..onGet('/attention', (s) => s.reply(200, attentionJson([])))
+      ..onGet('/notices/$noticeId', (s) => s.reply(200, detailJson(noticeId, title: 'Hall tickets are out')))
+      ..onPost('/notices/$noticeId/seen', (s) => s.reply(200, {'seenAt': '2026-10-03T09:00:00.000Z'}))
+      ..onPost('/notifications/receipts', (s) => s.reply(200, {'accepted': 1, 'rejected': 0}), data: Matchers.any)
+      ..onPut('/me/devices/current/push-token', (s) => s.reply(204, null), data: Matchers.any);
+
+    final api = JuviApi(dio: dio, basePathOverride: 'https://api.test/v1').getMobileApi();
+    final db = AppDatabase.memory();
+    addTearDown(db.close);
+    final local = FakeLocalNotifications();
+    container = ProviderContainer(
+      retry: (_, _) => null,
+      overrides: [
+        secureStoreProvider.overrideWithValue(store),
+        appDatabaseProvider.overrideWith((_) async => db),
+        appVersionProvider.overrideWith((_) async => '1.0.0'),
+        dioProvider.overrideWithValue(dio),
+        bareDioProvider.overrideWithValue(dio),
+        mobileApiProvider.overrideWithValue(api),
+        bareMobileApiProvider.overrideWithValue(api),
+        isOnlineProvider.overrideWith((_) => Stream.value(true)),
+        analyticsProvider.overrideWithValue(_NoopAnalytics()),
+        localNotificationsProvider.overrideWithValue(local),
+        pushMessagingProvider.overrideWithValue(FakePushMessaging()),
+      ],
+    );
+    addTearDown(container.dispose);
+    await container.read(sessionControllerProvider.notifier).restore();
+    await t.pumpWidget(UncontrolledProviderScope(container: container, child: const JuviApp()));
+    await t.pumpAndSettle();
+
+    // Signed out: the tap is held behind S01 and its `opened` receipt goes out anyway.
+    expect(find.text('Sign in to your college'), findsOneWidget);
+    local.onTap!(NoticePush.tryParse(pushData())!.toPayload());
+    await t.pumpAndSettle();
+    expect(find.text('Sign in to your college'), findsOneWidget);
+    expect(requests, contains('POST /notifications/receipts'));
+
+    await t.enterText(find.bySemanticsLabel('Institution code'), 'JIT');
+    await t.pump(const Duration(milliseconds: 600));
+    await t.enterText(find.bySemanticsLabel('Roll number, employee code or email'), '24JIT0001');
+    await t.enterText(find.bySemanticsLabel('Password'), 'longenough1');
+    await t.pump();
+    await t.tap(find.widgetWithText(FilledButton, 'Sign in'));
+    await t.pumpAndSettle();
+
+    // S04 for the tapped notice, and this phone's push token is now registered.
+    expect(find.text('Hall tickets are out'), findsWidgets);
+    expect(requests, contains('POST /notices/$noticeId/seen'));
+    expect(requests, contains('PUT /me/devices/current/push-token'));
+    expect(mem['juvi.pending_link'], isNull);
+
+    // Back lands on Today, not out of the app.
+    await t.pageBack();
+    await t.pumpAndSettle();
+    expect(find.text("You're clear"), findsOneWidget);
+    expect(find.text('No classes today'), findsOneWidget);
   });
 }
