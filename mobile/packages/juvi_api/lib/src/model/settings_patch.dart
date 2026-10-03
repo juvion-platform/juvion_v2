@@ -3,7 +3,7 @@
 //
 
 // ignore_for_file: unused_element
-import 'package:juvi_api/src/model/me_settings_quiet_hours.dart';
+import 'package:juvi_api/src/model/settings_patch_quiet_hours.dart';
 import 'package:juvi_api/src/model/settings_patch_tiers.dart';
 import 'package:json_annotation/json_annotation.dart';
 
@@ -47,7 +47,7 @@ class SettingsPatch {
   )
 
 
-  final MeSettingsQuietHours? quietHours;
+  final SettingsPatchQuietHours? quietHours;
 
 
 

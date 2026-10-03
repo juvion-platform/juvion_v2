@@ -14,6 +14,9 @@ export const NOTICE_BODY_MAX = 5000;
 export const NOTICE_ATTACHMENTS_MAX = 5;
 export const NOTICE_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
 export const NOTICE_REMINDERS_MAX = 2;
+/** Urgent needs a recorded reason (notifications spec §6.5). */
+export const URGENT_REASON_MIN = 10;
+export const URGENT_REASON_MAX = 300;
 /** PDF, PNG, JPEG, WEBP, DOCX, XLSX, PPTX (spec §6.1). */
 export const NOTICE_ATTACHMENT_MIMES: readonly string[] = [
   'application/pdf', 'image/png', 'image/jpeg', 'image/webp',
@@ -44,6 +47,10 @@ export interface INotice extends Document {
   ackDeadline?: Date | null;
   ackCommentAllowed: boolean;
   priority: NoticePriority;
+  /** Set at publish, never changed: the push shows only "New notice from <office>". */
+  confidential: boolean;
+  /** Required when `priority === 'urgent'` on notices published from now on. */
+  urgentReason: string | null;
   purpose: NoticePurpose;
   status: NoticeStatus;
   counts: { audience: number; onJuvi: number };
@@ -84,6 +91,8 @@ const schema = new Schema<INotice>(
     ackDeadline: { type: Date, default: null },
     ackCommentAllowed: { type: Boolean, default: false },
     priority: { type: String, enum: NOTICE_PRIORITIES, default: 'routine' },
+    confidential: { type: Boolean, default: false },
+    urgentReason: { type: String, trim: true, maxlength: URGENT_REASON_MAX, default: null },
     purpose: { type: String, enum: NOTICE_PURPOSES, default: 'standard' },
     status: { type: String, enum: NOTICE_STATUSES, required: true, default: 'publishing' },
     counts: { audience: { type: Number, default: 0 }, onJuvi: { type: Number, default: 0 } },
@@ -100,6 +109,10 @@ const schema = new Schema<INotice>(
 // A deadline only makes sense on an acknowledgement notice (spec §5).
 schema.pre('validate', function (next) {
   if (this.ackDeadline && !this.ackRequired) this.invalidate('ackDeadline', 'A deadline requires ackRequired');
+  // New Urgent notices carry a reason; Urgent notices published before the gate are left alone (spec §6.5).
+  if (this.isNew && this.priority === 'urgent' && (this.urgentReason ?? '').length < URGENT_REASON_MIN) {
+    this.invalidate('urgentReason', `An Urgent notice needs a reason of at least ${URGENT_REASON_MIN} characters`);
+  }
   next();
 });
 

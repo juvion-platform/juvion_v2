@@ -54,5 +54,8 @@ schema.index({ refreshTokenHash: 1 }, { unique: true });
 schema.index({ collegeId: 1, accountId: 1 });
 schema.index({ accountId: 1, deviceId: 1 });
 schema.index({ previousRefreshTokenHash: 1 }, { sparse: true });
+// One session per FCM token (notifications spec §4.2). Partial on string values rather than sparse,
+// so a stray `pushToken: null` can never collide with another; clear a token with $unset.
+schema.index({ pushToken: 1 }, { unique: true, partialFilterExpression: { pushToken: { $type: 'string' } } });
 
 export const MobileSession = model<IMobileSession>('MobileSession', schema);

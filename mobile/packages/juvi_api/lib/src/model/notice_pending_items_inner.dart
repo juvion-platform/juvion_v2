@@ -18,6 +18,8 @@ class NoticePendingItemsInner {
   /// Returns a new [NoticePendingItemsInner] instance.
   NoticePendingItemsInner({
 
+    required  this.delivery,
+
     required  this.group,
 
     required  this.identifier,
@@ -28,6 +30,18 @@ class NoticePendingItemsInner {
 
     required  this.state,
   });
+
+  @JsonKey(
+    
+    name: r'delivery',
+    required: true,
+    includeIfNull: false,
+  )
+
+
+  final NoticePendingItemsInnerDeliveryEnum delivery;
+
+
 
   @JsonKey(
     
@@ -93,6 +107,7 @@ class NoticePendingItemsInner {
 
     @override
     bool operator ==(Object other) => identical(this, other) || other is NoticePendingItemsInner &&
+      other.delivery == delivery &&
       other.group == group &&
       other.identifier == identifier &&
       other.lastSeenInApp == lastSeenInApp &&
@@ -101,6 +116,7 @@ class NoticePendingItemsInner {
 
     @override
     int get hashCode =>
+        delivery.hashCode +
         group.hashCode +
         (identifier == null ? 0 : identifier.hashCode) +
         (lastSeenInApp == null ? 0 : lastSeenInApp.hashCode) +
@@ -117,6 +133,34 @@ class NoticePendingItemsInner {
   }
 
 }
+
+
+enum NoticePendingItemsInnerDeliveryEnum {
+@JsonValue(r'not_delivered')
+notDelivered(r'not_delivered'),
+@JsonValue(r'delivered')
+delivered(r'delivered'),
+@JsonValue(r'opened')
+opened(r'opened'),
+@JsonValue(r'muted')
+muted(r'muted'),
+@JsonValue(r'tier_off')
+tierOff(r'tier_off'),
+@JsonValue(r'no_device')
+noDevice(r'no_device'),
+@JsonValue(r'scheduled')
+scheduled(r'scheduled'),
+@JsonValue(r'none')
+none(r'none');
+
+const NoticePendingItemsInnerDeliveryEnum(this.value);
+
+final String value;
+
+@override
+String toString() => value;
+}
+
 
 
 enum NoticePendingItemsInnerStateEnum {

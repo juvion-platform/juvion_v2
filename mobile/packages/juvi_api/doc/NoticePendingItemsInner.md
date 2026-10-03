@@ -8,6 +8,7 @@ import 'package:juvi_api/api.dart';
 ## Properties
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
+**delivery** | **String** |  | 
 **group** | **String** |  | 
 **identifier** | **String** |  | 
 **lastSeenInApp** | **String** |  | 

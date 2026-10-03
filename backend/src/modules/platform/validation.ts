@@ -127,7 +127,8 @@ export const createRbacPolicySchema = z.object({
   role: z.enum(['super_admin', 'admin', 'principal', 'hod', 'faculty', 'staff', 'student', 'parent', '*']),
   personaType: z.string().optional().nullable(),
   module: z.string().min(1),
-  action: z.enum(['read', 'create', 'update', 'delete', 'approve', '*']),
+  // 'urgent' is only meaningful on module 'notices' (Juvi notifications spec §6.5).
+  action: z.enum(['read', 'create', 'update', 'delete', 'approve', 'urgent', '*']),
   effect: z.enum(['allow', 'deny']),
   scope: z.object({
     departmentOnly: z.boolean().optional(),

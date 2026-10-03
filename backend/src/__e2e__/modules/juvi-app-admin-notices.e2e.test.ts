@@ -128,7 +128,7 @@ describe('list, reach, CSV and audit (US-4, RCH-01, RCH-02)', () => {
     const csv = await api.as(fx.admin.token).get(`${A}/${mine.id}/reach.csv`).expect(200);
     expect(csv.headers['content-type']).toMatch(/text\/csv/);
     const lines = csv.text.trim().split('\n');
-    expect(lines[0]).toBe('Name,Identifier,Group,Status,Acknowledged at,Late,Seen at,Comment,Added later');
+    expect(lines[0]).toBe('Name,Identifier,Group,Status,Acknowledged at,Late,Seen at,Comment,Added later,Delivery');
     expect(lines).toHaveLength(3);
     expect(lines.slice(1).every((l) => l.includes('Not on Juvi'))).toBe(true);
 

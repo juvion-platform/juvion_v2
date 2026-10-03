@@ -9,7 +9,7 @@ import 'package:juvi_api/api.dart';
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **language** | **String** |  | [optional] 
-**quietHours** | [**MeSettingsQuietHours**](MeSettingsQuietHours.md) |  | [optional] 
+**quietHours** | [**SettingsPatchQuietHours**](SettingsPatchQuietHours.md) |  | [optional] 
 **tiers** | [**SettingsPatchTiers**](SettingsPatchTiers.md) |  | [optional] 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)

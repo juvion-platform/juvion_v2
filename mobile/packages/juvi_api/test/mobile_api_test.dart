@@ -28,6 +28,13 @@ void main() {
       // TODO
     });
 
+    // Remove this device's FCM token
+    //
+    //Future clearPushToken() async
+    test('test clearPushToken', () async {
+      // TODO
+    });
+
     // Dismiss a notice that needs no acknowledgement
     //
     //Future<DismissResult> dismissNotice(String id) async
@@ -154,10 +161,31 @@ void main() {
       // TODO
     });
 
+    // Product analytics: allow-listed names, id-like props; invalid events are dropped one by one
+    //
+    //Future<EventsResult> postEvents({ EventsRequest eventsRequest }) async
+    test('test postEvents', () async {
+      // TODO
+    });
+
+    // Delivered and opened receipts; each item is authorised by its HMAC receipt, not a session
+    //
+    //Future<ReceiptsResult> postNotificationReceipts({ ReceiptsRequest receiptsRequest }) async
+    test('test postNotificationReceipts', () async {
+      // TODO
+    });
+
     // Rotate the refresh token
     //
     //Future<Tokens> refresh({ RefreshRequest refreshRequest }) async
     test('test refresh', () async {
+      // TODO
+    });
+
+    // Register this device's FCM token (cleared from any other session first)
+    //
+    //Future registerPushToken({ PushTokenRequest pushTokenRequest }) async
+    test('test registerPushToken', () async {
       // TODO
     });
 

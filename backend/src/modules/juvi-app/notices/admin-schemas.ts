@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import {
   AUDIENCE_RULE_KINDS, NOTICE_PRIORITIES, NOTICE_PURPOSES, NOTICE_ATTACHMENT_MIMES,
-  NOTICE_TITLE_MAX, NOTICE_BODY_MAX, NOTICE_ATTACHMENTS_MAX, NOTICE_ATTACHMENT_MAX_BYTES,
+  NOTICE_TITLE_MAX, NOTICE_BODY_MAX, NOTICE_ATTACHMENTS_MAX, NOTICE_ATTACHMENT_MAX_BYTES, URGENT_REASON_MIN, URGENT_REASON_MAX,
 } from '../../../models/juvi/Notice';
 import { objectId } from '../admin/schemas';
 
@@ -47,6 +47,10 @@ export const publishSchema = z.object({
   ackDeadline: z.string().datetime({ offset: true }).nullable().optional(),
   ackCommentAllowed: z.boolean().default(false),
   priority: z.enum(tuple(NOTICE_PRIORITIES)).default('routine'),
+  /** The phone notification says only "New notice from <office>" (notifications spec §1, §6.6). Fixed once published. */
+  confidential: z.boolean().default(false),
+  /** Required with `priority: 'urgent'`, stored on the notice and in the publish audit entry (spec §6.5); ignored otherwise. */
+  urgentReason: z.string().trim().min(URGENT_REASON_MIN).max(URGENT_REASON_MAX).optional(),
   purpose: z.enum(tuple(NOTICE_PURPOSES)).default('standard'),
   /** Admins only; ignored for everyone else (their office comes from their persona). */
   office: z.string().trim().min(1).max(60).optional(),
@@ -56,6 +60,7 @@ export const publishSchema = z.object({
   if (b.ackCommentAllowed && !b.ackRequired) ctx.addIssue({ code: 'custom', path: ['ackCommentAllowed'], message: 'Comments are collected with an acknowledgement only' });
   // Welcome rows are created at onboarding with the notice's deadline, so a fixed date would make late joiners late on arrival.
   if (b.ackDeadline && b.purpose === 'welcome') ctx.addIssue({ code: 'custom', path: ['ackDeadline'], message: 'A welcome notice cannot have a deadline: each person sees it when they join' });
+  if (b.priority === 'urgent' && !b.urgentReason) ctx.addIssue({ code: 'custom', path: ['urgentReason'], message: `An Urgent notice needs a reason (${URGENT_REASON_MIN}–${URGENT_REASON_MAX} characters)` });
 });
 export type PublishInput = z.infer<typeof publishSchema>;
 

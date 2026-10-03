@@ -563,7 +563,8 @@
                   "NOT_PUBLISHER",
                   "REMINDER_LIMIT",
                   "ACK_REQUIRED",
-                  "ACK_NOT_REQUIRED"
+                  "ACK_NOT_REQUIRED",
+                  "RECEIPT_INVALID"
                 ],
                 "type": "string"
               },
@@ -602,6 +603,72 @@
         },
         "required": [
           "error"
+        ],
+        "type": "object"
+      },
+      "EventsRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "events": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "name": {
+                  "enum": [
+                    "app.opened",
+                    "account.signed_in",
+                    "onboarding.step_completed",
+                    "onboarding.completed",
+                    "settings.changed",
+                    "channel.muted",
+                    "notice.seen",
+                    "notice.acknowledged",
+                    "notice.dismissed",
+                    "notification.opened",
+                    "notification.permission",
+                    "permission_card.shown",
+                    "permission_card.dismissed"
+                  ],
+                  "type": "string"
+                },
+                "props": {
+                  "additionalProperties": {},
+                  "description": "Up to 10 keys, 1 KB serialised; each value a string of at most 64 characters matching ^[A-Za-z0-9_.:-]*$, a number or a boolean.",
+                  "type": "object"
+                }
+              },
+              "required": [
+                "name",
+                "at"
+              ],
+              "type": "object"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "events"
+        ],
+        "type": "object"
+      },
+      "EventsResult": {
+        "properties": {
+          "accepted": {
+            "type": "integer"
+          },
+          "rejected": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "accepted",
+          "rejected"
         ],
         "type": "object"
       },
@@ -1439,6 +1506,19 @@
           "items": {
             "items": {
               "properties": {
+                "delivery": {
+                  "enum": [
+                    "not_delivered",
+                    "delivered",
+                    "opened",
+                    "muted",
+                    "tier_off",
+                    "no_device",
+                    "scheduled",
+                    "none"
+                  ],
+                  "type": "string"
+                },
                 "group": {
                   "type": "string"
                 },
@@ -1471,7 +1551,8 @@
                 "identifier",
                 "group",
                 "state",
-                "lastSeenInApp"
+                "lastSeenInApp",
+                "delivery"
               ],
               "type": "object"
             },
@@ -1616,6 +1697,57 @@
               "string",
               "null"
             ]
+          },
+          "delivery": {
+            "properties": {
+              "cancelled": {
+                "type": "integer"
+              },
+              "delivered": {
+                "type": "integer"
+              },
+              "failed": {
+                "type": "integer"
+              },
+              "opened": {
+                "type": "integer"
+              },
+              "scheduled": {
+                "type": "integer"
+              },
+              "sent": {
+                "type": "integer"
+              },
+              "suppressed": {
+                "properties": {
+                  "muted": {
+                    "type": "integer"
+                  },
+                  "noDevice": {
+                    "type": "integer"
+                  },
+                  "tierOff": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "muted",
+                  "tierOff",
+                  "noDevice"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "scheduled",
+              "sent",
+              "delivered",
+              "opened",
+              "failed",
+              "cancelled",
+              "suppressed"
+            ],
+            "type": "object"
           },
           "dismissed": {
             "type": "integer"
@@ -1767,6 +1899,7 @@
           "lateAcks",
           "comments",
           "addedLater",
+          "delivery",
           "asOf"
         ],
         "type": "object"
@@ -1830,6 +1963,19 @@
       },
       "PendingPerson": {
         "properties": {
+          "delivery": {
+            "enum": [
+              "not_delivered",
+              "delivered",
+              "opened",
+              "muted",
+              "tier_off",
+              "no_device",
+              "scheduled",
+              "none"
+            ],
+            "type": "string"
+          },
           "group": {
             "type": "string"
           },
@@ -1862,7 +2008,8 @@
           "identifier",
           "group",
           "state",
-          "lastSeenInApp"
+          "lastSeenInApp",
+          "delivery"
         ],
         "type": "object"
       },
@@ -1877,6 +2024,27 @@
         },
         "required": [
           "photoUrl"
+        ],
+        "type": "object"
+      },
+      "PushTokenRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "platform": {
+            "enum": [
+              "android"
+            ],
+            "type": "string"
+          },
+          "token": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "platform"
         ],
         "type": "object"
       },
@@ -1985,6 +2153,66 @@
         },
         "required": [
           "lastReadAt"
+        ],
+        "type": "object"
+      },
+      "ReceiptsRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "properties": {
+                "at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "deliveryId": {
+                  "pattern": "^[0-9a-fA-F]{24}$",
+                  "type": "string"
+                },
+                "event": {
+                  "enum": [
+                    "delivered",
+                    "opened"
+                  ],
+                  "type": "string"
+                },
+                "receipt": {
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "deliveryId",
+                "receipt",
+                "event",
+                "at"
+              ],
+              "type": "object"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "type": "object"
+      },
+      "ReceiptsResult": {
+        "properties": {
+          "accepted": {
+            "type": "integer"
+          },
+          "rejected": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "accepted",
+          "rejected"
         ],
         "type": "object"
       },
@@ -2988,6 +3216,61 @@
         ]
       }
     },
+    "/events": {
+      "post": {
+        "operationId": "postEvents",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventsResult"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 400"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 401"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Product analytics: allow-listed names, id-like props; invalid events are dropped one by one",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
     "/institutions/{code}": {
       "get": {
         "operationId": "lookupInstitution",
@@ -3136,6 +3419,81 @@
           }
         ],
         "summary": "Signed-in devices",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/me/devices/current/push-token": {
+      "delete": {
+        "operationId": "clearPushToken",
+        "responses": {
+          "204": {
+            "description": "No content"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 401"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Remove this device's FCM token",
+        "tags": [
+          "mobile"
+        ]
+      },
+      "put": {
+        "operationId": "registerPushToken",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushTokenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No content"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 400"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 401"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Register this device's FCM token (cleared from any other session first)",
         "tags": [
           "mobile"
         ]
@@ -4129,6 +4487,66 @@
           }
         ],
         "summary": "Mark a notice seen (once)",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/notifications/receipts": {
+      "post": {
+        "operationId": "postNotificationReceipts",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReceiptsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiptsResult"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 400"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 401"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 429"
+          }
+        },
+        "summary": "Delivered and opened receipts; each item is authorised by its HMAC receipt, not a session",
         "tags": [
           "mobile"
         ]

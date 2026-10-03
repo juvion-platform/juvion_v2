@@ -146,9 +146,31 @@ export async function rotateSession(
 }
 
 export async function revokeSession(sessionId: string, reason: RevokeReason): Promise<void> {
-  await MobileSession.updateOne({ _id: sessionId, revokedAt: null }, { $set: { revokedAt: new Date(), revokedReason: reason } });
+  // The session's push token goes with it (notifications spec §7.1): a revoked device gets no more notifications.
+  await MobileSession.updateOne({ _id: sessionId, revokedAt: null }, { $set: { revokedAt: new Date(), revokedReason: reason }, $unset: { pushToken: 1 } });
   // Write-through so the very next request on that device sees it (spec §8).
   await cacheState(sessionId, `revoked:${reason}`, REVOKED_CACHE_SECONDS);
+}
+
+/**
+ * Moves an FCM token to this session (notifications spec §7.1). The token is first cleared
+ * from every other session — across colleges, deliberately: a token names one phone, and
+ * the unique index on pushToken is global. A concurrent move can still collide; retry it.
+ */
+export async function setPushToken(sessionId: string, collegeId: string, token: string): Promise<void> {
+  for (let attempt = 1; ; attempt++) {
+    await MobileSession.updateMany({ pushToken: token, _id: { $ne: sessionId } }, { $unset: { pushToken: 1 } });
+    try {
+      await MobileSession.updateOne({ _id: sessionId, collegeId, revokedAt: null }, { $set: { pushToken: token } });
+      return;
+    } catch (err) {
+      if ((err as { code?: number } | null)?.code !== 11000 || attempt >= 3) throw err;
+    }
+  }
+}
+
+export async function clearPushToken(sessionId: string, collegeId: string): Promise<void> {
+  await MobileSession.updateOne({ _id: sessionId, collegeId }, { $unset: { pushToken: 1 } });
 }
 
 export async function revokeOtherSessions(accountId: string, keepSessionId: string | null, reason: RevokeReason): Promise<number> {

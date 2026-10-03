@@ -14,6 +14,7 @@ import { searchCustomPeople } from './people-search';
 import { pendingQuerySchema } from './schemas';
 import { OFFICE_NAMES } from './offices';
 import { getJuviConfig } from '../config/institution-config';
+import { canPublishUrgent, assertUrgentAllowed } from './urgent-gate';
 
 const UNSUPPORTED = 'Unsupported file type. Use PDF, PNG, JPEG, WEBP, DOCX, XLSX or PPTX.';
 
@@ -47,7 +48,7 @@ export async function list(req: AuthRequest, res: Response, next: NextFunction) 
 export async function targets(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const scope = await resolvePublisherScope(cid(req), userRef(req));
-    const [graph, cfg] = await Promise.all([loadAudienceGraph(cid(req)), getJuviConfig(cid(req))]);
+    const [graph, cfg, urgent] = await Promise.all([loadAudienceGraph(cid(req)), getJuviConfig(cid(req)), canPublishUrgent(cid(req), userRef(req))]);
     res.json({
       office: scope.office,
       isAdmin: scope.isAdmin,
@@ -55,6 +56,8 @@ export async function targets(req: AuthRequest, res: Response, next: NextFunctio
       offices: scope.isAdmin ? [...OFFICE_NAMES] : scope.office ? [scope.office] : [],
       // The composer's deadline is entered in college time (spec §8), and /settings is platform-gated.
       timezone: cfg?.timezone ?? 'Asia/Kolkata',
+      // The composer offers Urgent only when this is true (notifications spec §6.5, §9).
+      canPublishUrgent: urgent,
       ...allowedTargets(scope, graph),
     });
   } catch (e) { next(e); }
@@ -123,6 +126,7 @@ export async function preview(req: AuthRequest, res: Response, next: NextFunctio
 export async function publish(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const body = publishSchema.parse(req.body);
+    await assertUrgentAllowed(cid(req), userRef(req), body.priority);
     const scope = await resolvePublisherScope(cid(req), userRef(req), body.office);
     const notice = await publishNotice(cid(req), scope, body, who(req));
     res.status(201).json(await getAdminNotice(actor(req), String(notice._id)));

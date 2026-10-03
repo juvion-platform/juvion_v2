@@ -71,7 +71,7 @@ describe('session state cache', () => {
   it('revokeSession writes Mongo then Redis synchronously', async () => {
     sessionMock.updateOne.mockResolvedValue({ modifiedCount: 1 });
     await revokeSession('s1', 'sign_out');
-    expect(sessionMock.updateOne).toHaveBeenCalledWith({ _id: 's1', revokedAt: null }, { $set: { revokedAt: expect.any(Date), revokedReason: 'sign_out' } });
+    expect(sessionMock.updateOne).toHaveBeenCalledWith({ _id: 's1', revokedAt: null }, { $set: { revokedAt: expect.any(Date), revokedReason: 'sign_out' }, $unset: { pushToken: 1 } });
     expect(redisMock.set).toHaveBeenCalledWith('juvi:sess:s1', 'revoked:sign_out', 'EX', 900);
   });
 
@@ -94,7 +94,7 @@ describe('rotateSession reuse detection', () => {
     } catch (e) {
       expect((e as MobileApiError).code).toBe('SESSION_INVALIDATED');
       expect(((e as MobileApiError).detail as Record<string, unknown>)?.reason).toBe('token_reuse');
-      expect(sessionMock.updateOne).toHaveBeenCalledWith({ _id: 's1', revokedAt: null }, { $set: { revokedAt: expect.any(Date), revokedReason: 'token_reuse' } });
+      expect(sessionMock.updateOne).toHaveBeenCalledWith({ _id: 's1', revokedAt: null }, { $set: { revokedAt: expect.any(Date), revokedReason: 'token_reuse' }, $unset: { pushToken: 1 } });
     }
   });
 
@@ -110,7 +110,7 @@ describe('rotateSession reuse detection', () => {
     } catch (e) {
       expect((e as MobileApiError).code).toBe('SESSION_INVALIDATED');
       expect(((e as MobileApiError).detail as Record<string, unknown>)?.reason).toBe('expired');
-      expect(sessionMock.updateOne).toHaveBeenCalledWith({ _id: 's2', revokedAt: null }, { $set: { revokedAt: expect.any(Date), revokedReason: 'expired' } });
+      expect(sessionMock.updateOne).toHaveBeenCalledWith({ _id: 's2', revokedAt: null }, { $set: { revokedAt: expect.any(Date), revokedReason: 'expired' }, $unset: { pushToken: 1 } });
     }
   });
 

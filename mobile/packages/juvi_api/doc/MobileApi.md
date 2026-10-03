@@ -12,6 +12,7 @@ Method | HTTP request | Description
 [**acknowledgeNotice**](MobileApi.md#acknowledgenotice) | **POST** /notices/{id}/ack | Acknowledge a notice; 409 ALREADY_ACKNOWLEDGED carries the existing record
 [**advanceOnboarding**](MobileApi.md#advanceonboarding) | **POST** /me/onboarding/advance | Complete the current onboarding step
 [**changePassword**](MobileApi.md#changepassword) | **POST** /auth/change-password | Change password; revokes other sessions
+[**clearPushToken**](MobileApi.md#clearpushtoken) | **DELETE** /me/devices/current/push-token | Remove this device&#39;s FCM token
 [**dismissNotice**](MobileApi.md#dismissnotice) | **POST** /notices/{id}/dismiss | Dismiss a notice that needs no acknowledgement
 [**getAttention**](MobileApi.md#getattention) | **GET** /attention | Due acknowledgement notices: count and the first three
 [**getChannel**](MobileApi.md#getchannel) | **GET** /channels/{id} | Channel header and About
@@ -30,7 +31,10 @@ Method | HTTP request | Description
 [**markChannelRead**](MobileApi.md#markchannelread) | **POST** /channels/{id}/read | Mark a channel read
 [**markNoticeSeen**](MobileApi.md#marknoticeseen) | **POST** /notices/{id}/seen | Mark a notice seen (once)
 [**muteChannel**](MobileApi.md#mutechannel) | **PUT** /channels/{id}/mute | Mute a channel
+[**postEvents**](MobileApi.md#postevents) | **POST** /events | Product analytics: allow-listed names, id-like props; invalid events are dropped one by one
+[**postNotificationReceipts**](MobileApi.md#postnotificationreceipts) | **POST** /notifications/receipts | Delivered and opened receipts; each item is authorised by its HMAC receipt, not a session
 [**refresh**](MobileApi.md#refresh) | **POST** /auth/refresh | Rotate the refresh token
+[**registerPushToken**](MobileApi.md#registerpushtoken) | **PUT** /me/devices/current/push-token | Register this device&#39;s FCM token (cleared from any other session first)
 [**remindNotice**](MobileApi.md#remindnotice) | **POST** /notices/{id}/remind | Send a reminder (at most two)
 [**revokeDevice**](MobileApi.md#revokedevice) | **DELETE** /me/devices/{id} | Sign out one device
 [**revokeOtherDevices**](MobileApi.md#revokeotherdevices) | **POST** /me/devices/revoke-others | Sign out every other device
@@ -161,6 +165,42 @@ void (empty response body)
 ### HTTP request headers
 
  - **Content-Type**: application/json
+ - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **clearPushToken**
+> clearPushToken()
+
+Remove this device's FCM token
+
+### Example
+```dart
+import 'package:juvi_api/api.dart';
+
+final api = JuviApi().getMobileApi();
+
+try {
+    api.clearPushToken();
+} catch on DioException (e) {
+    print('Exception when calling MobileApi->clearPushToken: $e\n');
+}
+```
+
+### Parameters
+This endpoint does not need any parameter.
+
+### Return type
+
+void (empty response body)
+
+### Authorization
+
+[bearerAuth](../README.md#bearerAuth)
+
+### HTTP request headers
+
+ - **Content-Type**: Not defined
  - **Accept**: application/json
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
@@ -891,6 +931,88 @@ Name | Type | Description  | Notes
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
+# **postEvents**
+> EventsResult postEvents(eventsRequest)
+
+Product analytics: allow-listed names, id-like props; invalid events are dropped one by one
+
+### Example
+```dart
+import 'package:juvi_api/api.dart';
+
+final api = JuviApi().getMobileApi();
+final EventsRequest eventsRequest = ; // EventsRequest | 
+
+try {
+    final response = api.postEvents(eventsRequest);
+    print(response);
+} catch on DioException (e) {
+    print('Exception when calling MobileApi->postEvents: $e\n');
+}
+```
+
+### Parameters
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **eventsRequest** | [**EventsRequest**](EventsRequest.md)|  | [optional] 
+
+### Return type
+
+[**EventsResult**](EventsResult.md)
+
+### Authorization
+
+[bearerAuth](../README.md#bearerAuth)
+
+### HTTP request headers
+
+ - **Content-Type**: application/json
+ - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **postNotificationReceipts**
+> ReceiptsResult postNotificationReceipts(receiptsRequest)
+
+Delivered and opened receipts; each item is authorised by its HMAC receipt, not a session
+
+### Example
+```dart
+import 'package:juvi_api/api.dart';
+
+final api = JuviApi().getMobileApi();
+final ReceiptsRequest receiptsRequest = ; // ReceiptsRequest | 
+
+try {
+    final response = api.postNotificationReceipts(receiptsRequest);
+    print(response);
+} catch on DioException (e) {
+    print('Exception when calling MobileApi->postNotificationReceipts: $e\n');
+}
+```
+
+### Parameters
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **receiptsRequest** | [**ReceiptsRequest**](ReceiptsRequest.md)|  | [optional] 
+
+### Return type
+
+[**ReceiptsResult**](ReceiptsResult.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+ - **Content-Type**: application/json
+ - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
 # **refresh**
 > Tokens refresh(refreshRequest)
 
@@ -924,6 +1046,46 @@ Name | Type | Description  | Notes
 ### Authorization
 
 No authorization required
+
+### HTTP request headers
+
+ - **Content-Type**: application/json
+ - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **registerPushToken**
+> registerPushToken(pushTokenRequest)
+
+Register this device's FCM token (cleared from any other session first)
+
+### Example
+```dart
+import 'package:juvi_api/api.dart';
+
+final api = JuviApi().getMobileApi();
+final PushTokenRequest pushTokenRequest = ; // PushTokenRequest | 
+
+try {
+    api.registerPushToken(pushTokenRequest);
+} catch on DioException (e) {
+    print('Exception when calling MobileApi->registerPushToken: $e\n');
+}
+```
+
+### Parameters
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **pushTokenRequest** | [**PushTokenRequest**](PushTokenRequest.md)|  | [optional] 
+
+### Return type
+
+void (empty response body)
+
+### Authorization
+
+[bearerAuth](../README.md#bearerAuth)
 
 ### HTTP request headers
 

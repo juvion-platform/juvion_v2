@@ -185,7 +185,12 @@ export const DEFAULT_POLICIES: Omit<PolicyDoc, '_id'>[] = [
   // target (whole college / own department / own course offerings) is
   // enforced in modules/juvi-app/notices/scope.ts, not by row scope here.
   { role: 'principal', module: 'notices', action: '*', effect: 'allow', priority: 900, isActive: true, description: 'Principal: publish and manage Juvi notices' },
-  { role: 'hod', module: 'notices', action: '*', effect: 'allow', priority: 800, isActive: true, description: 'HOD: publish Juvi notices to own department' },
+  // Urgent (notifications spec §6.5): admin and principal only. Admin also holds *:*; HOD rows name their actions so a wildcard never grants it.
+  { role: 'admin', module: 'notices', action: 'urgent', effect: 'allow', priority: 950, isActive: true, description: 'Admin: publish Urgent Juvi notices' },
+  { role: 'principal', module: 'notices', action: 'urgent', effect: 'allow', priority: 900, isActive: true, description: 'Principal: publish Urgent Juvi notices' },
+  { role: 'hod', module: 'notices', action: 'read', effect: 'allow', priority: 800, isActive: true, description: 'HOD: read own department Juvi notices' },
+  { role: 'hod', module: 'notices', action: 'create', effect: 'allow', priority: 800, isActive: true, description: 'HOD: publish Juvi notices to own department' },
+  { role: 'hod', module: 'notices', action: 'update', effect: 'allow', priority: 800, isActive: true, description: 'HOD: remind and archive own Juvi notices' },
   { role: 'faculty', module: 'notices', action: 'read', effect: 'allow', priority: 700, isActive: true, description: 'Faculty: read own Juvi notices' },
   { role: 'faculty', module: 'notices', action: 'create', effect: 'allow', priority: 700, isActive: true, description: 'Faculty: publish Juvi notices to the courses they teach' },
   { role: 'faculty', module: 'notices', action: 'update', effect: 'allow', priority: 700, isActive: true, description: 'Faculty: remind and archive own Juvi notices' },

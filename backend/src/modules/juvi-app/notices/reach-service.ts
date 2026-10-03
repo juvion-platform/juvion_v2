@@ -6,6 +6,7 @@ import { Types } from 'mongoose';
 import { Notice, LeanNotice, NOTICE_REMINDERS_MAX } from '../../../models/juvi/Notice';
 import { NoticeRecipient, LeanNoticeRecipient } from '../../../models/juvi/NoticeRecipient';
 import { MobileSession } from '../../../models/juvi/MobileSession';
+import { NotificationDelivery, DeliveryStatus, DeliveryReason } from '../../../models/juvi/NotificationDelivery';
 import { User } from '../../../models/User';
 import { Person } from '../../../models/people/Person';
 import { Student } from '../../../models/people/Student';
@@ -17,7 +18,7 @@ import { MobileApiError } from '../errors';
 import { groupLabel } from './audience';
 import { ADMIN_ROLES } from './publisher-scope';
 import { encodeCursor, decodeCursor, noticeNotFound } from './mobile-service';
-import { ReachResponse, ReachGroup, PendingQuery, PendingResponse, Reminders } from './schemas';
+import { ReachResponse, ReachGroup, PendingQuery, PendingResponse, Reminders, DeliveryCounts, PendingDelivery } from './schemas';
 
 export const REACH_LIST_MAX = 200;
 export const SPARKLINE_BUCKETS = 24;
@@ -124,6 +125,36 @@ async function peopleInfo(collegeId: string, personIds: Types.ObjectId[]): Promi
   return new Map(persons.map((p) => [String(p._id), { name: p.name, identifier: ident.get(String(p._id)) ?? null }]));
 }
 
+type DeliveryRow = { status: DeliveryStatus; reason: DeliveryReason | null };
+const SUPPRESSED_KEY: Partial<Record<DeliveryReason, keyof DeliveryCounts['suppressed']>> = { muted: 'muted', tier_off: 'tierOff', no_device: 'noDevice' };
+/** Rows of the published notification only; reminders are not counted (notifications spec §7.4). */
+const publishedRows = (collegeId: string, noticeId: Types.ObjectId) =>
+  ({ collegeId: new Types.ObjectId(collegeId), 'source.type': 'notice', 'source.id': noticeId, 'source.kind': 'published' });
+
+/** A pending member's push state. Sent-but-no-receipt and failed are both "not delivered"; cancelled and missing rows are `none`. */
+export function deliveryState(onJuvi: boolean, row: DeliveryRow | undefined): PendingDelivery {
+  if (!onJuvi || !row) return 'none';
+  switch (row.status) {
+    case 'sent': case 'failed': return 'not_delivered';
+    case 'delivered': case 'opened': case 'scheduled': return row.status;
+    case 'suppressed': return row.reason === 'muted' || row.reason === 'tier_off' || row.reason === 'no_device' ? row.reason : 'none';
+    default: return 'none';
+  }
+}
+
+export async function deliveryCounts(collegeId: string, noticeId: Types.ObjectId): Promise<DeliveryCounts> {
+  const out: DeliveryCounts = { scheduled: 0, sent: 0, delivered: 0, opened: 0, failed: 0, cancelled: 0, suppressed: { muted: 0, tierOff: 0, noDevice: 0 } };
+  const groups = await NotificationDelivery.aggregate<{ _id: DeliveryRow; n: number }>([
+    { $match: publishedRows(collegeId, noticeId) },
+    { $group: { _id: { status: '$status', reason: '$reason' }, n: { $sum: 1 } } },
+  ]);
+  for (const { _id: { status, reason }, n } of groups) {
+    if (status !== 'suppressed') out[status] += n;
+    else if (reason && SUPPRESSED_KEY[reason]) out.suppressed[SUPPRESSED_KEY[reason]!] += n;
+  }
+  return out;
+}
+
 const COUNT_KEY: Record<ReachBucket, 'acknowledged' | 'seen' | 'notSeen' | 'notOnJuvi'> = {
   acknowledged: 'acknowledged', seen: 'seen', not_seen: 'notSeen', not_on_juvi: 'notOnJuvi',
 };
@@ -155,6 +186,7 @@ export async function buildReach(collegeId: string, notice: LeanNotice, now = ne
     const p = info.get(String(r.personId));
     return { name: p?.name ?? 'Unknown member', identifier: p?.identifier ?? null, group: labelOf(r) };
   };
+  const delivery = await deliveryCounts(collegeId, notice._id);
   const progress = snapshot.flatMap((r) => (notice.ackRequired ? (r.ack ? [new Date(r.ack.at)] : []) : (r.seenAt ? [new Date(r.seenAt)] : [])));
 
   return {
@@ -174,6 +206,7 @@ export async function buildReach(collegeId: string, notice: LeanNotice, now = ne
       seen: later.filter((r) => !r.ack && r.seenAt).length,
       items: laterRows.map((r) => ({ ...person(r), at: iso(r.ack?.at ?? r.seenAt), state: reachBucket(r) })),
     },
+    delivery,
     asOf: now.toISOString(),
   };
 }
@@ -191,6 +224,10 @@ export async function pendingPage(collegeId: string, notice: LeanNotice, q: Pend
     ])
     : [];
   const lastSeen = new Map(sessions.map((s) => [String(s._id), s.at]));
+  const deliveries = accountIds.length
+    ? await NotificationDelivery.find({ ...publishedRows(collegeId, notice._id), accountId: { $in: accountIds } }).select('accountId status reason').lean()
+    : [];
+  const deliveryBy = new Map(deliveries.map((d) => [String(d.accountId), d]));
 
   let people = rows.map((r) => {
     const p = info.get(String(r.personId));
@@ -198,6 +235,7 @@ export async function pendingPage(collegeId: string, notice: LeanNotice, q: Pend
       name: p?.name ?? 'Unknown member', identifier: p?.identifier ?? null, group: labelOf(r),
       state: reachBucket(r) as 'seen' | 'not_seen' | 'not_on_juvi',
       lastSeenInApp: r.accountId ? iso(lastSeen.get(String(r.accountId))) : null,
+      delivery: deliveryState(Boolean(r.accountId), r.accountId ? deliveryBy.get(String(r.accountId)) : undefined),
     };
   });
   const needle = q.q?.toLowerCase();
@@ -219,18 +257,31 @@ export async function pendingPage(collegeId: string, notice: LeanNotice, q: Pend
 }
 
 const STATUS_WORDS: Record<ReachBucket, string> = { acknowledged: 'Acknowledged', seen: 'Seen', not_seen: 'Not seen', not_on_juvi: 'Not on Juvi' };
+/** The portal's delivery column words (notifications spec §9); `none` is an empty cell. */
+const DELIVERY_WORDS: Record<PendingDelivery, string> = {
+  not_delivered: 'Not delivered', delivered: 'Delivered', opened: 'Opened', muted: 'Muted', tier_off: 'Notifications off',
+  no_device: 'No device', scheduled: 'Scheduled', none: '',
+};
 
 /** Every member, snapshot first then added later (admin only; the route enforces it). */
 export async function reachCsv(collegeId: string, notice: LeanNotice): Promise<string> {
   const rows = await NoticeRecipient.find({ collegeId, noticeId: notice._id }).select(ROW_FIELDS).lean<LeanNoticeRecipient[]>();
-  const info = await peopleInfo(collegeId, rows.map((r) => r.personId));
-  const lines = ['Name,Identifier,Group,Status,Acknowledged at,Late,Seen at,Comment,Added later'];
+  const accountIds = rows.flatMap((r) => (r.accountId ? [r.accountId] : []));
+  const [info, deliveries] = await Promise.all([
+    peopleInfo(collegeId, rows.map((r) => r.personId)),
+    accountIds.length
+      ? NotificationDelivery.find({ ...publishedRows(collegeId, notice._id), accountId: { $in: accountIds } }).select('accountId status reason').lean()
+      : Promise.resolve([]),
+  ]);
+  const deliveryBy = new Map(deliveries.map((d) => [String(d.accountId), d]));
+  const lines = ['Name,Identifier,Group,Status,Acknowledged at,Late,Seen at,Comment,Added later,Delivery'];
   const view = rows.map((r) => ({ r, name: info.get(String(r.personId))?.name ?? 'Unknown member', group: labelOf(r) }));
   view.sort((a, b) => Number(a.r.addedLater) - Number(b.r.addedLater) || a.group.localeCompare(b.group) || a.name.localeCompare(b.name));
   for (const { r, name, group } of view) {
     lines.push([
       name, info.get(String(r.personId))?.identifier ?? '', group, STATUS_WORDS[reachBucket(r)],
       iso(r.ack?.at) ?? '', r.ack?.late ? 'yes' : '', iso(r.seenAt) ?? '', r.ack?.comment ?? '', r.addedLater ? 'yes' : '',
+      DELIVERY_WORDS[deliveryState(Boolean(r.accountId), r.accountId ? deliveryBy.get(String(r.accountId)) : undefined)],
     ].map(csvCell).join(','));
   }
   return `${lines.join('\n')}\n`;

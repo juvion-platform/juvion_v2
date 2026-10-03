@@ -6,6 +6,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import { errorHandler } from './middleware/errorHandler';
+import { globalRateLimit } from './middleware/globalRateLimit';
 import apiRouter from './routes';
 import authRouter from './modules/auth/routes';
 import juviAppRouter from './modules/juvi-app/routes';
@@ -69,13 +70,13 @@ for (const problem of juviStartupProblems(process.env)) {
   process.exit(1);
 }
 
-// Global rate limit: 100 requests per minute per IP.
+// Global rate limit: 100 requests per minute per IP, except notification receipts (own limiter).
 // E2E_TESTING bypass keeps the Playwright suite (and other automated
 // load) from tripping the limit. Production NEVER sets this.
 const isE2ETesting = process.env.E2E_TESTING === '1' || process.env.E2E_TESTING === 'true';
 const isDev = process.env.NODE_ENV === 'development';
 if (!isE2ETesting) {
-  app.use(rateLimit({ windowMs: 60_000, max: isDev ? 1000 : 100, standardHeaders: true, legacyHeaders: false }));
+  app.use(globalRateLimit(isDev ? 1000 : 100));
   // Stricter rate limit on login in production.
   app.use('/api/auth/login', rateLimit({ windowMs: 15 * 60_000, max: isDev ? 1000 : 10, message: { error: 'Too many login attempts. Try again in 15 minutes.' } }));
 }

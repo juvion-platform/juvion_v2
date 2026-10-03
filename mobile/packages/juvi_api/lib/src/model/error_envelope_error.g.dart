@@ -59,4 +59,5 @@ const _$ErrorEnvelopeErrorCodeEnumEnumMap = {
   ErrorEnvelopeErrorCodeEnum.REMINDER_LIMIT: 'REMINDER_LIMIT',
   ErrorEnvelopeErrorCodeEnum.ACK_REQUIRED: 'ACK_REQUIRED',
   ErrorEnvelopeErrorCodeEnum.ACK_NOT_REQUIRED: 'ACK_NOT_REQUIRED',
+  ErrorEnvelopeErrorCodeEnum.RECEIPT_INVALID: 'RECEIPT_INVALID',
 };

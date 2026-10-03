@@ -41,6 +41,17 @@ describe('DEFAULT_POLICIES — notices (notices spec §7.4)', () => {
     }
   });
 
+  it('grants notices:urgent to admin and principal only (notifications spec §6.5)', () => {
+    expect(allows('admin', 'urgent', 'L-ADM')).toBe(true);
+    expect(allows('principal', 'urgent', 'L-PRIN')).toBe(true);
+    expect(allows('hod', 'urgent', 'F-HOD')).toBe(false);
+    expect(allows('faculty', 'urgent', 'F-FAC')).toBe(false);
+    for (const code of OFFICE_PERSONA_CODES) expect(allows('staff', 'urgent', code), code).toBe(false);
+    expect(allows('student', 'urgent', 'L-STU')).toBe(false);
+    const urgentRows = POLICIES.filter((p) => p.module === 'notices' && p.action === 'urgent').map((p) => p.role).sort();
+    expect(urgentRows).toEqual(['admin', 'principal']);
+  });
+
   it('names exactly the office personas of offices.ts', () => {
     const codes = POLICIES.filter((p) => p.module === 'notices' && p.role === 'staff' && p.action === 'create').map((p) => p.personaType).sort();
     expect(codes).toEqual([...OFFICE_PERSONA_CODES].sort());

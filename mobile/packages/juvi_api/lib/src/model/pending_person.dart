@@ -18,6 +18,8 @@ class PendingPerson {
   /// Returns a new [PendingPerson] instance.
   PendingPerson({
 
+    required  this.delivery,
+
     required  this.group,
 
     required  this.identifier,
@@ -28,6 +30,18 @@ class PendingPerson {
 
     required  this.state,
   });
+
+  @JsonKey(
+    
+    name: r'delivery',
+    required: true,
+    includeIfNull: false,
+  )
+
+
+  final PendingPersonDeliveryEnum delivery;
+
+
 
   @JsonKey(
     
@@ -93,6 +107,7 @@ class PendingPerson {
 
     @override
     bool operator ==(Object other) => identical(this, other) || other is PendingPerson &&
+      other.delivery == delivery &&
       other.group == group &&
       other.identifier == identifier &&
       other.lastSeenInApp == lastSeenInApp &&
@@ -101,6 +116,7 @@ class PendingPerson {
 
     @override
     int get hashCode =>
+        delivery.hashCode +
         group.hashCode +
         (identifier == null ? 0 : identifier.hashCode) +
         (lastSeenInApp == null ? 0 : lastSeenInApp.hashCode) +
@@ -117,6 +133,34 @@ class PendingPerson {
   }
 
 }
+
+
+enum PendingPersonDeliveryEnum {
+@JsonValue(r'not_delivered')
+notDelivered(r'not_delivered'),
+@JsonValue(r'delivered')
+delivered(r'delivered'),
+@JsonValue(r'opened')
+opened(r'opened'),
+@JsonValue(r'muted')
+muted(r'muted'),
+@JsonValue(r'tier_off')
+tierOff(r'tier_off'),
+@JsonValue(r'no_device')
+noDevice(r'no_device'),
+@JsonValue(r'scheduled')
+scheduled(r'scheduled'),
+@JsonValue(r'none')
+none(r'none');
+
+const PendingPersonDeliveryEnum(this.value);
+
+final String value;
+
+@override
+String toString() => value;
+}
+
 
 
 enum PendingPersonStateEnum {

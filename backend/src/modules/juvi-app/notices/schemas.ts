@@ -95,6 +95,20 @@ export const reachGroupSchema = z.object({
 });
 export type ReachGroup = z.infer<typeof reachGroupSchema>;
 
+/**
+ * Push delivery for the published notification (notifications spec §7.4): rows by
+ * current status, so the counts are disjoint, with suppressed split by reason.
+ */
+export const deliveryCountsSchema = z.object({
+  scheduled: z.number().int(), sent: z.number().int(), delivered: z.number().int(), opened: z.number().int(),
+  failed: z.number().int(), cancelled: z.number().int(),
+  suppressed: z.object({ muted: z.number().int(), tierOff: z.number().int(), noDevice: z.number().int() }),
+});
+export type DeliveryCounts = z.infer<typeof deliveryCountsSchema>;
+/** A pending member's push state; `none` is someone not on Juvi (or with no notification row). */
+export const PENDING_DELIVERY_STATES = ['not_delivered', 'delivered', 'opened', 'muted', 'tier_off', 'no_device', 'scheduled', 'none'] as const;
+export type PendingDelivery = (typeof PENDING_DELIVERY_STATES)[number];
+
 export const reachResponseSchema = z.object({
   noticeId: z.string(),
   title: z.string(),
@@ -118,6 +132,7 @@ export const reachResponseSchema = z.object({
     total: z.number().int(), acknowledged: z.number().int(), seen: z.number().int(),
     items: z.array(z.object({ ...reachPersonSchema.shape, state: z.enum(REACH_STATES) })),
   }),
+  delivery: deliveryCountsSchema,
   asOf: z.string(),
 });
 export type ReachResponse = z.infer<typeof reachResponseSchema>;
@@ -132,6 +147,7 @@ export type PendingQuery = z.infer<typeof pendingQuerySchema>;
 export const pendingPersonSchema = z.object({
   name: z.string(), identifier: z.string().nullable(), group: z.string(),
   state: z.enum(['seen', 'not_seen', 'not_on_juvi']), lastSeenInApp: z.string().nullable(),
+  delivery: z.enum(PENDING_DELIVERY_STATES),
 });
 export const pendingResponseSchema = z.object({
   items: z.array(pendingPersonSchema), total: z.number().int(),

@@ -129,14 +129,18 @@ Map<String, dynamic> reachJson({int used = 0, String status = 'published'}) => {
           {'name': 'Ishaan Gupta', 'identifier': '24JIT0042', 'group': '2024 Batch · A', 'at': null, 'state': 'seen'},
         ],
       },
+      'delivery': {
+        'scheduled': 0, 'sent': 2, 'delivered': 3, 'opened': 2, 'failed': 0, 'cancelled': 1,
+        'suppressed': {'muted': 1, 'tierOff': 0, 'noDevice': 0},
+      },
       'asOf': '2026-10-01T06:00:00.000Z',
     };
 
 Map<String, dynamic> pendingJson({String? nextCursor, List<Map<String, dynamic>>? items}) => {
       'items': items ??
           [
-            {'name': 'Aditya Nair', 'identifier': '24JIT0001', 'group': '2024 Batch · A', 'state': 'seen', 'lastSeenInApp': '2026-10-01T05:30:00.000Z'},
-            {'name': 'Meera Iyer', 'identifier': null, 'group': '2024 Batch · B', 'state': 'not_on_juvi', 'lastSeenInApp': null},
+            {'name': 'Aditya Nair', 'identifier': '24JIT0001', 'group': '2024 Batch · A', 'state': 'seen', 'lastSeenInApp': '2026-10-01T05:30:00.000Z', 'delivery': 'opened'},
+            {'name': 'Meera Iyer', 'identifier': null, 'group': '2024 Batch · B', 'state': 'not_on_juvi', 'lastSeenInApp': null, 'delivery': 'none'},
           ],
       'total': 2,
       'groups': [

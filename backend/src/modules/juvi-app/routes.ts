@@ -6,15 +6,20 @@ import { spacesRouter } from './spaces/routes';
 import { adminRouter } from './admin/routes';
 import { registerNoticeConsumers } from './notices/consumers';
 import { noticesRouter } from './notices/mobile-routes';
+import { registerNotificationConsumers } from './notifications';
+import { notificationsRouter } from './notifications/routes';
 
-// Outbox consumers for notices; the dispatcher (server.ts) and inline kick() both run them.
+// Outbox consumers for notices and notifications; the dispatcher (server.ts) and inline kick() both run them.
 registerNoticeConsumers();
+registerNotificationConsumers();
 
 export const v1Router = Router();
 v1Router.use(configRouter);
 v1Router.use(accountsRouter);
-// Before spacesRouter: its router-wide authenticateMobile would otherwise run first for these paths too.
+// Before spacesRouter: its router-wide authenticateMobile would otherwise run first for these paths too
+// (and /notifications/receipts has no session at all).
 v1Router.use(noticesRouter);
+v1Router.use(notificationsRouter);
 v1Router.use(spacesRouter);
 
 const router = Router();

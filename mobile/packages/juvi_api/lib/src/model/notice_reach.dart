@@ -7,6 +7,7 @@ import 'package:juvi_api/src/model/notice_reach_comments_inner.dart';
 import 'package:juvi_api/src/model/notice_reach_groups_inner.dart';
 import 'package:juvi_api/src/model/notice_reach_added_later.dart';
 import 'package:juvi_api/src/model/error_envelope_error_reminders.dart';
+import 'package:juvi_api/src/model/notice_reach_delivery.dart';
 import 'package:juvi_api/src/model/notice_reach_late_acks_inner.dart';
 import 'package:json_annotation/json_annotation.dart';
 
@@ -36,6 +37,8 @@ class NoticeReach {
     required  this.comments,
 
     required  this.deadline,
+
+    required  this.delivery,
 
     required  this.dismissed,
 
@@ -145,6 +148,18 @@ class NoticeReach {
 
 
   final String? deadline;
+
+
+
+  @JsonKey(
+    
+    name: r'delivery',
+    required: true,
+    includeIfNull: false,
+  )
+
+
+  final NoticeReachDelivery delivery;
 
 
 
@@ -315,6 +330,7 @@ class NoticeReach {
       other.audience == audience &&
       other.comments == comments &&
       other.deadline == deadline &&
+      other.delivery == delivery &&
       other.dismissed == dismissed &&
       other.groups == groups &&
       other.late_ == late_ &&
@@ -338,6 +354,7 @@ class NoticeReach {
         audience.hashCode +
         comments.hashCode +
         (deadline == null ? 0 : deadline.hashCode) +
+        delivery.hashCode +
         dismissed.hashCode +
         groups.hashCode +
         late_.hashCode +

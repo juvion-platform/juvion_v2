@@ -147,6 +147,17 @@ describe('processOnce, kick and drain', () => {
     expect(swept).toBe(1);
   });
 
+  it('runs afterEvents sweepers after the events on every pass, kick or tick', async () => {
+    const order: string[] = [];
+    registerSweeper(async () => { order.push('after'); }, { afterEvents: true });
+    registerConsumer('t.e', async () => { order.push('event'); });
+    await emit('t.e', { collegeId: cid }, 'e1');
+    await processOnce(500, { sweep: false });
+    expect(order).toEqual(['event', 'after']);
+    await processOnce();
+    expect(order).toEqual(['event', 'after', 'after']);
+  });
+
   it('kick uses the enqueuer when one is installed and falls back to inline processing otherwise', async () => {
     const handled: string[] = [];
     registerConsumer('t.k', async (_p, ev) => { handled.push(ev.dedupeKey); });
