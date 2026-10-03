@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
@@ -56,6 +57,30 @@ class _Session extends SessionController {
   final SessionState initial;
   @override
   SessionState build() => initial;
+}
+
+class _SettableSession extends SessionController {
+  _SettableSession(this.initial);
+  final SessionState initial;
+  @override
+  SessionState build() => initial;
+  // A test hook, not a property.
+  // ignore: use_setters_to_change_properties
+  void set(SessionState s) => state = s;
+}
+
+class _GatedLocal extends FakeLocalNotifications {
+  final gate = Completer<void>();
+  @override
+  Future<void> init({void Function(String? payload)? onTap}) async {
+    await super.init(onTap: onTap);
+    await gate.future;
+  }
+}
+
+class _ThrowingLaunchLocal extends FakeLocalNotifications {
+  @override
+  Future<String?> launchPayload() async => throw StateError('no launch details');
 }
 
 void main() {
@@ -147,6 +172,40 @@ void main() {
     t.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await t.pumpAndSettle();
     expect(c.read(notificationsAllowedProvider).value, isTrue);
+  });
+
+  testWidgets('cold start signed in: a forced sign-out before init finishes still deletes the FCM token', (t) async {
+    final gated = _GatedLocal();
+    final dio = Dio(BaseOptions(baseUrl: 'https://api.test/v1'));
+    DioAdapter(dio: dio)
+      ..onPut('/me/devices/current/push-token', (s) => s.reply(204, null), data: Matchers.any)
+      ..onDelete('/me/devices/current/push-token', (s) => s.reply(204, null));
+    final c = ProviderContainer(retry: (_, _) => null, overrides: [
+      localNotificationsProvider.overrideWithValue(gated),
+      pushMessagingProvider.overrideWithValue(messaging),
+      notificationPermissionProvider.overrideWithValue(permission),
+      receiptsProvider.overrideWithValue(receipts),
+      deepLinkResolverProvider.overrideWithValue(resolver),
+      noticeActionsProvider.overrideWithValue(actions),
+      mobileApiProvider.overrideWithValue(JuviApi(dio: dio, basePathOverride: 'https://api.test/v1').getMobileApi()),
+      sessionControllerProvider.overrideWith(() => _SettableSession(SessionState.signedIn(acct()))),
+    ]);
+    addTearDown(c.dispose);
+    await t.pumpWidget(UncontrolledProviderScope(container: c, child: const PushLifecycle(child: SizedBox())));
+    await t.pump();
+    (c.read(sessionControllerProvider.notifier) as _SettableSession).set(const SessionState.signedOut());
+    await t.pump();
+    gated.gate.complete();
+    await t.pumpAndSettle();
+    expect(messaging.deletes, 1);
+  });
+
+  testWidgets('launchPayload throwing does not skip the token sync or the receipt drain', (t) async {
+    local = _ThrowingLaunchLocal();
+    await ReceiptQueue().add(ReceiptItem(deliveryId: 'd00000000000000000000009', receipt: 'sig.1', event: 'delivered', at: DateTime.utc(2026, 10, 3)));
+    await pump(t);
+    verify(() => registration.sync()).called(1);
+    expect(posted, hasLength(1));
   });
 
   testWidgets('real wiring: a destination held by an earlier process is opened at startup', (t) async {

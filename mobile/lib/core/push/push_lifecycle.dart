@@ -41,11 +41,25 @@ class _PushLifecycleState extends ConsumerState<PushLifecycle> with WidgetsBindi
     if (p != null) unawaited(ref.read(deepLinkResolverProvider).onNotificationTap(p));
   }
 
+  /// Each step is best effort and independent: one failing never skips the next.
   Future<void> _start() async {
+    // Created before any await, so it watches the session from the start and a forced
+    // sign-out at any later point deletes the local FCM token.
+    PushRegistration? registration;
+    DeepLinkResolver? resolver;
     try {
-      final local = ref.read(localNotificationsProvider);
-      final messaging = ref.read(pushMessagingProvider);
-      final resolver = ref.read(deepLinkResolverProvider);
+      registration = ref.read(pushRegistrationProvider);
+    } on Object {
+      // Push stays off.
+    }
+    try {
+      resolver = ref.read(deepLinkResolverProvider);
+    } on Object {
+      // Taps and held links stay off.
+    }
+    final local = ref.read(localNotificationsProvider);
+    final messaging = ref.read(pushMessagingProvider);
+    try {
       await local.init(onTap: (payload) => _tap(NoticePush.fromPayload(payload)));
       if (!mounted) return;
       _subscriptions
@@ -56,17 +70,35 @@ class _PushLifecycleState extends ConsumerState<PushLifecycle> with WidgetsBindi
               refresh: () => ref.read(noticeActionsProvider).refresh(),
             ))))
         ..add(messaging.openedMessages.listen((data) => _tap(NoticePush.tryParse(data))));
+    } on Object {
+      // No tray or no foreground stream; the rest still runs.
+    }
+    NoticePush? launch;
+    try {
       final launchPayload = await local.launchPayload();
+      launch = NoticePush.fromPayload(launchPayload);
+    } on Object {
+      // No launch details.
+    }
+    try {
       final initial = await messaging.initialMessage();
-      final launch = NoticePush.fromPayload(launchPayload) ?? (initial == null ? null : NoticePush.tryParse(initial));
-      if (!mounted) return;
+      if (launch == null && initial != null) launch = NoticePush.tryParse(initial);
+    } on Object {
+      // No FCM launch message.
+    }
+    if (!mounted) return;
+    try {
       // A destination held across a restart first; the notification that launched the app wins.
-      await resolver.onSessionChanged(ref.read(sessionControllerProvider));
+      await resolver?.onSessionChanged(ref.read(sessionControllerProvider));
       _tap(launch);
-      unawaited(ref.read(pushRegistrationProvider).sync());
+    } on Object {
+      // The link is dropped, not retried.
+    }
+    try {
+      if (registration != null) unawaited(registration.sync());
       unawaited(ref.read(receiptsProvider).drain());
     } on Object {
-      // Push is best effort; the app works without it.
+      // Retried at the next resume.
     }
   }
 
