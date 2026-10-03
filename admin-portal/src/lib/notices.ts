@@ -1,11 +1,12 @@
 /**
  * Juvi notices: pure helpers shared by the portal's notice screens (spec §8).
  * Limits and the MIME list mirror backend/src/models/juvi/Notice.ts; the
- * admin roles mirror notices/publisher-scope.ts ADMIN_ROLES.
+ * admin roles mirror notices/publisher-scope.ts ADMIN_ROLES. The phone
+ * notification wording mirrors the notifications spec §6.6.
  */
 import type { AxiosError } from 'axios';
 import { extractErrorMessage } from './errors';
-import type { AudienceRuleKind, NoticePriority, NoticeRow, PendingPerson } from '../services/notices';
+import type { AudienceRuleKind, DeliveryCounts, NoticePriority, NoticeRow, PendingDelivery, PendingPerson } from '../services/notices';
 
 export const NOTICE_TITLE_MAX = 120;
 export const NOTICE_BODY_MAX = 5000;
@@ -33,9 +34,49 @@ export const ROLE_LABELS: Record<string, string> = { student: 'All students', fa
 export const roleLabel = (id: string): string => ROLE_LABELS[id] ?? id;
 
 export const PRIORITY_LABELS: Record<NoticePriority, string> = { routine: 'Routine', important: 'Important', urgent: 'Urgent' };
-export const URGENT_NOTE = 'Urgent bypasses quiet hours once push arrives. Until then every notice reaches the app on its next refresh.';
+export const URGENT_NOTE = 'Urgent notifies everyone at once, even during quiet hours and when they have muted the channel.';
 
 export const PENDING_STATE_LABELS: Record<PendingPerson['state'], string> = { seen: 'Seen, not acknowledged', not_seen: 'Not seen', not_on_juvi: 'Not on Juvi' };
+
+// ── Phone notifications (notifications spec §6.5, §6.6, §7.4, §9) ─────────
+
+/** `urgentReason` length, as backend/src/models/juvi/Notice.ts URGENT_REASON_MIN / URGENT_REASON_MAX. */
+export const URGENT_REASON_MIN = 10;
+export const URGENT_REASON_MAX = 300;
+export const NEED_URGENT_HINT = 'Need Urgent? Ask an IT admin.';
+export const URGENT_NOT_ALLOWED_MESSAGE = 'Your account cannot publish Urgent notices. Go back and choose Routine or Important, or ask an IT admin.';
+
+/** The Confidential helper text (spec §9), with the office the notice is published from. */
+export const confidentialHelp = (office: string): string =>
+  `The phone notification will say only 'New notice from ${office || 'your office'}'. The content opens in the app.`;
+
+/**
+ * What the phone shows for one notice (spec §6.6), as the two lines of an
+ * Android notification. The office is always there; a confidential notice
+ * never shows its title. The Flutter handler renders the same strings.
+ */
+export function trayNotification(i: { office: string; title: string; confidential: boolean; variant: 'published' | 'reminder' }): { title: string; text: string | null } {
+  const title = i.title.trim() || 'Notice title';
+  if (i.confidential) return { title: i.variant === 'reminder' ? `Reminder from ${i.office}` : `New notice from ${i.office}`, text: null };
+  return { title: i.office, text: i.variant === 'reminder' ? `Reminder: ${title}` : title };
+}
+
+/** How each tier reaches the phone (spec §2 goals 1–3, §6.3, §6.4). */
+export const TRAY_ALERT: Record<NoticePriority, string> = {
+  urgent: 'Rings at once, even during quiet hours and when the channel is muted.',
+  important: 'Plays a sound. During someone\'s quiet hours (22:00–07:00 unless they change them) it waits until they end.',
+  routine: 'Silent. Routine notices from one office within 15 minutes arrive as one notification.',
+};
+
+/** The Reach pending list's delivery column (spec §9); the CSV uses the same words, with an empty cell for `none`. */
+export const PENDING_DELIVERY_LABELS: Record<PendingDelivery, string> = {
+  not_delivered: 'Not delivered', delivered: 'Delivered', opened: 'Opened', muted: 'Muted', tier_off: 'Notifications off',
+  no_device: 'No device', scheduled: 'Scheduled', none: '—',
+};
+
+/** Everyone the published notification was decided for: each person is in exactly one count. */
+export const deliveryTotal = (d: DeliveryCounts): number =>
+  d.scheduled + d.sent + d.delivered + d.opened + d.failed + d.cancelled + d.suppressed.muted + d.suppressed.tierOff + d.suppressed.noDevice;
 
 // ── College-timezone dates ──────────────────────────────────────────────
 
@@ -102,8 +143,9 @@ export function errorStatus(err: unknown): number | undefined {
 
 /**
  * The server's message for a failed notices call, shown verbatim. ERP bodies
- * carry no machine-readable code, so screens branch on errorStatus() and never
- * on this text. A Zod 400 lists its field messages, not "Validation failed".
+ * carry no machine-readable code (the one exception is the Urgent gate's
+ * `detail.code`, see isUrgentNotAllowed), so screens branch on errorStatus()
+ * and never on this text. A Zod 400 lists its field messages, not "Validation failed".
  */
 export function noticeErrorMessage(err: unknown, fallback?: string): string {
   const body = bodyOf(err);
@@ -117,6 +159,16 @@ export function noticeErrorMessage(err: unknown, fallback?: string): string {
 export function errorDetail<T>(err: unknown): T | undefined {
   const detail = bodyOf(err)?.detail;
   return detail && typeof detail === 'object' ? (detail as T) : undefined;
+}
+
+/** The Urgent gate's refusal: 403 `{ error, detail: { code: 'URGENT_NOT_ALLOWED' } }` (notifications spec §6.5). */
+export function isUrgentNotAllowed(err: unknown): boolean {
+  return errorStatus(err) === 403 && errorDetail<{ code?: unknown }>(err)?.code === 'URGENT_NOT_ALLOWED';
+}
+
+/** A failed publish: the Urgent refusal in the portal's words, anything else as noticeErrorMessage. */
+export function publishErrorMessage(err: unknown): string {
+  return isUrgentNotAllowed(err) ? URGENT_NOT_ALLOWED_MESSAGE : noticeErrorMessage(err);
 }
 
 // ── List and reach wording ───────────────────────────────────────────────

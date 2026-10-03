@@ -5,12 +5,14 @@ import Drawer from '../ui/Drawer';
 import AudienceBuilder, { selectionToRules, useAudiencePreview, type AudienceSelection } from './AudienceBuilder';
 import AttachmentsField, { type AttachmentsState } from './AttachmentsField';
 import NoticeCardPreview from './NoticeCardPreview';
+import NotificationTrayPreview from './NotificationTrayPreview';
 import { toast } from '../../stores/toastStore';
 import {
   getNoticeTargets, publishNotice, type AudiencePreview, type NoticeDetail, type NoticePriority, type NoticePurpose, type PublishNoticeInput,
 } from '../../services/notices';
 import {
-  NOTICE_BODY_MAX, NOTICE_TITLE_MAX, PRIORITY_LABELS, URGENT_NOTE, formatInZone, isoToZonedLocal, noticeErrorMessage, zonedLocalToIso,
+  NEED_URGENT_HINT, NOTICE_BODY_MAX, NOTICE_TITLE_MAX, PRIORITY_LABELS, URGENT_NOTE, URGENT_REASON_MAX, URGENT_REASON_MIN,
+  confidentialHelp, formatInZone, isUrgentNotAllowed, isoToZonedLocal, noticeErrorMessage, publishErrorMessage, zonedLocalToIso,
 } from '../../lib/notices';
 
 const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default';
@@ -47,6 +49,8 @@ export function NoticeComposerForm({ initial, onPublished, onCancel, titleRef }:
   const bodyId = useId();
   const officeId = useId();
   const deadlineId = useId();
+  const reasonId = useId();
+  const confidentialId = useId();
   const targetsQ = useQuery({ queryKey: ['notice-targets'], queryFn: getNoticeTargets, staleTime: 5 * 60_000, meta: { silentError: true } });
   const targets = targetsQ.data;
   const tz = targets?.timezone ?? 'Asia/Kolkata';
@@ -60,13 +64,23 @@ export function NoticeComposerForm({ initial, onPublished, onCancel, titleRef }:
   const [deadline, setDeadline] = useState('');   // datetime-local, in college time
   const [ackCommentAllowed, setAckCommentAllowed] = useState(false);
   const [priority, setPriority] = useState<NoticePriority>('routine');
+  const [urgentReason, setUrgentReason] = useState('');
+  const [confidential, setConfidential] = useState(false);
   const [step, setStep] = useState<'compose' | 'confirm'>('compose');
+  const [refusal, setRefusal] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const reviewRef = useRef<HTMLButtonElement>(null);
   const backFromConfirm = useRef(false);
 
   const purpose = initial?.purpose ?? 'standard';
   const officeChoice = targets?.isAdmin ? office || targets.office : undefined;
+  const fromOffice = officeChoice ?? targets?.office ?? '';
+  // Urgent is offered only to those /targets allows (notifications spec §6.5, §9). After a
+  // URGENT_NOT_ALLOWED refusal /targets is fetched again, and a choice it no longer allows reads as Important.
+  const canUrgent = targets?.canPublishUrgent === true;
+  const priorities = canUrgent ? PRIORITIES : PRIORITIES.filter((p) => p !== 'urgent');
+  const chosenPriority: NoticePriority = priority === 'urgent' && !canUrgent ? 'important' : priority;
+  const urgent = chosenPriority === 'urgent';
   const rules = selectionToRules(audience);
   // Count only once /targets has said which office applies, so the first count is already the right one.
   const preview = useAudiencePreview(targets ? rules : [], officeChoice);
@@ -84,6 +98,16 @@ export function NoticeComposerForm({ initial, onPublished, onCancel, titleRef }:
     mutationFn: (input: PublishNoticeInput) => publishNotice(input),
     // The confirm step renders a failure itself; the success toast is below.
     meta: { silent: true, silentError: true },
+    // A refused Urgent closes the confirm step and falls back to Important, so the publisher
+    // reviews the notice again before anything goes out; /targets is fetched again to take Urgent off the form.
+    onError: (err) => {
+      if (!isUrgentNotAllowed(err)) return;
+      qc.invalidateQueries({ queryKey: ['notice-targets'] });
+      setRefusal(publishErrorMessage(err));
+      setPriority('important');
+      backFromConfirm.current = true;
+      setStep('compose');
+    },
     onSuccess: (notice) => {
       qc.invalidateQueries({ queryKey: ['notices'] });
       const total = preview.data?.total ?? 0;
@@ -105,20 +129,22 @@ export function NoticeComposerForm({ initial, onPublished, onCancel, titleRef }:
     if (files.uploading) e.attachments = 'Wait for the uploads to finish';
     else if (files.failed) e.attachments = 'Remove the attachments that could not be uploaded';
     if (deadlineIso && new Date(deadlineIso).getTime() <= Date.now()) e.deadline = 'The deadline must be in the future';
+    if (urgent && urgentReason.trim().length < URGENT_REASON_MIN) e.urgentReason = `Say why this is Urgent (at least ${URGENT_REASON_MIN} characters)`;
     return e;
   }
 
   function review() {
     const e = validate();
     setErrors(e);
-    if (Object.keys(e).length === 0) setStep('confirm');
+    if (Object.keys(e).length === 0) { setRefusal(null); publish.reset(); setStep('confirm'); }
   }
 
   function submit() {
     publish.mutate({
       title: title.trim(), body: body.trim(), attachments: files.attachments, audience: { rules },
       ackRequired, ackDeadline: deadlineIso, ackCommentAllowed: ackRequired && ackCommentAllowed,
-      priority, purpose, ...(officeChoice ? { office: officeChoice } : {}),
+      priority: chosenPriority, purpose, confidential: welcome ? false : confidential, ...(urgent ? { urgentReason: urgentReason.trim() } : {}),
+      ...(officeChoice ? { office: officeChoice } : {}),
     });
   }
 
@@ -140,7 +166,8 @@ export function NoticeComposerForm({ initial, onPublished, onCancel, titleRef }:
       {confirming && (
         <ConfirmStep
           preview={confirming} office={officeChoice} deadline={deadlineIso && `${formatInZone(deadlineIso, tz)} (${tz})`} welcome={welcome}
-          pending={publish.isPending} error={publish.isError ? noticeErrorMessage(publish.error) : null}
+          urgentReason={urgent ? urgentReason.trim() : null} confidentialOffice={confidential && !welcome ? fromOffice : null}
+          pending={publish.isPending} error={publish.isError && !refusal ? publishErrorMessage(publish.error) : null}
           onBack={backToEdit} onPublish={submit}
         />
       )}
@@ -213,18 +240,44 @@ export function NoticeComposerForm({ initial, onPublished, onCancel, titleRef }:
               </label>
             </fieldset>
 
+            {refusal && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{refusal}</p>}
             <fieldset>
               <legend className={lbl}>Priority</legend>
               <div className="flex gap-4">
-                {PRIORITIES.map((p) => (
+                {priorities.map((p) => (
                   <label key={p} className="flex items-center gap-1.5 text-sm">
-                    <input type="radio" name="notice-priority" value={p} checked={priority === p} onChange={() => setPriority(p)} />
+                    <input type="radio" name="notice-priority" value={p} checked={chosenPriority === p} onChange={() => setPriority(p)} />
                     {PRIORITY_LABELS[p]}
                   </label>
                 ))}
               </div>
-              {priority === 'urgent' && <p className="mt-1 text-xs text-amber-700">{URGENT_NOTE}</p>}
+              {targets && !canUrgent && <p className="mt-1 text-xs text-gray-500">{NEED_URGENT_HINT}</p>}
+              {urgent && (
+                <div className="mt-2 space-y-2">
+                  {!welcome && <p className="text-xs text-amber-700">{URGENT_NOTE}</p>}
+                  <div>
+                    <label htmlFor={reasonId} className={lbl}>Reason for Urgent</label>
+                    <textarea id={reasonId} className={inp} rows={2} required value={urgentReason} maxLength={URGENT_REASON_MAX}
+                      aria-invalid={Boolean(errors.urgentReason)}
+                      aria-describedby={errors.urgentReason ? `${reasonId}-count ${reasonId}-err` : `${reasonId}-count`} onChange={(e) => setUrgentReason(e.target.value)} />
+                    <p id={`${reasonId}-count`} className="mt-1 text-right text-xs text-gray-500">
+                      {urgentReason.length}/{URGENT_REASON_MAX} · at least {URGENT_REASON_MIN} · kept in the audit trail
+                    </p>
+                    {errors.urgentReason && <p id={`${reasonId}-err`} className="mt-1 text-xs text-red-600">{errors.urgentReason}</p>}
+                  </div>
+                </div>
+              )}
             </fieldset>
+
+            {!welcome && <fieldset>
+              <legend className={lbl}>Phone notification</legend>
+              <label className="flex items-center gap-2 text-sm">
+                <input id={confidentialId} type="checkbox" checked={confidential} aria-describedby={`${confidentialId}-help`}
+                  onChange={(e) => setConfidential(e.target.checked)} />
+                Confidential
+              </label>
+              <p id={`${confidentialId}-help`} className="mt-1 text-xs text-gray-500">{confidentialHelp(fromOffice)}</p>
+            </fieldset>}
 
             <div className="flex justify-end gap-2 border-t pt-4">
               <button type="button" onClick={onCancel} className="rounded-lg border px-4 py-2 text-sm hover:bg-gray-50">Cancel</button>
@@ -239,8 +292,10 @@ export function NoticeComposerForm({ initial, onPublished, onCancel, titleRef }:
             <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">Preview</p>
             <NoticeCardPreview
               title={title} body={body} office={officeChoice ?? targets?.office ?? ''} audienceLine={rules.length ? preview.data?.line ?? '' : ''}
-              priority={priority} ackRequired={ackRequired} deadline={deadlineIso} timezone={tz} attachmentCount={files.attachments.length}
+              priority={chosenPriority} ackRequired={ackRequired} deadline={deadlineIso} timezone={tz} attachmentCount={files.attachments.length}
             />
+            <p className="mb-2 mt-5 text-xs font-medium uppercase tracking-wide text-gray-500">On the phone</p>
+            <NotificationTrayPreview office={fromOffice} title={title} priority={chosenPriority} confidential={confidential} welcome={welcome} />
           </div>
         </div>
       </div>
@@ -250,6 +305,8 @@ export function NoticeComposerForm({ initial, onPublished, onCancel, titleRef }:
 
 interface ConfirmProps {
   preview: AudiencePreview; office?: string; deadline: string | null; welcome: boolean;
+  /** Set for an Urgent notice; `confidentialOffice` for a confidential one (notifications spec §6.5, §6.6). */
+  urgentReason: string | null; confidentialOffice: string | null;
   pending: boolean; error: string | null; onBack: () => void; onPublish: () => void;
 }
 
@@ -257,7 +314,7 @@ interface ConfirmProps {
  * Confirm-to-publish (spec §8): the count, the on-Juvi split, the deadline in college time. Takes focus.
  * A welcome notice is not sent to anyone now (spec §6.5), so it says who sees it instead of a count.
  */
-function ConfirmStep({ preview: d, office, deadline, welcome, pending, error, onBack, onPublish }: ConfirmProps) {
+function ConfirmStep({ preview: d, office, deadline, welcome, urgentReason, confidentialOffice, pending, error, onBack, onPublish }: ConfirmProps) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => { headingRef.current?.focus(); }, []);
   return (
@@ -271,12 +328,15 @@ function ConfirmStep({ preview: d, office, deadline, welcome, pending, error, on
             <li>Each new account sees it at onboarding step 4, once it is saved as the welcome notice.</li>
             <li>People already using Juvi do not receive it. To reach them, publish a regular notice.</li>
             {office && <li>From {office}.</li>}
+            {urgentReason && <li>Urgent. Reason: {urgentReason}</li>}
           </>
         ) : (
           <>
             <li>{d.line}{office ? `, from ${office}` : ''}.</li>
             <li>{n(d.onJuvi)} on Juvi see it on their next refresh.</li>
             {d.notOnJuvi > 0 && <li>{n(d.notOnJuvi)} not on Juvi yet get it when they activate the app.</li>}
+            {urgentReason && <li>Urgent: phones are notified at once, even during quiet hours. Reason: {urgentReason}</li>}
+            {confidentialOffice !== null && <li>Confidential: the phone notification says only "New notice from {confidentialOffice || 'your office'}".</li>}
           </>
         )}
         {deadline && <li>Acknowledge by {deadline}.</li>}

@@ -11,7 +11,7 @@ import { getNoticeTargets, previewAudience, uploadNoticeAttachment, publishNotic
 import { toast } from '../../../stores/toastStore';
 
 const TARGETS = {
-  office: 'College Office', offices: ['College Office', "Principal's Office", 'Exam Section'], isAdmin: true, timezone: 'Asia/Kolkata',
+  office: 'College Office', offices: ['College Office', "Principal's Office", 'Exam Section'], isAdmin: true, timezone: 'Asia/Kolkata', canPublishUrgent: true,
   kinds: ['all', 'role', 'batch'], roles: ['student', 'faculty'],
   departments: [], programmes: [], batches: [{ id: 'b1', label: 'CSE 2024' }], sections: [], courseOfferings: [], hostelBlocks: [],
 };
@@ -101,9 +101,9 @@ describe('NoticeComposer', () => {
     fireEvent.click(screen.getByLabelText('Require acknowledgement'));
     expect(deadline).toBeEnabled();
     expect(screen.getByLabelText('Allow a comment with the acknowledgement')).toBeEnabled();
-    expect(screen.queryByText(/bypasses quiet hours/)).toBeNull();
-    fireEvent.click(screen.getByLabelText('Urgent'));
-    expect(screen.getByText(/Urgent bypasses quiet hours once push arrives\./)).toBeInTheDocument();
+    expect(screen.queryByText(/even during quiet hours/)).toBeNull();
+    fireEvent.click(await screen.findByLabelText('Urgent'));
+    expect(screen.getByText('Urgent notifies everyone at once, even during quiet hours and when they have muted the channel.')).toBeInTheDocument();
   });
 
   it('previews the notice as the Juvi card', async () => {
@@ -153,7 +153,7 @@ describe('NoticeComposer', () => {
     await waitFor(() => expect(publishNotice).toHaveBeenCalledWith({
       title: 'Mid-semester timetable', body: 'Attached.', attachments: [], audience: { rules: [{ kind: 'batch', ids: ['b1'] }] },
       ackRequired: true, ackDeadline: '2030-01-15T11:30:00.000Z', ackCommentAllowed: true,
-      priority: 'important', purpose: 'standard', office: 'Exam Section',
+      priority: 'important', purpose: 'standard', confidential: false, office: 'Exam Section',
     }));
     expect(toast.success).toHaveBeenCalledWith('Notice published', 'Delivering to 3 people.');
     expect(onPublished).toHaveBeenCalledWith(expect.objectContaining({ id: 'n1' }));
@@ -218,5 +218,164 @@ describe('NoticeComposer', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Review and publish' }));
     expect(screen.getAllByText(/You can only send notices to your own department\./)).toHaveLength(1);
     expect(screen.queryByRole('heading', { name: /Publish to/ })).toBeNull();
+  });
+
+  describe('Urgent and Confidential (notifications spec §6.5, §9)', () => {
+    async function fillNotice() {
+      fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Exam hall changed' } });
+      fireEvent.change(screen.getByLabelText('Notice'), { target: { value: 'Report to Hall B at 2 pm.' } });
+      await chooseBatch();
+    }
+
+    it('offers Urgent only when /targets allows it, and says whom to ask otherwise', async () => {
+      (getNoticeTargets as Mock).mockResolvedValue({ ...TARGETS, isAdmin: false, office: 'Registrar', offices: ['Registrar'], canPublishUrgent: false });
+      open();
+      expect(await screen.findByText('Need Urgent? Ask an IT admin.')).toBeInTheDocument();
+      const priority = screen.getByRole('group', { name: 'Priority' });
+      expect(within(priority).getAllByRole('radio').map((r) => r.getAttribute('value'))).toEqual(['routine', 'important']);
+      expect(screen.queryByLabelText('Urgent')).toBeNull();
+    });
+
+    it('does not offer the hint to someone who may publish Urgent', async () => {
+      open();
+      expect(await screen.findByLabelText('Urgent')).toBeInTheDocument();
+      expect(screen.queryByText('Need Urgent? Ask an IT admin.')).toBeNull();
+    });
+
+    it('requires a 10–300 character reason with a counter, and sends it trimmed', async () => {
+      open();
+      await fillNotice();
+      expect(screen.queryByLabelText('Reason for Urgent')).toBeNull();
+      fireEvent.click(screen.getByLabelText('Urgent'));
+      const reason = screen.getByLabelText('Reason for Urgent');
+      expect(reason).toBeRequired();
+      expect(reason).toHaveAttribute('maxLength', '300');
+      fireEvent.change(reason, { target: { value: ' Too short ' } });
+      expect(reason).toHaveAccessibleDescription('11/300 · at least 10 · kept in the audit trail');
+      fireEvent.click(screen.getByRole('button', { name: 'Review and publish' }));
+      expect(screen.getByText('Say why this is Urgent (at least 10 characters)')).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: /Publish to/ })).toBeNull();
+
+      fireEvent.change(reason, { target: { value: ' Exam moved to today ' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Review and publish' }));
+      await screen.findByRole('heading', { name: 'Publish to 3 people?' });
+      expect(screen.getByText('Urgent: phones are notified at once, even during quiet hours. Reason: Exam moved to today')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Publish notice' }));
+      await waitFor(() => expect(publishNotice).toHaveBeenCalledWith(expect.objectContaining({ priority: 'urgent', urgentReason: 'Exam moved to today' })));
+    });
+
+    it('links the reason error to the field', async () => {
+      open();
+      await fillNotice();
+      fireEvent.click(screen.getByLabelText('Urgent'));
+      const reason = screen.getByLabelText('Reason for Urgent');
+      expect(reason).not.toHaveAttribute('aria-invalid', 'true');
+      fireEvent.change(reason, { target: { value: ' Too short ' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Review and publish' }));
+      expect(reason).toHaveAttribute('aria-invalid', 'true');
+      expect(reason).toHaveAccessibleDescription(expect.stringContaining('Say why this is Urgent (at least 10 characters)'));
+      expect(reason).toHaveAccessibleDescription(expect.stringContaining('11/300'));
+    });
+
+    it('offers a welcome notice no Confidential control and no "notifies at once" note, and sends confidential false', async () => {
+      open({ purpose: 'welcome', title: 'Welcome to Juvi', ackRequired: true, audience: { role: [{ id: 'student', label: 'All students' }] } });
+      fireEvent.change(screen.getByLabelText('Notice'), { target: { value: 'Hello.' } });
+      await screen.findByText(/2 on Juvi/);
+      expect(screen.queryByLabelText('Confidential')).toBeNull();
+      expect(screen.queryByRole('group', { name: 'Phone notification' })).toBeNull();
+      fireEvent.click(await screen.findByLabelText('Urgent'));
+      expect(screen.queryByText(/notifies everyone at once/)).toBeNull();
+      fireEvent.change(screen.getByLabelText('Reason for Urgent'), { target: { value: 'Exam moved to today' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Review and publish' }));
+      expect(await screen.findByRole('heading', { name: 'Publish this welcome notice?' })).toBeInTheDocument();
+      expect(screen.getByText('Urgent. Reason: Exam moved to today')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Publish notice' }));
+      await waitFor(() => expect(publishNotice).toHaveBeenCalledWith(expect.objectContaining({
+        purpose: 'welcome', confidential: false, priority: 'urgent', urgentReason: 'Exam moved to today',
+      })));
+    });
+
+    it('drops the reason when the priority goes back to Important', async () => {
+      open();
+      await fillNotice();
+      fireEvent.click(screen.getByLabelText('Urgent'));
+      fireEvent.change(screen.getByLabelText('Reason for Urgent'), { target: { value: 'Exam moved to today' } });
+      fireEvent.click(screen.getByLabelText('Important'));
+      expect(screen.queryByLabelText('Reason for Urgent')).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: 'Review and publish' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Publish notice' }));
+      await waitFor(() => expect(publishNotice).toHaveBeenCalled());
+      const input = (publishNotice as Mock).mock.calls[0]![0] as Record<string, unknown>;
+      expect(input.priority).toBe('important');
+      expect(input).not.toHaveProperty('urgentReason');
+    });
+
+    it('marks a notice Confidential, explains the notification with the office, and sends the flag', async () => {
+      open();
+      await fillNotice();
+      const box = screen.getByLabelText('Confidential');
+      expect(box).not.toBeChecked();
+      expect(box).toHaveAccessibleDescription("The phone notification will say only 'New notice from College Office'. The content opens in the app.");
+      fireEvent.change(screen.getByLabelText('Publish as'), { target: { value: 'Exam Section' } });
+      expect(box).toHaveAccessibleDescription("The phone notification will say only 'New notice from Exam Section'. The content opens in the app.");
+      fireEvent.click(box);
+      await waitFor(() => expect(previewAudience).toHaveBeenLastCalledWith([{ kind: 'batch', ids: ['b1'] }], 'Exam Section'));
+      fireEvent.click(screen.getByRole('button', { name: 'Review and publish' }));
+      expect(await screen.findByText('Confidential: the phone notification says only "New notice from Exam Section".')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Publish notice' }));
+      await waitFor(() => expect(publishNotice).toHaveBeenCalledWith(expect.objectContaining({ confidential: true, office: 'Exam Section' })));
+    });
+
+    it('explains a server refusal of Urgent and takes Urgent off the form', async () => {
+      (publishNotice as Mock).mockRejectedValue({
+        isAxiosError: true,
+        response: { status: 403, data: { error: 'Only an IT admin can publish Urgent notices. Choose Routine or Important, or ask an IT admin.', detail: { code: 'URGENT_NOT_ALLOWED' } } },
+      });
+      open();
+      await fillNotice();
+      fireEvent.click(screen.getByLabelText('Urgent'));
+      fireEvent.change(screen.getByLabelText('Reason for Urgent'), { target: { value: 'Exam moved to today' } });
+      (getNoticeTargets as Mock).mockResolvedValue({ ...TARGETS, canPublishUrgent: false });
+      fireEvent.click(screen.getByRole('button', { name: 'Review and publish' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Publish notice' }));
+      // The refusal closes the confirm step: Publish must not be reachable, so nothing goes out as a priority the user never reviewed.
+      expect(await screen.findByRole('alert')).toHaveTextContent('Your account cannot publish Urgent notices. Go back and choose Routine or Important, or ask an IT admin.');
+      expect(screen.queryByRole('heading', { name: /Publish to/ })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Publish notice' })).toBeNull();
+      await waitFor(() => expect(getNoticeTargets).toHaveBeenCalledTimes(2));
+      expect(await screen.findByText('Need Urgent? Ask an IT admin.')).toBeInTheDocument();
+      expect(screen.queryByLabelText('Urgent')).toBeNull();
+      expect(screen.getByLabelText('Important')).toBeChecked();
+      expect(publishNotice).toHaveBeenCalledTimes(1);
+      // Going through review again is the only way to publish, and it shows Important.
+      fireEvent.click(screen.getByRole('button', { name: 'Review and publish' }));
+      expect(await screen.findByRole('heading', { name: 'Publish to 3 people?' })).toBeInTheDocument();
+      expect(screen.queryByText(/^Urgent: phones/)).toBeNull();
+      expect(screen.queryByLabelText('Reason for Urgent')).toBeNull();
+      expect(screen.queryByRole('alert')).toBeNull();
+    });
+  });
+
+  describe('phone tray preview (notifications spec §6.6, §9)', () => {
+    it('follows the title, the office, Confidential and the priority', async () => {
+      open();
+      await screen.findByLabelText('Publish as');
+      fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Revaluation results' } });
+      const tray = screen.getByRole('region', { name: 'Phone notification preview' });
+      expect(within(tray).getByText('Revaluation results')).toBeInTheDocument();
+      expect(within(tray).getAllByText('College Office')).toHaveLength(2);
+      expect(tray).toHaveTextContent('Silent. Routine notices');
+      fireEvent.change(screen.getByLabelText('Publish as'), { target: { value: 'Exam Section' } });
+      fireEvent.click(screen.getByLabelText('Confidential'));
+      expect(within(tray).getByText('New notice from Exam Section')).toBeInTheDocument();
+      expect(tray).not.toHaveTextContent('Revaluation results');
+      fireEvent.click(screen.getByLabelText('Urgent'));
+      expect(tray).toHaveTextContent('Rings at once');
+    });
+
+    it('says a welcome notice is not pushed', async () => {
+      open({ purpose: 'welcome', title: 'Welcome to Juvi', ackRequired: true, audience: { role: [{ id: 'student', label: 'All students' }] } });
+      expect(await screen.findByRole('region', { name: 'Phone notification preview' })).toHaveTextContent('A welcome notice sends no phone notification.');
+    });
   });
 });

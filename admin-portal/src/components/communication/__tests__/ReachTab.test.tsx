@@ -26,7 +26,7 @@ const NOTICE = {
   ackRequired: true, deadline: '2026-10-05T11:30:00.000Z', deadlineState: 'open', counts: { audience: 10, onJuvi: 8 }, acknowledged: 4, seen: 3,
   reminders: { used: 1, max: 2, lastAt: '2026-09-30T06:00:00.000Z' }, isMine: true,
   body: 'Attached.', attachments: [], audience: { rules: [{ kind: 'batch', ids: ['b1'] }], line: 'Sent to 2024 Batch' },
-  ackCommentAllowed: true, priority: 'routine', archivedAt: null, canManage: true,
+  ackCommentAllowed: true, priority: 'routine', confidential: false, urgentReason: null, archivedAt: null, canManage: true,
 } as NoticeDetail;
 const person = (name: string, extra: object = {}) => ({ name, identifier: `24JIT-${name[0]}`, group: '2024 Batch · Section A', at: '2026-10-06T04:00:00.000Z', ...extra });
 const REACH: Reach = {
@@ -37,10 +37,12 @@ const REACH: Reach = {
   lateAcks: [person('Lata Late')],
   comments: [{ ...person('Chitra Comment'), comment: 'Will the hall change?', late: false }],
   addedLater: { total: 1, acknowledged: 0, seen: 1, items: [{ ...person('Arjun Added'), state: 'seen' }] },
+  delivery: { scheduled: 0, sent: 0, delivered: 0, opened: 0, failed: 0, cancelled: 0, suppressed: { muted: 0, tierOff: 0, noDevice: 0 } },
   asOf: '2026-10-01T04:00:00.000Z',
 };
 const PENDING = (items: object[], nextCursor: string | null = null) => ({ items, total: 3, groups: [{ label: '2024 Batch · Section A', count: 3 }], nextCursor });
-const pendingPerson = (name: string, state = 'not_seen') => ({ name, identifier: null, group: '2024 Batch · Section A', state, lastSeenInApp: state === 'not_on_juvi' ? null : '2026-09-29T04:00:00.000Z' });
+const pendingPerson = (name: string, state = 'not_seen', delivery = state === 'not_on_juvi' ? 'none' : 'not_delivered') =>
+  ({ name, identifier: null, group: '2024 Batch · Section A', state, lastSeenInApp: state === 'not_on_juvi' ? null : '2026-09-29T04:00:00.000Z', delivery });
 
 beforeEach(() => {
   vi.clearAllMocks(); auth.role = 'admin'; auth.perms = ['notices:update']; confirm.confirmed = true;
@@ -175,5 +177,53 @@ describe('ReachTab', () => {
     renderWithProviders(<ReachTab notice={{ ...NOTICE, status: 'publishing' }} />);
     expect(screen.getByText(/Reach appears once delivery has finished/)).toBeInTheDocument();
     expect(getReach).not.toHaveBeenCalled();
+  });
+
+  describe('notification delivery (notifications spec §7.4, §9)', () => {
+    const DELIVERY = { scheduled: 1, sent: 2, delivered: 3, opened: 4, failed: 1, cancelled: 1, suppressed: { muted: 2, tierOff: 1, noDevice: 5 } };
+    const cell = (group: HTMLElement, label: string) => within(group).getByText(label, { selector: 'dt' }).parentElement;
+
+    it('shows the delivery counts next to the reach counts', async () => {
+      (getReach as Mock).mockResolvedValue({ ...REACH, delivery: DELIVERY });
+      renderWithProviders(<ReachTab notice={NOTICE} />);
+      const summary = await screen.findByRole('region', { name: 'Reach summary' });
+      const group = within(summary).getByRole('group', { name: 'Notification delivery' });
+      expect(cell(group, 'Scheduled')).toHaveTextContent('Scheduled1');
+      expect(cell(group, 'Sent')).toHaveTextContent('Sent2');
+      expect(cell(group, 'Delivered')).toHaveTextContent('Delivered3');
+      expect(cell(group, 'Opened')).toHaveTextContent('Opened4');
+      expect(cell(group, 'Failed')).toHaveTextContent('Failed1');
+      expect(cell(group, 'Cancelled')).toHaveTextContent('Cancelled1');
+      expect(cell(group, 'Muted')).toHaveTextContent('Muted2');
+      expect(cell(group, 'Notifications off')).toHaveTextContent('Notifications off1');
+      expect(cell(group, 'No device')).toHaveTextContent('No device5');
+    });
+
+    it('says so when no phone notification was decided for the notice', async () => {
+      renderWithProviders(<ReachTab notice={NOTICE} />);
+      const group = await screen.findByRole('group', { name: 'Notification delivery' });
+      expect(group).toHaveTextContent('No phone notifications recorded yet for this notice.');
+      expect(within(group).queryByText('Delivered')).toBeNull();
+    });
+
+    it('labels each pending member with their delivery, and a dash for someone not on Juvi', async () => {
+      (getPending as Mock).mockResolvedValue(PENDING([
+        pendingPerson('Asha Opened', 'seen', 'opened'), pendingPerson('Bala Muted', 'not_seen', 'muted'), pendingPerson('Chetan Off', 'not_seen', 'tier_off'),
+        pendingPerson('Divya Nodevice', 'not_seen', 'no_device'), pendingPerson('Esha Held', 'not_seen', 'scheduled'), pendingPerson('Farid Sent', 'not_seen', 'not_delivered'),
+        pendingPerson('Gita Phone', 'seen', 'delivered'), pendingPerson('Hari Offline', 'not_on_juvi'),
+      ]));
+      renderWithProviders(<ReachTab notice={NOTICE} />);
+      const table = await screen.findByRole('table', { name: 'Pending members' });
+      expect(within(table).getByRole('columnheader', { name: 'Delivery' })).toBeInTheDocument();
+      const deliveryOf = (name: string) => within(table).getByText(name).closest('tr')!.lastElementChild;
+      expect(deliveryOf('Asha Opened')).toHaveTextContent('Opened');
+      expect(deliveryOf('Bala Muted')).toHaveTextContent('Muted');
+      expect(deliveryOf('Chetan Off')).toHaveTextContent('Notifications off');
+      expect(deliveryOf('Divya Nodevice')).toHaveTextContent('No device');
+      expect(deliveryOf('Esha Held')).toHaveTextContent('Scheduled');
+      expect(deliveryOf('Farid Sent')).toHaveTextContent('Not delivered');
+      expect(deliveryOf('Gita Phone')).toHaveTextContent('Delivered');
+      expect(deliveryOf('Hari Offline')).toHaveTextContent('—');
+    });
   });
 });

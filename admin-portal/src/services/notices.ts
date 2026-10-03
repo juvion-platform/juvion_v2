@@ -30,12 +30,18 @@ export interface NoticeRow {
 export interface NoticeDetail extends NoticeRow {
   body: string; attachments: NoticeAttachment[]; audience: { rules: AudienceRule[]; line: string };
   ackCommentAllowed: boolean; priority: NoticePriority; archivedAt: string | null; canManage: boolean;
+  /** The phone notification says only "New notice from <office>" (notifications spec §6.6). */
+  confidential: boolean;
+  /** Recorded when an Urgent notice is published (spec §6.5); null otherwise, and on Urgent notices from before the gate. */
+  urgentReason: string | null;
 }
 export interface NoticeListQuery { page: number; limit: number; status?: NoticeStatus; purpose?: NoticePurpose; office?: string; q?: string }
 
 export interface TargetOption { id: string; label: string }
 export interface NoticeTargets {
   office: string; offices: string[]; isAdmin: boolean; timezone: string;
+  /** Urgent is offered only when this is true (notifications spec §6.5, §9). */
+  canPublishUrgent: boolean;
   kinds: AudienceRuleKind[]; roles: string[];
   departments: TargetOption[]; programmes: TargetOption[]; batches: TargetOption[]; sections: TargetOption[];
   courseOfferings: TargetOption[]; hostelBlocks: TargetOption[];
@@ -47,10 +53,24 @@ export interface PublishNoticeInput {
   title: string; body: string; attachments: NoticeAttachment[]; audience: { rules: AudienceRule[] };
   ackRequired: boolean; ackDeadline?: string | null; ackCommentAllowed: boolean;
   priority: NoticePriority; purpose: NoticePurpose; office?: string;
+  /** Fixed once published (notifications spec §4.2). */
+  confidential: boolean;
+  /** Sent with `priority: 'urgent'` only: 10–300 characters (spec §6.5). */
+  urgentReason?: string;
 }
 
 export interface ReachGroup { label: string; total: number; acknowledged: number; seen: number; notSeen: number; notOnJuvi: number }
 export interface ReachPerson { name: string; identifier: string | null; group: string; at: string | null }
+/**
+ * Push delivery of the published notification (notifications spec §7.4): one
+ * count per person, at their row's current status, so the counts are disjoint.
+ */
+export interface DeliveryCounts {
+  scheduled: number; sent: number; delivered: number; opened: number; failed: number; cancelled: number;
+  suppressed: { muted: number; tierOff: number; noDevice: number };
+}
+/** A pending member's push state; `none` is someone not on Juvi (or with no notification). */
+export type PendingDelivery = 'not_delivered' | 'delivered' | 'opened' | 'muted' | 'tier_off' | 'no_device' | 'scheduled' | 'none';
 export interface Reach {
   noticeId: string; title: string; status: NoticeStatus; ackRequired: boolean; deadline: string | null; publishedAt: string | null;
   audience: number; acknowledged: number; seen: number; notSeen: number; notOnJuvi: number; dismissed: number; late: number;
@@ -58,9 +78,13 @@ export interface Reach {
   lateAcks: ReachPerson[];
   comments: (ReachPerson & { comment: string; late: boolean })[];
   addedLater: { total: number; acknowledged: number; seen: number; items: (ReachPerson & { state: ReachState })[] };
+  delivery: DeliveryCounts;
   asOf: string;
 }
-export interface PendingPerson { name: string; identifier: string | null; group: string; state: 'seen' | 'not_seen' | 'not_on_juvi'; lastSeenInApp: string | null }
+export interface PendingPerson {
+  name: string; identifier: string | null; group: string; state: 'seen' | 'not_seen' | 'not_on_juvi'; lastSeenInApp: string | null;
+  delivery: PendingDelivery;
+}
 export interface PendingQuery { group?: string; q?: string; cursor?: string; limit?: number }
 export interface PendingPage { items: PendingPerson[]; total: number; groups: { label: string; count: number }[]; nextCursor: string | null }
 

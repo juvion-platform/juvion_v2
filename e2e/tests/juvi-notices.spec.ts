@@ -7,6 +7,11 @@
  *      total once the fan-out lands.
  *   2. An HOD is offered only their own department, and the server refuses
  *      a preview for another one with a 403.
+ *   3. The Registrar is offered no Urgent option, and the server refuses an
+ *      Urgent publish with URGENT_NOT_ALLOWED (notifications spec §6.5, §12).
+ *   4. The principal (DB role admin, so Urgent by role) publishes an Urgent,
+ *      confidential notice with a reason; the tray preview hides the title and
+ *      the Audit tab shows the reason and the flag (notifications spec §9).
  *
  * The audience and the HOD come from seedE2ENoticeAudience in
  * backend/src/scripts/seed-e2e-users.ts, which global-setup runs. Zero
@@ -22,7 +27,7 @@ const OWN_DEPT = 'E2E Computer Science';
 const OTHER_DEPT = 'E2E Electronics';
 
 /** An API context logged in as `role`, for what the UI cannot express. */
-async function apiAs(role: 'principal' | 'hod') {
+async function apiAs(role: 'principal' | 'hod' | 'registrar') {
   const api = await apiRequest.newContext({ baseURL: BACKEND_URL });
   const res = await api.post('/api/auth/login', { data: { email: TEST_USERS[role].email, password: TEST_USERS[role].password } });
   expect(res.ok(), `${role} login`).toBeTruthy();
@@ -90,5 +95,73 @@ test.describe('Juvi notices — ERP portal', () => {
       await admin.api.dispose();
       await hod.api.dispose();
     }
+  });
+
+  test('the Registrar is offered no Urgent option, and the server refuses Urgent', async ({ page, loginAs }) => {
+    await loginAs('registrar');
+    await page.goto('/communication/notices');
+    await page.getByRole('button', { name: /new notice/i }).click();
+    const drawer = page.getByRole('dialog', { name: 'New notice' });
+    // The hint appears once /targets has answered canPublishUrgent: false.
+    await expect(drawer.getByText('Need Urgent? Ask an IT admin.')).toBeVisible();
+    const priority = drawer.getByRole('group', { name: 'Priority' });
+    await expect(priority.getByRole('radio')).toHaveCount(2);
+    await expect(priority.getByRole('radio', { name: 'Urgent' })).toHaveCount(0);
+
+    // The composer cannot express Urgent for the Registrar, so ask the API directly.
+    const registrar = await apiAs('registrar');
+    try {
+      const refused = await registrar.api.post(NOTICES, {
+        headers: registrar.headers,
+        data: { title: 'E2E refused urgent', body: 'Never published.', audience: { rules: [{ kind: 'all', ids: [] }] }, priority: 'urgent', urgentReason: 'Testing the Urgent gate' },
+      });
+      expect(refused.status()).toBe(403);
+      expect(await refused.json()).toMatchObject({ detail: { code: 'URGENT_NOT_ALLOWED' } });
+    } finally {
+      await registrar.api.dispose();
+    }
+  });
+
+  test('an admin publishes an Urgent, confidential notice with a reason, and the Audit tab records both', async ({ page, loginAs }) => {
+    const title = `E2E urgent ${Date.now()}`;
+    const reason = 'Exam hall changed this morning';
+    await loginAs('principal');
+    await page.goto('/communication/notices');
+    await page.getByRole('button', { name: /new notice/i }).click();
+    const drawer = page.getByRole('dialog', { name: 'New notice' });
+    await expect(drawer.getByLabel('Publish as')).toHaveValue('College Office');
+    await drawer.getByLabel('Title', { exact: true }).fill(title);
+    await drawer.getByLabel('Notice', { exact: true }).fill('Report to Hall B at 2 pm.');
+
+    await drawer.getByRole('button', { name: /^departments/i }).click();
+    const search = drawer.getByRole('combobox', { name: /search departments/i });
+    await search.fill('E2E Computer');
+    await drawer.getByRole('option', { name: OWN_DEPT }).click();
+    await search.press('Escape');
+    await expect(drawer.getByText(/1 person · 0 on Juvi · 1 not on Juvi yet/)).toBeVisible();
+
+    await drawer.getByRole('radio', { name: 'Urgent' }).check();
+    await drawer.getByLabel('Reason for Urgent').fill(reason);
+    await drawer.getByLabel('Confidential', { exact: true }).check();
+    const tray = drawer.getByRole('region', { name: 'Phone notification preview' });
+    await expect(tray.getByText('New notice from College Office')).toBeVisible();
+    await expect(tray.getByText(title)).toHaveCount(0);
+
+    await drawer.getByRole('button', { name: 'Review and publish' }).click();
+    await expect(drawer.getByRole('heading', { name: 'Publish to 1 person?' })).toBeVisible();
+    await expect(drawer.getByText(`Reason: ${reason}`)).toBeVisible();
+    await drawer.getByRole('button', { name: 'Publish notice' }).click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+
+    await page.getByRole('searchbox', { name: /search notices/i }).fill(title);
+    await page.getByRole('button', { name: `Open notice ${title}` }).click();
+    await expect(page.getByRole('heading', { name: title })).toBeVisible();
+    await page.getByRole('link', { name: 'Audit', exact: true }).click();
+    const record = page.getByRole('region', { name: 'Publishing record' });
+    await expect(record.getByText(reason)).toBeVisible();
+    await expect(record.getByText('Yes: the phone notification shows only the office')).toBeVisible();
+    const trail = page.getByRole('table', { name: 'Audit trail' });
+    await expect(trail).toContainText(`Urgent reason: — → ${reason}`);
+    await expect(trail).toContainText('Confidential: — → Yes');
   });
 });

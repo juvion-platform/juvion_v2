@@ -26,7 +26,7 @@ describe('notices service', () => {
     await searchNoticePeople('asha');
     expect(api.get).toHaveBeenCalledWith(`${BASE}/targets/people`, { params: { q: 'asha' } });
     (api.post as any).mockResolvedValue({ data: { id: 'n1' } });
-    const input = { title: 't', body: 'b', attachments: [], audience: { rules: [{ kind: 'all' as const, ids: [] }] }, ackRequired: false, ackCommentAllowed: false, priority: 'routine' as const, purpose: 'standard' as const };
+    const input = { title: 't', body: 'b', attachments: [], audience: { rules: [{ kind: 'all' as const, ids: [] }] }, ackRequired: false, ackCommentAllowed: false, priority: 'urgent' as const, purpose: 'standard' as const, confidential: true, urgentReason: 'Exam moved to today' };
     expect((await publishNotice(input)).id).toBe('n1');
     expect(api.post).toHaveBeenCalledWith(BASE, input);
   });
