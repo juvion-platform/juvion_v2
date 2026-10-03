@@ -17,6 +17,9 @@ jobs:
     env:
       # Secrets are empty on forks and on PRs from them; every step below copes.
       HAS_RELEASE_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+      HAS_REAL_FIREBASE: ${{ secrets.GOOGLE_SERVICES_JSON != '' }}
+      # Same-repo PRs see the secrets too, so the release steps also check the event and branch.
+      IS_MAIN_PUSH: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -44,20 +47,25 @@ jobs:
             cp android/app/google-services.placeholder.json android/app/google-services.json
           fi
       - run: flutter build apk --debug
+      # A release-signed bundle only from reviewed code on main, and only with the real
+      # Firebase project: signed on the placeholder it would install but never get a push.
       - name: Release keystore
-        if: env.HAS_RELEASE_KEYSTORE == 'true'
+        if: env.IS_MAIN_PUSH == 'true' && env.HAS_RELEASE_KEYSTORE == 'true' && env.HAS_REAL_FIREBASE == 'true'
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        # Outside the checkout, in the runner's temp directory; storeFile is absolute.
+        # Secrets reach the files through printf only, never the log.
         run: |
-          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
-          printf 'storeFile=upload-keystore.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
-            "$ANDROID_KEYSTORE_PASSWORD" "$ANDROID_KEY_ALIAS" "$ANDROID_KEY_PASSWORD" > android/key.properties
+          keystore="$RUNNER_TEMP/upload-keystore.jks"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          printf 'storeFile=%s\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+            "$keystore" "$ANDROID_KEYSTORE_PASSWORD" "$ANDROID_KEY_ALIAS" "$ANDROID_KEY_PASSWORD" > android/key.properties
       - name: Signed release bundle
-        if: env.HAS_RELEASE_KEYSTORE == 'true'
+        if: env.IS_MAIN_PUSH == 'true' && env.HAS_RELEASE_KEYSTORE == 'true' && env.HAS_REAL_FIREBASE == 'true'
         run: flutter build appbundle --release
       - uses: actions/upload-artifact@v4
-        if: env.HAS_RELEASE_KEYSTORE == 'true'
+        if: env.IS_MAIN_PUSH == 'true' && env.HAS_RELEASE_KEYSTORE == 'true' && env.HAS_REAL_FIREBASE == 'true'
         with: { name: juvi-release-aab, path: mobile/build/app/outputs/bundle/release/app-release.aab, retention-days: 14 }

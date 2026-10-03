@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:juvi/core/analytics/analytics.dart';
 import 'package:juvi/core/http/api_failure.dart';
 import 'package:juvi/core/storage/app_database.dart';
@@ -36,7 +37,9 @@ Map<String, Object> sanitizeProps(Map<String, Object?> props) {
 /// table (newest 1,000 kept) and flushed to `POST /v1/events` 30 s after the first unsent
 /// one, as soon as 20 are queued, and when the app goes to the background (SyncLifecycle).
 /// Only a signed-in session queues or sends: `/events` needs one, and a sign-out wipes the
-/// queue with the rest of the database. Debug builds still print every event.
+/// queue with the rest of the database. Debug builds still print every event. After a
+/// failed send it backs off: the 20-event trigger waits for the retry timer, whose delay
+/// doubles from [flushEvery] up to [maxRetryDelay] and resets after a send that succeeds.
 class BatchingAnalytics implements Analytics {
   BatchingAnalytics({
     required this._database,
@@ -44,6 +47,7 @@ class BatchingAnalytics implements Analytics {
     required this._signedIn,
     this.flushEvery = const Duration(seconds: 30),
     this.flushAt = 20,
+    this.maxRetryDelay = const Duration(minutes: 10),
     this._now = DateTime.now,
     this._log,
   });
@@ -55,10 +59,16 @@ class BatchingAnalytics implements Analytics {
   final void Function(String line)? _log;
   final Duration flushEvery;
   final int flushAt;
+  final Duration maxRetryDelay;
 
   static const _batch = 100;
   Timer? _timer;
   Future<void>? _inFlight;
+
+  /// Set while sends are failing: how long the pending retry timer waits.
+  Duration? _retryDelay;
+  @visibleForTesting
+  Duration? get retryDelay => _retryDelay;
 
   @override
   void track(String event, [Map<String, Object?> props = const {}]) {
@@ -71,7 +81,7 @@ class BatchingAnalytics implements Analytics {
     try {
       final db = await _database();
       await db.enqueueEvent(event, at, props);
-      if (await db.eventCount() >= flushAt) {
+      if (_retryDelay == null && await db.eventCount() >= flushAt) {
         await flush();
       } else {
         _schedule();
@@ -86,6 +96,16 @@ class BatchingAnalytics implements Analytics {
         unawaited(flush());
       });
 
+  void _retry() {
+    final next = _retryDelay == null ? flushEvery : _retryDelay! * 2;
+    final delay = _retryDelay = next > maxRetryDelay ? maxRetryDelay : next;
+    _timer?.cancel();
+    _timer = Timer(delay, () {
+      _timer = null;
+      unawaited(flush());
+    });
+  }
+
   /// Sends everything queued, 100 events a request. One flush at a time.
   Future<void> flush() => _inFlight ??= _flush().whenComplete(() => _inFlight = null);
 
@@ -99,9 +119,10 @@ class BatchingAnalytics implements Analytics {
         final batch = await db.eventBatch(_batch);
         if (batch.isEmpty) return;
         if (!await _send(batch)) {
-          _schedule();
+          _retry();
           return;
         }
+        _retryDelay = null;
         await db.removeEvents(batch.map((e) => e.id));
         if (batch.length < _batch) return;
       }
@@ -111,8 +132,10 @@ class BatchingAnalytics implements Analytics {
   }
 
   /// True when the batch is done with: accepted (the server drops invalid events one by
-  /// one), or refused in a way a retry cannot fix. False keeps it for later: offline, a
-  /// server error, rate limiting or an expired session.
+  /// one), or refused in a way a retry cannot fix, including an error with no HTTP status
+  /// (the request could not be built), which would otherwise block the head of the queue
+  /// for good. False keeps it for later: offline, a server error, rate limiting or an
+  /// expired session.
   Future<bool> _send(List<QueuedEvent> batch) async {
     try {
       await _api().postEvents(
@@ -126,7 +149,7 @@ class BatchingAnalytics implements Analytics {
     } on Object catch (e) {
       final f = ApiFailure.of(e);
       final s = f.status;
-      return !(f.isOffline || s == null || s >= 500 || s == 429 || s == 401);
+      return !(f.isOffline || (s != null && (s >= 500 || s == 429 || s == 401)));
     }
   }
 

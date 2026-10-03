@@ -20,6 +20,8 @@ const Set<ApiErrorCode> _fatalRestoreCodes = {
   ApiErrorCode.updateRequired,
 };
 
+const Duration _unregisterBound = Duration(seconds: 5);
+
 @Riverpod(keepAlive: true)
 class SessionController extends _$SessionController {
   @override
@@ -81,8 +83,11 @@ class SessionController extends _$SessionController {
 
   Future<void> signOut() async {
     // While the session is still valid, the server forgets this phone's push token and FCM
-    // issues the next account a fresh one (notifications spec §8.3).
-    await ref.read(pushRegistrationProvider).unregister();
+    // issues the next account a fresh one (notifications spec §8.3). FCM's getToken and
+    // deleteToken have no deadline of their own (offline, no Play services), so they get
+    // 5 s: the revoke and the wipe that protect the next person on this phone never wait
+    // longer than that.
+    await ref.read(pushRegistrationProvider).unregister().timeout(_unregisterBound, onTimeout: () {});
     await ref.read(authRepositoryProvider).signOut();
     await _wipe();
     state = const SessionState.signedOut();

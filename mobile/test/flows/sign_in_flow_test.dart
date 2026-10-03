@@ -12,6 +12,7 @@ import 'package:juvi/core/connectivity/connectivity_provider.dart';
 import 'package:juvi/core/http/api_providers.dart';
 import 'package:juvi/core/http/juvi_http.dart';
 import 'package:juvi/core/push/notice_push.dart';
+import 'package:juvi/core/push/notification_permission.dart';
 import 'package:juvi/core/push/push_messaging.dart';
 import 'package:juvi/core/session/session_controller.dart';
 import 'package:juvi/core/storage/app_database.dart';
@@ -351,6 +352,9 @@ void main() {
         analyticsProvider.overrideWithValue(_NoopAnalytics()),
         localNotificationsProvider.overrideWithValue(local),
         pushMessagingProvider.overrideWithValue(FakePushMessaging()),
+        // The PUT below needs notifications allowed; say so here rather than rely on the
+        // real plugin finding no Android implementation on the test host.
+        notificationPermissionProvider.overrideWithValue(FakeNotificationPermission(granted: true)),
       ],
     );
     addTearDown(container.dispose);

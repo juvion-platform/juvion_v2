@@ -21,9 +21,20 @@ Future<void> handleBackgroundPush(
   await receipts.post(ReceiptItem(deliveryId: p.deliveryId, receipt: p.receipt, event: 'delivered', at: now().toUtc()));
 }
 
+/// The background isolate's whole body (Ruling R4): an error there has no handler and
+/// nobody to show it to, so nothing thrown inside [body] escapes.
+Future<void> runInBackgroundIsolate(Future<void> Function() body) async {
+  try {
+    await body();
+  } on Object {
+    // Swallowed: background isolate.
+  }
+}
+
 /// A push received in the foreground (spec §8.2): Urgent and Important are rendered; every
 /// tier refreshes what shows notices ([refresh]: the attention stack and Due badge, the
-/// lists, any open S04), and `delivered` is posted.
+/// lists, any open S04), and `delivered` is posted. The app itself refreshed, so a tray
+/// that fails to render costs neither the refresh nor the receipt.
 Future<void> handleForegroundPush(
   Map<String, dynamic> data, {
   required LocalNotifications local,
@@ -33,7 +44,13 @@ Future<void> handleForegroundPush(
 }) async {
   final p = NoticePush.tryParse(data);
   if (p == null) return;
-  if (p.tier != 'routine') await local.show(p);
   refresh();
+  if (p.tier != 'routine') {
+    try {
+      await local.show(p);
+    } on Object {
+      // The attention stack already shows it.
+    }
+  }
   await receipts.post(ReceiptItem(deliveryId: p.deliveryId, receipt: p.receipt, event: 'delivered', at: now().toUtc()));
 }

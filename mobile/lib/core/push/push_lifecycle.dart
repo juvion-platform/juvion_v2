@@ -38,7 +38,8 @@ class _PushLifecycleState extends ConsumerState<PushLifecycle> with WidgetsBindi
   }
 
   void _tap(NoticePush? p) {
-    if (p != null) unawaited(ref.read(deepLinkResolverProvider).onNotificationTap(p));
+    // A keystore error while holding the link must not surface as an unhandled (fatal) one.
+    if (p != null) unawaited(ref.read(deepLinkResolverProvider).onNotificationTap(p).catchError((Object _) {}));
   }
 
   /// Each step is best effort and independent: one failing never skips the next.

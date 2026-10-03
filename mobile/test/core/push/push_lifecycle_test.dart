@@ -46,6 +46,12 @@ class _Resolver extends DeepLinkResolver {
   Future<void> onSessionChanged(SessionState next) async => calls.add('held link');
 }
 
+class _ThrowingTapResolver extends _Resolver {
+  _ThrowingTapResolver(super.receipts);
+  @override
+  Future<void> onNotificationTap(NoticePush p) async => throw Exception('keystore');
+}
+
 class _Registration extends Mock implements PushRegistration {}
 
 class _Actions extends Mock implements NoticeActions {}
@@ -157,6 +163,14 @@ void main() {
     messaging.opened.add(pushData(deliveryId: 'd00000000000000000000002'));
     await t.pumpAndSettle();
     expect(resolver.calls, ['held link', 'tap d00000000000000000000001', 'tap d00000000000000000000002']);
+  });
+
+  testWidgets('a tap whose destination cannot be held (keystore error) ends there, not as an unhandled error', (t) async {
+    resolver = _ThrowingTapResolver(receipts);
+    await pump(t);
+    local.onTap!(NoticePush.tryParse(pushData())!.toPayload());
+    await t.pumpAndSettle();
+    expect(t.takeException(), isNull);
   });
 
   testWidgets('cold start: the notification that launched the app opens after any held destination', (t) async {

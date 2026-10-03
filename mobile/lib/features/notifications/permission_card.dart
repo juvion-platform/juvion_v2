@@ -69,7 +69,8 @@ class _PermissionCardState extends ConsumerState<PermissionCard> {
       onOpenSettings: () => unawaited(ref.read(notificationPermissionProvider).openSettings()),
       onDismiss: () {
         ref.read(analyticsProvider).track('permission_card.dismissed');
-        unawaited(ref.read(permissionCardDismissalProvider.notifier).dismiss(_now()));
+        // The card is already hidden; a preferences write that fails only means it may return.
+        unawaited(ref.read(permissionCardDismissalProvider.notifier).dismiss(_now()).catchError((Object _) {}));
       },
     );
   }

@@ -33,12 +33,17 @@ Future<void> main() async {
 
 /// Firebase, Crashlytics and push (notifications spec §8). Any failure — no
 /// google-services.json values, no Play services — leaves push inert and the app running:
-/// the providers keep their no-op defaults.
+/// the providers keep their inert defaults. The background handler is registered as soon
+/// as Firebase is up, and Crashlytics failing to start costs crash reports only, not push.
 Future<List<Override>> _startFirebase() async {
   try {
     await Firebase.initializeApp();
-    await installCrashReporting(FirebaseCrashSink(), enabled: !kDebugMode);
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+    try {
+      await installCrashReporting(FirebaseCrashSink(), enabled: !kDebugMode);
+    } on Object catch (e) {
+      debugPrint('Crash reporting is off ($e)');
+    }
     return [
       pushMessagingProvider.overrideWithValue(FirebasePushMessaging()),
       localNotificationsProvider.overrideWithValue(PluginLocalNotifications(FlutterLocalNotificationsPlugin())),

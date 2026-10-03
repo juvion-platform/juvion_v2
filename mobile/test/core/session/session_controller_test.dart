@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -138,8 +141,10 @@ void main() {
     }));
     DioAdapter(dio: dio).onDelete('/me/devices/current/push-token', (s) => s.reply(204, null));
     final messaging = FakePushMessaging();
+    final local = FakeLocalNotifications();
     final registration = PushRegistration(
       messaging: messaging,
+      local: local,
       api: () => JuviApi(dio: dio, basePathOverride: 'https://api.test/v1').getMobileApi(),
       signedIn: () => true,
       allowed: () async => true,
@@ -156,8 +161,43 @@ void main() {
     await container.read(sessionControllerProvider.notifier).signOut();
     expect(order, ['DELETE /me/devices/current/push-token', 'sign-out']);
     expect(messaging.deletes, 1);
+    expect(local.cancelled, 1);
     expect(mem['juvi.access'], isNull);
     expect(container.read(sessionControllerProvider), const SessionState.signedOut());
+  });
+
+  // I2: sign-out must not wait on FCM for ever (offline, no Play services, a wedged FCM).
+  test('signOut revokes and wipes within about 5 s even when FCM deleteToken never completes', () {
+    fakeAsync((async) {
+      final order = <String>[];
+      final dio = Dio(BaseOptions(baseUrl: 'https://api.test/v1'));
+      DioAdapter(dio: dio).onDelete('/me/devices/current/push-token', (s) => s.reply(204, null));
+      final registration = PushRegistration(
+        messaging: _WedgedMessaging(),
+        local: FakeLocalNotifications(),
+        api: () => JuviApi(dio: dio, basePathOverride: 'https://api.test/v1').getMobileApi(),
+        signedIn: () => true,
+        allowed: () async => true,
+      );
+      when(() => auth.signOut()).thenAnswer((_) async => order.add('sign-out'));
+      final container = ProviderContainer(retry: (_, _) => null, overrides: [
+        authRepositoryProvider.overrideWithValue(auth),
+        secureStoreProvider.overrideWithValue(SecureStore(_storageOver(mem))),
+        appDatabaseProvider.overrideWith((_) async => db),
+        pushRegistrationProvider.overrideWithValue(registration),
+      ]);
+      addTearDown(container.dispose);
+      mem['juvi.access'] = 'a';
+      var done = false;
+      unawaited(container.read(sessionControllerProvider.notifier).signOut().then((_) => done = true));
+      async.elapse(const Duration(seconds: 4));
+      expect(done, isFalse); // still giving FCM its chance
+      async.elapse(const Duration(seconds: 2));
+      expect(done, isTrue);
+      expect(order, ['sign-out']);
+      expect(mem['juvi.access'], isNull);
+      expect(container.read(sessionControllerProvider), const SessionState.signedOut());
+    });
   });
 
   test('refreshTokens rotates and persists; a null refresh wipes', () async {
@@ -219,4 +259,10 @@ void main() {
     expect(container.read(sessionControllerProvider), const SessionState.signedOut(reason: 'missing'));
     expect(await db.readDoc('me'), isNull);
   });
+}
+
+/// FCM that never answers `deleteToken` (offline, no Play services, a wedged FCM).
+class _WedgedMessaging extends FakePushMessaging {
+  @override
+  Future<void> deleteToken() => Completer<void>().future;
 }

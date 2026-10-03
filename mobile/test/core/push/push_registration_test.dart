@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
@@ -32,6 +33,7 @@ void main() {
   late List<String> calls;
   late FakePushMessaging messaging;
   late FakeNotificationPermission permission;
+  late FakeLocalNotifications local;
 
   ProviderContainer container({SessionState session = const SessionState.signedIn(account)}) {
     final dio = Dio(BaseOptions(baseUrl: 'https://api.test/v1'));
@@ -44,6 +46,7 @@ void main() {
       ..onDelete('/me/devices/current/push-token', (s) => s.reply(204, null));
     final c = ProviderContainer(retry: (_, _) => null, overrides: [
       pushMessagingProvider.overrideWithValue(messaging),
+      localNotificationsProvider.overrideWithValue(local),
       notificationPermissionProvider.overrideWithValue(permission),
       mobileApiProvider.overrideWithValue(JuviApi(dio: dio, basePathOverride: 'https://api.test/v1').getMobileApi()),
       sessionControllerProvider.overrideWith(() => _Session(session)),
@@ -58,6 +61,7 @@ void main() {
     calls = [];
     messaging = FakePushMessaging();
     permission = FakeNotificationPermission(granted: true);
+    local = FakeLocalNotifications();
   });
 
   test('signed in and allowed: the token is PUT once per process', () async {
@@ -102,11 +106,13 @@ void main() {
     await registration.unregister();
     expect(calls.last, 'DELETE /me/devices/current/push-token');
     expect(messaging.deletes, 1);
-    messaging.currentToken = 'fcm-token-1';
     (c.read(sessionControllerProvider.notifier) as _Session).set(const SessionState.signedOut());
     (c.read(sessionControllerProvider.notifier) as _Session).set(const SessionState.signedIn(account));
     await settle();
-    expect(calls.where((l) => l.startsWith('PUT')), hasLength(2));
+    expect(calls.where((l) => l.startsWith('PUT')), [
+      'PUT /me/devices/current/push-token {platform: android, token: fcm-token-1}',
+      'PUT /me/devices/current/push-token {platform: android, token: fcm-token-2}',
+    ]);
   });
 
   test('a failed PUT is retried at the next trigger', () async {
@@ -165,7 +171,52 @@ void main() {
     final out = registration.unregister();
     await Future.wait([sync, out]);
     expect(calls, ['PUT /me/devices/current/push-token {platform: android, token: fcm-token-1}', 'DELETE /me/devices/current/push-token']);
+    // FCM would mint a fresh token here (the fake does too): nothing may register it on the
+    // session that is about to be revoked, neither a sync nor a token refresh.
     await registration.sync();
-    expect(calls.where((l) => l.startsWith('PUT')), hasLength(1)); // the FCM token is gone
+    messaging.refreshes.add('fcm-token-3');
+    await settle();
+    expect(calls.where((l) => l.startsWith('PUT')), hasLength(1));
   });
+
+  test('sign-out clears the tray, and so does a forced sign-out; the session ending after a sign-out does not clear it twice', () async {
+    final c = container();
+    final registration = c.read(pushRegistrationProvider);
+    final session = c.read(sessionControllerProvider.notifier) as _Session;
+    await registration.sync();
+    await registration.unregister();
+    expect(local.cancelled, 1);
+    session.set(const SessionState.signedOut());
+    await settle();
+    expect(local.cancelled, 1);
+    session.set(const SessionState.signedIn(account));
+    await settle();
+    session.set(const SessionState.signedOut(reason: 'revoked'));
+    await settle();
+    expect(local.cancelled, 2);
+    session.set(const SessionState.signedIn(account));
+    await settle();
+    session.set(const SessionState.paused('Back on Monday'));
+    await settle();
+    expect(local.cancelled, 3);
+  });
+
+  test('sign-out clears the tray even while FCM is wedged', () async {
+    final wedged = _WedgedMessaging();
+    messaging = wedged;
+    final c = container();
+    final registration = c.read(pushRegistrationProvider);
+    unawaited(registration.sync()); // stuck on getToken
+    unawaited(registration.unregister());
+    await settle();
+    expect(local.cancelled, 1);
+  });
+}
+
+/// FCM that never answers: `getToken` and `deleteToken` hang (offline, no Play services).
+class _WedgedMessaging extends FakePushMessaging {
+  @override
+  Future<String?> token() => Completer<String?>().future;
+  @override
+  Future<void> deleteToken() => Completer<void>().future;
 }

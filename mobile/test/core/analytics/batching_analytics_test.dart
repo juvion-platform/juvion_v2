@@ -6,6 +6,9 @@ import 'package:http_mock_adapter/http_mock_adapter.dart';
 import 'package:juvi/core/analytics/batching_analytics.dart';
 import 'package:juvi/core/storage/app_database.dart';
 import 'package:juvi_api/juvi_api.dart';
+import 'package:mocktail/mocktail.dart';
+
+class _Api extends Mock implements MobileApi {}
 
 void main() {
   late AppDatabase db;
@@ -29,9 +32,9 @@ void main() {
   });
   tearDown(() => db.close());
 
-  BatchingAnalytics build({Duration flushEvery = const Duration(minutes: 5), List<String>? log}) => BatchingAnalytics(
+  BatchingAnalytics build({Duration flushEvery = const Duration(minutes: 5), List<String>? log, MobileApi? via}) => BatchingAnalytics(
         database: () async => db,
-        api: () => api,
+        api: () => via ?? api,
         signedIn: () => signedIn,
         flushEvery: flushEvery,
         now: () => at,
@@ -124,6 +127,52 @@ void main() {
     adapter.onPost('/events', (s) => s.reply(400, {'error': {'code': 'VALIDATION_FAILED', 'message': 'x'}}), data: Matchers.any);
     await a.flush();
     expect(await db.eventCount(), 0);
+    a.dispose();
+  });
+
+  test('after a failed send: no new request at 20 queued events, and the retry delay doubles from 30 s to a 10-minute cap; a success resets it', () async {
+    adapter.onPost('/events', (s) => s.reply(503, {'error': {'code': 'INTERNAL', 'message': 'x'}}), data: Matchers.any);
+    await db.enqueueEvent('app.opened', at, const {});
+    final a = build(flushEvery: const Duration(seconds: 30));
+    await a.flush();
+    expect(posted, hasLength(1));
+    // During an outage every action would otherwise send another request.
+    for (var i = 0; i < 25; i++) {
+      a.track('onboarding.step_completed', {'step': i});
+    }
+    await settle();
+    expect(await db.eventCount(), 26);
+    expect(posted, hasLength(1));
+    expect(a.retryDelay, const Duration(seconds: 30));
+    final delays = <int>[];
+    for (var i = 0; i < 6; i++) {
+      await a.flush();
+      delays.add(a.retryDelay!.inSeconds);
+    }
+    expect(delays, [60, 120, 240, 480, 600, 600]);
+    adapter.onPost('/events', (s) => s.reply(200, {'accepted': 26, 'rejected': 0}), data: Matchers.any);
+    await a.flush();
+    expect(a.retryDelay, isNull);
+    expect(await db.eventCount(), 0);
+    // Back to normal: 20 queued events flush at once again.
+    posted.clear();
+    for (var i = 0; i < 20; i++) {
+      a.track('onboarding.step_completed', {'step': i});
+    }
+    await untilPosted(1);
+    expect(posted, hasLength(1));
+    a.dispose();
+  });
+
+  test('an error that is not an HTTP one (e.g. the request cannot be built) drops the batch instead of blocking the queue', () async {
+    registerFallbackValue(EventsRequest.fromJson({'events': <Object>[]}));
+    final failing = _Api();
+    when(() => failing.postEvents(eventsRequest: any(named: 'eventsRequest'))).thenThrow(StateError('serialisation'));
+    await db.enqueueEvent('app.opened', at, const {});
+    final a = build(via: failing);
+    await a.flush();
+    expect(await db.eventCount(), 0);
+    expect(a.retryDelay, isNull);
     a.dispose();
   });
 

@@ -94,6 +94,30 @@ void main() {
       expect(refreshed, 3);
       expect(posted, hasLength(3));
     });
+
+    test('a tray that throws still refreshes and still posts delivered, and nothing escapes', () async {
+      var refreshed = 0;
+      await handleForegroundPush(pushData(tier: 'urgent'), local: _ThrowingLocal(), receipts: receipts, refresh: () => refreshed++, now: () => at);
+      expect(refreshed, 1);
+      expect(posted, hasLength(1));
+      expect(((posted.single['items'] as List).single as Map)['event'], 'delivered');
+    });
+  });
+
+  group('background isolate', () {
+    test('nothing thrown in the body escapes the background entry point', () async {
+      final failing = Receipts(_ThrowingApi(), _ThrowingQueue());
+      await expectLater(
+        runInBackgroundIsolate(() => handleBackgroundPush(pushData(), local: FakeLocalNotifications(), receipts: failing, allowed: allowed)),
+        completes,
+      );
+      await expectLater(
+        runInBackgroundIsolate(() => handleBackgroundPush(pushData(), local: _ThrowingLocal(), receipts: receipts, allowed: allowed)),
+        completes,
+      );
+      await expectLater(runInBackgroundIsolate(() async => throw StateError('SharedPreferences')), completes);
+      await expectLater(runInBackgroundIsolate(() => throw StateError('sync throw')), completes);
+    });
   });
 
   group('PluginLocalNotifications', () {
@@ -129,6 +153,30 @@ void main() {
       ]);
     });
 
+    test('the small icon is the monochrome ic_stat_juvi, by default and on every notification', () async {
+      final local = PluginLocalNotifications(plugin);
+      await local.init();
+      final settings = verify(() => plugin.initialize(settings: captureAny(named: 'settings'), onDidReceiveNotificationResponse: any(named: 'onDidReceiveNotificationResponse')))
+          .captured
+          .single as InitializationSettings;
+      expect(settings.android!.defaultIcon, '@drawable/ic_stat_juvi');
+      await local.show(NoticePush.tryParse(pushData())!);
+      final details = verify(() => plugin.show(
+            id: any(named: 'id'),
+            title: any(named: 'title'),
+            body: any(named: 'body'),
+            notificationDetails: captureAny(named: 'notificationDetails'),
+            payload: any(named: 'payload'),
+          )).captured.cast<NotificationDetails>();
+      expect([for (final d in details) d.android!.icon], ['@drawable/ic_stat_juvi', '@drawable/ic_stat_juvi']);
+    });
+
+    test('cancelAll empties the tray', () async {
+      when(() => plugin.cancelAll()).thenAnswer((_) async {});
+      await PluginLocalNotifications(plugin).cancelAll();
+      verify(() => plugin.cancelAll()).called(1);
+    });
+
     test('show posts the notification and its group summary on the tier channel, with stable ids', () async {
       final p = NoticePush.tryParse(pushData(tier: 'urgent'))!;
       await PluginLocalNotifications(plugin).show(p);
@@ -151,4 +199,18 @@ void main() {
       expect([summary.groupKey, summary.setAsGroupSummary, summary.groupAlertBehavior], ['notice:66f1c0ffee0000000000abcd', true, GroupAlertBehavior.children]);
     });
   });
+}
+
+class _ThrowingLocal extends FakeLocalNotifications {
+  @override
+  Future<void> show(NoticePush p) async => throw StateError('tray');
+}
+
+class _ThrowingApi extends Mock implements MobileApi {}
+
+class _ThrowingQueue extends ReceiptQueue {
+  @override
+  Future<List<ReceiptItem>> read() async => throw StateError('prefs');
+  @override
+  Future<void> add(ReceiptItem item) async => throw StateError('prefs');
 }

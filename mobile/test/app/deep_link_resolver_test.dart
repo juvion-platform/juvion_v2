@@ -29,6 +29,7 @@ void main() {
   const id2 = '66f1c0ffee0000000000abce';
   const id9 = '66f1c0ffee0000000000abcf';
   late Map<String, String> mem;
+  late _Storage storage;
   late SecureStore store;
   late SessionState session;
   late GoRouter router;
@@ -45,7 +46,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     now = DateTime.utc(2026, 10, 3, 9);
     mem = {'juvi.college_id': 'c1'};
-    final storage = _Storage();
+    storage = _Storage();
     gate = null;
     when(() => storage.read(key: any(named: 'key'))).thenAnswer((i) async {
       if (i.namedArguments[#key] == 'juvi.last_account' && gate != null) return gate!.future;
@@ -156,6 +157,19 @@ void main() {
     expect(find.text('at /today'), findsOneWidget);
     // Used once: a later session change does not open it again.
     await become(t, r, student);
+    expect(find.text('at /today'), findsOneWidget);
+  });
+
+  testWidgets('a keystore that cannot record the owner does not lose the held tap', (t) async {
+    mem['juvi.last_account'] = 'c1:a';
+    final r = await pump(t, const SessionState.signedOut());
+    await r.open('/notices/$id');
+    await t.pumpAndSettle();
+    when(() => storage.write(key: 'juvi.last_account', value: any(named: 'value'))).thenAnswer((_) async => throw Exception('keystore'));
+    await become(t, r, student);
+    expect(find.text('at /notices/$id'), findsOneWidget);
+    expect(mem['juvi.pending_link'], isNull);
+    await back(t);
     expect(find.text('at /today'), findsOneWidget);
   });
 

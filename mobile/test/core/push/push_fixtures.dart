@@ -48,6 +48,7 @@ class FakeNotificationPermission implements NotificationPermission {
 /// Records what would have reached the tray.
 class FakeLocalNotifications implements LocalNotifications {
   final shown = <NoticePush>[];
+  int cancelled = 0;
   String? launch;
   void Function(String? payload)? onTap;
   @override
@@ -55,10 +56,13 @@ class FakeLocalNotifications implements LocalNotifications {
   @override
   Future<void> show(NoticePush p) async => shown.add(p);
   @override
+  Future<void> cancelAll() async => cancelled++;
+  @override
   Future<String?> launchPayload() async => launch;
 }
 
-/// FCM, driven by the test: emit on [refreshes], [foreground] or [opened].
+/// FCM, driven by the test: emit on [refreshes], [foreground] or [opened]. Like a device,
+/// the first `token()` after a `deleteToken()` mints a new one (`fcm-token-2`, …).
 class FakePushMessaging implements PushMessaging {
   FakePushMessaging({this.currentToken = 'fcm-token-1'});
   String? currentToken;
@@ -76,7 +80,7 @@ class FakePushMessaging implements PushMessaging {
   @override
   Future<void> deleteToken() async {
     deletes++;
-    currentToken = null;
+    currentToken = 'fcm-token-${deletes + 1}';
   }
 
   @override

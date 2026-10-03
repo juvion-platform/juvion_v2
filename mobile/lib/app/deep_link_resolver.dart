@@ -122,7 +122,12 @@ class DeepLinkResolver {
       link = _decode(raw);
       if (raw != null && link == null) await _store.clearPendingLink();
     }
-    await _store.writeLastAccount(owner);
+    try {
+      await _store.writeLastAccount(owner);
+    } on Object {
+      // The link was already taken from `_pending`; a keystore error must not lose it. The
+      // owner is recorded at the next ready session.
+    }
     if (link == null) return;
     await _store.clearPendingLink();
     if (_now().toUtc().difference(link.createdAt) > maxAge) return;
@@ -156,7 +161,8 @@ DeepLinkResolver deepLinkResolver(Ref ref) {
     receipts: ref.read(receiptsProvider),
     analytics: ref.read(analyticsProvider),
   );
-  ref.listen<SessionState>(sessionControllerProvider, (_, next) => unawaited(resolver.onSessionChanged(next)));
-  unawaited(resolver.start());
+  // Unawaited, so a storage error must end here rather than as an unhandled (fatal) one.
+  ref.listen<SessionState>(sessionControllerProvider, (_, next) => unawaited(resolver.onSessionChanged(next).catchError((Object _) {})));
+  unawaited(resolver.start().catchError((Object _) {}));
   return resolver;
 }
