@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   zonedLocalToIso, isoToZonedLocal, formatInZone, formatBytes, noticeErrorMessage, errorStatus, errorDetail,
   noticeStatus, deadlineText, countsText, pendingAsText, isNoticeAdmin, roleLabel,
+  trayNotification, confidentialHelp, isUrgentNotAllowed, publishErrorMessage, deliveryTotal, PENDING_DELIVERY_LABELS,
+  URGENT_NOT_ALLOWED_MESSAGE, URGENT_REASON_MIN, URGENT_REASON_MAX,
 } from '../notices';
 
 const httpError = (status: number, data: unknown) => ({ isAxiosError: true, response: { status, data } });
@@ -77,9 +79,9 @@ describe('list wording', () => {
 describe('pendingAsText', () => {
   it('groups members under their batch or section heading', () => {
     const text = pendingAsText('Exam timetable', [
-      { name: 'Asha Rao', identifier: '24JIT0001', group: '2024 Batch · Section A', state: 'not_seen', lastSeenInApp: null },
-      { name: 'Ravi Kumar', identifier: null, group: '2024 Batch · Section A', state: 'not_on_juvi', lastSeenInApp: null },
-      { name: 'Meera Das', identifier: '24JIT0007', group: '2024 Batch · Section B', state: 'seen', lastSeenInApp: '2026-10-01T04:00:00.000Z' },
+      { name: 'Asha Rao', identifier: '24JIT0001', group: '2024 Batch · Section A', state: 'not_seen', lastSeenInApp: null, delivery: 'not_delivered' },
+      { name: 'Ravi Kumar', identifier: null, group: '2024 Batch · Section A', state: 'not_on_juvi', lastSeenInApp: null, delivery: 'none' },
+      { name: 'Meera Das', identifier: '24JIT0007', group: '2024 Batch · Section B', state: 'seen', lastSeenInApp: '2026-10-01T04:00:00.000Z', delivery: 'opened' },
     ]);
     const lines = text.split('\n');
     expect(lines.slice(0, 5)).toEqual([
@@ -91,5 +93,55 @@ describe('pendingAsText', () => {
     ]);
     expect(lines[6]).toBe('2024 Batch · Section B');
     expect(lines[7]).toMatch(/^- Meera Das \(24JIT0007\): Seen, not acknowledged, last in the app /);
+  });
+});
+
+describe('phone notifications (notifications spec §6.5, §6.6, §9)', () => {
+  it('shows the office and the title, never the title of a confidential notice', () => {
+    expect(trayNotification({ office: 'Exam Section', title: ' Hall tickets are out ', confidential: false, variant: 'published' }))
+      .toEqual({ title: 'Exam Section', text: 'Hall tickets are out' });
+    expect(trayNotification({ office: 'Exam Section', title: 'Hall tickets are out', confidential: true, variant: 'published' }))
+      .toEqual({ title: 'New notice from Exam Section', text: null });
+  });
+
+  it('words a reminder the way the app does', () => {
+    expect(trayNotification({ office: 'Exam Section', title: 'Hall tickets are out', confidential: false, variant: 'reminder' }))
+      .toEqual({ title: 'Exam Section', text: 'Reminder: Hall tickets are out' });
+    expect(trayNotification({ office: 'Exam Section', title: 'Hall tickets are out', confidential: true, variant: 'reminder' }))
+      .toEqual({ title: 'Reminder from Exam Section', text: null });
+  });
+
+  it('stands in a placeholder while the title is empty', () => {
+    expect(trayNotification({ office: 'Registrar', title: '  ', confidential: false, variant: 'published' }).text).toBe('Notice title');
+  });
+
+  it('puts the office into the Confidential helper text', () => {
+    expect(confidentialHelp('Exam Section')).toBe("The phone notification will say only 'New notice from Exam Section'. The content opens in the app.");
+    expect(confidentialHelp('')).toMatch(/'New notice from your office'/);
+  });
+
+  it('recognises the Urgent refusal by its code, not its text', () => {
+    const refused = httpError(403, { error: 'Only an IT admin can publish Urgent notices.', detail: { code: 'URGENT_NOT_ALLOWED' } });
+    expect(isUrgentNotAllowed(refused)).toBe(true);
+    expect(publishErrorMessage(refused)).toBe(URGENT_NOT_ALLOWED_MESSAGE);
+    const scope = httpError(403, { error: 'You can only send notices to your own department.' });
+    expect(isUrgentNotAllowed(scope)).toBe(false);
+    expect(publishErrorMessage(scope)).toBe('You can only send notices to your own department.');
+    expect(isUrgentNotAllowed(httpError(400, { error: 'x', detail: { code: 'URGENT_NOT_ALLOWED' } }))).toBe(false);
+  });
+
+  it('mirrors the backend reason limits', () => {
+    expect([URGENT_REASON_MIN, URGENT_REASON_MAX]).toEqual([10, 300]);
+  });
+
+  it('labels every pending delivery state, with a dash for someone not on Juvi', () => {
+    expect(PENDING_DELIVERY_LABELS).toEqual({
+      not_delivered: 'Not delivered', delivered: 'Delivered', opened: 'Opened', muted: 'Muted', tier_off: 'Notifications off',
+      no_device: 'No device', scheduled: 'Scheduled', none: '—',
+    });
+  });
+
+  it('adds up every delivery count once', () => {
+    expect(deliveryTotal({ scheduled: 1, sent: 2, delivered: 3, opened: 4, failed: 5, cancelled: 6, suppressed: { muted: 7, tierOff: 8, noDevice: 9 } })).toBe(45);
   });
 });

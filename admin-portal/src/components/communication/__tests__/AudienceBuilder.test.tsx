@@ -9,7 +9,7 @@ vi.mock('../../../services/notices', () => ({ previewAudience: vi.fn(), searchNo
 import { previewAudience, searchNoticePeople } from '../../../services/notices';
 
 const COLLEGE: NoticeTargets = {
-  office: 'Exam Section', offices: ['Exam Section'], isAdmin: false, timezone: 'Asia/Kolkata',
+  office: 'Exam Section', offices: ['Exam Section'], isAdmin: false, timezone: 'Asia/Kolkata', canPublishUrgent: false,
   kinds: ['all', 'role', 'department', 'programme', 'batch', 'section', 'course_offering', 'hostel_block', 'custom'],
   roles: ['student', 'faculty', 'staff', 'hod'],
   departments: [{ id: 'd1', label: 'Computer Science' }, { id: 'd2', label: 'Electronics' }],

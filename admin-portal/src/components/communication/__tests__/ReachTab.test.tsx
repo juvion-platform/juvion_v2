@@ -26,7 +26,7 @@ const NOTICE = {
   ackRequired: true, deadline: '2026-10-05T11:30:00.000Z', deadlineState: 'open', counts: { audience: 10, onJuvi: 8 }, acknowledged: 4, seen: 3,
   reminders: { used: 1, max: 2, lastAt: '2026-09-30T06:00:00.000Z' }, isMine: true,
   body: 'Attached.', attachments: [], audience: { rules: [{ kind: 'batch', ids: ['b1'] }], line: 'Sent to 2024 Batch' },
-  ackCommentAllowed: true, priority: 'routine', archivedAt: null, canManage: true,
+  ackCommentAllowed: true, priority: 'routine', confidential: false, urgentReason: null, archivedAt: null, canManage: true,
 } as NoticeDetail;
 const person = (name: string, extra: object = {}) => ({ name, identifier: `24JIT-${name[0]}`, group: '2024 Batch · Section A', at: '2026-10-06T04:00:00.000Z', ...extra });
 const REACH: Reach = {
@@ -37,6 +37,7 @@ const REACH: Reach = {
   lateAcks: [person('Lata Late')],
   comments: [{ ...person('Chitra Comment'), comment: 'Will the hall change?', late: false }],
   addedLater: { total: 1, acknowledged: 0, seen: 1, items: [{ ...person('Arjun Added'), state: 'seen' }] },
+  delivery: { scheduled: 0, sent: 0, delivered: 0, opened: 0, failed: 0, cancelled: 0, suppressed: { muted: 0, tierOff: 0, noDevice: 0 } },
   asOf: '2026-10-01T04:00:00.000Z',
 };
 const PENDING = (items: object[], nextCursor: string | null = null) => ({ items, total: 3, groups: [{ label: '2024 Batch · Section A', count: 3 }], nextCursor });

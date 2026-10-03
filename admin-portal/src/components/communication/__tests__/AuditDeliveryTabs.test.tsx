@@ -23,7 +23,7 @@ const NOTICE = {
   delivery: { state: 'delivered', attempts: 1, lastError: null, updatedAt: '2026-09-30T04:01:00.000Z' }, publishedAt: '2026-09-30T04:00:00.000Z',
   createdAt: '2026-09-30T04:00:00.000Z', ackRequired: true, deadline: null, deadlineState: 'none', counts: { audience: 120, onJuvi: 100 },
   acknowledged: 0, seen: 0, reminders: { used: 0, max: 2, lastAt: null }, isMine: true, body: 'x', attachments: [],
-  audience: { rules: [{ kind: 'all', ids: [] }], line: 'Sent to everyone at JIT' }, ackCommentAllowed: false, priority: 'routine', archivedAt: null, canManage: true,
+  audience: { rules: [{ kind: 'all', ids: [] }], line: 'Sent to everyone at JIT' }, ackCommentAllowed: false, priority: 'routine', confidential: false, urgentReason: null, archivedAt: null, canManage: true,
 } as NoticeDetail;
 const FAILED = { ...NOTICE, status: 'publishing', delivery: { state: 'failed', attempts: 8, lastError: 'Mongo timeout', updatedAt: '2026-09-30T04:30:00.000Z' } } as NoticeDetail;
 
