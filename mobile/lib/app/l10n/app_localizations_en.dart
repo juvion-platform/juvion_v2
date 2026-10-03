@@ -716,4 +716,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get pushChannelRoutine => 'Routine notices';
+
+  @override
+  String get onboardingAllowNotifications => 'Allow notifications';
+
+  @override
+  String get onboardingNotNow => 'Not now';
+
+  @override
+  String get settingsNotificationsBlocked => 'Blocked in system settings';
+
+  @override
+  String get settingsNotificationsBlockedBody =>
+      'Juvi can\'t show notifications. Tap to allow them.';
 }

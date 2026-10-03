@@ -1,3 +1,5 @@
+import 'package:juvi/core/push/notification_permission.dart';
+
 /// The FCM data message the backend builds (`backend/src/modules/juvi-app/notifications/payload.ts`):
 /// every value a string, and no `title` key at all for a confidential notice or a batch.
 Map<String, dynamic> pushData({
@@ -18,3 +20,22 @@ Map<String, dynamic> pushData({
   'count': count,
   'title': ?title,
 };
+
+/// The OS permission, answered by the test: [granted] now, and what a prompt would return.
+class FakeNotificationPermission implements NotificationPermission {
+  FakeNotificationPermission({this.granted = false, this.grantOnRequest = true});
+  bool granted;
+  final bool grantOnRequest;
+  int requests = 0;
+  int settingsOpened = 0;
+  @override
+  Future<bool> isGranted() async => granted;
+  @override
+  Future<bool> request() async {
+    requests++;
+    return granted = grantOnRequest;
+  }
+
+  @override
+  Future<void> openSettings() async => settingsOpened++;
+}

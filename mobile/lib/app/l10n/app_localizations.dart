@@ -1317,6 +1317,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Routine notices'**
   String get pushChannelRoutine;
+
+  /// Onboarding step 3: shows the Android notification permission prompt, then continues (notifications spec §8.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Allow notifications'**
+  String get onboardingAllowNotifications;
+
+  /// Onboarding step 3: continues without asking for the permission.
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get onboardingNotNow;
+
+  /// No description provided for @settingsNotificationsBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Blocked in system settings'**
+  String get settingsNotificationsBlocked;
+
+  /// S12: shown while the OS permission is off; opens this app's notification settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Juvi can\'t show notifications. Tap to allow them.'**
+  String get settingsNotificationsBlockedBody;
 }
 
 class _AppLocalizationsDelegate

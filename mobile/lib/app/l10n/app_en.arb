@@ -289,5 +289,12 @@
   "pushChannelUrgent": "Urgent notices",
   "pushChannelImportant": "Important notices",
   "pushChannelRoutine": "Routine notices",
-  "@pushChannelRoutine": { "description": "Android notification channel names, shown in the system settings. Mirrored in notice_push.dart; the channel descriptions mirror settingsTier*Desc." }
+  "@pushChannelRoutine": { "description": "Android notification channel names, shown in the system settings. Mirrored in notice_push.dart; the channel descriptions mirror settingsTier*Desc." },
+  "onboardingAllowNotifications": "Allow notifications",
+  "@onboardingAllowNotifications": { "description": "Onboarding step 3: shows the Android notification permission prompt, then continues (notifications spec §8.4)." },
+  "onboardingNotNow": "Not now",
+  "@onboardingNotNow": { "description": "Onboarding step 3: continues without asking for the permission." },
+  "settingsNotificationsBlocked": "Blocked in system settings",
+  "settingsNotificationsBlockedBody": "Juvi can't show notifications. Tap to allow them.",
+  "@settingsNotificationsBlockedBody": { "description": "S12: shown while the OS permission is off; opens this app's notification settings." }
 }
