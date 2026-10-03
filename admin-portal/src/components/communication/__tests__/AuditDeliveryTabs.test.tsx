@@ -44,6 +44,43 @@ beforeEach(() => {
 });
 
 describe('AuditTab', () => {
+  // Notifications spec §6.5, §9: the Urgent reason and the Confidential flag, from the notice and from the publish entry.
+  it('heads the trail with the publishing record: priority, Urgent reason and Confidential', async () => {
+    (getNoticeAudit as Mock).mockResolvedValue({
+      items: [{
+        // Real shape from publish-service.ts publishNotice.
+        action: 'publish', entityType: 'Notice', performedBy: 'E2E Principal', at: '2026-10-03T04:00:00.000Z',
+        changes: [
+          { field: 'status', displayName: 'Status', oldValue: null, newValue: 'publishing' },
+          { field: 'audience', displayName: 'Audience', oldValue: null, newValue: 'Sent to everyone at JIT' },
+          { field: 'priority', displayName: 'Priority', oldValue: null, newValue: 'urgent' },
+          { field: 'urgentReason', displayName: 'Urgent reason', oldValue: null, newValue: 'Exam hall changed this morning' },
+          { field: 'confidential', displayName: 'Confidential', oldValue: null, newValue: true },
+        ],
+      }],
+    });
+    renderWithProviders(<AuditTab noticeId="n1" record={{ priority: 'urgent', urgentReason: 'Exam hall changed this morning', confidential: true }} />);
+    const record = screen.getByRole('region', { name: 'Publishing record' });
+    expect(within(record).getByText('Urgent')).toBeInTheDocument();
+    expect(within(record).getByText('Exam hall changed this morning')).toBeInTheDocument();
+    expect(within(record).getByText('Yes: the phone notification shows only the office')).toBeInTheDocument();
+    const table = await screen.findByRole('table', { name: 'Audit trail' });
+    expect(table).toHaveTextContent('Urgent reason: — → Exam hall changed this morning');
+    expect(table).toHaveTextContent('Confidential: — → Yes');
+  });
+
+  it('records a routine, open notice as such, and says when an old Urgent notice has no reason', () => {
+    const { unmount } = renderWithProviders(<AuditTab noticeId="n1" record={{ priority: 'routine', urgentReason: null, confidential: false }} />);
+    let record = screen.getByRole('region', { name: 'Publishing record' });
+    expect(record).toHaveTextContent('PriorityRoutine');
+    expect(record).toHaveTextContent('ConfidentialNo');
+    expect(within(record).queryByText('Urgent reason')).toBeNull();
+    unmount();
+    renderWithProviders(<AuditTab noticeId="n1" record={{ priority: 'urgent', urgentReason: null, confidential: false }} />);
+    record = screen.getByRole('region', { name: 'Publishing record' });
+    expect(record).toHaveTextContent('Not recorded: published before Urgent needed a reason.');
+  });
+
   it('lists the trail newest first with readable actions and changes', async () => {
     renderWithProviders(<AuditTab noticeId="n1" />);
     const table = await screen.findByRole('table', { name: 'Audit trail' });

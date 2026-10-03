@@ -5,7 +5,9 @@ import NoticeDetailPage from '../NoticeDetailPage';
 import { renderWithProviders } from '../../../__tests__/test-utils';
 
 vi.mock('../../../components/communication/ReachTab', () => ({ default: () => <p>Reach tab</p> }));
-vi.mock('../../../components/communication/AuditTab', () => ({ default: () => <p>Audit tab</p> }));
+vi.mock('../../../components/communication/AuditTab', () => ({
+  default: ({ record }: { record?: { urgentReason: string | null } }) => <p>Audit tab{record ? `: ${record.urgentReason}` : ''}</p>,
+}));
 vi.mock('../../../components/communication/DeliveryTab', () => ({ default: () => <p>Delivery tab</p> }));
 vi.mock('../../../services/notices', () => ({ getNotice: vi.fn() }));
 import { getNotice } from '../../../services/notices';
@@ -17,7 +19,7 @@ const NOTICE = {
   reminders: { used: 0, max: 2, lastAt: null }, isMine: true,
   body: 'The timetable is attached.', attachments: [{ key: 'k1', name: 'timetable.pdf', mime: 'application/pdf', size: 2048 }],
   audience: { rules: [{ kind: 'batch', ids: ['b1'] }], line: 'Sent to 2024 Batch' },
-  ackCommentAllowed: false, priority: 'urgent', archivedAt: null, canManage: true,
+  ackCommentAllowed: false, priority: 'urgent', confidential: true, urgentReason: 'Exam moved to today', archivedAt: null, canManage: true,
 };
 
 function renderAt(path: string) {
@@ -38,6 +40,7 @@ describe('NoticeDetailPage', () => {
     expect(await screen.findByRole('heading', { name: 'Exam timetable' })).toBeInTheDocument();
     expect(getNotice).toHaveBeenCalledWith('n1');
     expect(screen.getByText('Urgent')).toBeInTheDocument();
+    expect(screen.getByText('Confidential')).toBeInTheDocument();
     expect(screen.getByText(/Exam Section · Sent to 2024 Batch/)).toBeInTheDocument();
     expect(screen.getByText('The timetable is attached.')).toBeInTheDocument();
     expect(screen.getByRole('list', { name: 'Attachments' })).toHaveTextContent('timetable.pdf');
@@ -50,6 +53,11 @@ describe('NoticeDetailPage', () => {
     expect(await screen.findByText('Delivery tab')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Delivery' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('link', { name: 'Audit' })).toHaveAttribute('href', '/communication/notices/n1/audit');
+  });
+
+  it('hands the notice to the Audit tab for its publishing record', async () => {
+    renderAt('/communication/notices/n1/audit');
+    expect(await screen.findByText('Audit tab: Exam moved to today')).toBeInTheDocument();
   });
 
   it('says so when the notice is not one the caller can see', async () => {

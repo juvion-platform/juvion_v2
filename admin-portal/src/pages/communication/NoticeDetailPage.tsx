@@ -57,6 +57,7 @@ export default function NoticeDetailPage() {
           <h2 className="text-xl font-bold text-navy">{notice.title}</h2>
           <Badge variant={status.variant}>{status.label}</Badge>
           {notice.priority !== 'routine' && <Badge variant={notice.priority === 'urgent' ? 'danger' : 'warning'}>{PRIORITY_LABELS[notice.priority]}</Badge>}
+          {notice.confidential && <Badge>Confidential</Badge>}
           {notice.purpose === 'welcome' && <Badge variant="teal">Welcome</Badge>}
         </div>
         <p className="mt-1 text-sm text-gray-600">
@@ -84,7 +85,7 @@ export default function NoticeDetailPage() {
       </nav>
       <Routes>
         <Route index element={<ReachTab notice={notice} />} />
-        <Route path="audit" element={<AuditTab noticeId={notice.id} />} />
+        <Route path="audit" element={<AuditTab noticeId={notice.id} record={notice} />} />
         <Route path="delivery" element={<DeliveryTab notice={notice} />} />
       </Routes>
     </div>
