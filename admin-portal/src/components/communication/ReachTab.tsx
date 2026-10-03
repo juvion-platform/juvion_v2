@@ -9,9 +9,11 @@ import { toast } from '../../stores/toastStore';
 import { saveBlob } from '../../services/juvi-app';
 import {
   archiveNotice, downloadReachCsv, getAllPending, getPending, getReach, remindNotice,
-  type NoticeDetail, type Reach, type ReachState, type Reminders,
+  type DeliveryCounts, type NoticeDetail, type Reach, type ReachState, type Reminders,
 } from '../../services/notices';
-import { PENDING_STATE_LABELS, errorDetail, errorStatus, formatWhen, isNoticeAdmin, noticeErrorMessage, pendingAsText } from '../../lib/notices';
+import {
+  PENDING_DELIVERY_LABELS, PENDING_STATE_LABELS, deliveryTotal, errorDetail, errorStatus, formatWhen, isNoticeAdmin, noticeErrorMessage, pendingAsText,
+} from '../../lib/notices';
 
 const sel = 'border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-primary-200 focus:border-primary-400 outline-none';
 const btn = 'inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50';
@@ -20,6 +22,39 @@ const td = 'px-3 py-2';
 const REACH_STATE_LABELS: Record<ReachState, string> = { acknowledged: 'Acknowledged', seen: 'Seen', not_seen: 'Not seen', not_on_juvi: 'Not on Juvi' };
 const PENDING_PAGE = 50;
 const n = (x: number) => x.toLocaleString('en-IN');
+
+/**
+ * The published notification's push delivery (notifications spec §7.4, §9): each
+ * person once, at their notification's current step.
+ */
+function DeliveryRow({ d }: { d: DeliveryCounts }) {
+  const items: [string, number][] = [
+    ['Scheduled', d.scheduled], ['Sent', d.sent], ['Delivered', d.delivered], ['Opened', d.opened], ['Failed', d.failed], ['Cancelled', d.cancelled],
+    ['Muted', d.suppressed.muted], ['Notifications off', d.suppressed.tierOff], ['No device', d.suppressed.noDevice],
+  ];
+  return (
+    <div role="group" aria-label="Notification delivery" className="mt-4 border-t pt-3">
+      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Notification delivery</p>
+      {deliveryTotal(d) === 0 ? (
+        <p className="mt-1 text-sm text-gray-500">No phone notifications for this notice.</p>
+      ) : (
+        <>
+          <dl className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-sm">
+            {items.map(([label, value]) => (
+              <div key={label} className="flex gap-1.5">
+                <dt className="text-gray-500">{label}</dt>
+                <dd className="font-medium tabular-nums text-gray-900">{n(value)}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="mt-1 text-xs text-gray-500">
+            Each person is counted once, at their latest step. Sent means the phone has not confirmed it yet; Muted, Notifications off and No device were not sent.
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
 
 /**
  * Reach, the ERP side of S11 (spec §8, US-4): counts that reconcile to the
@@ -152,6 +187,7 @@ export default function ReachTab({ notice }: { notice: NoticeDetail }) {
         <p className="mt-1 text-xs text-gray-500">
           {r.ackRequired ? `${n(r.late)} acknowledged late` : `${n(r.dismissed)} dismissed`} · as of {formatWhen(r.asOf)}
         </p>
+        <DeliveryRow d={r.delivery} />
 
         <div className="mt-4 flex flex-wrap gap-2">
           {manage && (
@@ -214,13 +250,14 @@ export default function ReachTab({ notice }: { notice: NoticeDetail }) {
           <div className="mt-3 overflow-x-auto">
             <table className="w-full text-sm" aria-label="Pending members">
               <thead className="border-b bg-gray-50">
-                <tr><th className={th}>Name</th><th className={th}>Roll / employee no.</th><th className={th}>Group</th><th className={th}>State</th><th className={th}>Last in the app</th></tr>
+                <tr><th className={th}>Name</th><th className={th}>Roll / employee no.</th><th className={th}>Group</th><th className={th}>State</th><th className={th}>Last in the app</th><th className={th}>Delivery</th></tr>
               </thead>
               <tbody className="divide-y">
                 {pendingRows.map((p, i) => (
                   <tr key={`${p.group}:${p.name}:${i}`}>
                     <td className={td}>{p.name}</td><td className={td}>{p.identifier ?? '—'}</td><td className={td}>{p.group}</td>
                     <td className={td}>{PENDING_STATE_LABELS[p.state]}</td><td className={td}>{p.state === 'not_on_juvi' ? '—' : formatWhen(p.lastSeenInApp)}</td>
+                    <td className={td}>{PENDING_DELIVERY_LABELS[p.delivery]}</td>
                   </tr>
                 ))}
               </tbody>
