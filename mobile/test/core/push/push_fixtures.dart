@@ -1,3 +1,5 @@
+import 'package:juvi/core/push/local_notifications.dart';
+import 'package:juvi/core/push/notice_push.dart';
 import 'package:juvi/core/push/notification_permission.dart';
 
 /// The FCM data message the backend builds (`backend/src/modules/juvi-app/notifications/payload.ts`):
@@ -38,4 +40,17 @@ class FakeNotificationPermission implements NotificationPermission {
 
   @override
   Future<void> openSettings() async => settingsOpened++;
+}
+
+/// Records what would have reached the tray.
+class FakeLocalNotifications implements LocalNotifications {
+  final shown = <NoticePush>[];
+  String? launch;
+  void Function(String? payload)? onTap;
+  @override
+  Future<void> init({void Function(String? payload)? onTap}) async => this.onTap = onTap;
+  @override
+  Future<void> show(NoticePush p) async => shown.add(p);
+  @override
+  Future<String?> launchPayload() async => launch;
 }
