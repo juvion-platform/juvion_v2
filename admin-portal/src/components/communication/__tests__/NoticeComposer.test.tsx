@@ -324,4 +324,27 @@ describe('NoticeComposer', () => {
       expect(screen.queryByRole('alert')).toBeNull();
     });
   });
+
+  describe('phone tray preview (notifications spec §6.6, §9)', () => {
+    it('follows the title, the office, Confidential and the priority', async () => {
+      open();
+      await screen.findByLabelText('Publish as');
+      fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Revaluation results' } });
+      const tray = screen.getByRole('region', { name: 'Phone notification preview' });
+      expect(within(tray).getByText('Revaluation results')).toBeInTheDocument();
+      expect(within(tray).getAllByText('College Office')).toHaveLength(2);
+      expect(tray).toHaveTextContent('Silent. Routine notices');
+      fireEvent.change(screen.getByLabelText('Publish as'), { target: { value: 'Exam Section' } });
+      fireEvent.click(screen.getByLabelText('Confidential'));
+      expect(within(tray).getByText('New notice from Exam Section')).toBeInTheDocument();
+      expect(tray).not.toHaveTextContent('Revaluation results');
+      fireEvent.click(screen.getByLabelText('Urgent'));
+      expect(tray).toHaveTextContent('Rings at once');
+    });
+
+    it('says a welcome notice is not pushed', async () => {
+      open({ purpose: 'welcome', title: 'Welcome to Juvi', ackRequired: true, audience: { role: [{ id: 'student', label: 'All students' }] } });
+      expect(await screen.findByRole('region', { name: 'Phone notification preview' })).toHaveTextContent('A welcome notice sends no phone notification.');
+    });
+  });
 });

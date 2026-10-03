@@ -5,6 +5,7 @@ import Drawer from '../ui/Drawer';
 import AudienceBuilder, { selectionToRules, useAudiencePreview, type AudienceSelection } from './AudienceBuilder';
 import AttachmentsField, { type AttachmentsState } from './AttachmentsField';
 import NoticeCardPreview from './NoticeCardPreview';
+import NotificationTrayPreview from './NotificationTrayPreview';
 import { toast } from '../../stores/toastStore';
 import {
   getNoticeTargets, publishNotice, type AudiencePreview, type NoticeDetail, type NoticePriority, type NoticePurpose, type PublishNoticeInput,
@@ -292,6 +293,8 @@ export function NoticeComposerForm({ initial, onPublished, onCancel, titleRef }:
               title={title} body={body} office={officeChoice ?? targets?.office ?? ''} audienceLine={rules.length ? preview.data?.line ?? '' : ''}
               priority={chosenPriority} ackRequired={ackRequired} deadline={deadlineIso} timezone={tz} attachmentCount={files.attachments.length}
             />
+            <p className="mb-2 mt-5 text-xs font-medium uppercase tracking-wide text-gray-500">On the phone</p>
+            <NotificationTrayPreview office={fromOffice} title={title} priority={chosenPriority} confidential={confidential} welcome={welcome} />
           </div>
         </div>
       </div>
