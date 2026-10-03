@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:juvi/core/analytics/analytics.dart';
+import 'package:juvi/core/analytics/batching_analytics.dart';
 import 'package:juvi/core/connectivity/connectivity_provider.dart';
 import 'package:juvi/core/http/api_failure.dart';
 import 'package:juvi/core/http/api_providers.dart';
@@ -25,11 +26,19 @@ class _Spaces extends Mock implements SpacesRepository {}
 
 class _Notices extends Mock implements NoticesRepository {}
 
-/// A spy in place of `ConsoleAnalytics` — records every tracked event name.
+/// A spy in place of `BatchingAnalytics` — records every tracked event name.
 class _SpyAnalytics implements Analytics {
   final events = <String>[];
   @override
   void track(String event, [Map<String, Object?> props = const {}]) => events.add(event);
+}
+
+/// Counts flushes; queues nothing (never signed in).
+class _FlushSpy extends BatchingAnalytics {
+  _FlushSpy() : super(database: () => Completer<AppDatabase>().future, api: () => throw UnimplementedError(), signedIn: () => false);
+  int flushes = 0;
+  @override
+  Future<void> flush() async => flushes++;
 }
 
 Widget host({
@@ -73,6 +82,16 @@ void main() {
     await t.pumpWidget(host(db: db, me: me, spaces: spaces, analytics: analytics, online: controller.stream));
     await t.pumpAndSettle();
     expect(analytics.events.where((e) => e == 'app.opened'), hasLength(1));
+  });
+
+  testWidgets('going to the background flushes queued analytics (notifications spec §8.7)', (t) async {
+    final controller = StreamController<bool>();
+    addTearDown(controller.close);
+    final spy = _FlushSpy();
+    await t.pumpWidget(host(db: db, me: me, spaces: spaces, analytics: spy, online: controller.stream));
+    await t.pumpAndSettle();
+    t.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    expect(spy.flushes, 1);
   });
 
   testWidgets('an action queued before launch is sent at startup (I2)', (t) async {

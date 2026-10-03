@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:juvi/core/analytics/analytics.dart';
+import 'package:juvi/core/analytics/batching_analytics.dart';
 import 'package:juvi/core/connectivity/connectivity_provider.dart';
 import 'package:juvi/core/http/api_providers.dart';
 import 'package:juvi/core/repos/me_repository.dart';
@@ -12,7 +13,7 @@ import 'package:juvi/core/sync/sync_worker.dart';
 import 'package:juvi/features/notices/notice_actions.dart';
 
 /// Drains queued writes when connectivity returns or the app resumes; records
-/// `app.opened`. Wraps `MaterialApp.router` in `JuviApp` (`lib/app/app.dart`).
+/// `app.opened`; flushes queued analytics when the app goes to the background. Wraps `MaterialApp.router` in `JuviApp` (`lib/app/app.dart`).
 class SyncLifecycle extends ConsumerStatefulWidget {
   const SyncLifecycle({required this.child, super.key});
   final Widget child;
@@ -51,6 +52,10 @@ class _SyncLifecycleState extends ConsumerState<SyncLifecycle> with WidgetsBindi
     if (state == AppLifecycleState.resumed) {
       ref.read(analyticsProvider).track('app.opened');
       unawaited(_drain());
+    }
+    if (state == AppLifecycleState.paused) {
+      final analytics = ref.read(analyticsProvider);
+      if (analytics is BatchingAnalytics) unawaited(analytics.flush());
     }
   }
 

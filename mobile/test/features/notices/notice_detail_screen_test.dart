@@ -67,13 +67,13 @@ void main() {
     await t.pump();
   }
 
-  testWidgets('opening tracks notice.opened and marks the notice seen once', (t) async {
+  testWidgets('opening tracks notice.seen and marks the notice seen once', (t) async {
     await open(t);
     expect(find.text('Mid-semester exam timetable'), findsOneWidget);
     expect(find.text('Sent to 2024 Batch'), findsOneWidget);
     expect(find.text('See who has read it'), findsNothing);
     verify(() => repo.markSeen('n1')).called(1);
-    expect(analytics.events.first.$1, 'notice.opened');
+    expect(analytics.events.first.$1, 'notice.seen');
     expect(analytics.events.first.$2, {'noticeId': 'n1'});
   });
 
