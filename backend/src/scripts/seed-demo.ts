@@ -49,6 +49,7 @@ import { ensureStudents } from './demo-seed/students';
 import { seedAcademics } from './demo-seed/academics';
 import { seedStoryExtras, storyStudents } from './demo-seed/extras';
 import { seedBreadth } from './demo-seed/breadth';
+import { seedMobile, MOBILE_LOGINS } from './demo-seed/mobile';
 import { verifyDemo } from './demo-seed/verify';
 
 const CHECK_ONLY = process.argv.includes('--check');
@@ -146,6 +147,9 @@ async function build(): Promise<void> {
   step('Other modules (placement, HR, campus, library, clubs, compliance…)');
   await seedBreadth(ctx);
 
+  step('Juvi mobile app: accounts, channels, timetables, notices');
+  await seedMobile(ctx);
+
   step('Clearing cached roles and AI answers');
   await clearCaches(collegeId, log);
 
@@ -156,6 +160,8 @@ async function build(): Promise<void> {
   console.log('\n══ Demo logins ══');
   for (const l of DEMO_LOGINS) console.log(`  ${l.label.padEnd(24)} ${l.email.padEnd(26)} ${l.password}`);
   console.log(`  ${SUPER_LOGIN.label.padEnd(24)} ${SUPER_LOGIN.email.padEnd(26)} ${SUPER_LOGIN.password}`);
+  console.log('\n══ Juvi mobile app (institution code JIT) ══');
+  for (const m of MOBILE_LOGINS) console.log(`  ${m.label.padEnd(32)} ${m.identifier.padEnd(26)} ${m.password}`);
   console.log('\n══ Student Risk board (open these in the demo) ══');
   for (const s of story.slice(0, 10)) console.log(`  ${s.priority.padEnd(3)} ${String(s.score).padStart(3)}  ${s.name.padEnd(22)} ${s.roll.padEnd(11)} ${s.label}`);
   if (failed) {
