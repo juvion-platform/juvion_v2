@@ -2,6 +2,7 @@ import 'package:juvi/core/analytics/analytics.dart';
 import 'package:juvi/core/http/api_failure.dart';
 import 'package:juvi/core/http/api_providers.dart';
 import 'package:juvi/core/models/models.dart';
+import 'package:juvi/core/push/push_registration.dart';
 import 'package:juvi/core/repos/auth_repository.dart';
 import 'package:juvi/core/session/session_state.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -79,6 +80,9 @@ class SessionController extends _$SessionController {
   }
 
   Future<void> signOut() async {
+    // While the session is still valid, the server forgets this phone's push token and FCM
+    // issues the next account a fresh one (notifications spec §8.3).
+    await ref.read(pushRegistrationProvider).unregister();
     await ref.read(authRepositoryProvider).signOut();
     await _wipe();
     state = const SessionState.signedOut();

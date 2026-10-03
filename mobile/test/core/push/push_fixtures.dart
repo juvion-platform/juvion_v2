@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:juvi/core/push/local_notifications.dart';
 import 'package:juvi/core/push/notice_push.dart';
 import 'package:juvi/core/push/notification_permission.dart';
+import 'package:juvi/core/push/push_messaging.dart';
 
 /// The FCM data message the backend builds (`backend/src/modules/juvi-app/notifications/payload.ts`):
 /// every value a string, and no `title` key at all for a confidential notice or a batch.
@@ -53,4 +56,33 @@ class FakeLocalNotifications implements LocalNotifications {
   Future<void> show(NoticePush p) async => shown.add(p);
   @override
   Future<String?> launchPayload() async => launch;
+}
+
+/// FCM, driven by the test: emit on [refreshes], [foreground] or [opened].
+class FakePushMessaging implements PushMessaging {
+  FakePushMessaging({this.currentToken = 'fcm-token-1'});
+  String? currentToken;
+  int deletes = 0;
+  Map<String, dynamic>? initial;
+  final refreshes = StreamController<String>.broadcast();
+  final foreground = StreamController<Map<String, dynamic>>.broadcast();
+  final opened = StreamController<Map<String, dynamic>>.broadcast();
+  @override
+  bool get available => true;
+  @override
+  Future<String?> token() async => currentToken;
+  @override
+  Stream<String> get tokenRefreshes => refreshes.stream;
+  @override
+  Future<void> deleteToken() async {
+    deletes++;
+    currentToken = null;
+  }
+
+  @override
+  Future<Map<String, dynamic>?> initialMessage() async => initial;
+  @override
+  Stream<Map<String, dynamic>> get foregroundMessages => foreground.stream;
+  @override
+  Stream<Map<String, dynamic>> get openedMessages => opened.stream;
 }
