@@ -657,6 +657,23 @@ describe('getLiveTimetable', () => {
     expect(String(lastDay!._id)).toBe(String(t._id));
     expect(await getLiveTimetable(cid, String(secId), new Date('2026-11-08T18:30:00Z'), 'Asia/Kolkata')).toBeNull();
   });
+
+  it('builds each day bound from the local day, so a DST transition cannot stretch the range', async () => {
+    // 2026-03-08 is the US spring-forward day in America/New_York: local midnight of 03-08 is
+    // 2026-03-08T05:00Z (EST) and of 03-09 is 2026-03-09T04:00Z (EDT) — a 23-hour local day. A
+    // range built as `dayStart + 86_400_000` would put this window's dayEnd at 05:00Z and
+    // wrongly cover 03-08; deriving it with `startOfDay(addDays(day, 1), timezone)` gives
+    // 04:00Z and excludes it. R57.
+    const t = await Timetable.create({
+      collegeId: cidO(), semesterId: semId, sectionId: secId,
+      version: 1, status: 'published',
+      effectiveFrom: new Date('2026-03-09T04:30:00Z'), // 30 min into the local day 03-09
+    });
+    const dayBefore = await getLiveTimetable(cid, String(secId), new Date('2026-03-08T05:00:00Z'), 'America/New_York');
+    expect(dayBefore).toBeNull();
+    const firstDay = await getLiveTimetable(cid, String(secId), new Date('2026-03-09T04:00:00Z'), 'America/New_York');
+    expect(String(firstDay!._id)).toBe(String(t._id));
+  });
 });
 
 describe('liveSlotsForDay', () => {
