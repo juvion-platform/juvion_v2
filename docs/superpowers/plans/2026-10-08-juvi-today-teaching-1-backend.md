@@ -549,8 +549,9 @@ git commit -m "feat(academics): timezone-correct timetable date helpers"
 - Test: `backend/src/modules/academics/__tests__/live-timetable.test.ts`
 
 **Interfaces:**
-- Consumes: `Timetable`, `TimetableSlot`, `Semester` models; `ymd`, `dayEnumOf` (Task 2).
-- Produces: `getLiveTimetable(collegeId, sectionId, at): Promise<LeanTimetable | null>`, `getLiveTimetables(collegeId, at): Promise<Map<string, LeanTimetable>>` (key = sectionId string), `liveSlotsForDay(collegeId, sectionIds, at, timezone): Promise<LeanTimetableSlot[]>` (sorted by startTime then period; `'free'` excluded), `activeSemesterIds(collegeId): Promise<string[]>`, types `LeanTimetable`, `LeanTimetableSlot` — used by Tasks 4, 8, 11.
+- Consumes: `Timetable`, `TimetableSlot`, `Semester` models; `ymd`, `dayEnumOf`, `startOfDay`, `addDays` (Task 2).
+- Produces: `getLiveTimetable(collegeId, sectionId, at, timezone): Promise<LeanTimetable | null>`, `getLiveTimetables(collegeId, at, timezone): Promise<Map<string, LeanTimetable>>` (key = sectionId string), `liveSlotsForDay(collegeId, sectionIds, at, timezone): Promise<LeanTimetableSlot[]>` (sorted by startTime then period; `'free'` excluded), `activeSemesterIds(collegeId): Promise<string[]>`, types `LeanTimetable`, `LeanTimetableSlot` — used by Tasks 5, 8, 12.
+- **`timezone` is the college timezone and the window is judged on the college-LOCAL day** (`ymd(at, timezone)`), matching the weekday rule in the same file (R53). Every caller already holds the timezone; never pass a bare instant without it.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -588,14 +589,14 @@ describe('getLiveTimetable', () => {
   it('picks the highest version among published coverings', async () => {
     await createTimetable(1);
     const v2 = await createTimetable(2);
-    const out = await getLiveTimetable(cid, String(secId), new Date('2026-10-10T06:00:00Z'));
+    const out = await getLiveTimetable(cid, String(secId), new Date('2026-10-10T06:00:00Z'), 'UTC');
     expect(String(out!._id)).toBe(String(v2._id));
   });
 
   it('falls back to the earlier covering when the newer one has not started', async () => {
     const v1 = await createTimetable(1, { from: '2026-10-01' });
     await createTimetable(2, { from: '2026-10-20' });
-    const out = await getLiveTimetable(cid, String(secId), new Date('2026-10-10T06:00:00Z'));
+    const out = await getLiveTimetable(cid, String(secId), new Date('2026-10-10T06:00:00Z'), 'UTC');
     expect(String(out!._id)).toBe(String(v1._id));
   });
 
@@ -603,24 +604,33 @@ describe('getLiveTimetable', () => {
     await createTimetable(1, { from: '2026-09-01', to: '2026-09-30' });
     await createTimetable(2, { from: '2026-10-01', to: '2026-10-31', status: 'draft' });
     await createTimetable(3, { from: '2026-10-01', status: 'archived' });
-    expect(await getLiveTimetable(cid, String(secId), new Date('2026-10-10T06:00:00Z'))).toBeNull();
+    expect(await getLiveTimetable(cid, String(secId), new Date('2026-10-10T06:00:00Z'), 'UTC')).toBeNull();
   });
 
   it('treats window boundaries as inclusive', async () => {
     const t = await createTimetable(1, { from: '2026-10-01', to: '2026-10-10' });
-    const atStart = await getLiveTimetable(cid, String(secId), new Date('2026-10-01T00:00:00Z'));
-    const atEnd = await getLiveTimetable(cid, String(secId), new Date('2026-10-10T03:39:00Z'));
+    const atStart = await getLiveTimetable(cid, String(secId), new Date('2026-10-01T00:00:00Z'), 'UTC');
+    const atEnd = await getLiveTimetable(cid, String(secId), new Date('2026-10-10T03:39:00Z'), 'UTC');
     expect(String(atStart!._id)).toBe(String(t._id));
     expect(String(atEnd!._id)).toBe(String(t._id));
-    expect(await getLiveTimetable(cid, String(secId), new Date('2026-10-11T00:00:00Z'))).toBeNull();
+    expect(await getLiveTimetable(cid, String(secId), new Date('2026-10-11T00:00:00Z'), 'UTC')).toBeNull();
   });
 
   it('breaks equal versions by newest updatedAt', async () => {
     await createTimetable(3);
     await new Promise((r) => setTimeout(r, 20));
     const newer = await createTimetable(3);
-    const out = await getLiveTimetable(cid, String(secId), new Date('2026-10-10T06:00:00Z'));
+    const out = await getLiveTimetable(cid, String(secId), new Date('2026-10-10T06:00:00Z'), 'UTC');
     expect(String(out!._id)).toBe(String(newer._id));
+  });
+
+  it('judges the window on the college-local day, not the instant\'s UTC day', async () => {
+    // The term starts 2026-10-13 (stored at UTC midnight). Local midnight of that
+    // date in IST is 2026-10-12T18:30Z, whose UTC date is the 12th — an instant-day
+    // comparison would drop the term's first day; the local-day rule keeps it live. R53.
+    const t = await createTimetable(1, { from: '2026-10-13' });
+    const out = await getLiveTimetable(cid, String(secId), new Date('2026-10-12T18:30:00Z'), 'Asia/Kolkata');
+    expect(String(out!._id)).toBe(String(t._id));
   });
 });
 
@@ -638,6 +648,15 @@ describe('liveSlotsForDay', () => {
     expect(String(slots[0]!._id)).toBe(String(early._id));
   });
 
+  it('breaks equal start times by period', async () => {
+    const t = await createTimetable(1);
+    await TimetableSlot.create({ collegeId: cidO(), timetableId: t._id, day: 'monday', period: 5, startTime: '09:00', endTime: '10:00', courseOfferingId: offerId });
+    const p2 = await TimetableSlot.create({ collegeId: cidO(), timetableId: t._id, day: 'monday', period: 2, startTime: '09:00', endTime: '10:00', courseOfferingId: offerId });
+    const slots = await liveSlotsForDay(cid, [String(secId)], new Date('2026-10-12T06:00:00Z'), 'Asia/Kolkata');
+    expect(slots.map((s) => s.period)).toEqual([2, 5]);
+    expect(String(slots[0]!._id)).toBe(String(p2._id));
+  });
+
   it('returns nothing for a section with no live timetable', async () => {
     expect(await liveSlotsForDay(cid, [String(secId)], new Date('2026-10-12T06:00:00Z'), 'Asia/Kolkata')).toEqual([]);
   });
@@ -646,7 +665,7 @@ describe('liveSlotsForDay', () => {
 describe('getLiveTimetables / activeSemesterIds', () => {
   it('maps one live timetable per section and lists only active semesters', async () => {
     await createTimetable(1);
-    const map = await getLiveTimetables(cid, new Date('2026-10-10T06:00:00Z'));
+    const map = await getLiveTimetables(cid, new Date('2026-10-10T06:00:00Z'), 'UTC');
     expect(map.size).toBe(1);
 
     await Semester.create({ collegeId: cidO(), academicYearId: new Types.ObjectId(), number: 1, year: 2026, startDate: new Date(), endDate: new Date(), status: 'active' });
@@ -676,7 +695,7 @@ import { Document, Types } from 'mongoose';
 import { Timetable } from '../../models/academic-ops/Timetable';
 import { TimetableSlot } from '../../models/academic-ops/TimetableSlot';
 import { Semester } from '../../models/academic-structure/Semester';
-import { dayEnumOf, ymd } from './timetable-date';
+import { addDays, dayEnumOf, startOfDay, ymd } from './timetable-date';
 
 export type LeanTimetable = Omit<InstanceType<typeof Timetable>, keyof Document> & { _id: Types.ObjectId };
 export type LeanTimetableSlot = Omit<InstanceType<typeof TimetableSlot>, keyof Document> & { _id: Types.ObjectId };
@@ -686,12 +705,19 @@ export type LeanTimetableSlot = Omit<InstanceType<typeof TimetableSlot>, keyof D
  * `effectiveFrom ≤ date ≤ (effectiveTo ?? ∞)`). A timetable whose `effectiveTo`
  * is 2026-10-10 stays live for the whole of 2026-10-10 — an instant comparison
  * would drop it from midnight onward and contradict this module's own boundary
- * test. Bounds are stored as calendar days, so a half-open day range on `at`'s
- * day is the exact test. R45.
+ * test. Bounds are stored as calendar days, so a half-open day range is the exact test.
+ *
+ * The day is the COLLEGE-LOCAL day — `ymd(at, timezone)` — matching the weekday
+ * this same module judges in `timezone`. `at`'s UTC day is the *previous* local
+ * day for every positive-offset zone (local midnight of 2026-10-13 in IST is
+ * 2026-10-12T18:30Z), so judging the window on the UTC day would silently shift
+ * every window by one day: the term's first day would read as not-live and the
+ * day after it ended would read as live. R53.
  */
-const covering = (at: Date) => {
-  const dayStart = new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate()));
-  const dayEnd = new Date(dayStart.getTime() + 86_400_000);
+const covering = (at: Date, timezone: string) => {
+  const day = ymd(at, timezone);
+  const dayStart = startOfDay(day, timezone);
+  const dayEnd = startOfDay(addDays(day, 1), timezone);
   return {
     status: 'published' as const,
     effectiveFrom: { $lt: dayEnd },
@@ -699,15 +725,15 @@ const covering = (at: Date) => {
   };
 };
 
-export async function getLiveTimetable(collegeId: string, sectionId: string, at: Date): Promise<LeanTimetable | null> {
+export async function getLiveTimetable(collegeId: string, sectionId: string, at: Date, timezone: string): Promise<LeanTimetable | null> {
   const rows = await Timetable.find({
-    collegeId, sectionId, ...covering(at),
+    collegeId, sectionId, ...covering(at, timezone),
   }).sort({ version: -1, updatedAt: -1 }).limit(1).lean<LeanTimetable[]>();
   return rows[0] ?? null;
 }
 
-export async function getLiveTimetables(collegeId: string, at: Date): Promise<Map<string, LeanTimetable>> {
-  const rows = await Timetable.find({ collegeId, ...covering(at) })
+export async function getLiveTimetables(collegeId: string, at: Date, timezone: string): Promise<Map<string, LeanTimetable>> {
+  const rows = await Timetable.find({ collegeId, ...covering(at, timezone) })
     .sort({ version: -1, updatedAt: -1 })
     .lean<LeanTimetable[]>();
   // Sorted version-desc, so the FIRST row seen per section is the winner.
@@ -723,7 +749,7 @@ export async function getLiveTimetables(collegeId: string, at: Date): Promise<Ma
 export async function liveSlotsForDay(
   collegeId: string, sectionIds: string[], at: Date, timezone: string,
 ): Promise<LeanTimetableSlot[]> {
-  const live = await getLiveTimetables(collegeId, at);
+  const live = await getLiveTimetables(collegeId, at, timezone);
   const timetableIds: string[] = [];
   for (const sectionId of sectionIds) {
     const t = live.get(sectionId);
@@ -1182,7 +1208,7 @@ git commit -m "feat(academics): class exception service - create/revoke/list/act
 - Test: add a `describe` block to `backend/src/modules/academics/__tests__/class-exception.test.ts`
 
 **Interfaces:**
-- Consumes: `activeExceptionsFor` (R38, Task 4); `getLiveTimetables` (Task 3); `TimetableSlot`, `Timetable`, `Room`, `CourseOffering`, `Course` models; `dayEnumOf`, `instantOf`, `overlaps` (Task 2).
+- Consumes: `activeExceptionsFor` (R38, Task 4); `getLiveTimetables(collegeId, at, timezone)` (Task 3 — window judged on the college-LOCAL day, R53); `TimetableSlot`, `Timetable`, `Room`, `CourseOffering`, `Course` models; `dayEnumOf`, `instantOf`, `overlaps` (Task 2).
 - Produces: `interface RescheduleConflict { kind: 'section_overlap' | 'room_occupied'; detail: string }` and `checkRescheduleConflicts(collegeId, slot: LeanSlot, reschedule: { date, newDate, newStartTime, newEndTime, newRoomId? }, timezone): Promise<RescheduleConflict[]>`. Supersedes the `detectTimetableConflicts` placeholder (R2). Used by Task 7's `preview...` flow? No — used only inside `createClassException`; the preview endpoint does not conflict-check.
 
 Semantics (spec §5.1, R28):
@@ -1337,7 +1363,7 @@ export async function checkRescheduleConflicts(
 ): Promise<RescheduleConflict[]> {
   const weekday = dayEnumOf(r.newDate);
   const at = instantOf(r.newDate, '09:00', timezone); // any instant inside that zoned day
-  const live = await getLiveTimetables(collegeId, at);
+  const live = await getLiveTimetables(collegeId, at, timezone);
   const winnerIds = [...live.values()].map((t) => String(t._id));
   const daySlots = winnerIds.length === 0
     ? []
@@ -2165,7 +2191,7 @@ git commit -m "feat(academics): class-exception routes with per-actor permission
 - Test: `backend/src/modules/juvi-app/spaces/__tests__/next-class-live.test.ts`
 
 **Interfaces:**
-- Consumes: `getLiveTimetables` (Task 3), `activeExceptionsFor` (Task 4), `ymd`, `addDays`, `dayEnumOf`, `instantOf` (Task 2); `Timetable`, `TimetableSlot` models.
+- Consumes: `getLiveTimetables(collegeId, at, timezone)` (Task 3 — window judged on the college-LOCAL day, R53), `activeExceptionsFor` (Task 4), `ymd`, `addDays`, `dayEnumOf`, `instantOf` (Task 2); `Timetable`, `TimetableSlot` models.
 - Produces: `nextClassByOffering(collegeId, offeringIds, timezone): Promise<Map<string, Date>>` — **same name, same shape, new semantics** (§5.3); `formatNextClassLabel` unchanged. `spaces-service.ts` needs no change (same call sites at lines 10/44/54). `WeeklySlot` is referenced nowhere else (verified) and is deleted.
 - Import-direction check: `juvi-app/spaces/next-class.ts → academics/{live-timetable,class-exception-service,timetable-date}` — `class-exception-service` imports `juvi-app/config/institution-config`, which imports only `config/redis` and `models/College`, so there is no cycle.
 
@@ -2316,7 +2342,7 @@ export async function nextClassByOffering(
   const dates = Array.from({ length: HORIZON_DAYS }, (_, i) => addDays(today, i));
 
   for (const date of dates) {
-    const live = await getLiveTimetables(collegeId, instantOf(date, '12:00', timezone));
+    const live = await getLiveTimetables(collegeId, instantOf(date, '12:00', timezone), timezone);
     const winners = [...live.values()].map((t) => String(t._id));
     if (winners.length === 0) continue;
 
@@ -3734,7 +3760,7 @@ hall tickets no longer block on never-held courses."
 **Interfaces:**
 - Consumes:
   - From Task 2 (`backend/src/modules/academics/timetable-date.ts`): `startOfDay(date: string, timezone: string): Date`, `addDays(date: string, n: number): string`, `ymd(at: Date, timezone: string): string`, `hhmmToMinutes(hhmm: string): number`.
-  - From Task 3 (`backend/src/modules/academics/live-timetable.ts`): `liveSlotsForDay(collegeId: string, sectionIds: string[], at: Date, timezone: string): Promise<LeanTimetableSlot[]>`, `getLiveTimetables(collegeId: string, at: Date): Promise<Map<string, LeanTimetable>>`, `activeSemesterIds(collegeId: string): Promise<string[]>`, type `LeanTimetableSlot`.
+  - From Task 3 (`backend/src/modules/academics/live-timetable.ts`): `liveSlotsForDay(collegeId: string, sectionIds: string[], at: Date, timezone: string): Promise<LeanTimetableSlot[]>`, `getLiveTimetables(collegeId: string, at: Date, timezone: string): Promise<Map<string, LeanTimetable>>`, `activeSemesterIds(collegeId: string): Promise<string[]>`, type `LeanTimetableSlot`.
   - From Task 4 (`backend/src/modules/academics/class-exception-service.ts`): `activeExceptionsFor(collegeId: string, filter: { slotIds?: string[]; offeringIds?: string[]; dates?: string[] })` — rows are non-revoked `ClassException` docs with fields `timetableSlotId`, `courseOfferingId`, `date`, `type: 'cancelled' | 'rescheduled'`, `newDate?`, `newStartTime?`, `newEndTime?`, `newRoomId?`.
   - Models (barrel `../../../models` except `College`): `AcademicCalendar`, `Course`, `CourseOffering`, `Enrollment`, `TimetableSlot`, `Section`, `Person`, `Faculty`, `Building`, `Room`, `Channel`.
 - Produces (Task 14's home service imports exactly these):
@@ -4233,7 +4259,7 @@ export async function resolveDay(
       }).select('_id').lean<{ _id: Types.ObjectId }[]>();
       for (const o of owned) poolOfferingIds.add(String(o._id));
     }
-    const live = await getLiveTimetables(collegeId, at);
+    const live = await getLiveTimetables(collegeId, at, timezone);
     const slots = await liveSlotsForDay(collegeId, [...live.keys()], at, timezone);
     slotPool = slots.filter((s) =>
       (poolOfferingIds.has(String(s.courseOfferingId)) || String(s.substituteFacultyId ?? '') === viewer.facultyId)
