@@ -616,12 +616,16 @@ describe('getLiveTimetable', () => {
     expect(await getLiveTimetable(cid, String(secId), new Date('2026-10-11T00:00:00Z'), 'UTC')).toBeNull();
   });
 
-  it('breaks equal versions by newest updatedAt', async () => {
-    await createTimetable(3);
+  it('breaks equal versions by newest updatedAt, not by insertion order', async () => {
+    // The winner by `updatedAt` is inserted FIRST, so `_id`-desc and natural
+    // order would pick the other row — only the updatedAt tie-break gets this right (R54).
+    const newest = await createTimetable(3);
     await new Promise((r) => setTimeout(r, 20));
-    const newer = await createTimetable(3);
+    await createTimetable(3);
+    // Raw driver: bypasses Mongoose's timestamp plugin, so the bump is deterministic.
+    await Timetable.collection.updateOne({ _id: newest._id }, { $currentDate: { updatedAt: true } });
     const out = await getLiveTimetable(cid, String(secId), new Date('2026-10-10T06:00:00Z'), 'UTC');
-    expect(String(out!._id)).toBe(String(newer._id));
+    expect(String(out!._id)).toBe(String(newest._id));
   });
 
   it('judges the window on the college-local day, not the instant\'s UTC day', async () => {
