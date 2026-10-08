@@ -130,7 +130,10 @@ export async function createClassException(
 async function entityName(collegeId: string, offeringId: string, date: string): Promise<string> {
   const offering = await CourseOffering.findOne({ _id: offeringId, collegeId }).select('courseId').lean<{ courseId: Types.ObjectId } | null>();
   if (!offering) return `${offeringId} on ${date}`;
-  const course = await Course.findById(offering.courseId).select('code name').lean<{ code: string; name: string } | null>();
+  // Scoped by collegeId: `course.code` lands in AuditLog.entityName, a collection
+  // shared across colleges. `findOne({ _id, collegeId })` — not `findById(id,
+  // collegeId)`, whose second argument is a projection and would filter nothing.
+  const course = await Course.findOne({ _id: offering.courseId, collegeId }).lean<{ code: string } | null>();
   return `${course ? course.code : offeringId} on ${date}`;
 }
 
