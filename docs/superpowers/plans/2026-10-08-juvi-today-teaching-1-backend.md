@@ -871,12 +871,12 @@ Validation order in `createClassException`, exact messages, all `AppError`:
 // backend/src/modules/academics/__tests__/class-exception.test.ts
 import { beforeAll, afterAll, afterEach, describe, expect, it } from 'vitest';
 import { Types } from 'mongoose';
-import { ClassException } from '../../../models/academic-ops/ClassException';
 import { Timetable } from '../../../models/academic-ops/Timetable';
 import { TimetableSlot } from '../../../models/academic-ops/TimetableSlot';
-import { Course, CourseOffering } from '../../../models';
+import { Course } from '../../../models/academic-ops/Course';
+import { CourseOffering } from '../../../models/academic-ops/CourseOffering';
 import { AuditLog } from '../../../shared/audit';
-import { OutboxEvent } from '../../../shared/outbox/outbox';
+import { OutboxEvent } from '../../../shared/outbox';
 import {
   createClassException, revokeClassException, listClassExceptions, activeExceptionsFor,
   CLASS_EVENTS, classExceptionEventKey,
@@ -921,7 +921,7 @@ function upcoming(day: string, minDays = 2): string {
   const want = day.slice(0, 3);
   for (let i = minDays; i < minDays + 8; i++) {
     const d = new Date(Date.now() + i * 86_400_000);
-    if (weekday.format(d) === want) return fmt.format(d);
+    if (weekday.format(d).toLowerCase() === want) return fmt.format(d);
   }
   throw new Error('no upcoming date');
 }
@@ -1096,17 +1096,17 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 type LeanSlot = Omit<InstanceType<typeof TimetableSlot>, keyof Document> & { _id: Types.ObjectId };
 type LeanTimetableOfSlot = Omit<InstanceType<typeof Timetable>, keyof Document> & { _id: Types.ObjectId };
 
+/**
+ * The validation steps run in the order the brief's numbered list gives:
+ * slot → date shape → weekday → past → window → duplicate → reschedule.
+ */
 export async function createClassException(
   collegeId: string, input: ClassExceptionInput, performingUserId: string,
 ): Promise<LeanClassException> {
-  if (!DATE_RE.test(input.date)) throw new AppError(400, 'date must be YYYY-MM-DD');
   const slot = await TimetableSlot.findOne({ _id: input.timetableSlotId, collegeId }).lean<LeanSlot | null>();
   if (!slot) throw new AppError(404, 'Class slot not found');
 
-  // The exception pins a specific slot, so the window check uses the slot's own
-  // timetable; the live-winner rule governs reads (task 3), not this validation.
-  const timetable = await Timetable.findOne({ _id: slot.timetableId, collegeId }).lean<LeanTimetableOfSlot | null>();
-  if (!timetable || timetable.status !== 'published') throw new AppError(404, 'Class slot not found');
+  if (!DATE_RE.test(input.date)) throw new AppError(400, 'date must be YYYY-MM-DD');
 
   const timezone = await collegeTimezone(collegeId);
   const today = ymd(new Date(), timezone);
@@ -1115,6 +1115,11 @@ export async function createClassException(
     throw new AppError(400, `Class date does not fall on the slot's weekday (${slot.day})`);
   }
   if (diffDays(input.date, today) < 0) throw new AppError(400, 'Class date is in the past');
+
+  // The exception pins a specific slot, so the window check uses the slot's own
+  // timetable; the live-winner rule governs reads (task 3), not this validation.
+  const timetable = await Timetable.findOne({ _id: slot.timetableId, collegeId }).lean<LeanTimetableOfSlot | null>();
+  if (!timetable || timetable.status !== 'published') throw new AppError(404, 'Class slot not found');
 
   const fromDate = ymd(timetable.effectiveFrom, timezone);
   const toDate = timetable.effectiveTo ? ymd(timetable.effectiveTo, timezone) : null;
