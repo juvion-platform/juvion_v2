@@ -4171,17 +4171,44 @@ describe('resolveDay', () => {
     expect(day.classes.map((c) => c.start)).toEqual(['08:00']);
   });
 
-  it('day boundaries follow the timezone (§11 row: timezone)', async () => {
+  it('follows the college-local day, not the UTC day of the instant (R53)', async () => {
     const w = await seedTeachingWorld();
     const a = await w.makeOffering(w.facultyId as unknown as Types.ObjectId);
     await enrollIn(w.semesterId, w.studentId, a);
-    // The window starts at LOCAL midnight of 2026-11-10 in IST — 2026-11-09T18:30Z, an
-    // instant whose date is 11-09 in UTC but 11-10 in IST. So one stored instant starts the
-    // term a day earlier for a UTC college than for an IST one: the nominal date 2026-11-09
-    // is inside the term when read as a UTC day and outside it when read as an IST day (R53).
-    // Both expectations below are correct under the local-day rule and under the old UTC-day
-    // rule alike; the FIXTURE is what had to move (it used 2026-11-09T00:00:00Z, which the
-    // old rule excluded for IST and the new rule includes).
+    // 2026-11-09T00:00Z is 05:30 IST on 11-09. `live-timetable.ts` keeps a timetable whose
+    // `effectiveFrom` is strictly before the end of the queried LOCAL day, so it matters how
+    // that day end is computed. Correct rule: dayStart 2026-11-08T18:30Z, dayEnd
+    // 2026-11-09T18:30Z — the instant precedes dayEnd, so the term has opened. Old rule (the
+    // UTC day OF THAT INSTANT, i.e. 11-08): dayEnd 2026-11-09T00:00Z — the instant does not
+    // precede it, so the term had not opened. The two rules disagree, which is what makes the
+    // IST assertion below the one that fails if the boundary regresses to the UTC day; the UTC
+    // assertion holds under both rules and merely fixes the term's nominal date.
+    const tt = await Timetable.create({
+      collegeId, semesterId: w.semesterId, sectionId: w.sectionId,
+      version: 1, status: 'published', effectiveFrom: new Date('2026-11-09T00:00:00Z'),
+    });
+    await TimetableSlot.create({
+      collegeId, timetableId: tt._id, day: 'monday', period: 1,
+      startTime: '09:00', endTime: '10:00', courseOfferingId: a, slotType: 'lecture',
+    });
+    const utcDay = await resolveDay(collegeId.toString(), { kind: 'student', studentId: w.studentId }, '2026-11-09', 'UTC');
+    expect(utcDay.classes).toHaveLength(1);
+    const istDay = await resolveDay(collegeId.toString(), { kind: 'student', studentId: w.studentId }, '2026-11-09', 'Asia/Kolkata');
+    expect(istDay.classes).toHaveLength(1);
+  });
+
+  it('reads the day window in the caller\'s timezone (§11 row: timezone)', async () => {
+    const w = await seedTeachingWorld();
+    const a = await w.makeOffering(w.facultyId as unknown as Types.ObjectId);
+    await enrollIn(w.semesterId, w.studentId, a);
+    // The window starts at LOCAL midnight of 2026-11-10 in IST — 2026-11-09T18:30Z — so the
+    // nominal date 2026-11-09 is inside the term for a UTC college and outside it for an IST
+    // one. This pins that `timezone` reaches the window bound at all: a resolveDay that ignored
+    // the argument and used the day of the raw date string would return 1 for IST as well.
+    // It does NOT pin the local-day-over-UTC-day rule — both expectations hold under either
+    // rule, in both timezones — so do not rely on it to catch an R53 regression; the test above
+    // is the one that does. Keep it: it is the only test at this layer that fails if the tz
+    // argument stops reaching the window.
     const tt = await Timetable.create({
       collegeId, semesterId: w.semesterId, sectionId: w.sectionId,
       version: 1, status: 'published', effectiveFrom: new Date('2026-11-09T18:30:00Z'),
@@ -4509,7 +4536,7 @@ export async function nextTeachingDay(
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `npm test -w backend -- --run src/modules/juvi-app/home/__tests__/resolve-day.test.ts`
-Expected: PASS (all 13).
+Expected: PASS (all 14).
 
 - [ ] **Step 5: Run typecheck and the touched neighbour suites**
 
