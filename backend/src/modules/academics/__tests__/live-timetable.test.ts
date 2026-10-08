@@ -30,14 +30,14 @@ describe('getLiveTimetable', () => {
   it('picks the highest version among published coverings', async () => {
     await createTimetable(1);
     const v2 = await createTimetable(2);
-    const out = await getLiveTimetable(cid, String(secId), new Date('2026-10-10T06:00:00Z'));
+    const out = await getLiveTimetable(cid, String(secId), new Date('2026-10-10T06:00:00Z'), 'UTC');
     expect(String(out!._id)).toBe(String(v2._id));
   });
 
   it('falls back to the earlier covering when the newer one has not started', async () => {
     const v1 = await createTimetable(1, { from: '2026-10-01' });
     await createTimetable(2, { from: '2026-10-20' });
-    const out = await getLiveTimetable(cid, String(secId), new Date('2026-10-10T06:00:00Z'));
+    const out = await getLiveTimetable(cid, String(secId), new Date('2026-10-10T06:00:00Z'), 'UTC');
     expect(String(out!._id)).toBe(String(v1._id));
   });
 
@@ -45,24 +45,33 @@ describe('getLiveTimetable', () => {
     await createTimetable(1, { from: '2026-09-01', to: '2026-09-30' });
     await createTimetable(2, { from: '2026-10-01', to: '2026-10-31', status: 'draft' });
     await createTimetable(3, { from: '2026-10-01', status: 'archived' });
-    expect(await getLiveTimetable(cid, String(secId), new Date('2026-10-10T06:00:00Z'))).toBeNull();
+    expect(await getLiveTimetable(cid, String(secId), new Date('2026-10-10T06:00:00Z'), 'UTC')).toBeNull();
   });
 
   it('treats window boundaries as inclusive', async () => {
     const t = await createTimetable(1, { from: '2026-10-01', to: '2026-10-10' });
-    const atStart = await getLiveTimetable(cid, String(secId), new Date('2026-10-01T00:00:00Z'));
-    const atEnd = await getLiveTimetable(cid, String(secId), new Date('2026-10-10T03:39:00Z'));
+    const atStart = await getLiveTimetable(cid, String(secId), new Date('2026-10-01T00:00:00Z'), 'UTC');
+    const atEnd = await getLiveTimetable(cid, String(secId), new Date('2026-10-10T03:39:00Z'), 'UTC');
     expect(String(atStart!._id)).toBe(String(t._id));
     expect(String(atEnd!._id)).toBe(String(t._id));
-    expect(await getLiveTimetable(cid, String(secId), new Date('2026-10-11T00:00:00Z'))).toBeNull();
+    expect(await getLiveTimetable(cid, String(secId), new Date('2026-10-11T00:00:00Z'), 'UTC')).toBeNull();
   });
 
   it('breaks equal versions by newest updatedAt', async () => {
     await createTimetable(3);
     await new Promise((r) => setTimeout(r, 20));
     const newer = await createTimetable(3);
-    const out = await getLiveTimetable(cid, String(secId), new Date('2026-10-10T06:00:00Z'));
+    const out = await getLiveTimetable(cid, String(secId), new Date('2026-10-10T06:00:00Z'), 'UTC');
     expect(String(out!._id)).toBe(String(newer._id));
+  });
+
+  it('judges the window on the college-local day, not the instant\'s UTC day', async () => {
+    // The term starts 2026-10-13 (stored at UTC midnight). Local midnight of that
+    // date in IST is 2026-10-12T18:30Z, whose UTC date is the 12th — an instant-day
+    // comparison would drop the term's first day; the local-day rule keeps it live. R53.
+    const t = await createTimetable(1, { from: '2026-10-13' });
+    const out = await getLiveTimetable(cid, String(secId), new Date('2026-10-12T18:30:00Z'), 'Asia/Kolkata');
+    expect(String(out!._id)).toBe(String(t._id));
   });
 });
 
@@ -80,6 +89,15 @@ describe('liveSlotsForDay', () => {
     expect(String(slots[0]!._id)).toBe(String(early._id));
   });
 
+  it('breaks equal start times by period', async () => {
+    const t = await createTimetable(1);
+    await TimetableSlot.create({ collegeId: cidO(), timetableId: t._id, day: 'monday', period: 5, startTime: '09:00', endTime: '10:00', courseOfferingId: offerId });
+    const p2 = await TimetableSlot.create({ collegeId: cidO(), timetableId: t._id, day: 'monday', period: 2, startTime: '09:00', endTime: '10:00', courseOfferingId: offerId });
+    const slots = await liveSlotsForDay(cid, [String(secId)], new Date('2026-10-12T06:00:00Z'), 'Asia/Kolkata');
+    expect(slots.map((s) => s.period)).toEqual([2, 5]);
+    expect(String(slots[0]!._id)).toBe(String(p2._id));
+  });
+
   it('returns nothing for a section with no live timetable', async () => {
     expect(await liveSlotsForDay(cid, [String(secId)], new Date('2026-10-12T06:00:00Z'), 'Asia/Kolkata')).toEqual([]);
   });
@@ -88,7 +106,7 @@ describe('liveSlotsForDay', () => {
 describe('getLiveTimetables / activeSemesterIds', () => {
   it('maps one live timetable per section and lists only active semesters', async () => {
     await createTimetable(1);
-    const map = await getLiveTimetables(cid, new Date('2026-10-10T06:00:00Z'));
+    const map = await getLiveTimetables(cid, new Date('2026-10-10T06:00:00Z'), 'UTC');
     expect(map.size).toBe(1);
 
     await Semester.create({ collegeId: cidO(), academicYearId: new Types.ObjectId(), number: 1, year: 2026, startDate: new Date(), endDate: new Date(), status: 'active' });

@@ -8,7 +8,7 @@ import { Document, Types } from 'mongoose';
 import { Timetable } from '../../models/academic-ops/Timetable';
 import { TimetableSlot } from '../../models/academic-ops/TimetableSlot';
 import { Semester } from '../../models/academic-structure/Semester';
-import { dayEnumOf, ymd } from './timetable-date';
+import { addDays, dayEnumOf, startOfDay, ymd } from './timetable-date';
 
 export type LeanTimetable = Omit<InstanceType<typeof Timetable>, keyof Document> & { _id: Types.ObjectId };
 export type LeanTimetableSlot = Omit<InstanceType<typeof TimetableSlot>, keyof Document> & { _id: Types.ObjectId };
@@ -18,12 +18,19 @@ export type LeanTimetableSlot = Omit<InstanceType<typeof TimetableSlot>, keyof D
  * `effectiveFrom ≤ date ≤ (effectiveTo ?? ∞)`). A timetable whose `effectiveTo`
  * is 2026-10-10 stays live for the whole of 2026-10-10 — an instant comparison
  * would drop it from midnight onward and contradict this module's own boundary
- * test. Bounds are stored as calendar days, so a half-open day range on `at`'s
- * day is the exact test. R45.
+ * test. Bounds are stored as calendar days, so a half-open day range is the exact test.
+ *
+ * The day is the COLLEGE-LOCAL day — `ymd(at, timezone)` — matching the weekday
+ * this same module judges in `timezone`. `at`'s UTC day is the *previous* local
+ * day for every positive-offset zone (local midnight of 2026-10-13 in IST is
+ * 2026-10-12T18:30Z), so judging the window on the UTC day would silently shift
+ * every window by one day: the term's first day would read as not-live and the
+ * day after it ended would read as live. R53.
  */
-const covering = (at: Date) => {
-  const dayStart = new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate()));
-  const dayEnd = new Date(dayStart.getTime() + 86_400_000);
+const covering = (at: Date, timezone: string) => {
+  const day = ymd(at, timezone);
+  const dayStart = startOfDay(day, timezone);
+  const dayEnd = startOfDay(addDays(day, 1), timezone);
   return {
     status: 'published' as const,
     effectiveFrom: { $lt: dayEnd },
@@ -31,15 +38,15 @@ const covering = (at: Date) => {
   };
 };
 
-export async function getLiveTimetable(collegeId: string, sectionId: string, at: Date): Promise<LeanTimetable | null> {
+export async function getLiveTimetable(collegeId: string, sectionId: string, at: Date, timezone: string): Promise<LeanTimetable | null> {
   const rows = await Timetable.find({
-    collegeId, sectionId, ...covering(at),
+    collegeId, sectionId, ...covering(at, timezone),
   }).sort({ version: -1, updatedAt: -1 }).limit(1).lean<LeanTimetable[]>();
   return rows[0] ?? null;
 }
 
-export async function getLiveTimetables(collegeId: string, at: Date): Promise<Map<string, LeanTimetable>> {
-  const rows = await Timetable.find({ collegeId, ...covering(at) })
+export async function getLiveTimetables(collegeId: string, at: Date, timezone: string): Promise<Map<string, LeanTimetable>> {
+  const rows = await Timetable.find({ collegeId, ...covering(at, timezone) })
     .sort({ version: -1, updatedAt: -1 })
     .lean<LeanTimetable[]>();
   // Sorted version-desc, so the FIRST row seen per section is the winner.
@@ -55,7 +62,7 @@ export async function getLiveTimetables(collegeId: string, at: Date): Promise<Ma
 export async function liveSlotsForDay(
   collegeId: string, sectionIds: string[], at: Date, timezone: string,
 ): Promise<LeanTimetableSlot[]> {
-  const live = await getLiveTimetables(collegeId, at);
+  const live = await getLiveTimetables(collegeId, at, timezone);
   const timetableIds: string[] = [];
   for (const sectionId of sectionIds) {
     const t = live.get(sectionId);
