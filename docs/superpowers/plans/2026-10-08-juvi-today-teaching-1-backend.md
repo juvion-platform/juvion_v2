@@ -475,8 +475,9 @@ export function dayEnumOf(date: string): DayEnum {
 
 /**
  * The instant midnight of a zoned date: the UTC instant whose y/m/d parts, read
- * back in the zone, equal those of `date`. Binary-searched — exact for any zone
- * and offset shape, including half-hour offsets.
+ * back in the zone, equal those of `date`. Fixed-point iteration (converges in
+ * ≤3 passes) — exact for any zone and offset shape, including half-hour and
+ * quarter-hour offsets.
  */
 export function startOfDay(date: string, timezone: string): Date {
   const [y = 1970, m = 1, d = 1] = date.split('-').map(Number);
@@ -494,7 +495,7 @@ function fromWall(y: number, m: number, d: number, minutes: number, timezone: st
   let at = new Date(Date.UTC(y, m - 1, d, Math.floor(minutes / 60), minutes % 60));
   for (let i = 0; i < 3; i += 1) {
     const p = partsOf(at, timezone);
-    const delta = Date.UTC(y, m - 1, d, Math.floor(minutes / 60), minutes % 60) - Date.UTC(p.y, p.m - 1, p.d, p.minutes);
+    const delta = Date.UTC(y, m - 1, d, Math.floor(minutes / 60), minutes % 60) - Date.UTC(p.y, p.m - 1, p.d, 0, p.minutes);
     if (delta === 0) return at;
     at = new Date(at.getTime() + delta);
   }
@@ -506,7 +507,7 @@ export function addDays(date: string, n: number): string {
   return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
 }
 
-/** Days b − a as a whole number (calendar dates; no zone involved). */
+/** Days a − b as a whole number (calendar dates; no zone involved). */
 export function diffDays(a: string, b: string): number {
   const [ay = 1970, am = 1, ad = 1] = a.split('-').map(Number);
   const [by = 1970, bm = 1, bd = 1] = b.split('-').map(Number);
