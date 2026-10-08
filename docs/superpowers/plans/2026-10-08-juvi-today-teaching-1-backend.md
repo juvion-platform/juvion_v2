@@ -1360,8 +1360,12 @@ describe('reschedule conflicts (R2)', () => {
       startTime: '15:00', endTime: '16:00', courseOfferingId: offering._id, roomId: room._id,
     });
     const date = upcoming('monday');
+    // The exception's `date` is the ORIGINAL occurrence date, so it must be a Tuesday — the slot's
+    // own weekday; only `newDate` lands on the analysed Monday. Passing `date` here rejects with
+    // "Class date does not fall on the slot's weekday (tuesday)" (R80).
+    const tueDate = upcoming('tuesday');
     await createClassException(CID, {
-      timetableSlotId: String(tueSlot._id), date, type: 'rescheduled',
+      timetableSlotId: String(tueSlot._id), date: tueDate, type: 'rescheduled',
       newDate: date, newStartTime: '09:30', newEndTime: '10:30', reason: 'Room maintenance pending',
     }, USER);
     const conflicts = await checkRescheduleConflicts(CID, slot, {
