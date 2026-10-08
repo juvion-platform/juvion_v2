@@ -681,11 +681,23 @@ import { dayEnumOf, ymd } from './timetable-date';
 export type LeanTimetable = Omit<InstanceType<typeof Timetable>, keyof Document> & { _id: Types.ObjectId };
 export type LeanTimetableSlot = Omit<InstanceType<typeof TimetableSlot>, keyof Document> & { _id: Types.ObjectId };
 
-const covering = (at: Date) => ({
-  status: 'published' as const,
-  effectiveFrom: { $lte: at },
-  $or: [{ effectiveTo: null }, { effectiveTo: { $gte: at } }],
-});
+/**
+ * The live window is compared at DATE granularity, never by instant (R3/§5.3:
+ * `effectiveFrom ≤ date ≤ (effectiveTo ?? ∞)`). A timetable whose `effectiveTo`
+ * is 2026-10-10 stays live for the whole of 2026-10-10 — an instant comparison
+ * would drop it from midnight onward and contradict this module's own boundary
+ * test. Bounds are stored as calendar days, so a half-open day range on `at`'s
+ * day is the exact test. R45.
+ */
+const covering = (at: Date) => {
+  const dayStart = new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate()));
+  const dayEnd = new Date(dayStart.getTime() + 86_400_000);
+  return {
+    status: 'published' as const,
+    effectiveFrom: { $lt: dayEnd },
+    $or: [{ effectiveTo: null }, { effectiveTo: { $gte: dayStart } }],
+  };
+};
 
 export async function getLiveTimetable(collegeId: string, sectionId: string, at: Date): Promise<LeanTimetable | null> {
   const rows = await Timetable.find({
