@@ -1616,7 +1616,7 @@ git commit -m "feat(academics): real section/room conflict check for reschedules
   - `classifyExceptionPushTier(originalDate: string, originalStartHHMM: string, affectedDates: readonly string[], now: Date, timezone: string): ClassChangePushTier` — pure, §8: urgent ⇔ the ORIGINAL occurrence starts today (college tz) and its start instant is in the future and ≤ 2 h away; else important ⇔ any affected date is today or tomorrow; else none.
   - `interface ClassExceptionPreview { slotId: string; date: string; newDate?: string; affectedStudents: number; faculty: string[]; pushTier: ClassChangePushTier }`
   - `previewClassException(collegeId, slotId, date, now?, newDate?): Promise<ClassExceptionPreview>` — `now` defaults `new Date()`, `newDate` optional.
-- Used by Task 7 (routes) and Task 16 (the class-change expansion re-derives the tier through `classifyExceptionPushTier`).
+- Used by Task 7 (routes). Task 16 does **not** call this: its class-change notification expansion declares its own `tierOf` and its own `URGENT_WINDOW_MS`, because it never needs the `'none'` outcome — it only ever tiers a row it has already decided to notify about. That leaves the 2-hour urgent window expressed twice (here, and again in Task 16), so Task 16's dispatch must either import this function or state why the two must differ; it must not re-derive the constant by hand.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1856,7 +1856,7 @@ git commit -m "feat(academics): class-change push tier + preview (§5.1/§8)"
   - `type ClassChangeActor = { id: string; role: string; personaType?: string; personas?: string[] }`
   - `type ClassChangeBasis = 'faculty' | 'office'`
   - `assertClassChangePermission(collegeId: string, actor: ClassChangeActor, offeringId: string, slotId?: string): Promise<ClassChangeBasis>` — R6's exact order; teaching callers can change only their own classes.
-  - `classExceptionViewer(collegeId: string, actor: ClassChangeActor): Promise<{ isOffice: boolean; facultyId?: string }>` — list scoping (§5.5: teaching callers see only their own classes).
+  - `listClassExceptionViewer(collegeId: string, actor: ClassChangeActor): Promise<ClassExceptionViewer>` — list scoping (§5.5: teaching callers see only their own classes). `ClassExceptionViewer` is `{ isOffice: boolean; facultyId?: string }`, declared beside it in the service; use that name, not an inline type.
   - `getClassException(collegeId: string, id: string): Promise<LeanClassException>` (404 `'Class exception not found'`).
   - `interface ClassExceptionRow extends LeanClassException { courseCode: string; courseName: string; createdByName: string }`; `listClassExceptions(collegeId, { offeringId?, slotId?, from?, to?, viewerFacultyId? })` now returns `ClassExceptionRow[]`.
   - Routes: `GET /class-exceptions/preview`, `GET /class-exceptions`, `POST /class-exceptions`, `DELETE /class-exceptions/:id` under `/api/academics`.
@@ -2322,11 +2322,43 @@ git commit -m "feat(academics): class-exception routes with per-actor permission
 **Files:**
 - Modify: `backend/src/modules/juvi-app/spaces/next-class.ts` (full rewrite, §5.3; `WeeklySlot`, `nextOccurrence`, `zonedNow` are gone)
 - Modify: `backend/src/modules/juvi-app/spaces/__tests__/next-class.test.ts` (drop the `nextOccurrence` describe; keep the `formatNextClassLabel` tests and the `NOW`/`TZ` consts they use)
+- Modify: `backend/src/__e2e__/modules/juvi-app-spaces.e2e.test.ts` (it imports `nextOccurrence` — see the Interfaces note; its oracle must be replaced in the same commit)
 - Test: `backend/src/modules/juvi-app/spaces/__tests__/next-class-live.test.ts`
 
 **Interfaces:**
 - Consumes: `getLiveTimetables(collegeId, at, timezone)` (Task 3 — window judged on the college-LOCAL day, R53), `activeExceptionsFor` (Task 4), `ymd`, `addDays`, `dayEnumOf`, `instantOf` (Task 2); `Timetable`, `TimetableSlot` models.
-- Produces: `nextClassByOffering(collegeId, offeringIds, timezone): Promise<Map<string, Date>>` — **same name, same shape, new semantics** (§5.3); `formatNextClassLabel` unchanged. `spaces-service.ts` needs no change (same call sites at lines 10/44/54). `WeeklySlot` is referenced nowhere else (verified) and is deleted.
+- Produces: `nextClassByOffering(collegeId, offeringIds, timezone): Promise<Map<string, Date>>` — **same name, same shape, new semantics** (§5.3); `formatNextClassLabel` unchanged. `spaces-service.ts` needs no change (same call sites at lines 10/44/54).
+- **`WeeklySlot` and `nextOccurrence` ARE referenced elsewhere** — the claim that they are unreferenced is false, and deleting them breaks a live test. `backend/src/__e2e__/modules/juvi-app-spaces.e2e.test.ts:11` imports `nextOccurrence` and calls it at `:58` and `:59`, where it is the **independent oracle** for the "courses ordered by next class" assertion: the e2e deliberately derives the expected OS-before-DBMS order from the server's own `asOf` rather than hard-coding it, so the ordering assertion stays wall-clock independent. Step 4 below expects that file to pass, so it must be updated in the same commit. Replace the two calls with a local pure helper built on Task 2's primitives — no new production export, and the oracle stays independent of the code under test:
+
+```typescript
+// in juvi-app-spaces.e2e.test.ts, replacing the nextOccurrence import
+import { ymd, addDays, dayEnumOf, instantOf } from '../../modules/academics/timetable-date';
+
+/** Earliest instant strictly after `asOf` at which `hhmm` starts on weekday `day`. */
+function nextAt(day: string, hhmm: string, asOf: Date, tz: string): Date {
+  let date = ymd(asOf, tz);
+  for (let i = 0; i <= 7; i++) {
+    if (dayEnumOf(date) === day) {
+      const at = instantOf(date, hhmm, tz);
+      if (at.getTime() > asOf.getTime()) return at;
+    }
+    date = addDays(date, 1);
+  }
+  throw new Error(`no upcoming ${day} ${hhmm}`);
+}
+```
+
+  then `const osNext = nextAt('monday', '08:00', asOf, TZ);` becomes a fold over `DAYS6`:
+
+```typescript
+    const nextFor = (hhmm: string) => DAYS6
+      .map((day) => nextAt(day, hhmm, asOf, TZ))
+      .reduce((a, b) => (a.getTime() <= b.getTime() ? a : b));
+    const osNext = nextFor('08:00');
+    const dbmsNext = nextFor('17:00');
+```
+
+  `DAYS6`, `asOf` and `TZ` on the surrounding lines stay as they are; the two `!` non-null assertions go away because `nextFor` either returns a date or throws. The seeded rows are daily 08:00/17:00 across `DAYS6`, so the earliest-of-the-week fold is the same instant the old helper returned.
 - Import-direction check: `juvi-app/spaces/next-class.ts → academics/{live-timetable,class-exception-service,timetable-date}` — `class-exception-service` imports `juvi-app/config/institution-config`, which imports only `config/redis` and `models/College`, so there is no cycle.
 
 - [ ] **Step 1: Update the old test file and write the new tests**
@@ -2514,7 +2546,7 @@ export async function nextClassByOffering(
 Run: `npm test -w backend -- --run modules/juvi-app/spaces/__tests__/next-class-live.test.ts modules/juvi-app/spaces/__tests__/next-class.test.ts`
 Expected: PASS (4 new + 1 kept test).
 Run: `npm run test:e2e -w backend -- __e2e__/modules/juvi-app-spaces.e2e.test.ts`
-Expected: PASS — `spaces-service` uses the same `nextClassByOffering`/`formatNextClassLabel` exports, so its `nextClassAt` assertions see the new semantics on fixtures that have live published timetables.
+Expected: PASS — `spaces-service` uses the same `nextClassByOffering`/`formatNextClassLabel` exports, so its `nextClassAt` assertions see the new semantics on fixtures that have live published timetables. This run is also what proves the replaced `nextAt` oracle compiles and agrees: the old `nextOccurrence` import is gone from that file, so a missed update here fails at typecheck or import time rather than silently.
 Run: `npm run typecheck -w backend`
 Expected: no errors.
 
