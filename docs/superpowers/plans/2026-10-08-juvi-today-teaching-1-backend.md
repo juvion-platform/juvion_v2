@@ -2953,7 +2953,7 @@ export async function courseAttendanceFor(
   const [held, sessionIds, course] = await Promise.all([
     AttendanceSession.countDocuments(sessionFilter),
     AttendanceSession.find(sessionFilter).select('_id').lean<{ _id: Types.ObjectId }[]>(),
-    Course.findById(offering.courseId).select('code name').lean<{ code: string; name: string } | null>(),
+    Course.findOne({ _id: offering.courseId, collegeId }).select('code name').lean<{ code: string; name: string } | null>(),
   ]);
   const attended = sessionIds.length
     ? await AttendanceRecord.countDocuments({
@@ -5820,7 +5820,7 @@ export async function homeTeaching(ctx: MobileContext): Promise<TeachingResponse
 
 /** §7.2: adjunct when the contract is adjunct/visiting, else hod via Department.hodId, else regular (A4). */
 async function facultyKindOf(collegeId: string, facultyId: string): Promise<'regular' | 'hod' | 'adjunct'> {
-  const faculty = await Faculty.findById(facultyId).select('contractType').lean<{ contractType?: string } | null>();
+  const faculty = await Faculty.findOne({ _id: facultyId, collegeId }).select('contractType').lean<{ contractType?: string } | null>();
   if (!faculty) return 'regular';
   if (faculty.contractType === 'adjunct' || faculty.contractType === 'visiting') return 'adjunct';
   const dept = await Department.findOne({ collegeId, hodId: new Types.ObjectId(facultyId) }).select('_id').lean<{ _id: unknown } | null>();
@@ -7515,7 +7515,7 @@ async function sendClassChangeGroup(primary: Row, transport: PushTransport, now:
     stats.cancelled += 1;
     return;
   }
-  const course = await Course.findById(offering.courseId).select('code').lean<{ _id: Types.ObjectId; code: string } | null>();
+  const course = await Course.findOne({ _id: offering.courseId, collegeId: primary.collegeId }).select('code').lean<{ _id: Types.ObjectId; code: string } | null>();
   const sessions = await MobileSession.find({ collegeId: primary.collegeId, accountId: primary.accountId, revokedAt: null, refreshExpiresAt: { $gt: now }, pushToken: { $type: 'string' } })
     .select('pushToken').lean();
   const tokens = [...new Set(sessions.map((s) => s.pushToken!))];
