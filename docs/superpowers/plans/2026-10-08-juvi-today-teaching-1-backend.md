@@ -1492,7 +1492,9 @@ export async function checkRescheduleConflicts(
   // 2. Room occupancy across sections; no target room → nothing to check.
   const roomId = r.newRoomId ?? (slot.roomId ? String(slot.roomId) : null);
   if (roomId) {
-    const busy = await Room.find({ _id: roomId, collegeId }).select('roomNumber').lean<{ roomNumber: string } | null>();
+    // findOne, not find: `find` returns an array, so `busy?.roomNumber` would be
+    // undefined for every room and the detail would read "Room another room is taken by …".
+    const busy = await Room.findOne({ _id: roomId, collegeId }).select('roomNumber').lean<{ roomNumber: string } | null>();
     const roomNumber = busy?.roomNumber ?? 'another room';
     for (const occ of occs) {
       if (occ.roomId === roomId && overlaps(r.newStartTime, r.newEndTime, occ.start, occ.end)) {
