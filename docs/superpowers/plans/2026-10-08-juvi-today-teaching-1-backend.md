@@ -1265,7 +1265,7 @@ The unique-partial index makes a concurrent double-create race resolve to a 1100
 - [ ] **Step 4: Run to verify pass**
 
 Run: `npm test -w backend -- --run modules/academics/__tests__/class-exception.test.ts`
-Expected: PASS (8 tests).
+Expected: PASS (9 tests).
 Run: `npm run typecheck -w backend`
 Expected: no errors.
 
@@ -1521,7 +1521,7 @@ Update the file-header comment's last line to: "Section/room conflict checks liv
 - [ ] **Step 4: Run to verify pass**
 
 Run: `npm test -w backend -- --run modules/academics/__tests__/class-exception.test.ts`
-Expected: PASS (13 tests).
+Expected: PASS (14 tests).
 Run: `npm run typecheck -w backend`
 Expected: no errors.
 
