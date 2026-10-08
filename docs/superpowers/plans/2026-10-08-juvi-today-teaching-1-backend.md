@@ -1290,7 +1290,7 @@ git commit -m "feat(academics): class exception service - create/revoke/list/act
 Semantics (spec §5.1, R28):
 - **Section overlap:** any OTHER slot of the SAME section's live timetable on `newDate` (weekday of `newDate`, `'free'` excluded) whose occurrence is not vacated by an active exception dated `newDate`, and which is not the moving slot, overlapping `[newStartTime, newEndTime)`.
 - **Room occupancy (across sections):** the target room (`newRoomId ?? slot.roomId`; the check is skipped when that is null) occupied on `newDate` by any other live slot or by a moved-in exception row, excluding the moving slot's own occurrence; slots vacated by active exceptions dated `newDate` do not occupy.
-- Moved-in rows (active exceptions whose `newDate` equals the analysed date) occupy `newRoomId ?? slot.roomId` at `[newStartTime, newEndTime)`. A row whose `newDate` is some *other* day has moved away and occupies nothing here — `activeExceptionsFor` returns it because `dates` matches `date` OR `newDate` (R38), so the check is explicit (R47).
+- Moved-in rows (active exceptions whose `newDate` equals the analysed date) occupy `newRoomId ?? slot.roomId` at `[newStartTime, newEndTime)`. `slot.roomId` means the room stored on the row's ORIGINAL slot: when that slot is not in the analysed day's slot set — a move in from another weekday, or one whose timetable is no longer the live winner — it is resolved by a collegeId-scoped `findOne` on the slot itself, not left to resolve to null. A row whose `newDate` is some *other* day has moved away and occupies nothing here — `activeExceptionsFor` returns it because `dates` matches `date` OR `newDate` (R38), so the check is explicit (R47).
 
 - [ ] **Step 1: Add the failing tests**
 
@@ -1305,6 +1305,14 @@ describe('reschedule conflicts (R2)', () => {
       collegeId: new Types.ObjectId(CID), timetableId: slot.timetableId, day: 'monday', period: 2,
       startTime: '10:30', endTime: '11:30', courseOfferingId: offering._id,
     });
+    // Assert the conflict CONTRACT directly, not just that the call rejects: the `kind`
+    // literal and the section detail format are production strings, and asserting only
+    // /Reschedule conflicts/ leaves both unpinned (they could be renamed freely).
+    const conflicts = await checkRescheduleConflicts(CID, slot, {
+      date, newDate: date, newStartTime: '11:00', newEndTime: '12:00',
+    }, 'Asia/Kolkata');
+    expect(conflicts.map((c) => c.kind)).toEqual(['section_overlap']);
+    expect(conflicts[0]!.detail).toContain('(same section)');
     await expect(createClassException(CID, {
       timetableSlotId: String(slot._id), date, type: 'rescheduled',
       newDate: date, newStartTime: '11:00', newEndTime: '12:00', reason: 'Room maintenance pending',
@@ -1318,10 +1326,48 @@ describe('reschedule conflicts (R2)', () => {
   it('excludes the moving slot\'s own occurrence (R28)', async () => {
     const { slot } = await seedSlot();
     const date = upcoming('monday');
+    // The target window must OVERLAP the slot's own 09:00–10:00 occurrence on this date, or the
+    // test is vacuous: a target that does not overlap it (e.g. 13:00–14:00) passes with or
+    // without the exclusion and would not fail if the exclusion were deleted. 09:30–10:30
+    // overlaps, so the ONLY reason this can resolve is the R28 exclusion — delete the line and
+    // the slot's own occurrence becomes a section_overlap against itself.
+    const conflicts = await checkRescheduleConflicts(CID, slot, {
+      date, newDate: date, newStartTime: '09:30', newEndTime: '10:30',
+    }, 'Asia/Kolkata');
+    expect(conflicts).toEqual([]);
     await expect(createClassException(CID, {
       timetableSlotId: String(slot._id), date, type: 'rescheduled',
-      newDate: date, newStartTime: '13:00', newEndTime: '14:00', reason: 'Room maintenance pending',
-    }, USER)).resolves.toBeTruthy(); // only its own 09:00-10:00 would block, but it is excluded
+      newDate: date, newStartTime: '09:30', newEndTime: '10:30', reason: 'Room maintenance pending',
+    }, USER)).resolves.toBeTruthy();
+  });
+
+  it('a move-in from another weekday still occupies its stored room (R28)', async () => {
+    const { slot, offering } = await seedSlot();
+    const room = await Room.create({
+      collegeId: new Types.ObjectId(CID), buildingId: new Types.ObjectId(), roomNumber: 'B-203',
+      floor: 2, type: 'classroom', capacity: 60, status: 'available',
+    });
+    // A TUESDAY class holding this room, moved onto the analysed Monday with no newRoomId, so the
+    // row's room can only come from its STORED slot — which is not in Monday's slot set. Resolving
+    // the fallback only from that set yields null, the row occupies no room, and this blocks
+    // nothing; the check must look the original slot up instead.
+    const otherTt = await Timetable.create({
+      collegeId: new Types.ObjectId(CID), semesterId: new Types.ObjectId(), sectionId: new Types.ObjectId(),
+      version: 1, status: 'published', effectiveFrom: new Date(),
+    });
+    const tueSlot = await TimetableSlot.create({
+      collegeId: new Types.ObjectId(CID), timetableId: otherTt._id, day: 'tuesday', period: 1,
+      startTime: '15:00', endTime: '16:00', courseOfferingId: offering._id, roomId: room._id,
+    });
+    const date = upcoming('monday');
+    await createClassException(CID, {
+      timetableSlotId: String(tueSlot._id), date, type: 'rescheduled',
+      newDate: date, newStartTime: '09:30', newEndTime: '10:30', reason: 'Room maintenance pending',
+    }, USER);
+    const conflicts = await checkRescheduleConflicts(CID, slot, {
+      date, newDate: date, newStartTime: '09:30', newEndTime: '10:30', newRoomId: String(room._id),
+    }, 'Asia/Kolkata');
+    expect(conflicts.map((c) => c.kind)).toEqual(['room_occupied']);
   });
 
   it('a cancellation on the target date vacates that occurrence', async () => {
@@ -1462,9 +1508,19 @@ export async function checkRescheduleConflicts(
     // AWAY to a different day — only a row landing on the analysed day is a move-in. R47.
     if (e.type !== 'rescheduled' || e.newDate !== r.newDate || !e.newStartTime || !e.newEndTime) continue;
     const occSlot = daySlots.find((s) => String(s._id) === String(e.timetableSlotId));
+    // `daySlots` holds ONE weekday across the live timetables, so a row moved in from another
+    // weekday has no entry there — and neither does one whose timetable is no longer the live
+    // winner. Its room must then come from the stored slot itself; leaving the fallback to
+    // resolve to null would let the row occupy no room and block nothing (R28).
+    let originRoomId: string | null = occSlot?.roomId ? String(occSlot.roomId) : null;
+    if (!originRoomId) {
+      const origin = await TimetableSlot.findOne({ _id: e.timetableSlotId, collegeId })
+        .select('roomId').lean<{ roomId?: Types.ObjectId } | null>();
+      originRoomId = origin?.roomId ? String(origin.roomId) : null;
+    }
     occs.push({
       occSlotId: String(e.timetableSlotId),
-      roomId: e.newRoomId ? String(e.newRoomId) : occSlot?.roomId ? String(occSlot.roomId) : null,
+      roomId: e.newRoomId ? String(e.newRoomId) : originRoomId,
       start: e.newStartTime, end: e.newEndTime, code: '', offeringId: String(e.courseOfferingId),
     });
   }
@@ -1523,7 +1579,7 @@ Update the file-header comment's last line to: "Section/room conflict checks liv
 - [ ] **Step 4: Run to verify pass**
 
 Run: `npm test -w backend -- --run modules/academics/__tests__/class-exception.test.ts`
-Expected: PASS (14 tests).
+Expected: PASS (15 tests).
 Run: `npm run typecheck -w backend`
 Expected: no errors.
 
