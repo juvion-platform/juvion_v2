@@ -646,6 +646,17 @@ describe('getLiveTimetable', () => {
     const out = await getLiveTimetable(cid, String(secId), new Date('2026-10-12T18:30:00Z'), 'Asia/Kolkata');
     expect(String(out!._id)).toBe(String(t._id));
   });
+
+  it('keeps the window live through its last local day and not the day after', async () => {
+    // The window ends 2026-11-08, stored at UTC midnight, so its last covered LOCAL day in
+    // IST is 2026-11-08. Local midnight of 11-09 in IST is 2026-11-08T18:30Z, whose UTC date
+    // is still 11-08 — a UTC-day rule would keep this timetable live into 11-09 and show
+    // classes the day after the term ended. The last day stays live. R53/R56.
+    const t = await createTimetable(1, { from: '2026-10-01', to: '2026-11-08' });
+    const lastDay = await getLiveTimetable(cid, String(secId), new Date('2026-11-07T18:30:00Z'), 'Asia/Kolkata');
+    expect(String(lastDay!._id)).toBe(String(t._id));
+    expect(await getLiveTimetable(cid, String(secId), new Date('2026-11-08T18:30:00Z'), 'Asia/Kolkata')).toBeNull();
+  });
 });
 
 describe('liveSlotsForDay', () => {
@@ -4113,9 +4124,16 @@ describe('resolveDay', () => {
     const w = await seedTeachingWorld();
     const a = await w.makeOffering(w.facultyId as unknown as Types.ObjectId);
     await enrollIn(w.semesterId, w.studentId, a);
+    // The window starts at LOCAL midnight of 2026-11-10 in IST — 2026-11-09T18:30Z, an
+    // instant whose date is 11-09 in UTC but 11-10 in IST. So one stored instant starts the
+    // term a day earlier for a UTC college than for an IST one: the nominal date 2026-11-09
+    // is inside the term when read as a UTC day and outside it when read as an IST day (R53).
+    // Both expectations below are correct under the local-day rule and under the old UTC-day
+    // rule alike; the FIXTURE is what had to move (it used 2026-11-09T00:00:00Z, which the
+    // old rule excluded for IST and the new rule includes).
     const tt = await Timetable.create({
       collegeId, semesterId: w.semesterId, sectionId: w.sectionId,
-      version: 1, status: 'published', effectiveFrom: new Date('2026-11-09T00:00:00Z'),
+      version: 1, status: 'published', effectiveFrom: new Date('2026-11-09T18:30:00Z'),
     });
     await TimetableSlot.create({
       collegeId, timetableId: tt._id, day: 'monday', period: 1,
