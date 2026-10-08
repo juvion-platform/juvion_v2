@@ -105,12 +105,17 @@ describe('getLiveTimetable', () => {
     // range built as `dayStart + 86_400_000` would put this window's dayEnd at 05:00Z and
     // wrongly cover 03-08; deriving it with `startOfDay(addDays(day, 1), timezone)` gives
     // 04:00Z and excludes it. R57.
+    // The probe instant is the local EVENING of 03-08 (22:00 EDT = 02:00Z on 03-09), so its UTC
+    // date (03-09) is NOT its local date (03-08). That is what makes the ANCHOR — not only the
+    // step — observable here, so this test also fails if `dayStart` reverts to a UTC midnight
+    // (a UTC-anchored day resolves 03-09 and wrongly covers this timetable). A probe at local
+    // midnight would have UTC date == local date and hide the anchor entirely. R59.
     const t = await Timetable.create({
       collegeId: cidO(), semesterId: semId, sectionId: secId,
       version: 1, status: 'published',
       effectiveFrom: new Date('2026-03-09T04:30:00Z'), // 30 min into the local day 03-09
     });
-    const dayBefore = await getLiveTimetable(cid, String(secId), new Date('2026-03-08T05:00:00Z'), 'America/New_York');
+    const dayBefore = await getLiveTimetable(cid, String(secId), new Date('2026-03-09T02:00:00Z'), 'America/New_York');
     expect(dayBefore).toBeNull();
     const firstDay = await getLiveTimetable(cid, String(secId), new Date('2026-03-09T04:00:00Z'), 'America/New_York');
     expect(String(firstDay!._id)).toBe(String(t._id));
