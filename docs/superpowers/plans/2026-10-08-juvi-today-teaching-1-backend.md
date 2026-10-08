@@ -601,8 +601,8 @@ describe('getLiveTimetable', () => {
 
   it('excludes drafts, archived versions and expired windows', async () => {
     await createTimetable(1, { from: '2026-09-01', to: '2026-09-30' });
-    await createTimetable(2, { from: '2026-10-01', to: '2026-10-31' }, { status: 'draft' });
-    await createTimetable(3, { from: '2026-10-01' }, { status: 'archived' });
+    await createTimetable(2, { from: '2026-10-01', to: '2026-10-31', status: 'draft' });
+    await createTimetable(3, { from: '2026-10-01', status: 'archived' });
     expect(await getLiveTimetable(cid, String(secId), new Date('2026-10-10T06:00:00Z'))).toBeNull();
   });
 
@@ -1188,7 +1188,7 @@ git commit -m "feat(academics): class exception service - create/revoke/list/act
 Semantics (spec §5.1, R28):
 - **Section overlap:** any OTHER slot of the SAME section's live timetable on `newDate` (weekday of `newDate`, `'free'` excluded) whose occurrence is not vacated by an active exception dated `newDate`, and which is not the moving slot, overlapping `[newStartTime, newEndTime)`.
 - **Room occupancy (across sections):** the target room (`newRoomId ?? slot.roomId`; the check is skipped when that is null) occupied on `newDate` by any other live slot or by a moved-in exception row, excluding the moving slot's own occurrence; slots vacated by active exceptions dated `newDate` do not occupy.
-- Moved-in rows (active exceptions with `newDate === newDate`) occupy `newRoomId ?? slot.roomId` at `[newStartTime, newEndTime)`.
+- Moved-in rows (active exceptions whose `newDate` equals the analysed date) occupy `newRoomId ?? slot.roomId` at `[newStartTime, newEndTime)`. A row whose `newDate` is some *other* day has moved away and occupies nothing here — `activeExceptionsFor` returns it because `dates` matches `date` OR `newDate` (R38), so the check is explicit (R47).
 
 - [ ] **Step 1: Add the failing tests**
 
@@ -1209,8 +1209,8 @@ describe('reschedule conflicts (R2)', () => {
     }, USER)).rejects.toThrow(/Reschedule conflicts/);
     await expect(createClassException(CID, {
       timetableSlotId: String(slot._id), date, type: 'rescheduled',
-      newDate: date, newStartTime: '10:30', newEndTime: '11:30', reason: 'Room maintenance pending',
-    }, USER)).resolves.toBeTruthy();
+      newDate: date, newStartTime: '11:30', newEndTime: '12:30', reason: 'Room maintenance pending',
+    }, USER)).resolves.toBeTruthy(); // 11:30 only touches the occupant's end — strict overlap says free
   });
 
   it('excludes the moving slot\'s own occurrence (R28)', async () => {
@@ -1356,7 +1356,9 @@ export async function checkRescheduleConflicts(
     occs.push({ occSlotId: String(s._id), roomId: s.roomId ? String(s.roomId) : null, start: s.startTime, end: s.endTime, code: '', offeringId: String(s.courseOfferingId) });
   }
   for (const e of exceptions) {
-    if (e.type !== 'rescheduled' || !e.newStartTime || !e.newEndTime) continue;
+    // `dates` matches `date` OR `newDate` (R38), so this set also holds rows that moved
+    // AWAY to a different day — only a row landing on the analysed day is a move-in. R47.
+    if (e.type !== 'rescheduled' || e.newDate !== r.newDate || !e.newStartTime || !e.newEndTime) continue;
     const occSlot = daySlots.find((s) => String(s._id) === String(e.timetableSlotId));
     occs.push({
       occSlotId: String(e.timetableSlotId),
@@ -1713,7 +1715,7 @@ import { seedBase, BaseFixtures } from '../setup/seed-base';
 import { createTestApi, TestApi } from '../helpers/request';
 import { createTestCourse, createTestCourseOffering, createTestFaculty } from '../factories/academic.factory';
 import { createTestUser } from '../factories/user.factory';
-import { Timetable, TimetableSlot } from '../../models/academic-ops';
+import { Timetable, TimetableSlot } from '../../models';
 import { ClassException } from '../../models/academic-ops/ClassException';
 import { AuditLog } from '../../shared/audit';
 
@@ -2181,7 +2183,7 @@ import { Timetable } from '../../../../models/academic-ops/Timetable';
 import { TimetableSlot } from '../../../../models/academic-ops/TimetableSlot';
 import { ClassException } from '../../../../models/academic-ops/ClassException';
 import { nextClassByOffering } from '../next-class';
-import { instantOf, addDays } from '../../academics/timetable-date';
+import { instantOf, addDays } from '../../../academics/timetable-date';
 import { setupMongo, teardownMongo, clearCollections } from '../../../../__tests__/helpers/mongoMemory';
 
 const CID = '000000000000000000000001';
@@ -8072,8 +8074,7 @@ import mongoose from 'mongoose';
 import 'dotenv/config';
 import { assert } from 'node:assert';
 
-import { AcademicCalendar, AttendanceRecord, AttendanceSession, ClassException, InternalAssessment, Invoice, PaymentPlan, Student } from './src/models';
-import { Timetable, TimetableSlot } from './src/models/academic-ops';
+import { AcademicCalendar, AttendanceRecord, AttendanceSession, ClassException, InternalAssessment, Invoice, PaymentPlan, Student, Timetable, TimetableSlot } from './src/models';
 import { resolveDay } from './src/modules/juvi-app/home/resolve-day';
 
 const CID = '000000000000000000000001';
@@ -8393,7 +8394,7 @@ import { enableJuvi, mobileClient, provisionTestStudent } from '../factories/juv
 import { activateAccount, signInAs } from '../factories/notice.factory';
 import { Enrollment } from '../../models/academic-ops/Enrollment';
 import { InternalAssessment } from '../../models/academic-ops/InternalAssessment';
-import { Timetable, TimetableSlot } from '../../models/academic-ops';
+import { Timetable, TimetableSlot } from '../../models';
 import { Invoice } from '../../models/finance/Invoice';
 
 process.env.E2E_TESTING = '1';
