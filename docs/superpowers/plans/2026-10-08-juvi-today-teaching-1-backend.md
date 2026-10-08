@@ -2338,13 +2338,13 @@ git commit -m "feat(academics): class-exception routes with per-actor permission
 // in juvi-app-spaces.e2e.test.ts, replacing the nextOccurrence import
 import { ymd, addDays, dayEnumOf, instantOf } from '../../modules/academics/timetable-date';
 
-/** Earliest instant strictly after `asOf` at which `hhmm` starts on weekday `day`. */
+/** Earliest instant at-or-after `asOf` at which `hhmm` starts on weekday `day`. */
 function nextAt(day: string, hhmm: string, asOf: Date, tz: string): Date {
   let date = ymd(asOf, tz);
   for (let i = 0; i <= 7; i++) {
     if (dayEnumOf(date) === day) {
       const at = instantOf(date, hhmm, tz);
-      if (at.getTime() > asOf.getTime()) return at;
+      if (at.getTime() >= asOf.getTime()) return at;
     }
     date = addDays(date, 1);
   }
@@ -2362,7 +2362,7 @@ function nextAt(day: string, hhmm: string, asOf: Date, tz: string): Date {
     const dbmsNext = nextFor('17:00');
 ```
 
-  `DAYS6`, `asOf` and `TZ` on the surrounding lines stay as they are; the two `!` non-null assertions go away because `nextFor` either returns a date or throws. The seeded rows are daily 08:00/17:00 across `DAYS6`, so the earliest-of-the-week fold is the same instant the old helper returned.
+  `DAYS6`, `asOf` and `TZ` on the surrounding lines stay as they are; the two `!` non-null assertions go away because `nextFor` either returns a date or throws. The seeded rows are daily 08:00/17:00 across `DAYS6`, so the earliest-of-the-week fold is the same instant the old helper returned. **The comparison is `>=`, matching the reader's `at < nowMs → continue` (R81)** — both sides treat an occurrence starting exactly at the reference instant as next, so the oracle and the server cannot disagree at the boundary, which they would if one used `>` and the other `>=`.
 - Import-direction check: `juvi-app/spaces/next-class.ts → academics/{live-timetable,class-exception-service,timetable-date}` — `class-exception-service` imports `juvi-app/config/institution-config`, which imports only `config/redis` and `models/College`, so there is no cycle.
 
 - [ ] **Step 1: Update the old test file and write the new tests**
@@ -2379,7 +2379,7 @@ import { Timetable } from '../../../../models/academic-ops/Timetable';
 import { TimetableSlot } from '../../../../models/academic-ops/TimetableSlot';
 import { ClassException } from '../../../../models/academic-ops/ClassException';
 import { nextClassByOffering } from '../next-class';
-import { instantOf, addDays } from '../../../academics/timetable-date';
+import { ymd, addDays, dayEnumOf, instantOf } from '../../../academics/timetable-date';
 import { setupMongo, teardownMongo, clearCollections } from '../../../../__tests__/helpers/mongoMemory';
 
 const CID = '000000000000000000000001';
@@ -2411,6 +2411,22 @@ function nextMonday(): string {
   return '';
 }
 
+/**
+ * The Monday whose 09:00 occurrence the reader must return for test 1: the earliest Monday
+ * at-or-after now. The reader's horizon starts TODAY and it never returns a past occurrence
+ * (R81), so on a Monday after 09:00 that is NEXT Monday, not today — `nextMonday()` above is
+ * the "today or next Monday" query and is correct for tests 2-3, which cancel or move the
+ * occurrence the reader would otherwise pick, but it is wrong for test 1.
+ */
+function nextMondayAfter(hhmm: string): string {
+  let date = ymd(new Date(), TZ);
+  for (let i = 0; i <= 7; i++) {
+    if (dayEnumOf(date) === 'monday' && instantOf(date, hhmm, TZ).getTime() >= Date.now()) return date;
+    date = addDays(date, 1);
+  }
+  return '';
+}
+
 beforeAll(async () => { await setupMongo(); });
 afterAll(async () => { await teardownMongo(); });
 afterEach(async () => { await clearCollections(); });
@@ -2424,7 +2440,7 @@ describe('nextClassByOffering on the live rule (§5.3)', () => {
       version: 1, status: 'published', effectiveFrom: new Date('2026-01-01T00:00:00Z'),
     });
     const out = await nextClassByOffering(CID, [String(offerId)], TZ);
-    expect(out.get(String(offerId))?.toISOString()).toBe(instantOf(nextMonday(), '09:00', TZ).toISOString());
+    expect(out.get(String(offerId))?.toISOString()).toBe(instantOf(nextMondayAfter('09:00'), '09:00', TZ).toISOString());
   });
 
   it('a cancelled occurrence is skipped; the next meeting is the following week', async () => {
@@ -2464,7 +2480,7 @@ Note the two exception rows are created through the model directly (revokedAt/re
 - [ ] **Step 2: Run to verify failure**
 
 Run: `npm test -w backend -- --run modules/juvi-app/spaces/__tests__/next-class-live.test.ts`
-Expected: FAIL — the shipped `nextClassByOffering` is weekly arithmetic: it ignores exceptions (cancelled / rescheduled cases return the wrong occurrence) and the draft-timetable case returns an entry instead of an empty map (`out.has` true). All four tests fail.
+Expected: FAIL — the shipped `nextClassByOffering` is weekly arithmetic: it ignores exceptions (the cancelled and rescheduled cases return the wrong occurrence) and the draft-timetable case returns an entry instead of an empty map (`out.has` true). Tests 2, 3 and 4 fail **always**; test 1 fails only when it runs on a Monday after 09:00 IST (on any other run the weekly rule happens to return the same Monday the live rule must, so a green test 1 here is expected, not a problem).
 
 - [ ] **Step 3: Rewrite next-class.ts**
 
@@ -2508,7 +2524,13 @@ export async function nextClassByOffering(
   if (ids.length === 0) return out;
   const best = new Map<string, number>();
 
-  const today = ymd(new Date(), timezone);
+  // "Next" means at-or-after now. The horizon starts TODAY, so without this bound a class that
+  // already started today (08:00 when it is 15:00) is the minimum over the horizon and gets
+  // returned — and `formatNextClassLabel` then renders the past as "Next: Today 08:00". The
+  // weekly rule this replaces (`nextOccurrence`'s `delta < 0 → += week`) never returned a past
+  // occurrence either, so this preserves shipped semantics rather than changing them (R81).
+  const nowMs = Date.now();
+  const today = ymd(new Date(nowMs), timezone);
   const dates = Array.from({ length: HORIZON_DAYS }, (_, i) => addDays(today, i));
 
   for (const date of dates) {
@@ -2529,12 +2551,14 @@ export async function nextClassByOffering(
       const sid = String(s._id);
       if (vacated.has(sid)) continue;
       const at = instantOf(date, s.startTime, timezone).getTime();
+      if (at < nowMs) continue;
       const cur = best.get(String(s.courseOfferingId));
       if (cur === undefined || at < cur) best.set(String(s.courseOfferingId), at);
     }
     for (const e of rows) {
       if (e.type !== 'rescheduled' || e.newDate !== date || !e.newStartTime) continue;
       const at = instantOf(date, e.newStartTime, timezone).getTime();
+      if (at < nowMs) continue;
       const cur = best.get(String(e.courseOfferingId));
       if (cur === undefined || at < cur) best.set(String(e.courseOfferingId), at);
     }
