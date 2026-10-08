@@ -50,6 +50,7 @@ export { AcademicCalendar } from './academic-ops/AcademicCalendar';
 export { AttainmentRun } from './academic-ops/AttainmentRun';
 export { AttendanceRecord } from './academic-ops/AttendanceRecord';
 export { AttendanceSession } from './academic-ops/AttendanceSession';
+export { ClassException, LeanClassException, CLASS_EXCEPTION_TYPES } from './academic-ops/ClassException';
 export { COAttainmentRecord } from './academic-ops/COAttainmentRecord';
 export { Course } from './academic-ops/Course';
 export { CourseFeedback } from './academic-ops/CourseFeedback';
