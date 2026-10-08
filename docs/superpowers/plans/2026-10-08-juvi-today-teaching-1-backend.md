@@ -3709,6 +3709,7 @@ marking write (session create/update/delete, record create/update/delete,
 bulk upsert) recomputes the affected students' summaries through one
 recomputeSummaries helper. Alert thresholds stay hard-coded 75/65 (R9);
 hall tickets no longer block on never-held courses."
+```
 ### Task 12: `resolve-day.ts` — spec §6 reader shared by both surfaces
 
 **Files:**
@@ -4405,6 +4406,7 @@ faculty pool from owned offerings plus substitutions (minus replaced-out
 slots); exceptions vacate/mark/inject per §6; batch decoration omits
 optional fields instead of nulling them. nextTeachingDay scans 14 days
 ahead skipping Sundays and holidays."
+```
 ### Task 13: Juvi home readers — attendance, dues, assessments
 
 **Files:**
