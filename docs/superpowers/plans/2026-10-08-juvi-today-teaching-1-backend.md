@@ -992,6 +992,27 @@ describe('createClassException', () => {
       timetableSlotId: new Types.ObjectId().toString(), date: upcoming('monday'), type: 'cancelled', reason: 'Faculty attending a workshop',
     }, USER)).rejects.toThrow(/not found/);
   });
+
+  it('does not leak another college\'s course code into the audit name (falls back to the offering id)', async () => {
+    const { slot, offering } = await seedSlot();
+    const foreignCourse = await Course.create({
+      collegeId: new Types.ObjectId(), code: 'XX999', name: 'Foreign Course',
+      regulationId: new Types.ObjectId(), departmentId: new Types.ObjectId(),
+      credits: 3, type: 'theory',
+    });
+    // The offering stays in this college; its course does not.
+    await CourseOffering.updateOne({ _id: offering._id }, { $set: { courseId: foreignCourse._id } });
+
+    const date = upcoming('monday');
+    const row = await createClassException(CID, {
+      timetableSlotId: String(slot._id), date, type: 'cancelled', reason: 'Faculty attending a workshop',
+    }, USER);
+
+    const audits = await AuditLog.find({ entityType: 'ClassException', entityId: String(row._id) }).lean();
+    expect(audits).toHaveLength(1);
+    expect(audits[0]!.entityName).not.toContain('XX999');
+    expect(audits[0]!.entityName).toContain(String(offering._id));
+  });
 });
 
 describe('revokeClassException', () => {
@@ -1182,7 +1203,10 @@ export async function createClassException(
 async function entityName(collegeId: string, offeringId: string, date: string): Promise<string> {
   const offering = await CourseOffering.findOne({ _id: offeringId, collegeId }).select('courseId').lean<{ courseId: Types.ObjectId } | null>();
   if (!offering) return `${offeringId} on ${date}`;
-  const course = await Course.findById(offering.courseId).select('code name').lean<{ code: string; name: string } | null>();
+  // Scoped by collegeId: `course.code` lands in AuditLog.entityName, a collection
+  // shared across colleges. `findOne({ _id, collegeId })` — not `findById(id,
+  // collegeId)`, whose second argument is a projection and would filter nothing.
+  const course = await Course.findOne({ _id: offering.courseId, collegeId }).lean<{ code: string } | null>();
   return `${course ? course.code : offeringId} on ${date}`;
 }
 
