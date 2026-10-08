@@ -11,6 +11,9 @@ import { Timetable } from '../../models/academic-ops/Timetable';
 import { TimetableSlot } from '../../models/academic-ops/TimetableSlot';
 import { Course } from '../../models/academic-ops/Course';
 import { CourseOffering } from '../../models/academic-ops/CourseOffering';
+import { Enrollment } from '../../models/academic-ops/Enrollment';
+import { Person } from '../../models/people/Person';
+import { Faculty } from '../../models/people/Faculty';
 import { Room } from '../../models/campus/Room';
 import { AppError } from '../../middleware/errorHandler';
 import { createAuditLog } from '../../shared/audit';
@@ -18,6 +21,7 @@ import { emit } from '../../shared/outbox/outbox';
 import { getJuviConfig } from '../juvi-app/config/institution-config';
 import { getLiveTimetables } from './live-timetable';
 import { ymd, dayEnumOf, diffDays, hhmmToMinutes, instantOf, overlaps } from './timetable-date';
+import { classifyExceptionPushTier, ClassChangePushTier } from './push-tier';
 
 export const CLASS_EVENTS = { CHANGED: 'class.exception.changed' } as const;
 export type ClassChangeAction = 'created' | 'revoked';
@@ -301,4 +305,58 @@ export async function checkRescheduleConflicts(
     }
   }
   return conflicts;
+}
+
+export interface ClassExceptionPreview {
+  slotId: string;
+  date: string;
+  newDate?: string;
+  affectedStudents: number;
+  faculty: string[];
+  pushTier: ClassChangePushTier;
+}
+
+/** §5.1 dialog preview: how many students, which faculty, and what push tier the change triggers. */
+export async function previewClassException(
+  collegeId: string, slotId: string, date: string, now: Date = new Date(), newDate?: string,
+): Promise<ClassExceptionPreview> {
+  const slot = await TimetableSlot.findOne({ _id: slotId, collegeId }).lean<LeanSlot | null>();
+  if (!slot) throw new AppError(404, 'Class slot not found');
+  const timezone = await collegeTimezone(collegeId);
+
+  const [affectedStudents, faculty] = await Promise.all([
+    Enrollment.countDocuments({ collegeId, courseOfferingId: slot.courseOfferingId, status: 'enrolled' }),
+    facultyNames(collegeId, slot),
+  ]);
+
+  return {
+    slotId, date,
+    ...(newDate ? { newDate } : {}),
+    affectedStudents,
+    faculty,
+    pushTier: classifyExceptionPushTier(date, slot.startTime, newDate ? [date, newDate] : [date], now, timezone),
+  };
+}
+
+/** Display names for the occurrence's faculty: the substitution first, then the offering's. */
+async function facultyNames(collegeId: string, slot: LeanSlot): Promise<string[]> {
+  const offering = await CourseOffering.findOne({ _id: slot.courseOfferingId, collegeId }).select('facultyId coFacultyIds').lean<{ facultyId: Types.ObjectId; coFacultyIds?: Types.ObjectId[] } | null>();
+  const ids: Types.ObjectId[] = [];
+  if (offering) ids.push(offering.facultyId, ...(offering.coFacultyIds ?? []));
+  // `LeanSlot` exposes the model interface's `Schema.Types.ObjectId`, not `Types.ObjectId`;
+  // the value is only ever `String()`-ified below, so bridge the two here (the model's own
+  // `service.ts` setter casts the same field for the same reason).
+  if (slot.substituteFacultyId) ids.unshift(slot.substituteFacultyId as unknown as Types.ObjectId);
+  const unique = [...new Set(ids.map(String))];
+  if (unique.length === 0) return [];
+  const rows = await Faculty.find({ _id: { $in: unique }, collegeId }).select('personId').lean<{ _id: Types.ObjectId; personId: Types.ObjectId }[]>();
+  const people = await Person.find({ _id: { $in: rows.map((r) => r.personId) }, collegeId }).select('name').lean<{ _id: Types.ObjectId; name: string }[]>();
+  const nameByPerson = new Map(people.map((p) => [String(p._id), p.name]));
+  const personByFaculty = new Map(rows.map((r) => [String(r._id), String(r.personId)]));
+  return unique
+    .map((fid) => {
+      const pid = personByFaculty.get(fid);
+      return pid ? nameByPerson.get(pid) ?? '' : '';
+    })
+    .filter((name) => name.length > 0);
 }
