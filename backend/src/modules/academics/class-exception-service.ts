@@ -252,9 +252,19 @@ export async function checkRescheduleConflicts(
     // AWAY to a different day — only a row landing on the analysed day is a move-in. R47.
     if (e.type !== 'rescheduled' || e.newDate !== r.newDate || !e.newStartTime || !e.newEndTime) continue;
     const occSlot = daySlots.find((s) => String(s._id) === String(e.timetableSlotId));
+    // `daySlots` holds ONE weekday across the live timetables, so a row moved in from another
+    // weekday has no entry there — and neither does one whose timetable is no longer the live
+    // winner. Its room must then come from the stored slot itself; leaving the fallback to
+    // resolve to null would let the row occupy no room and block nothing (R28).
+    let originRoomId: string | null = occSlot?.roomId ? String(occSlot.roomId) : null;
+    if (!originRoomId) {
+      const origin = await TimetableSlot.findOne({ _id: e.timetableSlotId, collegeId })
+        .select('roomId').lean<{ roomId?: Types.ObjectId } | null>();
+      originRoomId = origin?.roomId ? String(origin.roomId) : null;
+    }
     occs.push({
       occSlotId: String(e.timetableSlotId),
-      roomId: e.newRoomId ? String(e.newRoomId) : occSlot?.roomId ? String(occSlot.roomId) : null,
+      roomId: e.newRoomId ? String(e.newRoomId) : originRoomId,
       start: e.newStartTime, end: e.newEndTime, code: '', offeringId: String(e.courseOfferingId),
     });
   }

@@ -199,6 +199,11 @@ describe('reschedule conflicts (R2)', () => {
       collegeId: new Types.ObjectId(CID), timetableId: slot.timetableId, day: 'monday', period: 2,
       startTime: '10:30', endTime: '11:30', courseOfferingId: offering._id,
     });
+    const conflicts = await checkRescheduleConflicts(CID, slot, {
+      date, newDate: date, newStartTime: '11:00', newEndTime: '12:00',
+    }, 'Asia/Kolkata');
+    expect(conflicts.map((c) => c.kind)).toEqual(['section_overlap']);
+    expect(conflicts[0]!.detail).toContain('(same section)');
     await expect(createClassException(CID, {
       timetableSlotId: String(slot._id), date, type: 'rescheduled',
       newDate: date, newStartTime: '11:00', newEndTime: '12:00', reason: 'Room maintenance pending',
@@ -212,10 +217,16 @@ describe('reschedule conflicts (R2)', () => {
   it('excludes the moving slot\'s own occurrence (R28)', async () => {
     const { slot } = await seedSlot();
     const date = upcoming('monday');
+    // The target window OVERLAPS the slot's own 09:00–10:00 occurrence, so the only reason this
+    // can resolve is the R28 exclusion: delete it and the slot's own occurrence blocks itself.
+    const conflicts = await checkRescheduleConflicts(CID, slot, {
+      date, newDate: date, newStartTime: '09:30', newEndTime: '10:30',
+    }, 'Asia/Kolkata');
+    expect(conflicts).toEqual([]);
     await expect(createClassException(CID, {
       timetableSlotId: String(slot._id), date, type: 'rescheduled',
-      newDate: date, newStartTime: '13:00', newEndTime: '14:00', reason: 'Room maintenance pending',
-    }, USER)).resolves.toBeTruthy(); // only its own 09:00-10:00 would block, but it is excluded
+      newDate: date, newStartTime: '09:30', newEndTime: '10:30', reason: 'Room maintenance pending',
+    }, USER)).resolves.toBeTruthy();
   });
 
   it('a cancellation on the target date vacates that occurrence', async () => {
@@ -285,5 +296,35 @@ describe('reschedule conflicts (R2)', () => {
       date, newDate: date, newStartTime: '09:30', newEndTime: '10:30', newRoomId: String(room._id),
     }, 'Asia/Kolkata');
     expect(after).toEqual([]);
+  });
+
+  it('a move-in from another weekday still occupies its stored room (R28)', async () => {
+    const { slot, offering } = await seedSlot();
+    const room = await Room.create({
+      collegeId: new Types.ObjectId(CID), buildingId: new Types.ObjectId(), roomNumber: 'B-203',
+      floor: 2, type: 'classroom', capacity: 60, status: 'available',
+    });
+    // A TUESDAY class holding this room, moved onto the analysed Monday with no newRoomId, so the
+    // row's room can only come from its STORED slot — which is not in Monday's slot set.
+    const otherTt = await Timetable.create({
+      collegeId: new Types.ObjectId(CID), semesterId: new Types.ObjectId(), sectionId: new Types.ObjectId(),
+      version: 1, status: 'published', effectiveFrom: new Date(),
+    });
+    const tueSlot = await TimetableSlot.create({
+      collegeId: new Types.ObjectId(CID), timetableId: otherTt._id, day: 'tuesday', period: 1,
+      startTime: '15:00', endTime: '16:00', courseOfferingId: offering._id, roomId: room._id,
+    });
+    const date = upcoming('monday');
+    // The exception's ORIGINAL occurrence date is the Tuesday slot's own weekday (the service
+    // enforces it); only newDate lands on the analysed Monday.
+    const tueDate = upcoming('tuesday');
+    await createClassException(CID, {
+      timetableSlotId: String(tueSlot._id), date: tueDate, type: 'rescheduled',
+      newDate: date, newStartTime: '09:30', newEndTime: '10:30', reason: 'Room maintenance pending',
+    }, USER);
+    const conflicts = await checkRescheduleConflicts(CID, slot, {
+      date, newDate: date, newStartTime: '09:30', newEndTime: '10:30', newRoomId: String(room._id),
+    }, 'Asia/Kolkata');
+    expect(conflicts.map((c) => c.kind)).toEqual(['room_occupied']);
   });
 });
