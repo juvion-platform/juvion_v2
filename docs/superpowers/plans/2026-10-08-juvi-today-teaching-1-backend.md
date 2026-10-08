@@ -34,7 +34,7 @@ Recorded so executors do not re-litigate; each traces to the spec or to verified
 - **R16 (assessment attention).** Deadline = the assessment's `at` instant.
 - **R17 (preview).** `previewClassException` returns `affectedStudents: number` and `faculty: string[]` (display names; substitution first).
 - **R18 (channel id).** A class's `channelId` resolves via an active `Channel` with `scopeType:'course_offering'`, `scopeId` = offering id; only such a channel counts.
-- **R19 (push consumer registration).** `registerClassChangeConsumers()` is called from `backend/src/modules/juvi-app/routes.ts` beside `registerNoticeConsumers()` / `registerNotificationConsumers()`.
+- **R19 (push consumer registration).** The class-change consumer is registered *inside* the existing `registerNotificationConsumers()` in `backend/src/modules/juvi-app/notifications/index.ts` (`registerConsumer(CLASS_CHANGE_EVENT, …)`, Task 16), which `backend/src/modules/juvi-app/routes.ts` already calls at module load beside `registerNoticeConsumers()`. No `registerClassChangeConsumers()` function exists and Task 16 does not edit `routes.ts`.
 - **R20 (variant mapping).** Push `variant`: created + `type:'cancelled'` → `'cancelled'`; created + `type:'rescheduled'` → `'rescheduled'`; revoked → `'restored'`.
 - **R21 (back-compat).** `GET /v1/attention` without `kinds` returns exactly today's notice items only; with `kinds=all` items carry a `kind` field. Old clients (not sending kinds) never see non-notice items.
 - **R22 (version tiebreak).** Two live published timetables for a section with equal `version` → newest `updatedAt` wins.
@@ -125,7 +125,7 @@ Files this plan creates (`C`) or modifies (`M`), with each file's one responsibi
 - C `backend/src/modules/juvi-app/home/service.ts` — payload builders + account-kind gates.
 - C `backend/src/modules/juvi-app/home/controller.ts` — home controllers.
 - C `backend/src/modules/juvi-app/home/routes.ts` — `homeRouter`.
-- M `backend/src/modules/juvi-app/routes.ts` — mount homeRouter + registerClassChangeConsumers().
+- M `backend/src/modules/juvi-app/routes.ts` — mount homeRouter (§7).
 - M `backend/src/modules/juvi-app/notices/mobile-service.ts` — export uncapped `dueNoticeCards`.
 - M `backend/src/modules/juvi-app/notices/mobile-controller.ts` — kinds param handling.
 - M `backend/src/modules/juvi-app/notices/schemas.ts` — attention response schema widened.
@@ -4824,6 +4824,7 @@ import { activeSemesterIds } from '../../academics/live-timetable';
 import { instantOf, ymd } from '../../academics/timetable-date';
 import { Course } from '../../../models/academic-ops/Course';
 import { CourseOffering } from '../../../models/academic-ops/CourseOffering';
+import { Enrollment } from '../../../models/academic-ops/Enrollment';
 import { ExamSchedule } from '../../../models/academic-ops/ExamSchedule';
 import { InternalAssessment } from '../../../models/academic-ops/InternalAssessment';
 import { Invoice } from '../../../models/finance/Invoice';
@@ -5174,7 +5175,7 @@ Expected: PASS with 0 errors.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add backend/src/modules/juvi-app/home/readers.ts backend/src/modules/juvi-app/home/__tests__/readers.test.ts
+git add backend/src/modules/juvi-app/home/money.ts backend/src/modules/juvi-app/home/readers.ts backend/src/modules/juvi-app/home/__tests__/readers.test.ts
 git commit -m "feat(juvi): Today/Teaching home readers - attendance, dues, assessments
 
 Attendance wraps the ERP formula (R12: aliased import) with available/
@@ -5566,7 +5567,7 @@ import { CourseOffering } from '../../../models/academic-ops/CourseOffering';
 import { Section } from '../../../models/academic-structure/Section';
 import { activeSemesterIds } from '../../academics/live-timetable';
 import { addDays, ymd } from '../../academics/timetable-date';
-import { nextTeachingDay, resolveDay, type DayViewer } from './resolve-day';
+import { nextTeachingDay, resolveDay, type DayView, type DayViewer } from './resolve-day';
 import {
   assessmentsFor,
   courseChannels,
@@ -8374,7 +8375,7 @@ import type { Express } from 'express';
 import { getTestApp, cleanupTestApp } from '../setup/test-app';
 import { seedBase, BaseFixtures } from '../setup/seed-base';
 import { createTestApi, TestApi } from '../helpers/request';
-import { createTestCourse, createTestCourseOffering } from '../factories/academic.factory';
+import { createTestCourse, createTestCourseOffering, createTestFaculty } from '../factories/academic.factory';
 import { enableJuvi, mobileClient, provisionTestStudent } from '../factories/juvi.factory';
 import { activateAccount, signInAs } from '../factories/notice.factory';
 import { Enrollment } from '../../models/academic-ops/Enrollment';
