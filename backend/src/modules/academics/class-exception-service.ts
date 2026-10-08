@@ -2,8 +2,8 @@
  * Class exceptions (Today&Teaching §4/§5). One active row per (slot, date).
  * Changes are revoke-then-create — rows are never edited or deleted. CUD writes
  * audit logs and emits `class.exception.changed` over the outbox so the Juvi
- * notification pipeline (plan task 16) reacts. Section/room conflict checks are
- * wired in by plan task 5.
+ * notification pipeline (plan task 16) reacts. Section/room conflict checks live
+ * here (checkRescheduleConflicts).
  */
 import { Document, Types } from 'mongoose';
 import { ClassException, LeanClassException, IClassException, ClassExceptionType } from '../../models/academic-ops/ClassException';
@@ -11,11 +11,13 @@ import { Timetable } from '../../models/academic-ops/Timetable';
 import { TimetableSlot } from '../../models/academic-ops/TimetableSlot';
 import { Course } from '../../models/academic-ops/Course';
 import { CourseOffering } from '../../models/academic-ops/CourseOffering';
+import { Room } from '../../models/campus/Room';
 import { AppError } from '../../middleware/errorHandler';
 import { createAuditLog } from '../../shared/audit';
 import { emit } from '../../shared/outbox/outbox';
 import { getJuviConfig } from '../juvi-app/config/institution-config';
-import { ymd, dayEnumOf, diffDays, hhmmToMinutes } from './timetable-date';
+import { getLiveTimetables } from './live-timetable';
+import { ymd, dayEnumOf, diffDays, hhmmToMinutes, instantOf, overlaps } from './timetable-date';
 
 export const CLASS_EVENTS = { CHANGED: 'class.exception.changed' } as const;
 export type ClassChangeAction = 'created' | 'revoked';
@@ -88,6 +90,13 @@ export async function createClassException(
     if (diffDays(input.newDate, today) > 14) throw new AppError(400, 'Reschedule target must be within 14 days of today');
     if (hhmmToMinutes(input.newStartTime) >= hhmmToMinutes(input.newEndTime)) {
       throw new AppError(400, 'newStartTime must be before newEndTime');
+    }
+    const conflicts = await checkRescheduleConflicts(collegeId, slot, {
+      date: input.date, newDate: input.newDate, newStartTime: input.newStartTime, newEndTime: input.newEndTime,
+      newRoomId: input.newRoomId,
+    }, timezone);
+    if (conflicts.length > 0) {
+      throw new AppError(400, `Reschedule conflicts: ${conflicts.map((c) => c.detail).join('; ')}`);
     }
     patch = {
       newDate: input.newDate,
@@ -184,4 +193,102 @@ export async function activeExceptionsFor(
   if (selector.offeringIds?.length) clauses.push({ courseOfferingId: { $in: selector.offeringIds } });
   if (clauses.length > 0) where.$and = clauses;
   return ClassException.find(where).sort({ date: 1 }).limit(500).lean<LeanClassException[]>();
+}
+
+export interface RescheduleConflict { kind: 'section_overlap' | 'room_occupied'; detail: string }
+
+/** courseId → course code, for conflict detail strings. */
+async function offeringCodes(collegeId: string, offeringIds: string[]): Promise<Map<string, string>> {
+  if (offeringIds.length === 0) return new Map();
+  const offerings = await CourseOffering.find({ _id: { $in: offeringIds }, collegeId }).select('courseId').lean<{ _id: Types.ObjectId; courseId: Types.ObjectId }[]>();
+  const courseIds = [...new Set(offerings.map((o) => String(o.courseId)))];
+  const courses = await Course.find({ _id: { $in: courseIds }, collegeId }).select('code').lean<{ _id: Types.ObjectId; code: string }[]>();
+  const codeByCourse = new Map(courses.map((c) => [String(c._id), c.code]));
+  const out = new Map<string, string>();
+  for (const o of offerings) out.set(String(o._id), codeByCourse.get(String(o.courseId)) ?? 'another class');
+  return out;
+}
+
+async function sectionOf(collegeId: string, slot: LeanSlot): Promise<string | null> {
+  const tt = await Timetable.findOne({ _id: slot.timetableId, collegeId }).select('sectionId').lean<{ sectionId: Types.ObjectId } | null>();
+  return tt ? String(tt.sectionId) : null;
+}
+
+/**
+ * The real conflict check the `detectTimetableConflicts` route placeholder stood
+ * for (R2). Rescheduling into `newDate`/[newStartTime, newEndTime): no other
+ * class of the same section overlaps, and the target room (newRoomId ?? the
+ * slot's room) is free of every other class on that day. That day's own
+ * exceptions apply — cancellations and moves-away vacate, moves-in occupy. The
+ * moving slot's own occurrence is excluded everywhere (R28).
+ */
+export async function checkRescheduleConflicts(
+  collegeId: string, slot: LeanSlot,
+  r: { date: string; newDate: string; newStartTime: string; newEndTime: string; newRoomId?: string },
+  timezone: string,
+): Promise<RescheduleConflict[]> {
+  const weekday = dayEnumOf(r.newDate);
+  const at = instantOf(r.newDate, '09:00', timezone); // any instant inside that zoned day
+  const live = await getLiveTimetables(collegeId, at, timezone);
+  const winnerIds = [...live.values()].map((t) => String(t._id));
+  const daySlots = winnerIds.length === 0
+    ? []
+    : await TimetableSlot.find({
+        collegeId, timetableId: { $in: winnerIds }, day: weekday, slotType: { $ne: 'free' },
+      }).lean<LeanSlot[]>();
+
+  const exceptions = await activeExceptionsFor(collegeId, { dates: [r.newDate] });
+  const vacated = new Set(exceptions.map((e) => String(e.timetableSlotId)));
+
+  type Occ = { occSlotId: string; roomId: string | null; start: string; end: string; code: string; offeringId: string };
+  const occs: Occ[] = [];
+  for (const s of daySlots) {
+    if (vacated.has(String(s._id))) continue;          // cancelled on newDate, or moved away
+    if (String(s._id) === String(slot._id)) continue;  // the moving slot's own occurrence (R28)
+    occs.push({ occSlotId: String(s._id), roomId: s.roomId ? String(s.roomId) : null, start: s.startTime, end: s.endTime, code: '', offeringId: String(s.courseOfferingId) });
+  }
+  for (const e of exceptions) {
+    // `dates` matches `date` OR `newDate` (R38), so this set also holds rows that moved
+    // AWAY to a different day — only a row landing on the analysed day is a move-in. R47.
+    if (e.type !== 'rescheduled' || e.newDate !== r.newDate || !e.newStartTime || !e.newEndTime) continue;
+    const occSlot = daySlots.find((s) => String(s._id) === String(e.timetableSlotId));
+    occs.push({
+      occSlotId: String(e.timetableSlotId),
+      roomId: e.newRoomId ? String(e.newRoomId) : occSlot?.roomId ? String(occSlot.roomId) : null,
+      start: e.newStartTime, end: e.newEndTime, code: '', offeringId: String(e.courseOfferingId),
+    });
+  }
+  const codes = await offeringCodes(collegeId, [...new Set(occs.map((o) => o.offeringId))]);
+  for (const occ of occs) occ.code = codes.get(occ.offeringId) ?? 'another class';
+
+  const conflicts: RescheduleConflict[] = [];
+
+  // 1. Same-section overlap: the moving slot's section's live slots. Move-ins from
+  //    other sections are room-wide, not section-wise.
+  const sectionId = await sectionOf(collegeId, slot);
+  const sectionWinner = sectionId ? live.get(sectionId) : undefined;
+  if (sectionWinner) {
+    const sectionSlotIds = new Set(
+      daySlots.filter((s) => String(s.timetableId) === String(sectionWinner._id)).map((s) => String(s._id)),
+    );
+    for (const occ of occs) {
+      if (!sectionSlotIds.has(occ.occSlotId)) continue;
+      if (overlaps(r.newStartTime, r.newEndTime, occ.start, occ.end)) {
+        conflicts.push({ kind: 'section_overlap', detail: `${occ.code} ${occ.start}–${occ.end} (same section)` });
+      }
+    }
+  }
+
+  // 2. Room occupancy across sections; no target room → nothing to check.
+  const roomId = r.newRoomId ?? (slot.roomId ? String(slot.roomId) : null);
+  if (roomId) {
+    const busy = await Room.findOne({ _id: roomId, collegeId }).select('roomNumber').lean<{ roomNumber: string } | null>();
+    const roomNumber = busy?.roomNumber ?? 'another room';
+    for (const occ of occs) {
+      if (occ.roomId === roomId && overlaps(r.newStartTime, r.newEndTime, occ.start, occ.end)) {
+        conflicts.push({ kind: 'room_occupied', detail: `Room ${roomNumber} is taken by ${occ.code} ${occ.start}–${occ.end}` });
+      }
+    }
+  }
+  return conflicts;
 }

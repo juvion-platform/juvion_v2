@@ -4,11 +4,12 @@ import { Timetable } from '../../../models/academic-ops/Timetable';
 import { TimetableSlot } from '../../../models/academic-ops/TimetableSlot';
 import { Course } from '../../../models/academic-ops/Course';
 import { CourseOffering } from '../../../models/academic-ops/CourseOffering';
+import { Room } from '../../../models/campus/Room';
 import { AuditLog } from '../../../shared/audit';
 import { OutboxEvent } from '../../../shared/outbox';
 import {
   createClassException, revokeClassException, listClassExceptions, activeExceptionsFor,
-  CLASS_EVENTS, classExceptionEventKey,
+  checkRescheduleConflicts, CLASS_EVENTS, classExceptionEventKey,
 } from '../class-exception-service';
 import { setupMongo, teardownMongo, clearCollections } from '../../../__tests__/helpers/mongoMemory';
 
@@ -187,5 +188,102 @@ describe('listClassExceptions / activeExceptionsFor', () => {
     // upcoming(2,9) is never today.
     expect(active.map((x) => String(x._id))).toEqual([String(b._id)]);
     expect(await activeExceptionsFor(CID, { offeringIds: [String(offering._id)] })).toHaveLength(1);
+  });
+});
+
+describe('reschedule conflicts (R2)', () => {
+  it('blocks a same-section time overlap; adjacent times pass (strict overlap)', async () => {
+    const { slot, offering } = await seedSlot();
+    const date = upcoming('monday');
+    await TimetableSlot.create({
+      collegeId: new Types.ObjectId(CID), timetableId: slot.timetableId, day: 'monday', period: 2,
+      startTime: '10:30', endTime: '11:30', courseOfferingId: offering._id,
+    });
+    await expect(createClassException(CID, {
+      timetableSlotId: String(slot._id), date, type: 'rescheduled',
+      newDate: date, newStartTime: '11:00', newEndTime: '12:00', reason: 'Room maintenance pending',
+    }, USER)).rejects.toThrow(/Reschedule conflicts/);
+    await expect(createClassException(CID, {
+      timetableSlotId: String(slot._id), date, type: 'rescheduled',
+      newDate: date, newStartTime: '11:30', newEndTime: '12:30', reason: 'Room maintenance pending',
+    }, USER)).resolves.toBeTruthy(); // 11:30 only touches the occupant's end — strict overlap says free
+  });
+
+  it('excludes the moving slot\'s own occurrence (R28)', async () => {
+    const { slot } = await seedSlot();
+    const date = upcoming('monday');
+    await expect(createClassException(CID, {
+      timetableSlotId: String(slot._id), date, type: 'rescheduled',
+      newDate: date, newStartTime: '13:00', newEndTime: '14:00', reason: 'Room maintenance pending',
+    }, USER)).resolves.toBeTruthy(); // only its own 09:00-10:00 would block, but it is excluded
+  });
+
+  it('a cancellation on the target date vacates that occurrence', async () => {
+    const { slot, offering } = await seedSlot();
+    const date = upcoming('monday');
+    const other = await TimetableSlot.create({
+      collegeId: new Types.ObjectId(CID), timetableId: slot.timetableId, day: 'monday', period: 2,
+      startTime: '10:30', endTime: '11:30', courseOfferingId: offering._id,
+    });
+    await createClassException(CID, {
+      timetableSlotId: String(other._id), date, type: 'cancelled', reason: 'Faculty attending a workshop',
+    }, USER);
+    await expect(createClassException(CID, {
+      timetableSlotId: String(slot._id), date, type: 'rescheduled',
+      newDate: date, newStartTime: '10:30', newEndTime: '11:30', reason: 'Room maintenance pending',
+    }, USER)).resolves.toBeTruthy(); // the vacated window is free
+  });
+
+  it('another section\'s slot in the target room blocks with a room detail (no section check)', async () => {
+    const { slot, offering } = await seedSlot();
+    const room = await Room.create({
+      collegeId: new Types.ObjectId(CID), buildingId: new Types.ObjectId(), roomNumber: 'B-201',
+      floor: 2, type: 'classroom', capacity: 60, status: 'available',
+    });
+    const otherTt = await Timetable.create({
+      collegeId: new Types.ObjectId(CID), semesterId: new Types.ObjectId(), sectionId: new Types.ObjectId(),
+      version: 1, status: 'published', effectiveFrom: new Date(),
+    });
+    await TimetableSlot.create({
+      collegeId: new Types.ObjectId(CID), timetableId: otherTt._id, day: 'monday', period: 1,
+      startTime: '09:00', endTime: '10:00', courseOfferingId: offering._id, roomId: room._id,
+    });
+    const date = upcoming('monday');
+    const conflicts = await checkRescheduleConflicts(CID, slot, {
+      date, newDate: date, newStartTime: '09:00', newEndTime: '10:00', newRoomId: String(room._id),
+    }, 'Asia/Kolkata');
+    expect(conflicts.map((c) => c.kind)).toEqual(['room_occupied']);
+    expect(conflicts[0]!.detail).toContain('B-201');
+    expect(conflicts[0]!.detail).toContain('CS301');
+  });
+
+  it('a move-in exception occupies its new room; a revoked one does not', async () => {
+    const { slot, offering } = await seedSlot();
+    const room = await Room.create({
+      collegeId: new Types.ObjectId(CID), buildingId: new Types.ObjectId(), roomNumber: 'B-202',
+      floor: 2, type: 'classroom', capacity: 60, status: 'available',
+    });
+    const otherTt = await Timetable.create({
+      collegeId: new Types.ObjectId(CID), semesterId: new Types.ObjectId(), sectionId: new Types.ObjectId(),
+      version: 1, status: 'published', effectiveFrom: new Date(),
+    });
+    const lateSlot = await TimetableSlot.create({
+      collegeId: new Types.ObjectId(CID), timetableId: otherTt._id, day: 'monday', period: 6,
+      startTime: '15:00', endTime: '16:00', courseOfferingId: offering._id, roomId: room._id,
+    });
+    const date = upcoming('monday');
+    const moveIn = await createClassException(CID, {
+      timetableSlotId: String(lateSlot._id), date, type: 'rescheduled',
+      newDate: date, newStartTime: '09:00', newEndTime: '10:00', newRoomId: String(room._id), reason: 'Room maintenance pending',
+    }, USER);
+    const conflicts = await checkRescheduleConflicts(CID, slot, {
+      date, newDate: date, newStartTime: '09:30', newEndTime: '10:30', newRoomId: String(room._id),
+    }, 'Asia/Kolkata');
+    expect(conflicts.map((c) => c.kind)).toEqual(['room_occupied']);
+    await revokeClassException(CID, String(moveIn._id), USER);
+    const after = await checkRescheduleConflicts(CID, slot, {
+      date, newDate: date, newStartTime: '09:30', newEndTime: '10:30', newRoomId: String(room._id),
+    }, 'Asia/Kolkata');
+    expect(after).toEqual([]);
   });
 });

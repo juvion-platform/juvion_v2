@@ -315,6 +315,8 @@ router.post('/sections/:id/lab-batches', authorize('academics', 'create'), valid
 
 // ═══ W02: Faculty Assignment & Timetable Conflict Detection ═════
 router.post('/offerings/:id/assign-faculty', authorize('academics', 'update'), validate(assignFacultySchema), ctrl.assignFacultyToOffering);
+// Superseded for class-change conflicts: class-exception-service.checkRescheduleConflicts is the real
+// section/room check that spec §5.1 means (R2); this route keeps its legacy draft-conflict behaviour.
 router.get('/timetables/:id/conflicts', authorize('academics', 'read'), ctrl.detectTimetableConflicts);
 
 // ═══ W02: Timetable Substitution & Elective Allocation ═════════
