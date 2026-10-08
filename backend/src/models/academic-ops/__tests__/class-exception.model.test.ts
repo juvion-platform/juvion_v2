@@ -18,7 +18,12 @@ function valid(overrides: Record<string, unknown> = {}): Record<string, unknown>
   };
 }
 
-beforeAll(async () => { await setupMongo(); });
+// The duplicate-key assertion below depends on the unique partial index
+// ({ timetableSlotId, date } where revokedAt is null). Mongoose builds indexes in the
+// background after connect, so on a loaded machine the build can still be in flight when
+// the second insert fires and the duplicate is accepted. syncIndexes() awaits it — the
+// same guard student-rollnumber-index and fee-structure-uniqueness already use (R51).
+beforeAll(async () => { await setupMongo(); await ClassException.syncIndexes(); });
 afterAll(async () => { await teardownMongo(); });
 afterEach(async () => { await clearCollections(); });
 
