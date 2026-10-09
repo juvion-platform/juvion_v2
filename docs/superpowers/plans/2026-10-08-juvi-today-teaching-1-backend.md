@@ -2600,7 +2600,7 @@ git commit -m "feat(juvi-app): next-class on the live timetable rule with except
 - Produces (used by Tasks 10, 13, 14):
   - `IJuviConfig.attendanceThreshold: number` — 50–95, default **75**
   - `IJuviConfig.showAttendanceHeadroom: boolean` — default **true** (D6)
-  - `IJuviConfig.paymentPortalUrl?: string` — `https://` URL or omitted (never null in views)
+  - `IJuviConfig.paymentPortalUrl?: string` — `https://` URL, or `null` when cleared (spec §4.2: "`https://` URL or null"); the field IS nullable in views, and Steps 3 and 4 below assert exactly that, so do not treat a null as "omitted" (R85)
 - `flatten()` in `settings-service.ts` needs no change: all three keys are leaves.
 
 - [ ] **Step 1: Extend the failing e2e tests**
@@ -2687,7 +2687,7 @@ In `backend/src/modules/juvi-app/admin/schemas.ts`, extend `settingsUpdateSchema
 - [ ] **Step 4: Run to verify pass**
 
 Run: `npm run test:e2e -w backend -- __e2e__/modules/juvi-app-admin-settings.e2e.test.ts __e2e__/modules/juvi-app-config.e2e.test.ts`
-Expected: PASS (7 existing + 4 new tests; the config e2e's settings flow is unaffected).
+Expected: PASS (8 existing + 4 new tests; the config e2e's settings flow is unaffected). The admin-settings e2e already holds 8 `it(` blocks, not 7 — if you count 11 passing you have lost one (R84).
 Run: `npm run typecheck -w backend`
 Expected: no errors.
 
@@ -3162,7 +3162,7 @@ Spec §5.4 makes `computeAttendanceSummary`, `updateAttendanceSummary` and the m
 
 **Files:**
 - Modify: `backend/src/models/academic-ops/AttendanceSummary.ts` (interface + schema `percentage`, `default: null`)
-- Modify: `backend/src/modules/academics/service.ts` (`categorizeAttendance` deletion; `updateAttendanceSummary` rewrite; private `courseOfferingIdOfSession` + exported `recomputeSummaries` helpers; six marking-write recompute hooks; four `.percentage` null-coalescing fallout sites)
+- Modify: `backend/src/modules/academics/service.ts` (`categorizeAttendance` deletion; `updateAttendanceSummary` rewrite; private `courseOfferingIdOfSession` + exported `recomputeSummaries` helpers; seven marking-write recompute hooks — six whole-function replacements in 3f plus `bulkUpsertAttendanceRecords`; four `.percentage` null-coalescing fallout sites)
 - Modify: `backend/src/modules/academics/academic-delivery-service.ts` (`computeAttendanceSummary` rewrite; `checkAttendanceThreshold` guards; `generateAttendanceAlerts` guard; `checkHallTicketEligibility` guard)
 - Modify: `backend/src/modules/academics/juvi-service.ts` (three `.percentage` fallout sites)
 - Modify: `backend/src/modules/finance/service.ts` (`computeDistressScore` attendance signal guard)
@@ -3682,7 +3682,7 @@ export async function recomputeSummaries(
 }
 ```
 
-**3f. Wire the six marking writes.** Replace each whole function (verbatim current bodies):
+**3f. Wire the seven marking writes.** Replace each whole function (verbatim current bodies):
 
 `createAttendanceSession`:
 
@@ -3812,7 +3812,9 @@ export async function deleteAttendanceRecord(collegeId: string, id: string, _per
   };
 ```
 
-**3g. Rewrite `computeAttendanceSummary`** in `backend/src/modules/academics/academic-delivery-service.ts` (replace the whole function; add the formula import at the top):
+**3g. Rewrite `computeAttendanceSummary`** in `backend/src/modules/academics/academic-delivery-service.ts` (replace the whole function; add the formula import at the top).
+
+**Two imports go dead when you do.** That file imports `AttendanceRecord` (line 4) and `AttendanceSession` (line 5); grep the whole file and their only uses are lines 350 and 341, both inside `computeAttendanceSummary` (lines 336–386) — the body you are replacing. The new body reads through `courseAttendanceFor`, so neither symbol survives, and `noUnusedLocals: true` turns both into TS6133, failing Step 5's `npm run typecheck -w backend`. **Delete both import lines as part of this step.** (`Enrollment` stays — eight uses elsewhere; `CourseOffering`, `AttendanceSummary` and `AttendanceAlert` all stay too.) R82.
 
 ```typescript
 old: import { AppError } from '../../middleware/errorHandler';
@@ -3906,7 +3908,7 @@ new:     if (summary && summary.percentage !== null && summary.percentage < 75) 
 | `academics/service.ts` | lowAttendance query (~L4997) | `percentage: { $lt: 65 },` → `percentage: { $gte: 0, $lt: 65 }, // §5.4: null (never held) must not read as low` |
 | `academics/juvi-service.ts` | avg (~L40) | `attendanceSummaries.reduce((sum, s) => sum + s.percentage, 0) / totalCourses` → `attendanceSummaries.reduce((sum, s) => sum + (s.percentage ?? 0), 0) / totalCourses` |
 | `academics/juvi-service.ts` | map (~L106) | `attendanceMap.set(String(summary.courseOfferingId), summary.percentage);` → `attendanceMap.set(String(summary.courseOfferingId), summary.percentage ?? 0);` |
-| `academics/juvi-service.ts` | recommendations (~L147–186) | hoist `const matchedPct = matchedSummary?.percentage ?? 0;` directly after the `matchedSummary = attendanceSummaries.find(...)` declaration; then `if (matchedSummary && matchedSummary.percentage < 75) {` → `if (matchedPct < 75) {`; `\`Your attendance is ${matchedSummary.percentage.toFixed(1)}%.\`` → `\`Your attendance is ${matchedPct.toFixed(1)}%.\``; `matchedSummary && matchedSummary.percentage >= 90` → `matchedPct >= 90` |
+| `academics/juvi-service.ts` | recommendations (~L147–186) | hoist `const matchedPct = matchedSummary?.percentage ?? 0;` directly after the `matchedSummary = attendanceSummaries.find(...)` declaration; then `if (matchedSummary && matchedSummary.percentage < 75) {` → `if (matchedSummary && matchedPct < 75) {` — **keep the `matchedSummary &&`**: `matchedPct` is `0` both when there is no summary row and when `percentage` is `null` (held = 0, R13), and `0 < 75` is true, so dropping the guard fires a high-priority "Improve Attendance — Your attendance is 0.0%" for a student who has simply never been marked: R13's "never alerted" case inverted, and nothing in this plan's tests catches it (R83); `\`Your attendance is ${matchedSummary.percentage.toFixed(1)}%.\`` → `\`Your attendance is ${matchedPct.toFixed(1)}%.\``; `matchedSummary && matchedSummary.percentage >= 90` → `matchedPct >= 90` (dropping the guard is safe *here* only because `0 >= 90` is false, so an absent or null summary still cannot fire) |
 | `finance/service.ts` | `computeDistressScore` (~L3665) | `const attendanceSignal = attendanceSummary\n    ? Math.max(0, Math.min(1, (75 - attendanceSummary.percentage) / 75))\n    : 0;` → `const attendanceSignal = attendanceSummary && attendanceSummary.percentage !== null\n    ? Math.max(0, Math.min(1, (75 - attendanceSummary.percentage) / 75))\n    : 0;` |
 
 Notes:
