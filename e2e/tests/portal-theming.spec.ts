@@ -6,9 +6,10 @@ import { test, expect } from './fixtures/auth-fixture';
  *
  * The assertion is "a well-formed triplet that is NOT the legacy default", not an
  * exact triplet. A non-default value is only reachable if the whole chain ran —
- * DB -> /auth/me -> store -> applyRamp — which is what makes this an acceptance test
+ * DB -> the login response's `colleges[]` projection (a superadmin) or /auth/me
+ * (everyone else) -> store -> applyRamp — which is what makes this an acceptance test
  * rather than a smoke test. The exact value is deliberately left unpinned so this
- * file does not duplicate the colour maths that Task 1's unit tests own, and does not
+ * file does not duplicate the colour maths the `brand-ramp` unit tests own, and does not
  * have to be edited in two places when the derivation changes on purpose.
  *
  * The college is a dedicated seed fixture (E2E_THEME_COLLEGE_ID) because
