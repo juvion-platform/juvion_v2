@@ -19,7 +19,7 @@ export default function CollegeSelector() {
     } catch { return 'Super Admin'; }
   })();
 
-  async function handleSelect(college: { _id: string; name: string; status?: string }) {
+  async function handleSelect(college: { _id: string; name: string; status?: string; accentColor?: string | null }) {
     // An inactive college was previously enterable with nothing but a small
     // grey badge as a hint — easy to miss, and the data inside is stale.
     if (college.status && college.status !== 'active') {
@@ -31,7 +31,7 @@ export default function CollegeSelector() {
       });
       if (!confirmed) return;
     }
-    selectCollege(college._id, college.name);
+    selectCollege(college._id, college.name, college.accentColor);
     navigate('/', { replace: true });
   }
 

@@ -7,6 +7,7 @@ import App from './App';
 import ErrorBoundary from './components/ErrorBoundary';
 import Toaster from './components/ui/Toaster';
 import ConfirmDialog from './components/ui/ConfirmDialog';
+import BrandTheme from './components/BrandTheme';
 import { toast } from './stores/toastStore';
 import { extractErrorMessage, defaultSuccessTitle } from './lib/errors';
 import './index.css';
@@ -71,6 +72,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
+          <BrandTheme />
           <App />
           <ConfirmDialog />
           <Toaster />

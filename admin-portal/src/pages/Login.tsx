@@ -41,12 +41,13 @@ export default function Login() {
     try {
       const { data } = await api.post('/auth/login', { email, password });
       if (data.isSuperAdmin) {
-        // Superadmin: store token + colleges, redirect to college selector
-        setAuth(data.user, data.token, undefined, data.colleges, data.permissions, data.sensitivity);
+        // Superadmin: store token + colleges, redirect to college selector.
+        // No single college yet, so no accent — selectCollege supplies it.
+        setAuth(data.user, data.token, undefined, data.colleges, data.permissions, data.sensitivity, null);
         navigate('/select-college', { replace: true });
       } else {
         // Regular admin: store token + collegeId, redirect to dashboard
-        setAuth(data.user, data.token, data.collegeId, undefined, data.permissions, data.sensitivity);
+        setAuth(data.user, data.token, data.collegeId, undefined, data.permissions, data.sensitivity, data.college?.accentColor ?? null);
         navigate('/', { replace: true });
       }
     } catch (err: any) {
