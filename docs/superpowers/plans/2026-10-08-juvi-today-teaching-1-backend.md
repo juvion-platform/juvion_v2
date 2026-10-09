@@ -8819,7 +8819,7 @@ Create `backend/tmp-seed-check.ts`:
  */
 import mongoose from 'mongoose';
 import 'dotenv/config';
-import { assert } from 'node:assert';
+import assert from 'node:assert'; // default import, NOT `{ assert }`: require('node:assert').assert is undefined in Node ≥16 (R114)
 
 import { AcademicCalendar, AttendanceRecord, AttendanceSession, ClassException, InternalAssessment, Invoice, PaymentPlan, Student, Timetable, TimetableSlot } from './src/models';
 import { resolveDay } from './src/modules/juvi-app/home/resolve-day';
