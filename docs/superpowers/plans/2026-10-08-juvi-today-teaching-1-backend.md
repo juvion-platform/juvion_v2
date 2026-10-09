@@ -4121,8 +4121,6 @@ async function seedTeachingWorld(): Promise<TeachingWorld> {
     collegeId, academicYearId: new Types.ObjectId(), number: 1, year: 2,
     startDate: new Date('2026-06-01T00:00:00Z'), endDate: new Date('2026-12-01T00:00:00Z'), status: 'active',
   });
-  // makeOffering/makeTimetable dereference the bare `semesterId`; bind it here, as the
-  // sibling seeds do (Task 11's seedWorld assigns `semesterId = semester._id as Types.ObjectId`).
   const semesterId = semester._id as Types.ObjectId;
   const section = await Section.create({
     collegeId, name: 'CSE-A', branchId: new Types.ObjectId(), batchId: new Types.ObjectId(),
@@ -4356,6 +4354,78 @@ describe('resolveDay', () => {
     expect(day.classes[0]!.movedFrom).toEqual({ date: '2026-11-13', start: '10:00' });
   });
 
+  it('shows a substitute a class moved into today for an offering she only covers (R102 face A)', async () => {
+    const w = await seedTeachingWorld();
+    // Dr. Rao owns the offering; Dr. Sub only substitutes on its slots.
+    const a = await w.makeOffering(w.facultyId as unknown as Types.ObjectId);
+    const tt = await w.makeTimetable(1, []);
+    // The Monday slot Dr. Sub covers — this is what puts the offering in her visible
+    // pool at all (she owns nothing).
+    await TimetableSlot.create({
+      collegeId, timetableId: tt, day: 'monday', period: 1,
+      startTime: '09:00', endTime: '10:00', courseOfferingId: a, slotType: 'lecture',
+      substituteFacultyId: new Types.ObjectId(w.altFacultyId),
+      originalFacultyId: new Types.ObjectId(w.facultyId), isSubstitution: true,
+    });
+    // …and a Friday slot of the same offering, also hers, rescheduled into Monday.
+    const fridaySlot = await TimetableSlot.create({
+      collegeId, timetableId: tt, day: 'friday', period: 6,
+      startTime: '14:00', endTime: '15:00', courseOfferingId: a, slotType: 'lecture',
+      substituteFacultyId: new Types.ObjectId(w.altFacultyId),
+      originalFacultyId: new Types.ObjectId(w.facultyId), isSubstitution: true,
+    });
+    await rescheduleException(a, fridaySlot._id, '2026-11-13', '2026-11-09', '13:00', '14:00');
+    const day = await resolveDay(collegeId.toString(), { kind: 'faculty', facultyId: w.altFacultyId }, '2026-11-09', 'Asia/Kolkata');
+    const moved = day.classes.find((c) => c.status === 'rescheduled');
+    // Before the fix the exception query was scoped to offerings she OWNS (none), so the
+    // Friday row was never fetched and the move-in was silently absent.
+    expect(moved).toBeDefined();
+    expect(moved).toMatchObject({
+      offeringId: String(a), start: '13:00', end: '14:00',
+      movedFrom: { date: '2026-11-13', start: '14:00' },
+    });
+  });
+
+  it('hides a class moved into today for a faculty member replaced out of it (R102 face B)', async () => {
+    const w = await seedTeachingWorld();
+    const a = await w.makeOffering(w.facultyId as unknown as Types.ObjectId);
+    // Dr. Rao's own Monday slot keeps the offering in his pool…
+    const tt = await w.makeTimetable(1, [
+      { day: 'monday', start: '09:00', end: '10:00', period: 1, offeringId: a },
+    ]);
+    // …and a Friday slot he was REPLACED OUT of (Dr. Sub covers it) moves into Monday.
+    const fridaySlot = await TimetableSlot.create({
+      collegeId, timetableId: tt, day: 'friday', period: 6,
+      startTime: '14:00', endTime: '15:00', courseOfferingId: a, slotType: 'lecture',
+      substituteFacultyId: new Types.ObjectId(w.altFacultyId),
+      originalFacultyId: new Types.ObjectId(w.facultyId), isSubstitution: true,
+    });
+    await rescheduleException(a, fridaySlot._id, '2026-11-13', '2026-11-09', '13:00', '14:00');
+    const day = await resolveDay(collegeId.toString(), { kind: 'faculty', facultyId: w.facultyId }, '2026-11-09', 'Asia/Kolkata');
+    // Before the fix the move-in loop re-inserted the origin without re-applying the
+    // replaced-out exclusion (and the origin read did not even project `originalFacultyId`),
+    // so the class came back the moment it was rescheduled into today.
+    expect(day.classes.map((c) => c.start)).toEqual(['09:00']);
+    expect(day.classes.some((c) => c.status === 'rescheduled')).toBe(false);
+  });
+
+  it('marks a class cancelled for a substitute on an offering she only covers (R102 face A)', async () => {
+    const w = await seedTeachingWorld();
+    const a = await w.makeOffering(w.facultyId as unknown as Types.ObjectId);
+    const tt = await w.makeTimetable(1, []);
+    const mondaySlot = await TimetableSlot.create({
+      collegeId, timetableId: tt, day: 'monday', period: 1,
+      startTime: '09:00', endTime: '10:00', courseOfferingId: a, slotType: 'lecture',
+      substituteFacultyId: new Types.ObjectId(w.altFacultyId),
+      originalFacultyId: new Types.ObjectId(w.facultyId), isSubstitution: true,
+    });
+    await cancelException(a, mondaySlot._id, '2026-11-09');
+    const day = await resolveDay(collegeId.toString(), { kind: 'faculty', facultyId: w.altFacultyId }, '2026-11-09', 'Asia/Kolkata');
+    expect(day.classes).toHaveLength(1);
+    // Before the fix the cancellation was invisible, so the class kept reading as scheduled.
+    expect(day.classes[0]!.status).toBe('cancelled');
+  });
+
   it('handles a student with no enrollments and an offering without a faculty person (Review Focus #5)', async () => {
     const w = await seedTeachingWorld();
     const a = await w.makeOffering(w.facultyId as unknown as Types.ObjectId, 0);
@@ -4378,7 +4448,7 @@ describe('resolveDay', () => {
     expect(facDay.classes[0]!.registered).toBe(0);
   });
 
-  it('returns no classes on a Sunday (R10)', async () => {
+  it('filters a stray wrong-semester enrollment off a weekday it meets on, and shows nothing on Sunday (R10)', async () => {
     const w = await seedTeachingWorld();
     const a = await w.makeOffering(w.facultyId as unknown as Types.ObjectId);
     await enrollIn(w.semesterId, w.studentId, a);
@@ -4386,11 +4456,20 @@ describe('resolveDay', () => {
     await w.makeTimetable(1, [
       { day: 'monday', start: '09:00', end: '10:00', period: 1, offeringId: a },
       { day: 'saturday', start: '09:00', end: '10:00', period: 1, offeringId: a },
-      { day: 'monday', start: '11:00', end: '12:00', period: 2, offeringId: stray },
+      { day: 'tuesday', start: '11:00', end: '12:00', period: 2, offeringId: stray },
     ]);
     // The stray zero-semester enrollment goes on a DIFFERENT offering: the Enrollment key
     // (collegeId, courseOfferingId, studentId) is unique, so a second row for `a` collides (E11000).
     await enroll(w.studentId, stray); // stray wrong-semester enrollment must not leak
+    // Tuesday matches ONLY the stray offering, so an empty day here can only be the
+    // active-semester filter biting — not the absence of slots. (Before this assertion the
+    // test resolved a Sunday, a day on which NO offering has a slot: it passed with the
+    // filter deleted, so it was not evidence of anything.)
+    const tuesday = await resolveDay(collegeId.toString(), { kind: 'student', studentId: w.studentId }, '2026-11-10', 'Asia/Kolkata');
+    expect(tuesday.classes).toHaveLength(0);
+    // …and the enrolled offering is still shown where it does meet, so the filter is not over-broad.
+    const monday = await resolveDay(collegeId.toString(), { kind: 'student', studentId: w.studentId }, '2026-11-09', 'Asia/Kolkata');
+    expect(monday.classes).toHaveLength(1);
     const sunday = await resolveDay(collegeId.toString(), { kind: 'student', studentId: w.studentId }, '2026-11-15', 'Asia/Kolkata');
     expect(sunday.classes).toHaveLength(0);
   });
@@ -4613,9 +4692,19 @@ export async function resolveDay(
       && String(s.originalFacultyId ?? '') !== viewer.facultyId);
   }
 
-  // Exceptions for the pool: rows dated today OR moved into today (R38).
-  const exceptions = poolOfferingIds.size > 0
-    ? await activeExceptionsFor(collegeId, { offeringIds: [...poolOfferingIds], dates: [date] })
+  // Exceptions for the pool: rows dated today OR moved into today (R38). The offering set
+  // is the pool's OWN offerings unioned with every offering MEETING today — the substitution
+  // matches :127-129 admitted to `slotPool`. Scoping to owned offerings alone hides a
+  // substitute's exceptions: a class moved into today for an offering they only cover
+  // vanished, and a cancellation on one kept reading as scheduled (R102 face A).
+  // `activeExceptionsFor` ANDs its clauses (class-exception-service.ts:329-332), so
+  // `slotIds` cannot widen this — the offering set is the only lever.
+  const exceptionOfferingIds = new Set([
+    ...poolOfferingIds,
+    ...slotPool.map((s) => String(s.courseOfferingId)),
+  ]);
+  const exceptions = exceptionOfferingIds.size > 0
+    ? await activeExceptionsFor(collegeId, { offeringIds: [...exceptionOfferingIds], dates: [date] })
     : [];
   const cancellations = new Map<string, boolean>();
   const rescheduledAway = new Set<string>();
@@ -4631,11 +4720,31 @@ export async function resolveDay(
   const missingOrigins = [...new Set(moveIns
     .map((row) => String(row.timetableSlotId))
     .filter((id) => !bySlotId.has(id)))];
+  // `originalFacultyId` is projected because the move-in loop re-judges the origin with the
+  // pool's own visibility predicate (R102 face B) — without it a replaced-out faculty member
+  // reads as their own replacement.
   const fetched = missingOrigins.length > 0
     ? await TimetableSlot.find({ collegeId, _id: { $in: missingOrigins.map(asObjectId) } })
-        .select('_id courseOfferingId startTime endTime roomId slotType substituteFacultyId').lean<LeanTimetableSlot[]>()
+        .select('_id courseOfferingId startTime endTime roomId slotType substituteFacultyId originalFacultyId')
+        .lean<LeanTimetableSlot[]>()
     : [];
   for (const s of fetched) bySlotId.set(String(s._id), s);
+
+  /**
+   * The pool's own filter (:110 for students, :127-129 for faculty), factored so a move-in's
+   * ORIGIN is judged the same way: the origin stands on another weekday, so nothing judged it
+   * before. Uniform whether the origin came from `slotPool` (a no-op — it already passed) or
+   * the `fetched` read. Without it a faculty member REPLACED OUT of the origin saw the class
+   * come back the moment it was rescheduled into today (R102 face B).
+   */
+  const canSeeSlot = (slot: LeanTimetableSlot): boolean => {
+    if (viewer.kind === 'faculty') {
+      return String(slot.originalFacultyId ?? '') !== viewer.facultyId
+        && (poolOfferingIds.has(String(slot.courseOfferingId))
+          || String(slot.substituteFacultyId ?? '') === viewer.facultyId);
+    }
+    return poolOfferingIds.has(String(slot.courseOfferingId));
+  };
 
   const effEntries: EffEntry[] = [];
   for (const slot of slotPool) {
@@ -4654,6 +4763,7 @@ export async function resolveDay(
   for (const row of moveIns) {
     const origin = bySlotId.get(String(row.timetableSlotId));
     if (!origin) continue; // origin slot no longer exists — nothing to move in
+    if (!canSeeSlot(origin)) continue; // replaced out of it, or a class they neither teach nor cover
     effEntries.push({
       offeringId: String(row.courseOfferingId),
       start: row.newStartTime ?? origin.startTime,
@@ -4692,7 +4802,7 @@ export async function resolveDay(
     : [];
   const personIds = [...new Set(faculties.map((f) => String(f.personId)))];
   const persons = personIds.length > 0
-    ? await Person.find({ _id: { $in: personIds.map(asObjectId) } }).select('name').lean<{ _id: Types.ObjectId; name: string }[]>()
+    ? await Person.find({ collegeId, _id: { $in: personIds.map(asObjectId) } }).select('name').lean<{ _id: Types.ObjectId; name: string }[]>()
     : [];
   const nameByFaculty = new Map<string, string>();
   const nameByPerson = new Map(persons.map((p) => [String(p._id), p.name]));
@@ -4714,7 +4824,10 @@ export async function resolveDay(
     : [];
   const buildingById = new Map(buildings.map((b) => [String(b._id), b.name]));
 
-  const channels = poolOfferingIds.size > 0
+  // Keyed on the offerings actually IN the day (`offeringIds`), not the owned pool: a
+  // substitute-only viewer owns nothing, so a `poolOfferingIds` guard stripped the channel
+  // link off every class they can see (R102's root cause).
+  const channels = offeringIds.length > 0
     ? await Channel.find({
         collegeId, scopeType: 'course_offering', scopeId: { $in: offeringIds.map(asObjectId) }, status: 'active',
       }).select('scopeId').lean<{ _id: Types.ObjectId; scopeId: Types.ObjectId }[]>()
@@ -6126,13 +6239,19 @@ export async function meAcademics(ctx: MobileContext): Promise<MeAcademicsRespon
   const duesBlock: StudentDues = {
     available: dues.available,
     totalOutstanding: dues.total,
-    invoices: dues.invoices.map((i: DuesInvoice) => ({
-      number: i.invoiceNumber,
-      type: i.type,
-      outstanding: i.outstanding,
-      nextDue: nextInvoiceDue(i),
-      overdue: i.overdue,
-    })),
+    invoices: dues.invoices.map((i: DuesInvoice) => {
+      // nextInvoiceDue returns { invoiceId, amount, date, overdue }. A call result gets no
+      // excess-property check, so forwarding it whole ships `invoiceId`/`overdue` beyond the
+      // declared `{ amount, date }` — and Task 17 registers that declared shape as the contract.
+      const n = nextInvoiceDue(i);
+      return {
+        number: i.invoiceNumber,
+        type: i.type,
+        outstanding: i.outstanding,
+        nextDue: { amount: n.amount, date: n.date },
+        overdue: i.overdue,
+      };
+    }),
   };
   if (dues.lastPayment) duesBlock.lastPayment = { amount: dues.lastPayment.amount, date: dues.lastPayment.date };
   if (cfg?.paymentPortalUrl) duesBlock.payUrl = cfg.paymentPortalUrl;
@@ -6381,7 +6500,7 @@ faculty-only. Mounted after notificationsRouter, before spacesRouter."
   - `activeExceptionsFor(collegeId, { dates?; slotIds?; offeringIds? }): Promise<LeanClassException[]>` from `'../../academics/class-exception-service'` (Task 4) — non-revoked rows, sorted date asc, `$or [{date $in}, {newDate $in}]` for a `dates` selector.
   - `duesFor(collegeId, studentId)`, `assessmentsFor(collegeId, studentId, from, to)`, `courseChannels(collegeId, offeringIds)`, `nextInvoiceDue(invoice: DuesInvoice): { invoiceId: string; amount: number; date: string; overdue: boolean }` from `./readers` (Task 13).
   - `ymd(at: Date, timezone)`, `addDays(date: string, n: number): string`, `instantOf(date: string, hhmm: string, timezone): Date` from `'../../academics/timetable-date'` (Task 2).
-  - `TimetableSlot` from `'../../../models/academic-ops/TimetableSlot'`, `CourseOffering` from `'../../../models/academic-ops/CourseOffering'`, `Course` from `'../../../models/academic-ops/Course'`, `Enrollment` from `'../../../models/academic-ops/Enrollment'`, `Room`/`Building` from `'../../../models/campus/…'`, `getJuviConfig` from `'../config/institution-config'`, `MobileContext` type from `'../middleware/authenticate-mobile'`, `MobileApiError` from `'../errors'`, types `AttentionItem`/`AttentionResponse` from `'../notices/schemas'`.
+  - `TimetableSlot` from `'../../../models/academic-ops/TimetableSlot'`, `CourseOffering` from `'../../../models/academic-ops/CourseOffering'`, `Course` from `'../../../models/academic-ops/Course'`, `Enrollment` from `'../../../models/academic-ops/Enrollment'`, `Room`/`Building` from `'../../../models/campus/…'`, `getJuviConfig` from `'../config/institution-config'`, `MobileContext` type from `'../middleware/authenticate-mobile'`, `MobileApiError` from `'../errors'` (consumed by the `notices/mobile-controller.ts` fence below — **not** by `home/attention.ts`, which throws nothing, and `noUnusedLocals` rejects a stray import there), types `AttentionItem`/`AttentionResponse` from `'../notices/schemas'`.
   - `loadDue(ctx)` + `toCard` stay internal to `notices/mobile-service.ts`; the new export reuses them (no duplication of the due-notice query).
 - Produces (Task 17's contract + the Flutter attention repository rely on these):
   - `attentionItems(ctx: MobileContext): Promise<AttentionItem[]>` — exported from `home/attention.ts`; the ERP items for `kinds=all`.
@@ -7132,7 +7251,7 @@ Run: `npm run test:e2e -w backend -- src/__e2e__/modules/juvi-attention.e2e.test
 Expected: PASS.
 
 Run: `npm test -w backend -- --run src/modules/juvi-app src/modules/notices`
-Expected: PASS — the widened schema compiles against the legacy `attention` function; readers, resolve-day, home-service suites stay green.
+Expected: PASS with exactly **one known failure**, which you must report and must NOT "fix": `src/modules/juvi-app/openapi/__tests__/document.test.ts` goes RED in this run. It byte-compares the generated document against the committed `mobile/api/openapi.json`, and the `Attention` component is generated from the `attentionResponseSchema` this task widens (`openapi/document.ts:93` registers it inside `buildOpenApiDocument()`). Regenerating that file belongs to Task 17, which also owns `document.ts`'s hand-maintained path/component lists and the Dart client. **Do not** run `npm run openapi:mobile -w backend`, do not hand-edit `mobile/api/openapi.json`, and never regenerate `mobile/packages/juvi_api` (CI byte-compares the committed Dart directory). Everything else stays green — in particular the widened schema compiling against the legacy `attention` function, plus readers, resolve-day and the home service.
 
 Run: `npm run typecheck -w backend`
 Expected: PASS with 0 errors.
