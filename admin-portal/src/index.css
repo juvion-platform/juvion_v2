@@ -2,6 +2,36 @@
 @tailwind components;
 @tailwind utilities;
 
+/**
+ * Brand ramp defaults — the palette the portal shipped with.
+ *
+ * `lib/apply-ramp.ts` overwrites these on the document element once a college's
+ * accent is known. They must never be removed: Tailwind emits
+ * `rgb(var(--c-primary-500) / 1)`, and if the property is undefined the whole
+ * declaration is dropped, leaving the element transparent rather than merely
+ * the wrong colour.
+ *
+ * Values are space-separated sRGB channel triplets, so Tailwind's alpha
+ * placeholder can compose them (`bg-primary-500/20`).
+ */
+:root {
+  --c-primary-50:  240 244 255;
+  --c-primary-100: 219 234 254;
+  --c-primary-200: 186 212 242;
+  --c-primary-300: 123 174 212;
+  --c-primary-400: 74 141 192;
+  --c-primary-500: 43 108 176;
+  --c-primary-600: 37 99 160;
+  --c-primary-700: 30 79 130;
+  --c-primary-800: 26 54 93;
+  --c-primary-900: 15 39 68;
+  --c-navy:        15 39 68;
+  --c-navy-dark:   26 54 93;
+  --c-navy-light:  45 74 111;
+  --c-chrome-soft: 94 234 212;
+  --c-chrome-wash: 56 178 172;
+}
+
 @layer base {
   body {
     @apply font-sans antialiased;

@@ -4,24 +4,37 @@ export default {
   theme: {
     extend: {
       colors: {
-        // ── Old Juvion brand palette ──────────────────
+        // ── Institution-themed ramps ──────────────────
+        //
+        // These resolve at runtime from CSS custom properties defined in
+        // src/index.css and overwritten by lib/apply-ramp.ts when a college has
+        // set an accent. The properties hold space-separated sRGB channel
+        // triplets ("43 108 176"), NOT hex — a plain `var()` cannot carry an
+        // alpha channel, so `bg-primary-500/20` would silently break, and the
+        // portal uses opacity modifiers ~900 times.
         navy: {
-          DEFAULT: '#0F2744',
-          dark: '#1A365D',
-          light: '#2D4A6F',
+          DEFAULT: 'rgb(var(--c-navy) / <alpha-value>)',
+          dark: 'rgb(var(--c-navy-dark) / <alpha-value>)',
+          light: 'rgb(var(--c-navy-light) / <alpha-value>)',
         },
         primary: {
-          50:  '#F0F4FF',
-          100: '#DBEAFE',
-          200: '#BAD4F2',
-          300: '#7BAED4',
-          400: '#4A8DC0',
-          500: '#2B6CB0',  // blue-brand from old Juvion
-          600: '#2563A0',
-          700: '#1E4F82',
-          800: '#1A365D',  // navy-dark
-          900: '#0F2744',  // navy
+          50:  'rgb(var(--c-primary-50) / <alpha-value>)',
+          100: 'rgb(var(--c-primary-100) / <alpha-value>)',
+          200: 'rgb(var(--c-primary-200) / <alpha-value>)',
+          300: 'rgb(var(--c-primary-300) / <alpha-value>)',
+          400: 'rgb(var(--c-primary-400) / <alpha-value>)',
+          500: 'rgb(var(--c-primary-500) / <alpha-value>)',
+          600: 'rgb(var(--c-primary-600) / <alpha-value>)',
+          700: 'rgb(var(--c-primary-700) / <alpha-value>)',
+          800: 'rgb(var(--c-primary-800) / <alpha-value>)',
+          900: 'rgb(var(--c-primary-900) / <alpha-value>)',
         },
+        // The sidebar's active state. Teal at rest; an accent tint when themed.
+        chrome: {
+          soft: 'rgb(var(--c-chrome-soft) / <alpha-value>)',
+          wash: 'rgb(var(--c-chrome-wash) / <alpha-value>)',
+        },
+        // ── Static semantic ramps — never themed ──────
         teal: {
           50:  '#F0FDFA',
           100: '#CCFBF1',
@@ -58,7 +71,7 @@ export default {
           800: '#9A3412',
           900: '#7C2D12',
         },
-        // ── App background ───────────────────────────
+        // ── App background (a neutral surface — not themed) ──
         'bg-app': '#F0F4F8',
       },
     },
