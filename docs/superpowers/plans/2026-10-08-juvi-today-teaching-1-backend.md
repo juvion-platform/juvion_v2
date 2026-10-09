@@ -5539,7 +5539,7 @@ Create `backend/src/modules/juvi-app/home/__tests__/home-service.test.ts`:
 ```typescript
 import { Types } from 'mongoose';
 
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   AttendanceRecord,
   AttendanceSession,
@@ -5573,6 +5573,16 @@ const DOW = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', '
 beforeAll(async () => { await setupMongo(); });
 afterAll(async () => { await teardownMongo(); });
 
+// Pin the clock. `homeToday` derives "today" from the wall clock in the college tz, and this fixture
+// must place its slots on the very weekday the service will resolve — so the fixture cannot side-step
+// the problem by choosing a different date. On the real clock it lands on a Sunday twice a week, and
+// `TimetableSlot.day`'s enum has no 'sunday' member (TimetableSlot.ts:14), so `seedHomeWorld`'s create
+// throws a Mongoose ValidationError instead of the test failing honestly. It seeds *today and tomorrow*,
+// so a Saturday run is fatal too. FIXED is a Tuesday. `toFake: ['Date']` only — faking the Mongo
+// driver's timers hangs the suite (the same note Task 15's file carries). R87.
+const FIXED = new Date('2026-11-10T04:00:00.000Z'); // 09:30 IST, Tuesday
+beforeEach(() => { vi.useFakeTimers({ now: FIXED, toFake: ['Date'], shouldAdvanceTime: true }); });
+
 interface World {
   studentId: string;
   facultyId: string;
@@ -5599,8 +5609,9 @@ function ctxOf(kind: 'student' | 'faculty' | 'staff', w?: World): MobileContext 
 }
 
 function collegeDates(): { todayDate: string; tomorrowDate: string } {
-  // The service derives dates from the college tz (Asia/Kolkata here); derive the
-  // same strings for slot placement so the test never depends on the wall clock.
+  // The service derives dates from the pinned clock in the college tz (Asia/Kolkata here); derive
+  // the same strings for slot placement, from the same pinned clock, so the two cannot disagree —
+  // and so the weekday they map to can never be a Sunday (R87).
   const inIst = new Date(Date.now() + 5.5 * 3_600_000);
   const todayDate = inIst.toISOString().slice(0, 10);
   const tomorrowDate = new Date(inIst.getTime() + 86_400_000).toISOString().slice(0, 10);
@@ -7774,7 +7785,7 @@ Create `backend/src/__e2e__/modules/juvi-class-change-push.e2e.test.ts`. It driv
 
 ```typescript
 import { Types } from 'mongoose';
-import { describe, expect, it, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, expect, it, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import type { Express } from 'express';
 import { getTestApp, cleanupTestApp } from '../setup/test-app';
 import { seedBase, BaseFixtures } from '../setup/seed-base';
@@ -7796,12 +7807,18 @@ let fx: BaseFixtures;
 const fake = new FakePushTransport();
 
 const oid = () => new Types.ObjectId();
-const istDate = (offsetDays = 0) => new Date(Date.now() + 5.5 * 3_600_000 + offsetDays * 86_400_000).toISOString().slice(0, 10);
+// Pin the clock. `seedPushWorld(1)` puts its slot on *tomorrow's* weekday, and `TimetableSlot.day`'s
+// enum has no 'sunday' member (TimetableSlot.ts:14) — on a Saturday run "tomorrow" is Sunday and the
+// create throws. The send legs also re-check start instants against `Date.now()`, so the service's
+// clock has to match the fixture's, not merely agree on the date. FIXED is a Tuesday.
+// `toFake: ['Date']` only, exactly as in this task's first file. R87.
+const FIXED = new Date('2026-11-10T04:00:00.000Z'); // 09:30 IST, Tuesday
+const istDate = (offsetDays = 0) => new Date(FIXED.getTime() + 5.5 * 3_600_000 + offsetDays * 86_400_000).toISOString().slice(0, 10);
 const DOW = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
 const dow = (date: string) => DOW[new Date(`${date}T00:00:00Z`).getUTCDay()];
 
 beforeAll(async () => { app = await getTestApp(); setPushTransport(fake); });
-beforeEach(async () => { await drainOutbox(); await cleanupTestApp(); fx = await seedBase(); await enableJuvi(fx.collegeId); fake.reset(); });
+beforeEach(async () => { vi.useFakeTimers({ now: FIXED, toFake: ['Date'], shouldAdvanceTime: true }); await drainOutbox(); await cleanupTestApp(); fx = await seedBase(); await enableJuvi(fx.collegeId); fake.reset(); });
 afterAll(async () => { await drainOutbox(); await cleanupTestApp(); setPushTransport(null); });
 
 interface PushWorld {
@@ -8351,6 +8368,13 @@ const collegeId = new mongoose.Types.ObjectId(CID);
 const SEED_TZ = 'Asia/Kolkata';
 
 const tomorrowDate = () => new Intl.DateTimeFormat('en-CA', { timeZone: SEED_TZ }).format(new Date(Date.now() + 86_400_000));
+// Sunday has no weekday slot to cancel (`TimetableSlot.day` has no 'sunday' member, R10), so the
+// seed skips the demo cancellation on a Saturday run. This checker has to skip it too, or
+// `check-seed` fails every Saturday with a message saying the row is missing — which it is, by
+// design. The holiday and resolveDay assertions below need no guard: the AcademicCalendar row is
+// created unconditionally, and a holiday covering tomorrow resolves `{ holiday, classes: [] }`
+// whether or not tomorrow is a Sunday. R87.
+const tomorrowIsSunday = () => new Date(`${tomorrowDate()}T00:00:00Z`).getUTCDay() === 0;
 
 async function main(): Promise<void> {
   await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/juvion_v2');
@@ -8376,8 +8400,10 @@ async function main(): Promise<void> {
   assert(slotCount >= 20, `check-seed: expected ≥20 timetable slots (Mon–Sat × 2 offerings + CSE-B + ECE), got ${slotCount}`);
   assert(closedSessions >= 40, `check-seed: expected ≥40 closed sessions in the last 8+ weeks, got ${closedSessions}`);
   assert(records >= 80, `check-seed: expected ≥80 attendance records, got ${records}`);
-  assert(exception?.type === 'cancelled', `check-seed: no cancelled ClassException dated ${tomorrowDate()}: ${String(exception)}`);
-  assert(exception.reason.includes('Demo'), 'check-seed: exception reason missing');
+  if (!tomorrowIsSunday()) {
+    assert(exception?.type === 'cancelled', `check-seed: no cancelled ClassException dated ${tomorrowDate()}: ${String(exception)}`);
+    assert(exception.reason.includes('Demo'), 'check-seed: exception reason missing');
+  }
   assert(holiday?.title === 'Demo College Holiday', `check-seed: no published holiday covering ${tomorrowDate()}: ${String(holiday)}`);
   assert(invoice, 'check-seed: open invoice JUVI-DEMO-001 missing');
   const first = plan?.installments[0];
@@ -8605,7 +8631,7 @@ Insert after the `demoFaculty` provisionPerson line and **before** `const juviSu
   }
 ```
 
-(The `dow` helper indexes the Sunday-first `DOW` array directly with `getUTCDay()` — Sunday is 0, matching the array's first element — so `dow(tomorrowDate)` names the weekday-key used by TimetableSlot. `persons[10]`/`persons[13]` are faculties[0]/faculties[3]'s persons, the offering faculty for courseOfferings[0]/[1].)
+(The `dow` helper indexes the Sunday-first `DOW` array directly with `getUTCDay()` — Sunday is 0, matching the array's first element — so `dow(tomorrowDate)` names the weekday-key used by `TimetableSlot` for every day **except Sunday, which has no `TimetableSlot.day` member at all** (`TimetableSlot.ts:14`, R10). That one day is precisely what the `if (adminUser && cancelledSlot)` guard above absorbs, and what `check-seed` now skips alongside it (R87) — the sentence is not a licence to drop either guard. `persons[10]`/`persons[13]` are faculties[0]/faculties[3]'s persons, the offering faculty for courseOfferings[0]/[1].)
 
 - [ ] **Step 5: Run the seed twice (idempotency proof)**
 
@@ -8653,7 +8679,7 @@ Create `backend/src/__e2e__/modules/juvi-erp-parity.e2e.test.ts`:
 
 ```typescript
 // ERP↔Juvi parity (§11): the ERP write surface and the Juvi read surface share one truth.
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import type { Express } from 'express';
 import { getTestApp, cleanupTestApp } from '../setup/test-app';
 import { seedBase, BaseFixtures } from '../setup/seed-base';
@@ -8672,11 +8698,16 @@ let app: Express; let api: TestApi; let fx: BaseFixtures;
 const A = '/api/academics';
 const V1 = '/api/juvi-app/v1';
 beforeAll(async () => { app = await getTestApp(); api = createTestApi(app); });
-beforeEach(async () => { await cleanupTestApp(); fx = await seedBase(); await enableJuvi(fx.collegeId); });
+// Pin the clock. `parityWorld()` puts its slot on tomorrow's weekday and `TimetableSlot.day`'s enum
+// has no 'sunday' member (TimetableSlot.ts:14), so a Saturday run creates a 'sunday' slot and throws;
+// the service under test resolves /v1/today from `Date.now()`, so fixture and service must share one
+// clock. FIXED is a Tuesday. `toFake: ['Date']` only. R87.
+const FIXED = new Date('2026-11-10T04:00:00.000Z'); // 09:30 IST, Tuesday
+beforeEach(async () => { vi.useFakeTimers({ now: FIXED, toFake: ['Date'], shouldAdvanceTime: true }); await cleanupTestApp(); fx = await seedBase(); await enableJuvi(fx.collegeId); });
 afterAll(async () => { await cleanupTestApp(); });
 
 const DOW = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
-const tomorrowDate = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(Date.now() + 86_400_000));
+const tomorrowDate = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(FIXED.getTime() + 86_400_000));
 const dow = (date: string) => DOW[new Date(`${date}T00:00:00Z`).getUTCDay()];
 
 /** One offering taught to fx.cseSection, one live timetable, and one slot dated tomorrow. */
