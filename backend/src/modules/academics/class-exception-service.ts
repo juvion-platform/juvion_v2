@@ -114,16 +114,27 @@ export async function createClassException(
     };
   }
 
-  const doc = await ClassException.create({
-    collegeId: new Types.ObjectId(collegeId),
-    timetableSlotId: slot._id,
-    courseOfferingId: slot.courseOfferingId,
-    date: input.date,
-    type: input.type,
-    ...patch,
-    reason: input.reason,
-    createdBy: new Types.ObjectId(performingUserId),
-  });
+  // The pre-check above can be raced by a concurrent post; the partial unique index
+  // ({timetableSlotId,date} where revokedAt:null) then rejects the loser with a MongoDB
+  // E11000, which errorHandler does not map. Surface it as the SAME 409 the pre-check throws.
+  let doc: IClassException;
+  try {
+    doc = await ClassException.create({
+      collegeId: new Types.ObjectId(collegeId),
+      timetableSlotId: slot._id,
+      courseOfferingId: slot.courseOfferingId,
+      date: input.date,
+      type: input.type,
+      ...patch,
+      reason: input.reason,
+      createdBy: new Types.ObjectId(performingUserId),
+    });
+  } catch (e) {
+    if (e && typeof e === 'object' && (e as { code?: unknown }).code === 11000) {
+      throw new AppError(409, 'This class already has an active exception for that date');
+    }
+    throw e;
+  }
 
   await createAuditLog({
     collegeId,

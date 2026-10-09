@@ -17,6 +17,7 @@ import { ExamSchedule } from '../../../../models/academic-ops/ExamSchedule';
 import { Invoice } from '../../../../models/finance/Invoice';
 import { Payment } from '../../../../models/finance/Payment';
 import { PaymentPlan } from '../../../../models/finance/PaymentPlan';
+import { PaymentTransaction } from '../../../../models/finance/PaymentTransaction';
 import { Channel } from '../../../../models/juvi/Channel';
 import { toPaise } from '../money';
 import { assessmentsFor, juviAttendance, duesFor } from '../readers';
@@ -300,6 +301,72 @@ describe('duesFor', () => {
     });
     const out = await duesFor(collegeId.toString(), w.studentId);
     expect(out.invoices[0]!.outstanding).toBe(900000); // 9000 ₹ in paise (R1)
+  });
+
+  it('counts a counter/online PaymentTransaction against the invoice too (both ERP ledgers, R1)', async () => {
+    const w = await seedWorld();
+    const inv = await Invoice.create({
+      collegeId, studentId: new Types.ObjectId(w.studentId), invoiceNumber: 'INV-80',
+      type: 'fee', totalAmount: 15000, dueDate: new Date('2027-07-01T00:00:00Z'), status: 'partially_paid',
+    });
+    // A counter payment writes a PaymentTransaction and sets the invoice to
+    // 'partially_paid' — still an OPEN status — and writes no Payment. Before the fix
+    // the reader summed only Payment and over-reported the full 15000 outstanding.
+    await PaymentTransaction.create({
+      collegeId, studentId: new Types.ObjectId(w.studentId), invoiceId: inv._id,
+      amount: 5000, channel: 'cash', paymentMode: 'cash', reconciliationStatus: 'received',
+      paymentDate: new Date('2026-11-01T00:00:00Z'),
+    });
+    const out = await duesFor(collegeId.toString(), w.studentId);
+    expect(out.invoiceCount).toBe(1);
+    expect(out.invoices[0]!.outstanding).toBe(1000000); // 15000 − 5000 = 10000 ₹ in paise (R1)
+    expect(out.total).toBe(1000000);
+  });
+
+  it('ignores reversed and refunded PaymentTransactions (the ERP predicate excludes them)', async () => {
+    const w = await seedWorld();
+    const inv = await Invoice.create({
+      collegeId, studentId: new Types.ObjectId(w.studentId), invoiceNumber: 'INV-81',
+      type: 'fee', totalAmount: 9000, dueDate: new Date('2027-07-01T00:00:00Z'), status: 'generated',
+    });
+    await PaymentTransaction.create({
+      collegeId, studentId: new Types.ObjectId(w.studentId), invoiceId: inv._id,
+      amount: 4000, channel: 'cash', paymentMode: 'cash', reconciliationStatus: 'reversed',
+      paymentDate: new Date('2026-11-01T00:00:00Z'),
+    });
+    await PaymentTransaction.create({
+      collegeId, studentId: new Types.ObjectId(w.studentId), invoiceId: inv._id,
+      amount: 3000, channel: 'neft', paymentMode: 'bank', reconciliationStatus: 'refunded',
+      paymentDate: new Date('2026-11-02T00:00:00Z'),
+    });
+    const out = await duesFor(collegeId.toString(), w.studentId);
+    expect(out.invoices[0]!.outstanding).toBe(900000); // neither reversed nor refunded reduces it
+  });
+
+  it('lastPayment is the newer of the Payment and PaymentTransaction ledgers', async () => {
+    const w = await seedWorld();
+    const inv = await Invoice.create({
+      collegeId, studentId: new Types.ObjectId(w.studentId), invoiceNumber: 'INV-82',
+      type: 'fee', totalAmount: 20000, dueDate: new Date('2027-07-01T00:00:00Z'), status: 'sent',
+    });
+    await Payment.create({
+      collegeId, studentId: new Types.ObjectId(w.studentId), invoiceId: inv._id,
+      receiptNumber: 'RCP-82', amount: 5000, paymentMode: 'upi', status: 'success',
+      paymentDate: new Date('2026-06-01T00:00:00Z'),
+    });
+    // The later row lives on the OTHER ledger — it must win.
+    await PaymentTransaction.create({
+      collegeId, studentId: new Types.ObjectId(w.studentId), invoiceId: inv._id,
+      amount: 7000, channel: 'cash', paymentMode: 'cash', reconciliationStatus: 'received',
+      transactionRef: 'TXN-82', paymentDate: new Date('2026-08-01T00:00:00Z'),
+    });
+    const out = await duesFor(collegeId.toString(), w.studentId);
+    expect(out.lastPayment).toMatchObject({
+      invoiceId: String(inv._id),
+      amount: 700000, // 7000 ₹ in paise (R1)
+      date: new Date('2026-08-01T00:00:00Z').toISOString(),
+      receiptNumber: 'TXN-82', // a PaymentTransaction's transactionRef stands in for the receipt
+    });
   });
 
   it('reports lastPayment even when the only invoice is closed (latest successful Payment for the student)', async () => {

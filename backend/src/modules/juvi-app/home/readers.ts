@@ -11,6 +11,7 @@ import { InternalAssessment } from '../../../models/academic-ops/InternalAssessm
 import { Invoice } from '../../../models/finance/Invoice';
 import { Payment } from '../../../models/finance/Payment';
 import { PaymentPlan } from '../../../models/finance/PaymentPlan';
+import { PaymentTransaction } from '../../../models/finance/PaymentTransaction';
 import { Channel } from '../../../models/juvi/Channel';
 import { getJuviConfig } from '../config/institution-config';
 import { toPaise } from './money';
@@ -129,6 +130,27 @@ interface RawPayment {
   paymentDate: Date;
 }
 
+// The counter / online / bank-import / gateway ledger. Unlike Payment it carries no
+// receiptNumber; `transactionRef` (the gateway/bank reference) is the closest stand-in.
+interface RawTxn {
+  _id: Types.ObjectId;
+  invoiceId: Types.ObjectId;
+  amount: number; // rupees (ERP)
+  transactionRef?: string;
+  paymentDate: Date;
+}
+
+/** The newer of the two ledgers' latest rows, normalised to the `lastPayment` shape. */
+function newestPayment(
+  a: RawPayment | null, b: RawTxn | null,
+): { invoiceId?: Types.ObjectId; amount: number; paymentDate: Date; receiptNumber: string } | null {
+  if (!a) return b ? { invoiceId: b.invoiceId, amount: b.amount, paymentDate: b.paymentDate, receiptNumber: b.transactionRef ?? '' } : null;
+  if (!b) return { invoiceId: a.invoiceId, amount: a.amount, paymentDate: a.paymentDate, receiptNumber: a.receiptNumber };
+  return b.paymentDate.getTime() > a.paymentDate.getTime()
+    ? { invoiceId: b.invoiceId, amount: b.amount, paymentDate: b.paymentDate, receiptNumber: b.transactionRef ?? '' }
+    : { invoiceId: a.invoiceId, amount: a.amount, paymentDate: a.paymentDate, receiptNumber: a.receiptNumber };
+}
+
 interface RawInstalment {
   dueDate: Date;
   amount: number; // rupees (ERP)
@@ -148,24 +170,42 @@ export async function duesFor(collegeId: string, studentId: string): Promise<Juv
   }).sort({ dueDate: 1 }).lean<RawInvoice[]>();
 
   const invoiceIds = invoices.map((i) => i._id);
-  const [payments, plans, lastSuccessful] = await Promise.all([
+  // Money against an invoice lives in TWO disjoint ERP ledgers, and both count:
+  //   • `Payment` — written ONLY by createPayment (finance/service.ts), the
+  //     POST /api/finance/payments path; its own paid-so-far sum is status:'success'.
+  //   • `PaymentTransaction` — written by the counter / online / bank-import /
+  //     gateway paths (fee-lifecycle-service.ts) and by no Payment; the ERP's own
+  //     "paid against this invoice" sum is reconciliationStatus ∉ {reversed,refunded}.
+  // createPayment writes no PaymentTransaction, so the sets are disjoint and
+  // summing both cannot double-count. Do not "simplify" this back to one ledger.
+  const [payments, transactions, plans, lastSuccessful, lastSuccessfulTxn] = await Promise.all([
     invoiceIds.length
       ? Payment.find({ collegeId, invoiceId: { $in: invoiceIds }, status: 'success' })
           .sort({ paymentDate: 1 }).lean<RawPayment[]>()
       : Promise.resolve([] as RawPayment[]),
     invoiceIds.length
+      ? PaymentTransaction.find({ collegeId, invoiceId: { $in: invoiceIds }, reconciliationStatus: { $nin: ['reversed', 'refunded'] } })
+          .sort({ paymentDate: 1 }).lean<RawTxn[]>()
+      : Promise.resolve([] as RawTxn[]),
+    invoiceIds.length
       ? PaymentPlan.find({ collegeId, studentId: new Types.ObjectId(studentId), invoiceId: { $in: invoiceIds } })
           .lean<{ invoiceId: Types.ObjectId | null; installments: RawInstalment[] }[]>()
       : Promise.resolve([] as { invoiceId: Types.ObjectId | null; installments: RawInstalment[] }[]),
-    // Spec §6: `lastPayment` is the student's latest successful Payment for the
+    // Spec §6: `lastPayment` is the student's latest successful payment for the
     // STUDENT — read independently of invoice status so a fully-paid (closed)
-    // invoice still surfaces. `payments` above stays scoped to open invoices
-    // because it only feeds per-invoice outstanding.
+    // invoice still surfaces. Drawn from BOTH ledgers (see newestPayment below).
+    // `payments` above stays scoped to open invoices because it only feeds
+    // per-invoice outstanding.
     Payment.findOne({
       collegeId,
       studentId: new Types.ObjectId(studentId),
       status: 'success',
     }).sort({ paymentDate: -1 }).limit(1).lean<RawPayment | null>(),
+    PaymentTransaction.findOne({
+      collegeId,
+      studentId: new Types.ObjectId(studentId),
+      reconciliationStatus: { $nin: ['reversed', 'refunded'] },
+    }).sort({ paymentDate: -1 }).limit(1).lean<RawTxn | null>(),
   ]);
 
   const paidByInvoice = new Map<string, number>();
@@ -173,6 +213,11 @@ export async function duesFor(collegeId: string, studentId: string): Promise<Juv
     const key = String(p.invoiceId);
     paidByInvoice.set(key, (paidByInvoice.get(key) ?? 0) + toPaise(p.amount));
   }
+  for (const t of transactions) {
+    const key = String(t.invoiceId);
+    paidByInvoice.set(key, (paidByInvoice.get(key) ?? 0) + toPaise(t.amount));
+  }
+  const latest = newestPayment(lastSuccessful, lastSuccessfulTxn);
   const instalmentsByInvoice = new Map<string, RawInstalment[]>();
   for (const plan of plans) if (plan.invoiceId) instalmentsByInvoice.set(String(plan.invoiceId), plan.installments ?? []);
 
@@ -229,12 +274,12 @@ export async function duesFor(collegeId: string, studentId: string): Promise<Juv
     total,
     invoices: duesInvoices,
     nextDue: winner,
-    lastPayment: lastSuccessful
+    lastPayment: latest
       ? {
-          invoiceId: lastSuccessful.invoiceId ? String(lastSuccessful.invoiceId) : '',
-          amount: toPaise(lastSuccessful.amount), // integer paise (R1)
-          date: lastSuccessful.paymentDate.toISOString(),
-          receiptNumber: lastSuccessful.receiptNumber,
+          invoiceId: latest.invoiceId ? String(latest.invoiceId) : '',
+          amount: toPaise(latest.amount), // integer paise (R1)
+          date: latest.paymentDate.toISOString(),
+          receiptNumber: latest.receiptNumber,
         }
       : null,
   };

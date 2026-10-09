@@ -60,6 +60,10 @@ export async function previewClassException(
 ) {
   try {
     const q = req.validatedQuery!;
+    // Preview leaks head-count and faculty names for ANY slot/date, so it runs the
+    // same per-actor check as the write paths (belt-and-braces atop the route's
+    // authorize('academics','read'), exactly like revoke). It 404s an unknown slot too.
+    await svc.assertClassChangePermissionForSlot(req.collegeId!, req.user!, q.slotId);
     res.json(await svc.previewClassException(req.collegeId!, q.slotId, q.date, new Date(), q.newDate));
   } catch (e) { next(e); }
 }

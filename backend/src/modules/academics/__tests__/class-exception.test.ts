@@ -1,12 +1,14 @@
-import { beforeAll, afterAll, afterEach, describe, expect, it } from 'vitest';
+import { beforeAll, afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import { Types } from 'mongoose';
 import { Timetable } from '../../../models/academic-ops/Timetable';
 import { TimetableSlot } from '../../../models/academic-ops/TimetableSlot';
+import { ClassException } from '../../../models/academic-ops/ClassException';
 import { Course } from '../../../models/academic-ops/Course';
 import { CourseOffering } from '../../../models/academic-ops/CourseOffering';
 import { Room } from '../../../models/campus/Room';
 import { AuditLog } from '../../../shared/audit';
 import { OutboxEvent } from '../../../shared/outbox';
+import { AppError } from '../../../middleware/errorHandler';
 import {
   createClassException, revokeClassException, listClassExceptions, activeExceptionsFor,
   checkRescheduleConflicts, CLASS_EVENTS, classExceptionEventKey,
@@ -121,6 +123,25 @@ describe('createClassException', () => {
     await expect(createClassException(CID, {
       timetableSlotId: new Types.ObjectId().toString(), date: upcoming('monday'), type: 'cancelled', reason: 'Faculty attending a workshop',
     }, USER)).rejects.toThrow(/not found/);
+  });
+
+  it('maps a duplicate-key race on create to the same 409 as the pre-check (E11000)', async () => {
+    const { slot } = await seedSlot();
+    const date = upcoming('monday');
+    await createClassException(CID, {
+      timetableSlotId: String(slot._id), date, type: 'cancelled', reason: 'Faculty attending a workshop',
+    }, USER);
+    // The partial unique index must exist in the memory server for the race to reproduce.
+    await ClassException.init();
+    // Simulate the race: the pre-check passes as though a concurrent create had not yet
+    // committed, so the insert hits the unique index and must map E11000 → 409 (not a bare 500).
+    const spy = vi.spyOn(ClassException, 'findOne').mockReturnValueOnce({ lean: () => Promise.resolve(null) } as never);
+    const err = await createClassException(CID, {
+      timetableSlotId: String(slot._id), date, type: 'cancelled', reason: 'Faculty attending a workshop',
+    }, USER).catch((e: unknown) => e);
+    spy.mockRestore();
+    expect(err).toBeInstanceOf(AppError);
+    expect(err).toMatchObject({ statusCode: 409, message: 'This class already has an active exception for that date' });
   });
 
   it('does not leak another college\'s course code into the audit name (falls back to the offering id)', async () => {
