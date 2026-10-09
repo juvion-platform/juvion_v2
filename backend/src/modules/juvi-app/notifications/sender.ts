@@ -11,12 +11,18 @@
  */
 import { Types } from 'mongoose';
 import { NotificationDelivery, LeanNotificationDelivery, DeliveryReason } from '../../../models/juvi/NotificationDelivery';
+import { ClassException, LeanClassException } from '../../../models/academic-ops/ClassException';
+import { TimetableSlot } from '../../../models/academic-ops/TimetableSlot';
+import { CourseOffering } from '../../../models/academic-ops/CourseOffering';
+import { Course } from '../../../models/academic-ops/Course';
+import { getJuviConfig } from '../config/institution-config';
+import { instantOf } from '../../academics/timetable-date';
 import { Notice, LeanNotice } from '../../../models/juvi/Notice';
 import { NoticeRecipient, LeanNoticeRecipient } from '../../../models/juvi/NoticeRecipient';
 import { MobileSession } from '../../../models/juvi/MobileSession';
 import { getPushTransport, PushTransport, PushResult, TOKEN_ERRORS } from './transport';
 import { signReceipt, RECEIPT_TTL_MS } from './receipts';
-import { buildNoticePush } from './payload';
+import { buildNoticePush, buildClassChangePush } from './payload';
 
 export const SEND_BATCH_MAX = 500;
 /** Account groups in flight at once within a pass; claims are atomic, so workers never share a row. */
@@ -86,6 +92,9 @@ const cancelReason = (notice: LeanNotice | undefined, row: LeanNoticeRecipient |
 };
 
 async function sendGroup(primary: Row, transport: PushTransport, now: Date, clock: Clock, stats: SenderStats): Promise<void> {
+  // A class-change row is never Routine, so it has no digest to gather — its own
+  // group function re-checks the exception instead of the notice.
+  if (primary.source.type === 'class_change') return sendClassChangeGroup(primary, transport, now, stats);
   const rows = primary.tier === 'routine' ? [primary, ...(await claimDigest(primary, now, clock))] : [primary];
   stats.claimed += rows.length - 1;
   const collegeId = primary.collegeId;
@@ -162,6 +171,89 @@ async function sendGroup(primary: Row, transport: PushTransport, now: Date, cloc
       stats.retried += 1;
     }
   }
+}
+
+/** R20: created+cancelled → cancelled, created+rescheduled → rescheduled, revoked → restored. */
+const variantOf = (kind: 'created' | 'revoked', type: 'cancelled' | 'rescheduled'): 'cancelled' | 'rescheduled' | 'restored' => (
+  kind === 'revoked' ? 'restored' : type === 'cancelled' ? 'cancelled' : 'rescheduled'
+);
+
+/**
+ * §8 send-time re-check before any device is touched: a created row whose
+ * exception was revoked since (or a revoked row whose exception is active
+ * again), or one whose slot or offering no longer resolves, is superseded; once
+ * the original start has passed the row is already_started. Then one message to
+ * the account's devices, dead-token pruning and back-off, exactly as sendGroup.
+ */
+async function sendClassChangeGroup(primary: Row, transport: PushTransport, now: Date, stats: SenderStats): Promise<void> {
+  const kind = primary.source.kind as 'created' | 'revoked';
+  const exception = await ClassException.findOne({ collegeId: primary.collegeId, _id: primary.source.id })
+    .select('type date newDate newStartTime courseOfferingId timetableSlotId revokedAt')
+    .lean<LeanClassException | null>();
+  if (!exception || (kind === 'created' && exception.revokedAt) || (kind === 'revoked' && !exception.revokedAt)) {
+    await settle([primary], { status: 'cancelled', reason: 'superseded' });
+    stats.cancelled += 1;
+    return;
+  }
+  const tz = (await getJuviConfig(String(primary.collegeId)))?.timezone ?? 'Asia/Kolkata';
+  const slot = await TimetableSlot.findOne({ collegeId: primary.collegeId, _id: exception.timetableSlotId })
+    .select('startTime').lean<{ _id: Types.ObjectId; startTime: string } | null>();
+  if (!slot || instantOf(exception.date, slot.startTime, tz).getTime() <= now.getTime()) {
+    await settle([primary], { status: 'cancelled', reason: !slot ? 'superseded' : 'already_started' });
+    stats.cancelled += 1;
+    return;
+  }
+  const offering = await CourseOffering.findOne({ collegeId: primary.collegeId, _id: exception.courseOfferingId })
+    .select('courseId').lean<{ _id: Types.ObjectId; courseId: Types.ObjectId } | null>();
+  if (!offering) {
+    await settle([primary], { status: 'cancelled', reason: 'superseded' });
+    stats.cancelled += 1;
+    return;
+  }
+  const course = await Course.findOne({ _id: offering.courseId, collegeId: primary.collegeId }).select('code').lean<{ _id: Types.ObjectId; code: string } | null>();
+  const sessions = await MobileSession.find({ collegeId: primary.collegeId, accountId: primary.accountId, revokedAt: null, refreshExpiresAt: { $gt: now }, pushToken: { $type: 'string' } })
+    .select('pushToken').lean();
+  const tokens = [...new Set(sessions.map((s) => s.pushToken!))];
+  if (tokens.length === 0) {
+    await settle([primary], { status: 'suppressed', reason: 'no_device' });
+    stats.noDevice += 1;
+    return;
+  }
+  const deliveryId = String(primary._id);
+  const message = buildClassChangePush({
+    deliveryId, receipt: signReceipt(deliveryId, new Date(now.getTime() + RECEIPT_TTL_MS)),
+    exceptionId: String(primary.source.id), tier: primary.tier, groupKey: primary.groupKey,
+    office: course?.code ?? '', variant: variantOf(kind, exception.type),
+    when: instantOf(exception.date, slot.startTime, tz).toISOString(),
+    ...(exception.newDate && exception.newStartTime ? { newWhen: instantOf(exception.newDate, exception.newStartTime, tz).toISOString() } : {}),
+  });
+  let results: PushResult[];
+  try {
+    results = await transport.send(tokens, message);
+  } catch {
+    results = tokens.map((token) => ({ token, ok: false, error: 'UNAVAILABLE' as const }));
+  }
+  const dead = results.filter((r) => !r.ok && r.error && TOKEN_ERRORS.has(r.error)).map((r) => r.token);
+  if (dead.length > 0) await MobileSession.updateMany({ collegeId: primary.collegeId, pushToken: { $in: dead } }, { $unset: { pushToken: 1 } });
+  if (results.some((r) => r.ok)) {
+    await settle([primary], { status: 'sent', sentAt: now, lastError: null });
+    stats.sent += 1;
+    return;
+  }
+  const transient = results.find((r) => !r.ok && !(r.error && TOKEN_ERRORS.has(r.error)));
+  if (!transient) {
+    await settle([primary], { status: 'suppressed', reason: 'no_device' });
+    stats.noDevice += 1;
+    return;
+  }
+  const attempts = primary.attempts + 1;
+  if (attempts >= MAX_SEND_ATTEMPTS) {
+    await settle([primary], { status: 'failed', attempts, lastError: transient.error ?? 'UNKNOWN' });
+    stats.failed += 1;
+    return;
+  }
+  await settle([primary], { attempts, lastError: transient.error ?? 'UNKNOWN', sendAfter: new Date(now.getTime() + sendBackoffMs(attempts)) });
+  stats.retried += 1;
 }
 
 /**

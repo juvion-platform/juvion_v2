@@ -14,6 +14,12 @@ import { NotificationDelivery, NotificationSourceKind, NotificationTier } from '
 import { emit, OutboxPayload } from '../../../shared/outbox';
 import { getJuviConfig } from '../config/institution-config';
 import { decide, digestSendAfter, PolicySettings } from './policy';
+import { ClassException, LeanClassException } from '../../../models/academic-ops/ClassException';
+import { TimetableSlot } from '../../../models/academic-ops/TimetableSlot';
+import { CourseOffering } from '../../../models/academic-ops/CourseOffering';
+import { Enrollment } from '../../../models/academic-ops/Enrollment';
+import { Channel } from '../../../models/juvi/Channel';
+import { ELIGIBLE_STATUSES } from '../../../models/juvi/JuviAccount'; // JuviAccount and IAccountSettings are already imported
 
 export const NOTIFICATION_REQUESTED = 'notification.requested';
 export const EXPAND_BATCH_SIZE = 1000;
@@ -34,7 +40,10 @@ export const notificationKey = {
 export const batchKeyOf = (notice: Pick<LeanNotice, 'publisher'>): string => `office:${notice.publisher.office}`;
 export const groupKeyOf = (noticeId: string): string => `notice:${noticeId}`;
 
-export interface NotificationSource { type: 'notice'; id: string; kind: NotificationSourceKind }
+export interface NoticeSource { type: 'notice'; id: string; kind: NotificationSourceKind }
+/** Today&Teaching §8: the tier travels in the request, so expansion does not recompute it. */
+export interface ClassChangeSource { type: 'class_change'; id: string; kind: 'created' | 'revoked'; tier: NotificationTier }
+export type NotificationSource = NoticeSource | ClassChangeSource;
 
 /** Records notification.requested for a notice; idempotent on its dedupe key. */
 export async function requestNoticeNotification(collegeId: string, noticeId: string, kind: NotificationSourceKind, accountId?: string): Promise<boolean> {
@@ -45,7 +54,7 @@ export async function requestNoticeNotification(collegeId: string, noticeId: str
   return emit(NOTIFICATION_REQUESTED, { collegeId, source, ...(accountId ? { accountId } : {}) }, dedupeKey);
 }
 
-function settingsOf(s: IAccountSettings | undefined): PolicySettings {
+export function settingsOf(s: IAccountSettings | undefined): PolicySettings {
   return {
     quietHours: { start: s?.quietHours?.start ?? '22:00', end: s?.quietHours?.end ?? '07:00' },
     tiers: { important: s?.tiers?.important ?? true, routine: s?.tiers?.routine ?? true },
@@ -58,7 +67,7 @@ function settingsOf(s: IAccountSettings | undefined): PolicySettings {
  * (notices/mobile-service.ts) reads for the channel screen — so this inverts it:
  * the person's memberships whose channel is in the notice's list (spec §6.2).
  */
-async function mutedEverywhere(collegeId: string, accountIds: Types.ObjectId[], channelIds: Types.ObjectId[]): Promise<Set<string>> {
+export async function mutedEverywhere(collegeId: string, accountIds: Types.ObjectId[], channelIds: Types.ObjectId[]): Promise<Set<string>> {
   if (channelIds.length === 0) return new Set();
   const memberships = await ChannelMembership.find({ collegeId, accountId: { $in: accountIds }, channelId: { $in: channelIds } })
     .select('accountId mutedAt').lean();
@@ -125,7 +134,9 @@ async function expandBatch(
 export async function expandNotification(payload: OutboxPayload, now: Date = new Date()): Promise<number> {
   const collegeId = payload.collegeId;
   const source = payload.source as NotificationSource | undefined;
-  if (source?.type !== 'notice' || !Types.ObjectId.isValid(source.id)) return 0;
+  if (!source || !Types.ObjectId.isValid(source.id)) return 0;
+  if (source.type === 'class_change') return expandClassChange(payload, now);
+  if (source.type !== 'notice') return 0;
   const notice = await Notice.findOne({ _id: source.id, collegeId }).select('status priority publisher channelIds').lean<LeanNotice>();
   if (!notice || notice.status !== 'published') return 0;
 
@@ -149,4 +160,81 @@ export async function expandNotification(payload: OutboxPayload, now: Date = new
     if (page.length < expandBatchSize) break;
   }
   return expanded;
+}
+
+/**
+ * The teaching seats of the slot other than the acting user: the offering's
+ * facultyId and coFacultyIds plus the slot's substitute and original faculty.
+ */
+function teachingFacultyOf(offering: { facultyId?: Types.ObjectId; coFacultyIds?: Types.ObjectId[] } | null, slot: { substituteFacultyId?: Types.ObjectId; originalFacultyId?: Types.ObjectId } | null): Types.ObjectId[] {
+  const ids = [offering?.facultyId, ...(offering?.coFacultyIds ?? []), slot?.substituteFacultyId, slot?.originalFacultyId]
+    .filter((v): v is Types.ObjectId => Boolean(v));
+  return [...new Set(ids.map(String))].map((v) => new Types.ObjectId(v));
+}
+
+/**
+ * notification.requested → one NotificationDelivery row per account for a class
+ * change (Today&Teaching §8). Audience: students enrolled in the offering plus
+ * the slot's other teaching faculty, minus the acting user, eligible Juvi accounts
+ * only. Mute matches the course channel; the tier carried by the request (urgent
+ * for a just-announced same-day change) bypasses it inside decide(). Class-change
+ * rows are never Routine, so no digest window applies.
+ */
+export async function expandClassChange(payload: OutboxPayload, now: Date = new Date()): Promise<number> {
+  const collegeId = payload.collegeId;
+  const source = payload.source as ClassChangeSource | undefined;
+  const tier: NotificationTier = source && 'tier' in source && source.tier === 'urgent' ? 'urgent' : 'important';
+  if (!source || source.type !== 'class_change' || !Types.ObjectId.isValid(source.id)) return 0;
+  const exception = await ClassException.findOne({ _id: source.id, collegeId })
+    .select('timetableSlotId courseOfferingId createdBy revokedBy')
+    .lean<LeanClassException | null>();
+  if (!exception) return 0;
+  const [slot, offering, channel, cfg] = await Promise.all([
+    TimetableSlot.findOne({ _id: exception.timetableSlotId, collegeId })
+      .select('substituteFacultyId originalFacultyId')
+      .lean<{ _id: Types.ObjectId; substituteFacultyId?: Types.ObjectId; originalFacultyId?: Types.ObjectId } | null>(),
+    CourseOffering.findOne({ _id: exception.courseOfferingId, collegeId })
+      .select('facultyId coFacultyIds')
+      .lean<{ _id: Types.ObjectId; facultyId?: Types.ObjectId; coFacultyIds?: Types.ObjectId[] } | null>(),
+    Channel.findOne({ collegeId, scopeType: 'course_offering', scopeId: exception.courseOfferingId, status: 'active' })
+      .select('_id').lean<{ _id: Types.ObjectId } | null>(),
+    getJuviConfig(collegeId),
+  ]);
+  if (!offering) return 0;
+  const timezone = cfg?.timezone ?? DEFAULT_TIMEZONE;
+  const actorUserId = source.kind === 'created' ? exception.createdBy : exception.revokedBy;
+  const [students, accounts] = await Promise.all([
+    Enrollment.find({ collegeId, courseOfferingId: exception.courseOfferingId, status: 'enrolled' })
+      .select('studentId').lean<{ studentId: Types.ObjectId }[]>(),
+    JuviAccount.find({ collegeId, status: { $in: ELIGIBLE_STATUSES } })
+      .select('userId studentId facultyId settings')
+      .lean<{ _id: Types.ObjectId; userId: Types.ObjectId; studentId?: Types.ObjectId; facultyId?: Types.ObjectId; settings?: IAccountSettings }[]>(),
+  ]);
+  const studentIds = new Set(students.map((s) => String(s.studentId)));
+  const facultyIds = new Set(teachingFacultyOf(offering, slot).map(String));
+  const audience = accounts
+    .filter((a) => (a.studentId && studentIds.has(String(a.studentId))) || (a.facultyId && facultyIds.has(String(a.facultyId))))
+    .filter((a) => String(a.userId) !== String(actorUserId));
+  if (audience.length === 0) return 0;
+  const muted = await mutedEverywhere(collegeId, audience.map((a) => a._id), channel ? [channel._id] : []);
+  const settingsBy = new Map(audience.map((a) => [String(a._id), settingsOf(a.settings)]));
+  const groupKey = `class:${String(exception.courseOfferingId)}`;
+  await NotificationDelivery.bulkWrite(audience.map((a) => {
+    const id = String(a._id);
+    const d = decide({ tier, settings: settingsBy.get(id) ?? settingsOf(undefined), mutedAllMatchingChannels: muted.has(id), now, collegeTimezone: timezone });
+    const common = { tier, batchKey: 'class', groupKey, sentAt: null, deliveredAt: null, openedAt: null, attempts: 0, lastError: null, lockedUntil: null, createdAt: now, updatedAt: now };
+    const row = d.status === 'suppressed'
+      ? { ...common, status: 'suppressed' as const, reason: d.reason, sendAfter: now }
+      : { ...common, status: 'scheduled' as const, reason: null, sendAfter: d.sendAfter };
+    return {
+      updateOne: {
+        // `collegeId`, `source` and `accountId` are written from the filter on insert. No automatic timestamps: a re-run must not touch updatedAt.
+        filter: { collegeId: new Types.ObjectId(collegeId), 'source.type': 'class_change', 'source.id': exception._id, 'source.kind': source.kind, accountId: a._id },
+        update: { $setOnInsert: row },
+        upsert: true,
+        timestamps: false,
+      },
+    };
+  }), { ordered: false });
+  return audience.length;
 }
