@@ -11,6 +11,7 @@ import { NotificationDelivery } from '../../models/juvi/NotificationDelivery';
 import { drainOutbox, emit } from '../../shared/outbox';
 import { CLASS_CHANGE_EVENT } from '../../modules/juvi-app/notifications/class-change';
 import { runSender } from '../../modules/juvi-app/notifications/sender';
+import { instantOf } from '../../modules/academics/timetable-date';
 import { FakePushTransport, setPushTransport } from '../../modules/juvi-app/notifications/transport';
 
 process.env.E2E_TESTING = '1';
@@ -169,6 +170,35 @@ describe('class_change push through the real pipeline (Today&Teaching §8)', () 
     });
     expect(message.data.when).toBeTypeOf('string');
     expect(message.data.newWhen).toBeUndefined();        // a cancellation has no new date
+    expect(JSON.stringify(fake.sent)).not.toContain('Venue flooded');
+    expect(await rowsFor(exceptionId)).toEqual(expect.arrayContaining([expect.objectContaining({ status: 'sent' })]));
+  });
+
+  it('a rescheduled send carries variant rescheduled and the newWhen instant, still never the reason (NFR-05)', async () => {
+    const w = await seedPushWorld(1, '10:00'); // original tomorrow 10:00 IST: a future start, so the re-check sends it
+    // The helper hardcodes the new* trio: newDate istDate(2) at 15:00. Both affected dates are in the §8 window
+    // (original tomorrow), and the original start is future, so R20 maps created+rescheduled → 'rescheduled'.
+    const exceptionId = await classChange(w, 'created', { type: 'rescheduled' });
+    await deviceFor(w.studentAccountIds[0]!, oid().toString(), 'tok-c3');
+    await deviceFor(w.studentAccountIds[1]!, oid().toString(), 'tok-c4');
+    await NotificationDelivery.updateMany({ collegeId: fx.collegeId, 'source.type': 'class_change' }, { $set: { sendAfter: new Date(Date.now() - 1_000) } });
+    await runSender(new Date(), fake);
+    expect(fake.sent).toHaveLength(2);
+    const { message } = fake.sent[0]!;
+    const row = (await rowsFor(exceptionId)).find((r) => message.data.deliveryId === String(r._id))!;
+    expect(message).toMatchObject({
+      data: {
+        deliveryId: String(row._id), kind: 'class_change', exceptionId, tier: 'important',
+        groupKey: `class:${w.offeringId}`, office: 'PJ201', variant: 'rescheduled',
+      },
+      priority: 'high', collapseKey: `class:${w.offeringId}`,
+    });
+    // The instants are derived by the same helper the sender uses. `enableJuvi` sets no timezone, so the
+    // college config falls back to the module default the suite already relies on.
+    const TZ = 'Asia/Kolkata';
+    expect(message.data.when).toBe(instantOf(w.exceptionDate, '10:00', TZ).toISOString());
+    expect(message.data.newWhen).toBe(instantOf(istDate(2), '15:00', TZ).toISOString());
+    expect(new Date(message.data.newWhen!).getTime()).toBeGreaterThan(new Date(message.data.when!).getTime());
     expect(JSON.stringify(fake.sent)).not.toContain('Venue flooded');
     expect(await rowsFor(exceptionId)).toEqual(expect.arrayContaining([expect.objectContaining({ status: 'sent' })]));
   });
