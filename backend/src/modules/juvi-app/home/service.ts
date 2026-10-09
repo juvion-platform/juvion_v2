@@ -147,7 +147,14 @@ async function facultyKindOf(collegeId: string, facultyId: string): Promise<'reg
 
 export async function meAcademics(ctx: MobileContext): Promise<MeAcademicsResponse> {
   const id = requireNotStaff(ctx);
-  if (ctx.kind === 'faculty') return { coursesTaught: await coursesTaughtOf(ctx.collegeId, id) };
+  if (ctx.kind === 'faculty') {
+    // `JuviAccount.facultyId` is neither required nor cross-validated against `kind`, so a
+    // faculty-kind account can arrive with no facultyId. Without this, `coursesTaughtOf`
+    // would receive '' and `new Types.ObjectId('')` would throw a BSONError → 500. Siblings
+    // (requireFaculty, the student branch below) already re-check their empty id.
+    if (!id) throw new MobileApiError(403, 'FORBIDDEN', 'Available to students and faculty only.');
+    return { coursesTaught: await coursesTaughtOf(ctx.collegeId, id) };
+  }
 
   const studentId = id;
   if (!studentId) throw new MobileApiError(403, 'FORBIDDEN', 'Available to students and faculty only.');

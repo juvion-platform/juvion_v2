@@ -228,9 +228,11 @@ describe('homeTeaching (§7.2)', () => {
     const out = await homeTeaching(ctxOf('faculty', w));
     expect(out.faculty).toEqual({ kind: 'regular' });
     expect(out.asOf).toBeTypeOf('string');
-    const first = out.nextTeachingDay ?? out.tomorrow;
-    expect(first.classes[0]!.registered).toBe(1);
-    expect(first.date === w.tomorrowDate || out.tomorrow.classes.length === 0).toBe(true);
+    // Read the field itself — no `?? out.tomorrow` fallback, which would make the day
+    // assertion trivially true and let a missing `nextTeachingDay` slip through.
+    expect(out.nextTeachingDay).toBeDefined();
+    expect(out.nextTeachingDay!.date).toBe(w.tomorrowDate);
+    expect(out.nextTeachingDay!.classes[0]!.registered).toBe(1);
   });
 
   it('kind adjunct wins over hod (precedence A4)', async () => {
@@ -298,5 +300,13 @@ describe('meAcademics (§7.3)', () => {
   it('staff is 403 FORBIDDEN (R24)', async () => {
     await seedHomeWorld(false);
     await expect(meAcademics(ctxOf('staff'))).rejects.toMatchObject({ statusCode: 403, code: 'FORBIDDEN' });
+  });
+
+  it('a faculty-kind account with no facultyId is 403, not a 500 from an empty ObjectId', async () => {
+    // An active semester must exist so `coursesTaughtOf` reaches `new Types.ObjectId('')`:
+    // with no active semester it returns [] and would 200, proving nothing. `ctxOf('faculty')`
+    // with no World omits facultyId (schema-legal — JuviAccount.facultyId is not required).
+    await seedHomeWorld(false);
+    await expect(meAcademics(ctxOf('faculty'))).rejects.toMatchObject({ statusCode: 403, code: 'FORBIDDEN' });
   });
 });
