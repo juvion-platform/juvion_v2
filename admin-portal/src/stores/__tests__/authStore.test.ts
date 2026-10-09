@@ -1,5 +1,10 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useAuthStore } from '../authStore';
+
+// `hydrate` lazily imports the axios instance; mocking it lets the failing-/auth/me
+// path be exercised without a network or the interceptor stack.
+const { apiGet } = vi.hoisted(() => ({ apiGet: vi.fn() }));
+vi.mock('../../services/api', () => ({ default: { get: apiGet } }));
 
 /** 010 — permission strings may be sub-domain qualified (`academics/exams:create`). */
 describe('authStore.hasPermission', () => {
@@ -88,6 +93,30 @@ describe('authStore college accent', () => {
     useAuthStore.getState().selectCollege('c1', 'College', '');
     expect(localStorage.getItem('collegeAccent')).toBeNull();
     expect(useAuthStore.getState().collegeAccent).toBeNull();
+  });
+});
+
+describe('authStore hydrate with a live token', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    apiGet.mockReset();
+    useAuthStore.setState({ token: null, collegeAccent: null, hydrated: false });
+  });
+
+  // Review Focus 5. A failed `/auth/me` (a network blip — the 401 case is the
+  // axios interceptor's) must leave the already-applied accent in place and mark
+  // only `hydrated`, rather than clearing the theme the first paint already used.
+  it('keeps the already-applied accent when /auth/me rejects', async () => {
+    apiGet.mockRejectedValueOnce(new Error('network blip'));
+    localStorage.setItem('token', 'tok-1');
+    localStorage.setItem('collegeAccent', '#7A1FA2');
+    useAuthStore.setState({ token: 'tok-1', collegeAccent: '#7A1FA2' });
+
+    await useAuthStore.getState().hydrate();
+
+    expect(useAuthStore.getState().collegeAccent).toBe('#7A1FA2');
+    expect(localStorage.getItem('collegeAccent')).toBe('#7A1FA2');
+    expect(useAuthStore.getState().hydrated).toBe(true);
   });
 });
 
