@@ -275,6 +275,78 @@ describe('resolveDay', () => {
     expect(day.classes[0]!.movedFrom).toEqual({ date: '2026-11-13', start: '10:00' });
   });
 
+  it('shows a substitute a class moved into today for an offering she only covers (R102 face A)', async () => {
+    const w = await seedTeachingWorld();
+    // Dr. Rao owns the offering; Dr. Sub only substitutes on its slots.
+    const a = await w.makeOffering(w.facultyId as unknown as Types.ObjectId);
+    const tt = await w.makeTimetable(1, []);
+    // The Monday slot Dr. Sub covers — this is what puts the offering in her visible
+    // pool at all (she owns nothing).
+    await TimetableSlot.create({
+      collegeId, timetableId: tt, day: 'monday', period: 1,
+      startTime: '09:00', endTime: '10:00', courseOfferingId: a, slotType: 'lecture',
+      substituteFacultyId: new Types.ObjectId(w.altFacultyId),
+      originalFacultyId: new Types.ObjectId(w.facultyId), isSubstitution: true,
+    });
+    // …and a Friday slot of the same offering, also hers, rescheduled into Monday.
+    const fridaySlot = await TimetableSlot.create({
+      collegeId, timetableId: tt, day: 'friday', period: 6,
+      startTime: '14:00', endTime: '15:00', courseOfferingId: a, slotType: 'lecture',
+      substituteFacultyId: new Types.ObjectId(w.altFacultyId),
+      originalFacultyId: new Types.ObjectId(w.facultyId), isSubstitution: true,
+    });
+    await rescheduleException(a, fridaySlot._id, '2026-11-13', '2026-11-09', '13:00', '14:00');
+    const day = await resolveDay(collegeId.toString(), { kind: 'faculty', facultyId: w.altFacultyId }, '2026-11-09', 'Asia/Kolkata');
+    const moved = day.classes.find((c) => c.status === 'rescheduled');
+    // Before the fix the exception query was scoped to offerings she OWNS (none), so the
+    // Friday row was never fetched and the move-in was silently absent.
+    expect(moved).toBeDefined();
+    expect(moved).toMatchObject({
+      offeringId: String(a), start: '13:00', end: '14:00',
+      movedFrom: { date: '2026-11-13', start: '14:00' },
+    });
+  });
+
+  it('hides a class moved into today for a faculty member replaced out of it (R102 face B)', async () => {
+    const w = await seedTeachingWorld();
+    const a = await w.makeOffering(w.facultyId as unknown as Types.ObjectId);
+    // Dr. Rao's own Monday slot keeps the offering in his pool…
+    const tt = await w.makeTimetable(1, [
+      { day: 'monday', start: '09:00', end: '10:00', period: 1, offeringId: a },
+    ]);
+    // …and a Friday slot he was REPLACED OUT of (Dr. Sub covers it) moves into Monday.
+    const fridaySlot = await TimetableSlot.create({
+      collegeId, timetableId: tt, day: 'friday', period: 6,
+      startTime: '14:00', endTime: '15:00', courseOfferingId: a, slotType: 'lecture',
+      substituteFacultyId: new Types.ObjectId(w.altFacultyId),
+      originalFacultyId: new Types.ObjectId(w.facultyId), isSubstitution: true,
+    });
+    await rescheduleException(a, fridaySlot._id, '2026-11-13', '2026-11-09', '13:00', '14:00');
+    const day = await resolveDay(collegeId.toString(), { kind: 'faculty', facultyId: w.facultyId }, '2026-11-09', 'Asia/Kolkata');
+    // Before the fix the move-in loop re-inserted the origin without re-applying the
+    // replaced-out exclusion (and the origin read did not even project `originalFacultyId`),
+    // so the class came back the moment it was rescheduled into today.
+    expect(day.classes.map((c) => c.start)).toEqual(['09:00']);
+    expect(day.classes.some((c) => c.status === 'rescheduled')).toBe(false);
+  });
+
+  it('marks a class cancelled for a substitute on an offering she only covers (R102 face A)', async () => {
+    const w = await seedTeachingWorld();
+    const a = await w.makeOffering(w.facultyId as unknown as Types.ObjectId);
+    const tt = await w.makeTimetable(1, []);
+    const mondaySlot = await TimetableSlot.create({
+      collegeId, timetableId: tt, day: 'monday', period: 1,
+      startTime: '09:00', endTime: '10:00', courseOfferingId: a, slotType: 'lecture',
+      substituteFacultyId: new Types.ObjectId(w.altFacultyId),
+      originalFacultyId: new Types.ObjectId(w.facultyId), isSubstitution: true,
+    });
+    await cancelException(a, mondaySlot._id, '2026-11-09');
+    const day = await resolveDay(collegeId.toString(), { kind: 'faculty', facultyId: w.altFacultyId }, '2026-11-09', 'Asia/Kolkata');
+    expect(day.classes).toHaveLength(1);
+    // Before the fix the cancellation was invisible, so the class kept reading as scheduled.
+    expect(day.classes[0]!.status).toBe('cancelled');
+  });
+
   it('handles a student with no enrollments and an offering without a faculty person (Review Focus #5)', async () => {
     const w = await seedTeachingWorld();
     const a = await w.makeOffering(w.facultyId as unknown as Types.ObjectId, 0);
@@ -297,7 +369,7 @@ describe('resolveDay', () => {
     expect(facDay.classes[0]!.registered).toBe(0);
   });
 
-  it('returns no classes on a Sunday (R10)', async () => {
+  it('filters a stray wrong-semester enrollment off a weekday it meets on, and shows nothing on Sunday (R10)', async () => {
     const w = await seedTeachingWorld();
     const a = await w.makeOffering(w.facultyId as unknown as Types.ObjectId);
     await enrollIn(w.semesterId, w.studentId, a);
@@ -305,11 +377,20 @@ describe('resolveDay', () => {
     await w.makeTimetable(1, [
       { day: 'monday', start: '09:00', end: '10:00', period: 1, offeringId: a },
       { day: 'saturday', start: '09:00', end: '10:00', period: 1, offeringId: a },
-      { day: 'monday', start: '11:00', end: '12:00', period: 2, offeringId: stray },
+      { day: 'tuesday', start: '11:00', end: '12:00', period: 2, offeringId: stray },
     ]);
     // The stray zero-semester enrollment goes on a DIFFERENT offering: the Enrollment key
     // (collegeId, courseOfferingId, studentId) is unique, so a second row for `a` collides (E11000).
     await enroll(w.studentId, stray); // stray wrong-semester enrollment must not leak
+    // Tuesday matches ONLY the stray offering, so an empty day here can only be the
+    // active-semester filter biting — not the absence of slots. (Before this assertion the
+    // test resolved a Sunday, a day on which NO offering has a slot: it passed with the
+    // filter deleted, so it was not evidence of anything.)
+    const tuesday = await resolveDay(collegeId.toString(), { kind: 'student', studentId: w.studentId }, '2026-11-10', 'Asia/Kolkata');
+    expect(tuesday.classes).toHaveLength(0);
+    // …and the enrolled offering is still shown where it does meet, so the filter is not over-broad.
+    const monday = await resolveDay(collegeId.toString(), { kind: 'student', studentId: w.studentId }, '2026-11-09', 'Asia/Kolkata');
+    expect(monday.classes).toHaveLength(1);
     const sunday = await resolveDay(collegeId.toString(), { kind: 'student', studentId: w.studentId }, '2026-11-15', 'Asia/Kolkata');
     expect(sunday.classes).toHaveLength(0);
   });

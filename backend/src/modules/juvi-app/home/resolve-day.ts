@@ -129,9 +129,19 @@ export async function resolveDay(
       && String(s.originalFacultyId ?? '') !== viewer.facultyId);
   }
 
-  // Exceptions for the pool: rows dated today OR moved into today (R38).
-  const exceptions = poolOfferingIds.size > 0
-    ? await activeExceptionsFor(collegeId, { offeringIds: [...poolOfferingIds], dates: [date] })
+  // Exceptions for the pool: rows dated today OR moved into today (R38). The offering set
+  // is the pool's OWN offerings unioned with every offering MEETING today — the substitution
+  // matches :127-129 admitted to `slotPool`. Scoping to owned offerings alone hides a
+  // substitute's exceptions: a class moved into today for an offering they only cover
+  // vanished, and a cancellation on one kept reading as scheduled (R102 face A).
+  // `activeExceptionsFor` ANDs its clauses (class-exception-service.ts:329-332), so
+  // `slotIds` cannot widen this — the offering set is the only lever.
+  const exceptionOfferingIds = new Set([
+    ...poolOfferingIds,
+    ...slotPool.map((s) => String(s.courseOfferingId)),
+  ]);
+  const exceptions = exceptionOfferingIds.size > 0
+    ? await activeExceptionsFor(collegeId, { offeringIds: [...exceptionOfferingIds], dates: [date] })
     : [];
   const cancellations = new Map<string, boolean>();
   const rescheduledAway = new Set<string>();
@@ -147,11 +157,31 @@ export async function resolveDay(
   const missingOrigins = [...new Set(moveIns
     .map((row) => String(row.timetableSlotId))
     .filter((id) => !bySlotId.has(id)))];
+  // `originalFacultyId` is projected because the move-in loop re-judges the origin with the
+  // pool's own visibility predicate (R102 face B) — without it a replaced-out faculty member
+  // reads as their own replacement.
   const fetched = missingOrigins.length > 0
     ? await TimetableSlot.find({ collegeId, _id: { $in: missingOrigins.map(asObjectId) } })
-        .select('_id courseOfferingId startTime endTime roomId slotType substituteFacultyId').lean<LeanTimetableSlot[]>()
+        .select('_id courseOfferingId startTime endTime roomId slotType substituteFacultyId originalFacultyId')
+        .lean<LeanTimetableSlot[]>()
     : [];
   for (const s of fetched) bySlotId.set(String(s._id), s);
+
+  /**
+   * The pool's own filter (:110 for students, :127-129 for faculty), factored so a move-in's
+   * ORIGIN is judged the same way: the origin stands on another weekday, so nothing judged it
+   * before. Uniform whether the origin came from `slotPool` (a no-op — it already passed) or
+   * the `fetched` read. Without it a faculty member REPLACED OUT of the origin saw the class
+   * come back the moment it was rescheduled into today (R102 face B).
+   */
+  const canSeeSlot = (slot: LeanTimetableSlot): boolean => {
+    if (viewer.kind === 'faculty') {
+      return String(slot.originalFacultyId ?? '') !== viewer.facultyId
+        && (poolOfferingIds.has(String(slot.courseOfferingId))
+          || String(slot.substituteFacultyId ?? '') === viewer.facultyId);
+    }
+    return poolOfferingIds.has(String(slot.courseOfferingId));
+  };
 
   const effEntries: EffEntry[] = [];
   for (const slot of slotPool) {
@@ -170,6 +200,7 @@ export async function resolveDay(
   for (const row of moveIns) {
     const origin = bySlotId.get(String(row.timetableSlotId));
     if (!origin) continue; // origin slot no longer exists — nothing to move in
+    if (!canSeeSlot(origin)) continue; // replaced out of it, or a class they neither teach nor cover
     effEntries.push({
       offeringId: String(row.courseOfferingId),
       start: row.newStartTime ?? origin.startTime,
@@ -208,7 +239,7 @@ export async function resolveDay(
     : [];
   const personIds = [...new Set(faculties.map((f) => String(f.personId)))];
   const persons = personIds.length > 0
-    ? await Person.find({ _id: { $in: personIds.map(asObjectId) } }).select('name').lean<{ _id: Types.ObjectId; name: string }[]>()
+    ? await Person.find({ collegeId, _id: { $in: personIds.map(asObjectId) } }).select('name').lean<{ _id: Types.ObjectId; name: string }[]>()
     : [];
   const nameByFaculty = new Map<string, string>();
   const nameByPerson = new Map(persons.map((p) => [String(p._id), p.name]));
@@ -230,7 +261,10 @@ export async function resolveDay(
     : [];
   const buildingById = new Map(buildings.map((b) => [String(b._id), b.name]));
 
-  const channels = poolOfferingIds.size > 0
+  // Keyed on the offerings actually IN the day (`offeringIds`), not the owned pool: a
+  // substitute-only viewer owns nothing, so a `poolOfferingIds` guard stripped the channel
+  // link off every class they can see (R102's root cause).
+  const channels = offeringIds.length > 0
     ? await Channel.find({
         collegeId, scopeType: 'course_offering', scopeId: { $in: offeringIds.map(asObjectId) }, status: 'active',
       }).select('scopeId').lean<{ _id: Types.ObjectId; scopeId: Types.ObjectId }[]>()
