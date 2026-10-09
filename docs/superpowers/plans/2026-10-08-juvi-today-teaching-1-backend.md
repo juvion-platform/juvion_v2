@@ -3565,6 +3565,46 @@ describe('attendance summary wiring', { timeout: 30_000 }, () => {
     expect(reasons.filter((r) => r.includes('Attendance below'))).toHaveLength(1);
     expect(reasons.join('; ')).toContain(b.offeringIds[1]!);
   });
+
+  // held counts SESSIONS (attendance-formula.ts), so a status flip or a delete
+  // changes it for every enrolled student — including those with no record.
+  it('closing an existing open session recomputes unmarked enrolled students (fix1)', async () => {
+    const b = await seedBase();
+    const ses = await AttendanceSession.create({
+      collegeId, courseOfferingId: new Types.ObjectId(b.offeringIds[0]!),
+      date: new Date('2026-07-01T00:00:00Z'), period: 1,
+      facultyId: new Types.ObjectId(b.facultyId), status: 'open',
+    });
+    // Student B is enrolled in offering a but has NO record for this session.
+    await updateAttendanceSession(collegeId.toString(), String(ses._id), { status: 'closed' }, 'user-1');
+    const s = await AttendanceSummary.findOne(summaryFilter(b.studentIds[1]!, b.offeringIds[0]!));
+    expect(s?.totalClasses).toBe(1);
+    expect(s?.percentage).toBe(0);
+  });
+
+  it('reopening a closed session lowers unmarked enrolled students back to null (fix1)', async () => {
+    const b = await seedBase();
+    const ses = await createAttendanceSession(collegeId.toString(), {
+      courseOfferingId: b.offeringIds[0], date: '2026-07-01', period: 1, facultyId: b.facultyId, status: 'closed',
+    }, 'user-1');
+    expect((await AttendanceSummary.findOne(summaryFilter(b.studentIds[1]!, b.offeringIds[0]!)))?.totalClasses).toBe(1);
+    await updateAttendanceSession(collegeId.toString(), String(ses._id), { status: 'open' }, 'user-1');
+    const s = await AttendanceSummary.findOne(summaryFilter(b.studentIds[1]!, b.offeringIds[0]!));
+    expect(s?.totalClasses).toBe(0);
+    expect(s?.percentage).toBeNull();
+  });
+
+  it('deleting the only closed session lowers unmarked enrolled students back to null (fix1)', async () => {
+    const b = await seedBase();
+    const sesId = await closedSession(b.offeringIds[0]!, b.facultyId, 1);
+    // Student B is enrolled in offering a and has no record for the session.
+    await updateAttendanceSummary(collegeId.toString(), b.studentIds[1]!, b.offeringIds[0]!);
+    expect((await AttendanceSummary.findOne(summaryFilter(b.studentIds[1]!, b.offeringIds[0]!)))?.percentage).toBe(0);
+    await deleteAttendanceSession(collegeId.toString(), String(sesId), 'user-1');
+    const s = await AttendanceSummary.findOne(summaryFilter(b.studentIds[1]!, b.offeringIds[0]!));
+    expect(s?.totalClasses).toBe(0);
+    expect(s?.percentage).toBeNull();
+  });
 });
 ```
 
@@ -3739,18 +3779,37 @@ export async function createAttendanceSession(collegeId: string, data: any, perf
 ```typescript
 export async function updateAttendanceSession(collegeId: string, id: string, data: any, _performedBy: string) {
   const before = await AttendanceSession.findOne({ _id: id, collegeId })
-    .select('courseOfferingId').lean<{ courseOfferingId?: unknown } | null>();
+    .select('courseOfferingId status').lean<{ courseOfferingId?: unknown; status?: string } | null>();
   const doc = await AttendanceSession.findOneAndUpdate({ _id: id, collegeId }, { $set: data }, { new: true });
   if (!doc) throw new AppError(404, 'Attendance session not found');
+
+  // held counts SESSIONS, not records (attendance-formula.ts), so a status flip
+  // (open↔closed) or an offering move changes held for EVERY enrolled student —
+  // not just the marked ones. Collect the offerings whose rosters must recompute.
+  const affectedOfferings = new Set<string>();
+  const offeringChanged = Boolean(before?.courseOfferingId)
+    && String(before!.courseOfferingId) !== String(doc.courseOfferingId);
+  if (String(doc.status) === 'closed' || before?.status === 'closed') {
+    affectedOfferings.add(String(doc.courseOfferingId));
+  }
+  if (offeringChanged) affectedOfferings.add(String(before!.courseOfferingId));
+
   const marked = await AttendanceRecord.find({ collegeId, sessionId: doc._id })
     .select('studentId').lean<{ studentId: Types.ObjectId }[]>();
-  const pairs = marked.flatMap((m) => {
+  const pairs: { studentId: string; courseOfferingId: string }[] = marked.flatMap((m) => {
     const list = [{ studentId: String(m.studentId), courseOfferingId: String(doc.courseOfferingId) }];
-    if (before?.courseOfferingId && String(before.courseOfferingId) !== String(doc.courseOfferingId)) {
-      list.push({ studentId: String(m.studentId), courseOfferingId: String(before.courseOfferingId) });
+    if (offeringChanged) {
+      list.push({ studentId: String(m.studentId), courseOfferingId: String(before!.courseOfferingId) });
     }
     return list;
   });
+  if (affectedOfferings.size > 0) {
+    const enrolled = await Enrollment.find({ collegeId, courseOfferingId: { $in: [...affectedOfferings] }, status: 'enrolled' })
+      .select('studentId courseOfferingId').lean<{ studentId: Types.ObjectId; courseOfferingId: Types.ObjectId }[]>();
+    for (const e of enrolled) {
+      pairs.push({ studentId: String(e.studentId), courseOfferingId: String(e.courseOfferingId) });
+    }
+  }
   await recomputeSummaries(collegeId, pairs);
   return doc;
 }
@@ -3765,7 +3824,19 @@ export async function deleteAttendanceSession(collegeId: string, id: string, _pe
   const marked = await AttendanceRecord.find({ collegeId, sessionId: id })
     .select('studentId').lean<{ studentId: Types.ObjectId }[]>();
   await AttendanceRecord.deleteMany({ sessionId: id, collegeId });
-  await recomputeSummaries(collegeId, marked.map((m) => ({ studentId: String(m.studentId), courseOfferingId: String(doc.courseOfferingId) })));
+  const pairs: { studentId: string; courseOfferingId: string }[] = marked.map((m) => ({
+    studentId: String(m.studentId), courseOfferingId: String(doc.courseOfferingId),
+  }));
+  // A deleted CLOSED session lowers held for every enrolled student, unmarked
+  // ones included. An open session never counted toward held — no roster needed.
+  if (String(doc.status) === 'closed') {
+    const enrolled = await Enrollment.find({ collegeId, courseOfferingId: doc.courseOfferingId, status: 'enrolled' })
+      .select('studentId').lean<{ studentId: Types.ObjectId }[]>();
+    for (const e of enrolled) {
+      pairs.push({ studentId: String(e.studentId), courseOfferingId: String(doc.courseOfferingId) });
+    }
+  }
+  await recomputeSummaries(collegeId, pairs);
   return { deleted: true };
 }
 ```
@@ -4471,13 +4542,16 @@ const asObjectId = (value: string): Types.ObjectId => new Types.ObjectId(value);
 async function holidayCovering(collegeId: string, date: string, timezone: string): Promise<string | undefined> {
   const dayStart = startOfDay(date, timezone);
   const dayEnd = startOfDay(addDays(date, 1), timezone);
-  const doc = await AcademicCalendar.find({
+  // findOne, not find: `find()` returns an array, and `.lean<T>()` then mangles the
+  // type into a single doc — so `doc?.title` would be `undefined` at runtime and this
+  // gate would never fire. Task 19's reader uses the same findOne shape.
+  const doc = await AcademicCalendar.findOne({
     collegeId,
     status: 'published',
     isHoliday: true,
     startDate: { $lte: dayEnd },
     endDate: { $gte: dayStart },
-  }).sort({ startDate: -1 }).limit(1).lean<{ title: string } | null>();
+  }).sort({ startDate: -1 }).lean<{ title: string } | null>();
   return doc?.title;
 }
 
@@ -4761,6 +4835,7 @@ import { AttendanceRecord } from '../../../../models/academic-ops/AttendanceReco
 import { AttendanceSession } from '../../../../models/academic-ops/AttendanceSession';
 import { Course } from '../../../../models/academic-ops/Course';
 import { CourseOffering } from '../../../../models/academic-ops/CourseOffering';
+import { Enrollment } from '../../../../models/academic-ops/Enrollment';
 import { Semester } from '../../../../models/academic-structure/Semester';
 import { Faculty } from '../../../../models/people/Faculty';
 import { Person } from '../../../../models/people/Person';
@@ -4824,6 +4899,14 @@ async function seedWorld(): Promise<World> {
   const offering = await CourseOffering.create({
     collegeId, courseId: course._id, semesterId: semester._id,
     sectionId: new Types.ObjectId(), facultyId: faculty._id, maxEnrollment: 60, enrolledCount: 1, status: 'active',
+  });
+  // Both readers in this file are enrollment-driven — juviAttendance through
+  // erpAttendanceFor's Enrollment lookup, and assessmentsFor through its own — so
+  // without this row every course list comes back empty. Task 11's sibling seedWorld
+  // already enrolls the student.
+  await Enrollment.create({
+    collegeId, studentId: student._id, courseOfferingId: offering._id,
+    semesterId: semester._id, status: 'enrolled', enrolledAt: new Date(),
   });
   return {
     studentId: String(student._id), facultyId: String(faculty._id),
