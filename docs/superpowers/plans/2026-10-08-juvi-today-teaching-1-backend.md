@@ -3267,6 +3267,7 @@ async function seedBase(withThreshold?: number): Promise<SeedBase> {
       contactEmail: 'a@juvion.test', contactPhone: '9000000000',
       juvi: { enabled: true, attendanceThreshold: withThreshold },
     });
+    // Reassigns the module-scope collegeId; clearCollections() clears Mongo but not Redis, and getJuviConfig caches for 60 s, so a later seedBase() can read a stale threshold. (R91)
     collegeId = college._id as Types.ObjectId;
   }
   const semester = await Semester.create({
