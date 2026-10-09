@@ -70,6 +70,19 @@ const L500_MAX = 0.58;
 const S500_MIN = 0.35;
 const S500_MAX = 0.75;
 /**
+ * Relative-luminance ceilings for steps 500-900, in step order.
+ *
+ * HSL lightness is not relative luminance: for a high-luminance hue — gold,
+ * yellow, olive, lime, mint — an `L` of 0.40 is still a bright colour, so the
+ * fixed `L_LADDER` steps 600-900 (and a 500 step clamped only in lightness) can
+ * leave `text-white` below WCAG AA. Each ceiling is the most luminous value the
+ * step may take. They decrease strictly, and each sits *above* the corresponding
+ * `LEGACY_RAMP` step's luminance, so a college whose accent is the legacy blue
+ * derives the legacy ramp rather than a darker one. Steps 50-400 are light tints
+ * and are not clamped.
+ */
+const LUM_CEILING = [0.170, 0.130, 0.080, 0.045, 0.024];
+/**
  * Saturation below which an accent is treated as achromatic.
  *
  * `rgbToHsl` reports hue 0 for a pure grey, and a grey's saturation sits far
@@ -131,37 +144,61 @@ function luminance(t: Triplet): number {
   return 0.2126 * chan(r!) + 0.7152 * chan(g!) + 0.0722 * chan(b!);
 }
 
-/** Dark ink used for text on light fills; matches Tailwind's `slate-900`. */
-const INK = '15 23 42';
+/**
+ * Lowers `l` until the emitted triplet's relative luminance is at or below
+ * `ceiling`, preserving hue and saturation so the step still reads as the accent.
+ *
+ * Luminance rises monotonically with HSL lightness and reaches 0 at `l = 0`, so
+ * the ceiling is always reachable; a binary search keeps the step as vivid as the
+ * ceiling allows. The comparison runs on the emitted 8-bit triplet, so the value
+ * written to CSS is the value that was checked.
+ */
+function capLuminance(h: number, s: number, l: number, ceiling: number): [number, number, number] {
+  if (luminance(triplet(hslToRgb(h, s, l))) <= ceiling) return hslToRgb(h, s, l);
+  let lo = 0;
+  let hi = l;
+  for (let i = 0; i < 32; i++) {
+    const mid = (lo + hi) / 2;
+    if (luminance(triplet(hslToRgb(h, s, mid))) <= ceiling) lo = mid;
+    else hi = mid;
+  }
+  return hslToRgb(h, s, lo);
+}
 
 /**
- * Picks whichever of white / dark ink contrasts better against `background`.
- * Comparing the two ratios beats a fixed luminance threshold, which lands badly
- * for mid-lightness accents.
+ * The 500 step's lightness *before* the relative-luminance clamp.
+ *
+ * The clamp band's guarantee — that the accent's own lightness never crosses
+ * `L_LADDER[6]` and so cannot invert the ramp — is a property of this pre-clamp
+ * value. The emitted 500 step is deliberately darker than this for bright
+ * accents, so the band is only witnessable through here.
  */
-export function readableOn(background: Triplet): '#FFFFFF' | '#0F172A' {
-  const l = luminance(background);
-  const onWhite = 1.05 / (l + 0.05);
-  const onInk = (l + 0.05) / (luminance(INK) + 0.05);
-  return onInk >= onWhite ? '#0F172A' : '#FFFFFF';
+export function preClamp500Lightness(accentHex: string | null | undefined): number | null {
+  if (!isValidAccentHex(accentHex)) return null;
+  const [, , l] = rgbToHsl(...hexToRgb(accentHex));
+  return clamp(l, L500_MIN, L500_MAX);
 }
 
 export function resolveRamp(accentHex: string | null | undefined): BrandRamp {
   if (!isValidAccentHex(accentHex)) return LEGACY_RAMP;
 
-  const [h, s, l] = rgbToHsl(...hexToRgb(accentHex));
+  const [h, s] = rgbToHsl(...hexToRgb(accentHex));
   // A neutral accent carries no hue worth preserving, so it keeps the grey it
   // arrived with instead of acquiring a saturated identity at hue 0.
   const achromatic = s < ACHROMATIC_S;
   const hueDeg = achromatic ? 0 : h;
   const s500 = achromatic ? 0 : clamp(s, S500_MIN, S500_MAX);
-  const l500 = clamp(l, L500_MIN, L500_MAX);
+  const l500 = preClamp500Lightness(accentHex)!;
 
   const primary = {} as Record<PrimaryStep, Triplet>;
   PRIMARY_STEPS.forEach((step, i) => {
     const stepL = i === 5 ? l500 : L_LADDER[i]!;
     const stepS = i === 5 ? s500 : clamp(s500 * S_SCALE[i]!, achromatic ? 0 : 0.02, 0.95);
-    primary[step] = triplet(hslToRgb(hueDeg, stepS, stepL));
+    // Steps 500-900 also take a relative-luminance ceiling — the clamp that
+    // keeps white label text legible for a bright accent. 50-400 are tints.
+    const ceiling = LUM_CEILING[i - 5];
+    const rgb = hslToRgb(hueDeg, stepS, stepL);
+    primary[step] = triplet(ceiling === undefined ? rgb : capLuminance(hueDeg, stepS, stepL, ceiling));
   });
 
   const navyS = Math.min(s500, NAVY_S_MAX);

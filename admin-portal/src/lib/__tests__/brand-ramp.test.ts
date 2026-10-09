@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   LEGACY_RAMP,
   isValidAccentHex,
-  readableOn,
+  preClamp500Lightness,
   resolveRamp,
   type Triplet,
 } from '../brand-ramp';
@@ -24,6 +24,35 @@ function hue(t: Triplet): number {
   const h = max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
   return h * 60;
 }
+
+/**
+ * Accents the ramp guards sweep. Deliberately broad: the bright half of the hue
+ * wheel is where an HSL-lightness-only clamp stops guaranteeing a legible fill,
+ * and the near-black, near-white and achromatic ends exercise the luminance
+ * ceiling's limits.
+ */
+const ACCENTS = [
+  '#0B5FA5', '#7A1FA2', '#FFEE00', '#FFCC00', '#00B894', '#BDB76B', '#C8B560',
+  '#88DD88', '#000080', '#808080', '#7F8080', '#000000', '#020201', '#101008',
+  '#F5F5F5', '#FFFFFF',
+] as const;
+
+// WCAG 2.1 relative luminance and contrast ratio, shared by the guards below.
+const linear = (c: number) => (c / 255 <= 0.03928 ? c / 255 / 12.92 : Math.pow((c / 255 + 0.055) / 1.055, 2.4));
+const luminance = (t: Triplet) => {
+  const [r, g, b] = t.split(' ').map(Number);
+  return 0.2126 * linear(r!) + 0.7152 * linear(g!) + 0.0722 * linear(b!);
+};
+const contrast = (a: Triplet, b: Triplet) => {
+  const [hi, lo] = luminance(a) > luminance(b) ? [luminance(a), luminance(b)] : [luminance(b), luminance(a)];
+  return (hi + 0.05) / (lo + 0.05);
+};
+// CSS alpha compositing, in sRGB, as the browser blends `bg-chrome-wash/20` and `/15`.
+const over = (fg: Triplet, alpha: number, bg: Triplet) => {
+  const f = fg.split(' ').map(Number);
+  const b = bg.split(' ').map(Number);
+  return f.map((v, i) => Math.round(alpha * v! + (1 - alpha) * b![i]!)).join(' ');
+};
 
 describe('LEGACY_RAMP', () => {
   // Success criterion 1. These are frozen from tailwind.config.js as it stood
@@ -101,17 +130,21 @@ describe('resolveRamp', () => {
   });
 
   it('emits every value as a valid R G B triplet', () => {
-    const ramp = resolveRamp('#7A1FA2');
-    const all = [...STEPS.map((s) => ramp.primary[s]), ...Object.values(ramp.navy), ...Object.values(ramp.chrome)];
-    for (const t of all) expect(t).toMatch(/^\d{1,3} \d{1,3} \d{1,3}$/);
+    for (const accent of ACCENTS) {
+      const ramp = resolveRamp(accent);
+      const all = [...STEPS.map((s) => ramp.primary[s]), ...Object.values(ramp.navy), ...Object.values(ramp.chrome)];
+      for (const t of all) expect(t, `${accent} emitted ${t}`).toMatch(/^\d{1,3} \d{1,3} \d{1,3}$/);
+    }
   });
 
-  // Review Focus 1 + 2. The bounds carry ~0.01 of slack: the assertion measures
-  // the emitted 8-bit triplet, which rounds off the exact L500 value (#FFEE00
-  // lands on 0.5, #FFFFFF on 0.578 against a 0.58 cap).
-  it('keeps the 500 step legible for extreme accents', () => {
+  // Review Focus 1 + 2, retargeted after the luminance clamp. The band is a
+  // property of the *pre-clamp* 500 lightness — the value that must stay inside
+  // `(L_LADDER[6], L_LADDER[4])` — while the emitted step is deliberately darker
+  // for bright accents, so the emitted triplet can no longer witness the band.
+  // Asserted through `preClamp500Lightness`, with the bounds unchanged.
+  it('keeps the pre-clamp 500 step lightness inside its band for extreme accents', () => {
     for (const accent of ['#FFEE00', '#000080', '#FFFFFF', '#000000', '#808080']) {
-      const l = lightness(resolveRamp(accent).primary['500']);
+      const l = preClamp500Lightness(accent)!;
       expect(l).toBeGreaterThanOrEqual(0.43);
       expect(l).toBeLessThanOrEqual(0.59);
     }
@@ -136,29 +169,35 @@ describe('resolveRamp', () => {
   // sweeps the ones that converge the 300/500 pair hardest. Both alphas matter: top-level
   // items use `/20` and submenu items `/15`, and for some accents `/15` is the binding one.
   it('keeps the themed sidebar label above AA contrast for any accent', () => {
-    // WCAG 2.1 relative luminance and contrast ratio.
-    const lin = (c: number) => (c / 255 <= 0.03928 ? c / 255 / 12.92 : Math.pow((c / 255 + 0.055) / 1.055, 2.4));
-    const lum = (t: string) => {
-      const [r, g, b] = t.split(' ').map(Number);
-      return 0.2126 * lin(r!) + 0.7152 * lin(g!) + 0.0722 * lin(b!);
-    };
-    const contrast = (a: string, b: string) => {
-      const [hi, lo] = lum(a) > lum(b) ? [lum(a), lum(b)] : [lum(b), lum(a)];
-      return (hi + 0.05) / (lo + 0.05);
-    };
-    // CSS alpha compositing, in sRGB, as the browser blends `bg-chrome-wash/20` and `/15`.
-    const over = (fg: string, alpha: number, bg: string) => {
-      const f = fg.split(' ').map(Number);
-      const b = bg.split(' ').map(Number);
-      return f.map((v, i) => Math.round(alpha * v! + (1 - alpha) * b![i]!)).join(' ');
-    };
-
-    for (const accent of ['#BDB76B', '#C8B560', '#FFCC00', '#88DD88', '#7A1FA2', '#0B5FA5', '#000080']) {
+    for (const accent of ACCENTS) {
       const ramp = resolveRamp(accent);
       for (const alpha of [0.15, 0.2]) {
         const bg = over(ramp.chrome.wash, alpha, ramp.navy.dark);
         expect(contrast(ramp.chrome.soft, bg), `${accent} at /${Math.round(alpha * 100)} dropped below AA`)
           .toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
+
+  // Review Focus 1. The portal hardcodes `text-white` on every accent fill, and uses the
+  // 500/600/700 steps as foreground text on white. An operator may type any accent, so the
+  // ramp itself must guarantee both directions clear AA.
+  it('keeps accent fills legible for white text and as text on white, for any accent', () => {
+    for (const accent of ACCENTS) {
+      const ramp = resolveRamp(accent);
+      for (const step of ['500', '600', '700'] as const) {
+        expect(contrast(ramp.primary[step], '255 255 255'), `${accent} step ${step}`)
+          .toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
+
+  it('keeps the ramp monotonic in relative luminance from 500 to 900', () => {
+    for (const accent of ACCENTS) {
+      const ramp = resolveRamp(accent);
+      const lums = (['500', '600', '700', '800', '900'] as const).map((s) => luminance(ramp.primary[s]));
+      for (let i = 1; i < lums.length; i++) {
+        expect(lums[i]!, `${accent} step ${500 + i * 100}`).toBeLessThan(lums[i - 1]!);
       }
     }
   });
@@ -175,20 +214,5 @@ describe('resolveRamp', () => {
         expect(Math.max(r!, g!, b!) - Math.min(r!, g!, b!), `${accent} emitted a tinted ${t}`).toBe(0);
       }
     }
-  });
-});
-
-describe('readableOn', () => {
-  it('picks dark text on a light fill and white on a dark one', () => {
-    expect(readableOn('240 244 255')).toBe('#0F172A');
-    expect(readableOn('15 39 68')).toBe('#FFFFFF');
-  });
-
-  // The extremes above are satisfied by any monotone rule, including a fixed
-  // luminance cut. This grey has lightness 0.502 but relative luminance 0.216,
-  // so a 0.5 cut would give it white text — which is the bug the ratio
-  // comparison exists to prevent.
-  it('takes dark ink on a mid-lightness fill', () => {
-    expect(readableOn('128 128 128')).toBe('#0F172A');
   });
 });
