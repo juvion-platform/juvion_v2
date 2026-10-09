@@ -77,9 +77,11 @@ const S500_MAX = 0.75;
  * fixed `L_LADDER` steps 600-900 (and a 500 step clamped only in lightness) can
  * leave `text-white` below WCAG AA. Each ceiling is the most luminous value the
  * step may take. They decrease strictly, and each sits *above* the corresponding
- * `LEGACY_RAMP` step's luminance, so a college whose accent is the legacy blue
- * derives the legacy ramp rather than a darker one. Steps 50-400 are light tints
- * and are not clamped.
+ * `LEGACY_RAMP` step's luminance, so the clamp only ever darkens a step the
+ * derivation placed too bright — it cannot touch one already at or below the
+ * legacy palette's own luminance. It does not reproduce `LEGACY_RAMP`, whose
+ * values are hand-tuned rather than derived. Steps 50-400 are light tints and are
+ * not clamped.
  */
 const LUM_CEILING = [0.170, 0.130, 0.080, 0.045, 0.024];
 /**

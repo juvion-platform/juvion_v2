@@ -233,9 +233,9 @@ The student/faculty Flutter app (`mobile/`) talks to `/api/juvi-app/v1`, **not**
   triplets, not hex**: a plain `var()` cannot carry an alpha channel and would silently break
   `bg-primary-500/20`. Defaults live in `admin-portal/src/index.css` `:root` and must stay —
   an undefined property makes Tailwind drop the declaration and render the element transparent.
-  The accent arrives on `GET /auth/me` (`college.accentColor`) — except for a superadmin, whose
-  login response already carries it in the `colleges[]` projection (what the college selector feeds
-  to `selectCollege`), after which `/auth/me` re-supplies it. Never from a juvi-app endpoint:
+  The accent arrives on the **login response** — for a regular user as `college.accentColor`, for a
+  superadmin as the `colleges[]` projection the college selector feeds to `selectCollege` — and
+  `GET /auth/me` re-supplies it afterwards. Never from a juvi-app endpoint:
   `/juvi-app/admin/settings` needs `platform:read`, which staff are explicitly denied.
   Spec: `docs/superpowers/specs/2026-10-09-portal-institution-theming-design.md`.
 
