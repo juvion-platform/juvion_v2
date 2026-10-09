@@ -1632,9 +1632,22 @@ import { classifyExceptionPushTier } from '../push-tier';
 import { previewClassException } from '../class-exception-service';
 import { Timetable } from '../../../models/academic-ops/Timetable';
 import { TimetableSlot } from '../../../models/academic-ops/TimetableSlot';
-import { Course, CourseOffering, Enrollment } from '../../../models';
-import { Person, Faculty, Student } from '../../../models';
+import { Course } from '../../../models/academic-ops/Course';
+import { CourseOffering } from '../../../models/academic-ops/CourseOffering';
+import { Enrollment } from '../../../models/academic-ops/Enrollment';
+import { Person } from '../../../models/people/Person';
+import { Faculty } from '../../../models/people/Faculty';
+import { Student } from '../../../models/people/Student';
 import { setupMongo, teardownMongo, clearCollections } from '../../../__tests__/helpers/mongoMemory';
+
+// Direct model paths, NOT the `../../../models` barrel: the barrel registers every model, so
+// mongoose kicks off index builds for all ~387 of them against the memory server and the first
+// `clearCollections` queues behind that and overruns vitest's 10s hook default — which forces a
+// 120s `hookTimeout` that would also hide a genuine hang. This file uses six models; importing them
+// by path keeps the run at ~2s with no override, and matches the sibling
+// `modules/academics/__tests__/class-exception.test.ts`. (`scripts/demo-seed/__tests__/breadth.test.ts`
+// does import the barrel and does carry `vi.setConfig({ testTimeout: 60_000, hookTimeout: 120_000 })`
+// — it seeds two dozen models, so its override is earned; this file's would not be.) R86.
 
 const TZ = 'Asia/Kolkata';
 const CID = '000000000000000000000001';
