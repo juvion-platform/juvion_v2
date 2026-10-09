@@ -2759,17 +2759,15 @@ import { Types } from 'mongoose';
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { College } from '../../../models/College';
-import {
-  AttendanceRecord,
-  AttendanceSession,
-  Course,
-  CourseOffering,
-  Enrollment,
-  Faculty,
-  Person,
-  Semester,
-  Student,
-} from '../../../models';
+import { AttendanceRecord } from '../../../models/academic-ops/AttendanceRecord';
+import { AttendanceSession } from '../../../models/academic-ops/AttendanceSession';
+import { Course } from '../../../models/academic-ops/Course';
+import { CourseOffering } from '../../../models/academic-ops/CourseOffering';
+import { Enrollment } from '../../../models/academic-ops/Enrollment';
+import { Semester } from '../../../models/academic-structure/Semester';
+import { Faculty } from '../../../models/people/Faculty';
+import { Person } from '../../../models/people/Person';
+import { Student } from '../../../models/people/Student';
 import { clearCollections, setupMongo, teardownMongo } from '../../../__tests__/helpers/mongoMemory';
 import {
   attendanceAvailableFor,
@@ -3217,19 +3215,17 @@ import { Types } from 'mongoose';
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { College } from '../../../models/College';
-import {
-  AttendanceAlert,
-  AttendanceRecord,
-  AttendanceSession,
-  AttendanceSummary,
-  Course,
-  CourseOffering,
-  Enrollment,
-  Faculty,
-  Person,
-  Semester,
-  Student,
-} from '../../../models';
+import { AttendanceAlert } from '../../../models/academic-ops/AttendanceAlert';
+import { AttendanceRecord } from '../../../models/academic-ops/AttendanceRecord';
+import { AttendanceSession } from '../../../models/academic-ops/AttendanceSession';
+import { AttendanceSummary } from '../../../models/academic-ops/AttendanceSummary';
+import { Course } from '../../../models/academic-ops/Course';
+import { CourseOffering } from '../../../models/academic-ops/CourseOffering';
+import { Enrollment } from '../../../models/academic-ops/Enrollment';
+import { Semester } from '../../../models/academic-structure/Semester';
+import { Faculty } from '../../../models/people/Faculty';
+import { Person } from '../../../models/people/Person';
+import { Student } from '../../../models/people/Student';
 import { clearCollections, setupMongo, teardownMongo } from '../../../__tests__/helpers/mongoMemory';
 import {
   bulkUpsertAttendanceRecords,
@@ -4006,22 +4002,20 @@ Create `backend/src/modules/juvi-app/home/__tests__/resolve-day.test.ts`:
 import { Types } from 'mongoose';
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import {
-  AcademicCalendar,
-  Building,
-  Channel,
-  Course,
-  CourseOffering,
-  Enrollment,
-  Faculty,
-  Person,
-  Room,
-  Section,
-  Semester,
-  Student,
-  Timetable,
-  TimetableSlot,
-} from '../../../../models';
+import { AcademicCalendar } from '../../../../models/academic-ops/AcademicCalendar';
+import { Course } from '../../../../models/academic-ops/Course';
+import { CourseOffering } from '../../../../models/academic-ops/CourseOffering';
+import { Enrollment } from '../../../../models/academic-ops/Enrollment';
+import { Timetable } from '../../../../models/academic-ops/Timetable';
+import { TimetableSlot } from '../../../../models/academic-ops/TimetableSlot';
+import { Section } from '../../../../models/academic-structure/Section';
+import { Semester } from '../../../../models/academic-structure/Semester';
+import { Building } from '../../../../models/campus/Building';
+import { Room } from '../../../../models/campus/Room';
+import { Channel } from '../../../../models/juvi/Channel';
+import { Faculty } from '../../../../models/people/Faculty';
+import { Person } from '../../../../models/people/Person';
+import { Student } from '../../../../models/people/Student';
 import { clearCollections, setupMongo, teardownMongo } from '../../../../__tests__/helpers/mongoMemory';
 import { ClassException } from '../../../../models/academic-ops/ClassException';
 import { nextTeachingDay, resolveDay } from '../resolve-day';
@@ -4756,16 +4750,14 @@ import { Types } from 'mongoose';
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { College } from '../../../../models/College';
-import {
-  AttendanceRecord,
-  AttendanceSession,
-  Course,
-  CourseOffering,
-  Faculty,
-  Person,
-  Semester,
-  Student,
-} from '../../../../models';
+import { AttendanceRecord } from '../../../../models/academic-ops/AttendanceRecord';
+import { AttendanceSession } from '../../../../models/academic-ops/AttendanceSession';
+import { Course } from '../../../../models/academic-ops/Course';
+import { CourseOffering } from '../../../../models/academic-ops/CourseOffering';
+import { Semester } from '../../../../models/academic-structure/Semester';
+import { Faculty } from '../../../../models/people/Faculty';
+import { Person } from '../../../../models/people/Person';
+import { Student } from '../../../../models/people/Student';
 import { clearCollections, setupMongo, teardownMongo } from '../../../../__tests__/helpers/mongoMemory';
 import { InternalAssessment } from '../../../../models/academic-ops/InternalAssessment';
 import { ExamSchedule } from '../../../../models/academic-ops/ExamSchedule';
@@ -5568,24 +5560,22 @@ Create `backend/src/modules/juvi-app/home/__tests__/home-service.test.ts`:
 import { Types } from 'mongoose';
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  AttendanceRecord,
-  AttendanceSession,
-  Building,
-  Channel,
-  Course,
-  CourseOffering,
-  Department,
-  Enrollment,
-  Faculty,
-  Person,
-  Room,
-  Section,
-  Semester,
-  Student,
-  Timetable,
-  TimetableSlot,
-} from '../../../../models';
+import { AttendanceRecord } from '../../../../models/academic-ops/AttendanceRecord';
+import { AttendanceSession } from '../../../../models/academic-ops/AttendanceSession';
+import { Course } from '../../../../models/academic-ops/Course';
+import { CourseOffering } from '../../../../models/academic-ops/CourseOffering';
+import { Enrollment } from '../../../../models/academic-ops/Enrollment';
+import { Timetable } from '../../../../models/academic-ops/Timetable';
+import { TimetableSlot } from '../../../../models/academic-ops/TimetableSlot';
+import { Department } from '../../../../models/academic-structure/Department';
+import { Section } from '../../../../models/academic-structure/Section';
+import { Semester } from '../../../../models/academic-structure/Semester';
+import { Building } from '../../../../models/campus/Building';
+import { Room } from '../../../../models/campus/Room';
+import { Channel } from '../../../../models/juvi/Channel';
+import { Faculty } from '../../../../models/people/Faculty';
+import { Person } from '../../../../models/people/Person';
+import { Student } from '../../../../models/people/Student';
 import { clearCollections, setupMongo, teardownMongo } from '../../../../__tests__/helpers/mongoMemory';
 import { College } from '../../../../models/College';
 import { Invoice } from '../../../../models/finance/Invoice';
@@ -5885,7 +5875,7 @@ import { Types } from 'mongoose';
 
 import type { MobileContext } from '../middleware/authenticate-mobile';
 import { MobileApiError } from '../errors';
-import { Department } from '../../../models';
+import { Department } from '../../../models/academic-structure/Department';
 import { Faculty } from '../../../models/people/Faculty';
 import { Course } from '../../../models/academic-ops/Course';
 import { CourseOffering } from '../../../models/academic-ops/CourseOffering';
@@ -6387,21 +6377,19 @@ Create `backend/src/modules/juvi-app/home/__tests__/attention-items.test.ts`:
 import { Types } from 'mongoose';
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  Building,
-  Channel,
-  Course,
-  CourseOffering,
-  Enrollment,
-  Faculty,
-  Person,
-  Room,
-  Section,
-  Semester,
-  Student,
-  Timetable,
-  TimetableSlot,
-} from '../../../../models';
+import { Course } from '../../../../models/academic-ops/Course';
+import { CourseOffering } from '../../../../models/academic-ops/CourseOffering';
+import { Enrollment } from '../../../../models/academic-ops/Enrollment';
+import { Timetable } from '../../../../models/academic-ops/Timetable';
+import { TimetableSlot } from '../../../../models/academic-ops/TimetableSlot';
+import { Section } from '../../../../models/academic-structure/Section';
+import { Semester } from '../../../../models/academic-structure/Semester';
+import { Building } from '../../../../models/campus/Building';
+import { Room } from '../../../../models/campus/Room';
+import { Channel } from '../../../../models/juvi/Channel';
+import { Faculty } from '../../../../models/people/Faculty';
+import { Person } from '../../../../models/people/Person';
+import { Student } from '../../../../models/people/Student';
 import { clearCollections, setupMongo, teardownMongo } from '../../../../__tests__/helpers/mongoMemory';
 import { College } from '../../../../models/College';
 import { Invoice } from '../../../../models/finance/Invoice';
@@ -7196,7 +7184,14 @@ import { Types } from 'mongoose';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { clearCollections, setupMongo, teardownMongo } from '../../../../__tests__/helpers/mongoMemory';
-import { Channel, Course, CourseOffering, Enrollment, Faculty, Person, Student, TimetableSlot } from '../../../../models';
+import { Course } from '../../../../models/academic-ops/Course';
+import { CourseOffering } from '../../../../models/academic-ops/CourseOffering';
+import { Enrollment } from '../../../../models/academic-ops/Enrollment';
+import { TimetableSlot } from '../../../../models/academic-ops/TimetableSlot';
+import { Channel } from '../../../../models/juvi/Channel';
+import { Faculty } from '../../../../models/people/Faculty';
+import { Person } from '../../../../models/people/Person';
+import { Student } from '../../../../models/people/Student';
 import { ClassException } from '../../../../models/academic-ops/ClassException';
 import { JuviAccount } from '../../../../models/juvi/JuviAccount';
 import { ChannelMembership } from '../../../../models/juvi/ChannelMembership';
