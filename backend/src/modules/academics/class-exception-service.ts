@@ -3,7 +3,8 @@
  * Changes are revoke-then-create — rows are never edited or deleted. CUD writes
  * audit logs and emits `class.exception.changed` over the outbox so the Juvi
  * notification pipeline (plan task 16) reacts. Section/room conflict checks live
- * here (checkRescheduleConflicts).
+ * here (checkRescheduleConflicts). Permission (R6) and the §5.5 list viewer live
+ * here; the controllers stay thin.
  */
 import { Document, Types } from 'mongoose';
 import { ClassException, LeanClassException, IClassException, ClassExceptionType } from '../../models/academic-ops/ClassException';
@@ -15,8 +16,11 @@ import { Enrollment } from '../../models/academic-ops/Enrollment';
 import { Person } from '../../models/people/Person';
 import { Faculty } from '../../models/people/Faculty';
 import { Room } from '../../models/campus/Room';
+import { User } from '../../models/User';
 import { AppError } from '../../middleware/errorHandler';
 import { createAuditLog } from '../../shared/audit';
+import { evaluateAccess } from '../../shared/rbac/engine';
+import { personaCodesOf } from '../../shared/rbac/persona-registry';
 import { emit } from '../../shared/outbox/outbox';
 import { getJuviConfig } from '../juvi-app/config/institution-config';
 import { getLiveTimetables } from './live-timetable';
@@ -172,9 +176,17 @@ export async function revokeClassException(
   return lean;
 }
 
+export async function getClassException(collegeId: string, id: string): Promise<LeanClassException> {
+  if (!Types.ObjectId.isValid(id)) throw new AppError(404, 'Class exception not found');
+  const row = await ClassException.findOne({ _id: id, collegeId }).lean<LeanClassException | null>();
+  if (!row) throw new AppError(404, 'Class exception not found');
+  return row;
+}
+
 export async function listClassExceptions(
-  collegeId: string, filter: { offeringId?: string; slotId?: string; from?: string; to?: string },
-): Promise<LeanClassException[]> {
+  collegeId: string,
+  filter: { offeringId?: string; slotId?: string; from?: string; to?: string; viewerFacultyId?: string },
+): Promise<ClassExceptionRow[]> {
   const where: Record<string, unknown> = { collegeId };
   if (filter.offeringId) where.courseOfferingId = filter.offeringId;
   if (filter.slotId) where.timetableSlotId = filter.slotId;
@@ -184,7 +196,121 @@ export async function listClassExceptions(
     if (filter.to) range.$lte = filter.to;
     where.date = range;
   }
-  return ClassException.find(where).sort({ date: -1, createdAt: -1 }).limit(200).lean<LeanClassException[]>();
+  if (filter.viewerFacultyId) {
+    const ownOfferings = await CourseOffering.find({
+      collegeId,
+      $or: [{ facultyId: filter.viewerFacultyId }, { coFacultyIds: filter.viewerFacultyId }],
+    }).select('_id').lean<{ _id: Types.ObjectId }[]>();
+    const ownSlots = await TimetableSlot.find({
+      collegeId, substituteFacultyId: filter.viewerFacultyId,
+    }).select('_id').lean<{ _id: Types.ObjectId }[]>();
+    if (ownOfferings.length === 0 && ownSlots.length === 0) return []; // theirs only, and they own nothing
+    where.$or = [
+      { courseOfferingId: { $in: ownOfferings.map((o) => o._id) } },
+      { timetableSlotId: { $in: ownSlots.map((s) => s._id) } },
+    ];
+  }
+  const rows = await ClassException.find(where).sort({ date: -1, createdAt: -1 }).limit(200)
+    .lean<LeanClassException[]>();
+  return decorateClassExceptions(collegeId, rows);
+}
+
+export type ClassChangeActor = { id: string; role: string; personaType?: string; personas?: string[] };
+export type ClassChangeBasis = 'faculty' | 'office';
+
+/** The caller's Faculty row (ERP User → Person → Faculty), or null when they are not a teaching person. */
+async function actingFacultyId(collegeId: string, actor: ClassChangeActor): Promise<string | null> {
+  const user = await User.findOne({ _id: actor.id, collegeId }).select('personId').lean<{ personId?: Types.ObjectId } | null>();
+  if (!user?.personId) return null;
+  const faculty = await Faculty.findOne({ collegeId, personId: user.personId }).select('_id').lean<{ _id: Types.ObjectId } | null>();
+  return faculty ? String(faculty._id) : null;
+}
+
+/** True when the faculty member owns the class: the offering's faculty, a co-faculty, or the slot's substitute. */
+async function ownsOfferingOrSlot(
+  collegeId: string, offeringId: string, fid: string, slotId?: string,
+): Promise<boolean> {
+  const offering = await CourseOffering.findOne({ _id: offeringId, collegeId })
+    .select('facultyId coFacultyIds').lean<{ facultyId: Types.ObjectId; coFacultyIds?: Types.ObjectId[] } | null>();
+  if (!offering) return false;
+  if (String(offering.facultyId) === fid || (offering.coFacultyIds ?? []).some((id) => String(id) === fid)) return true;
+  if (!slotId) return false;
+  const slot = await TimetableSlot.findOne({ _id: slotId, collegeId })
+    .select('substituteFacultyId').lean<{ substituteFacultyId?: Types.ObjectId } | null>();
+  return Boolean(slot?.substituteFacultyId && String(slot.substituteFacultyId) === fid);
+}
+
+/**
+ * §5.1 permission (R6: RBAC off → office; teaching callers are decided by
+ * ownership alone — their default academics:update policy does not widen it;
+ * non-teaching callers fall to the academics:update policy; anything else 403).
+ */
+export async function assertClassChangePermission(
+  collegeId: string, actor: ClassChangeActor, offeringId: string, slotId?: string,
+): Promise<ClassChangeBasis> {
+  if (process.env.RBAC_ENFORCE === 'false') return 'office'; // dev bypass, matches authorize()
+  const fid = await actingFacultyId(collegeId, actor);
+  if (fid !== null) {
+    const own = await ownsOfferingOrSlot(collegeId, offeringId, fid, slotId);
+    if (own) return 'faculty';
+    throw new AppError(403, 'You can change only your own classes');
+  }
+  const policy = await evaluateAccess(collegeId, actor.role, personaCodesOf(actor), 'academics', 'update');
+  if (policy) return 'office';
+  throw new AppError(403, 'You can change only your own classes');
+}
+
+/** Create-path variant: resolve the slot first, then decide on it; 404 for an unknown slot. */
+export interface SlotChangeCheck { slot: LeanSlot; basis: ClassChangeBasis }
+export async function assertClassChangePermissionForSlot(
+  collegeId: string, actor: ClassChangeActor, slotId: string,
+): Promise<SlotChangeCheck> {
+  const slot = await TimetableSlot.findOne({ _id: slotId, collegeId }).lean<LeanSlot | null>();
+  if (!slot) throw new AppError(404, 'Class slot not found');
+  const basis = await assertClassChangePermission(collegeId, actor, String(slot.courseOfferingId), slotId);
+  return { slot, basis };
+}
+
+export interface ClassExceptionViewer { isOffice: boolean; facultyId?: string }
+
+/** List scoping (§5.5): teaching callers see only their own classes; office callers see everything. */
+export async function listClassExceptionViewer(collegeId: string, actor: ClassChangeActor): Promise<ClassExceptionViewer> {
+  if (process.env.RBAC_ENFORCE === 'false') return { isOffice: true };
+  const fid = await actingFacultyId(collegeId, actor);
+  if (fid) return { isOffice: false, facultyId: fid };
+  const policy = await evaluateAccess(collegeId, actor.role, personaCodesOf(actor), 'academics', 'update');
+  return policy ? { isOffice: true } : { isOffice: false };
+}
+
+export interface ClassExceptionRow extends LeanClassException {
+  courseCode: string;
+  courseName: string;
+  createdByName: string;
+}
+
+/** §5.5 list decoration: course code/name and who made each change. */
+async function decorateClassExceptions(collegeId: string, rows: LeanClassException[]): Promise<ClassExceptionRow[]> {
+  const offeringIds = [...new Set(rows.map((r) => String(r.courseOfferingId)))];
+  const offerings = offeringIds.length === 0 ? [] : await CourseOffering.find({ _id: { $in: offeringIds }, collegeId })
+    .select('courseId').lean<{ _id: Types.ObjectId; courseId: Types.ObjectId }[]>();
+  const courseIds = [...new Set(offerings.map((o) => String(o.courseId)))];
+  const courses = courseIds.length === 0 ? [] : await Course.find({ _id: { $in: courseIds }, collegeId })
+    .select('code name').lean<{ _id: Types.ObjectId; code: string; name: string }[]>();
+  const courseByOffering = new Map(offerings.map((o) => [String(o._id), String(o.courseId)]));
+  const byCourse = new Map(courses.map((c) => [String(c._id), c]));
+  const users = rows.length === 0 ? [] : await User.find({ _id: { $in: rows.map((r) => r.createdBy) }, collegeId })
+    .select('name').lean<{ _id: Types.ObjectId; name: string }[]>();
+  const nameByUser = new Map(users.map((u) => [String(u._id), u.name]));
+  return rows.map((r) => {
+    const courseId = courseByOffering.get(String(r.courseOfferingId));
+    const course = courseId ? byCourse.get(courseId) : undefined;
+    return {
+      ...r,
+      courseCode: course?.code ?? 'Unknown',
+      courseName: course?.name ?? 'Unknown',
+      createdByName: nameByUser.get(String(r.createdBy)) ?? 'Unknown',
+    };
+  });
 }
 
 export async function activeExceptionsFor(

@@ -4,6 +4,7 @@ import { authorize } from '../../middleware/authorize';
 import { validate } from '../../middleware/validate';
 import * as ctrl from './controller';
 import * as examCfg from './exam-config-controller';
+import * as classExc from './class-exception-controller';
 import {
   createRegulationSchema, updateRegulationSchema,
   createProgrammeSchema, updateProgrammeSchema,
@@ -92,6 +93,7 @@ import {
   assignInvigilationSchema,
   aggregatePOAttainmentSchema,
   createAttainmentRunSchema,
+  createClassExceptionBodySchema, classExceptionListQuerySchema, classExceptionPreviewQuerySchema,
 } from './validation';
 
 const router = Router();
@@ -332,6 +334,12 @@ router.post('/attendance-summary/refresh', authorize('academics', 'create'), val
 
 // Attendance Alerts
 router.get('/attendance-alerts', authorize('academics', 'read'), ctrl.listAttendanceAlerts);
+
+// ─── Class exceptions (spec §5.2): reads through RBAC; writes through the per-actor check (§5.1) ───
+router.get('/class-exceptions/preview', authenticate, authorize('academics', 'read'), validate(classExceptionPreviewQuerySchema, 'query'), classExc.previewClassException);
+router.get('/class-exceptions', authenticate, authorize('academics', 'read'), validate(classExceptionListQuerySchema, 'query'), classExc.listClassExceptions);
+router.post('/class-exceptions', authenticate, validate(createClassExceptionBodySchema), classExc.createClassException);
+router.delete('/class-exceptions/:id', authenticate, classExc.revokeClassException);
 
 // ═══ W02: Condonation Request Workflow ═══════════════════════
 
