@@ -64,7 +64,7 @@ export async function login(req: Request, res: Response, next: NextFunction) {
 
 export async function me(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const result = await service.getMe(req.user!.id);
+    const result = await service.getMe(req.user!.id, req.collegeId);
     res.json(result);
   } catch (err) {
     next(err);

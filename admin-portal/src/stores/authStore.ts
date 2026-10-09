@@ -11,13 +11,15 @@ interface User {
   dashboardWidgets?: string[];
   accessibleModules?: string[];
 }
-interface CollegeRef { _id: string; name: string; code: string; status: string; }
+interface CollegeRef { _id: string; name: string; code: string; status: string; accentColor?: string | null; }
 
 interface AuthState {
   user: User | null;
   token: string | null;
   collegeId: string | null;
   collegeName: string | null;
+  /** The selected college's accent, or null when it has none. */
+  collegeAccent: string | null;
   colleges: CollegeRef[];
   isSuperAdmin: boolean;
   permissions: string[];
@@ -25,9 +27,9 @@ interface AuthState {
   sensitivity: Record<string, string[] | null>;
   /** False until the boot-time /auth/me rehydration settles. */
   hydrated: boolean;
-  setAuth: (user: User, token: string, collegeId?: string, colleges?: CollegeRef[], permissions?: string[], sensitivity?: Record<string, string[] | null>) => void;
+  setAuth: (user: User, token: string, collegeId?: string, colleges?: CollegeRef[], permissions?: string[], sensitivity?: Record<string, string[] | null>, accentColor?: string | null) => void;
   setToken: (token: string, permissions?: string[], sensitivity?: Record<string, string[] | null>) => void;
-  selectCollege: (collegeId: string, collegeName: string) => void;
+  selectCollege: (collegeId: string, collegeName: string, accentColor?: string | null) => void;
   clearCollege: () => void;
   hydrate: () => Promise<void>;
   logout: () => void;
@@ -71,12 +73,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   token: localStorage.getItem('token'),
   collegeId: localStorage.getItem('collegeId'),
   collegeName: localStorage.getItem('collegeName'),
+  collegeAccent: localStorage.getItem('collegeAccent'),
   colleges: readStoredJson<CollegeRef[]>('colleges', []),
   isSuperAdmin: localStorage.getItem('isSuperAdmin') === 'true',
   permissions: readStoredJson<string[]>('permissions', []),
   sensitivity: readStoredJson<Record<string, string[] | null>>('sensitivity', {}),
   hydrated: false,
-  setAuth: (user, token, collegeId?, colleges?, permissions?, sensitivity?) => {
+  setAuth: (user, token, collegeId?, colleges?, permissions?, sensitivity?, accentColor?) => {
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(user));
     const isSuperAdmin = user.role === 'super_admin';
@@ -102,6 +105,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } else {
       localStorage.removeItem('permissions');
     }
+    // `''`, undefined and null are all "no accent"; normalise once so the store
+    // field and the persisted key can never disagree about it.
+    const accent = accentColor || null;
+    if (accent) {
+      localStorage.setItem('collegeAccent', accent);
+    } else {
+      localStorage.removeItem('collegeAccent');
+    }
     set({
       user,
       token,
@@ -111,6 +122,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       isSuperAdmin,
       permissions: resolvedPermissions,
       sensitivity: storeSensitivity(sensitivity),
+      collegeAccent: accent,
       hydrated: true,
     });
   },
@@ -123,19 +135,26 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ token });
     }
   },
-  selectCollege: (collegeId, collegeName) => {
+  selectCollege: (collegeId, collegeName, accentColor) => {
     localStorage.setItem('collegeId', collegeId);
     localStorage.setItem('collegeName', collegeName);
-    set({ collegeId, collegeName });
+    const accent = accentColor || null;
+    if (accent) localStorage.setItem('collegeAccent', accent);
+    else localStorage.removeItem('collegeAccent');
+    set({ collegeId, collegeName, collegeAccent: accent });
   },
   clearCollege: () => {
     localStorage.removeItem('collegeId');
     localStorage.removeItem('collegeName');
-    set({ collegeId: null, collegeName: null });
+    localStorage.removeItem('collegeAccent');
+    set({ collegeId: null, collegeName: null, collegeAccent: null });
   },
   hydrate: async () => {
     if (!get().token) {
-      set({ hydrated: true });
+      // No session, so any accent still cached from a previous one is stale.
+      // Safe precisely because this branch cannot run with a live token.
+      localStorage.removeItem('collegeAccent');
+      set({ hydrated: true, collegeAccent: null });
       return;
     }
     try {
@@ -154,12 +173,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         dashboardWidgets: data.dashboardWidgets,
         accessibleModules: data.accessibleModules,
       };
+      const college = data.college as { accentColor?: string | null } | null | undefined;
+      const collegeAccent = college?.accentColor ?? null;
+      if (collegeAccent) localStorage.setItem('collegeAccent', collegeAccent);
+      else localStorage.removeItem('collegeAccent');
       localStorage.setItem('user', JSON.stringify(user));
       // 010 — /auth/me carries permissions, so a policy edit lands on the next hydrate.
       const permissions: string[] | undefined = Array.isArray(data.permissions) && data.permissions.length > 0 ? data.permissions : undefined;
       if (permissions) localStorage.setItem('permissions', JSON.stringify(permissions));
       const sensitivity = data.sensitivity && typeof data.sensitivity === 'object' ? storeSensitivity(data.sensitivity) : undefined;
-      set({ user, isSuperAdmin: user.role === 'super_admin', hydrated: true, ...(permissions ? { permissions } : {}), ...(sensitivity ? { sensitivity } : {}) });
+      set({ user, isSuperAdmin: user.role === 'super_admin', hydrated: true, collegeAccent, ...(permissions ? { permissions } : {}), ...(sensitivity ? { sensitivity } : {}) });
     } catch {
       // A 401 is handled by the axios interceptor (which logs out). Any other
       // failure (network blip) keeps the cached user rather than blanking the UI.
@@ -171,11 +194,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     localStorage.removeItem('user');
     localStorage.removeItem('collegeId');
     localStorage.removeItem('collegeName');
+    localStorage.removeItem('collegeAccent');
     localStorage.removeItem('colleges');
     localStorage.removeItem('isSuperAdmin');
     localStorage.removeItem('permissions');
     localStorage.removeItem('sensitivity');
-    set({ user: null, token: null, collegeId: null, collegeName: null, colleges: [], isSuperAdmin: false, permissions: [], sensitivity: {}, hydrated: true });
+    set({ user: null, token: null, collegeId: null, collegeName: null, collegeAccent: null, colleges: [], isSuperAdmin: false, permissions: [], sensitivity: {}, hydrated: true });
   },
   // 010 P3 — undefined/null for a module means unrestricted; a list means only those classes.
   canSeeClass: (module, cls) => {

@@ -190,7 +190,7 @@ export default function DashboardLayout() {
       <aside className={clsx(
         'flex flex-col transition-all duration-200',
         collapsed ? 'w-16' : 'w-56',
-      )} style={{ background: 'linear-gradient(180deg, #0F2744 0%, #1A365D 100%)' }}>
+      )} style={{ background: 'linear-gradient(180deg, rgb(var(--c-navy)) 0%, rgb(var(--c-navy-dark)) 100%)' }}>
         {/* Logo */}
         <div className="flex items-center justify-between h-14 px-3 border-b border-white/10">
           {!collapsed && (
@@ -210,7 +210,7 @@ export default function DashboardLayout() {
               onClick={handleSwitchCollege}
               className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs text-gray-300 hover:text-white transition-colors"
             >
-              <Building2 size={14} className="text-teal-400 shrink-0" />
+              <Building2 size={14} className="text-chrome-soft shrink-0" />
               <span className="truncate">{collegeName}</span>
               <ArrowLeftRight size={12} className="ml-auto shrink-0 text-gray-500" />
             </button>
@@ -238,7 +238,7 @@ export default function DashboardLayout() {
                   className={({ isActive }) => clsx(
                     'flex items-center gap-3 px-3 py-2 mx-1.5 rounded-lg text-sm transition-all duration-150',
                     isActive
-                      ? 'bg-teal-500/20 text-teal-300 font-medium shadow-sm'
+                      ? 'bg-chrome-wash/20 text-chrome-soft font-medium shadow-sm'
                       : 'text-gray-400 hover:bg-white/5 hover:text-gray-200',
                   )}
                 >
@@ -270,7 +270,7 @@ export default function DashboardLayout() {
                   className={clsx(
                     'w-full flex items-center gap-3 px-3 py-2 mx-1.5 rounded-lg text-sm transition-all duration-150',
                     isOnGroupPath
-                      ? 'bg-teal-500/20 text-teal-300 font-medium shadow-sm'
+                      ? 'bg-chrome-wash/20 text-chrome-soft font-medium shadow-sm'
                       : 'text-gray-400 hover:bg-white/5 hover:text-gray-200',
                   )}
                   style={{ width: 'calc(100% - 0.75rem)' }}
@@ -291,7 +291,7 @@ export default function DashboardLayout() {
 
                 {collapsed && flyoutGroup === to && (
                   <div className="absolute left-full top-0 z-50 ml-1 w-56 rounded-lg border border-white/10 py-1.5 shadow-xl"
-                       style={{ background: 'linear-gradient(180deg, #1A365D 0%, #0F2744 100%)' }}>
+                       style={{ background: 'linear-gradient(180deg, rgb(var(--c-navy-dark)) 0%, rgb(var(--c-navy)) 100%)' }}>
                     <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
                       {label}
                     </p>
@@ -307,7 +307,7 @@ export default function DashboardLayout() {
                           onClick={() => setFlyoutGroup(null)}
                           className={({ isActive }) => clsx(
                             'block px-3 py-1.5 text-xs transition-colors',
-                            isActive ? 'bg-teal-500/15 text-teal-300 font-medium' : 'text-gray-300 hover:bg-white/5 hover:text-white',
+                            isActive ? 'bg-chrome-wash/15 text-chrome-soft font-medium' : 'text-gray-300 hover:bg-white/5 hover:text-white',
                           )}
                         >
                           {child.label}
@@ -342,7 +342,7 @@ export default function DashboardLayout() {
                             clsx(
                               'flex items-center gap-2 px-3 py-1.5 ml-7 mr-1.5 rounded-md text-xs transition-all duration-150',
                               isActive
-                                ? 'bg-teal-500/15 text-teal-300 font-medium'
+                                ? 'bg-chrome-wash/15 text-chrome-soft font-medium'
                                 : 'text-gray-400 hover:bg-white/5 hover:text-gray-200',
                             )
                           }

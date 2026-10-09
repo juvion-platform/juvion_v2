@@ -19,7 +19,7 @@ export default function CollegeSelector() {
     } catch { return 'Super Admin'; }
   })();
 
-  async function handleSelect(college: { _id: string; name: string; status?: string }) {
+  async function handleSelect(college: { _id: string; name: string; status?: string; accentColor?: string | null }) {
     // An inactive college was previously enterable with nothing but a small
     // grey badge as a hint — easy to miss, and the data inside is stale.
     if (college.status && college.status !== 'active') {
@@ -31,7 +31,7 @@ export default function CollegeSelector() {
       });
       if (!confirmed) return;
     }
-    selectCollege(college._id, college.name);
+    selectCollege(college._id, college.name, college.accentColor);
     navigate('/', { replace: true });
   }
 
@@ -41,7 +41,7 @@ export default function CollegeSelector() {
   }
 
   return (
-    <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #0F2744 0%, #1A365D 50%, #0F2744 100%)' }}>
+    <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, rgb(var(--c-navy)) 0%, rgb(var(--c-navy-dark)) 50%, rgb(var(--c-navy)) 100%)' }}>
       {/* Header */}
       <header className="flex items-center justify-between px-8 py-5">
         <h1 className="text-2xl font-bold bg-gradient-to-r from-teal-400 to-cyan-300 bg-clip-text text-transparent">

@@ -1,5 +1,10 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useAuthStore } from '../authStore';
+
+// `hydrate` lazily imports the axios instance; mocking it lets the failing-/auth/me
+// path be exercised without a network or the interceptor stack.
+const { apiGet } = vi.hoisted(() => ({ apiGet: vi.fn() }));
+vi.mock('../../services/api', () => ({ default: { get: apiGet } }));
 
 /** 010 — permission strings may be sub-domain qualified (`academics/exams:create`). */
 describe('authStore.hasPermission', () => {
@@ -52,6 +57,66 @@ describe('authStore.canSeeClass', () => {
   it('hides people.identity when people sensitivity is empty array (HOD, Faculty, Accounts)', () => {
     useAuthStore.setState({ sensitivity: { people: [] } });
     expect(can('people', 'people.identity')).toBe(false);
+  });
+});
+
+describe('authStore college accent', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useAuthStore.setState({ token: null, collegeAccent: null });
+  });
+
+  // Fix 2 — `collegeAccent` is seeded from localStorage at store construction, so
+  // the tokenless boot is the one path that could leave an accent with no session
+  // behind it. It must clear both halves.
+  it('drops a cached accent when there is no token to back it', async () => {
+    localStorage.setItem('collegeAccent', '#7A1FA2');
+    useAuthStore.setState({ collegeAccent: '#7A1FA2' });
+    await useAuthStore.getState().hydrate();
+    expect(useAuthStore.getState().collegeAccent).toBeNull();
+    expect(localStorage.getItem('collegeAccent')).toBeNull();
+  });
+
+  // Fix 1 — `''` used to reach the store verbatim (`'' ?? null === ''`) while
+  // localStorage had the key removed. Both halves must read as the same absent
+  // state, so each case asserts both.
+  it('an empty accent lands as null in the store and absent in localStorage (setAuth)', () => {
+    useAuthStore.getState().setAuth(
+      { id: 'u1', name: 'Admin', email: 'a@jit.edu.in', role: 'admin', personaType: 'L-PRIN' },
+      'token-1', 'c1', undefined, undefined, undefined, '',
+    );
+    expect(localStorage.getItem('collegeAccent')).toBeNull();
+    expect(useAuthStore.getState().collegeAccent).toBeNull();
+  });
+
+  it('an empty accent lands as null in the store and absent in localStorage (selectCollege)', () => {
+    useAuthStore.getState().selectCollege('c1', 'College', '');
+    expect(localStorage.getItem('collegeAccent')).toBeNull();
+    expect(useAuthStore.getState().collegeAccent).toBeNull();
+  });
+});
+
+describe('authStore hydrate with a live token', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    apiGet.mockReset();
+    useAuthStore.setState({ token: null, collegeAccent: null, hydrated: false });
+  });
+
+  // Review Focus 5. A failed `/auth/me` (a network blip — the 401 case is the
+  // axios interceptor's) must leave the already-applied accent in place and mark
+  // only `hydrated`, rather than clearing the theme the first paint already used.
+  it('keeps the already-applied accent when /auth/me rejects', async () => {
+    apiGet.mockRejectedValueOnce(new Error('network blip'));
+    localStorage.setItem('token', 'tok-1');
+    localStorage.setItem('collegeAccent', '#7A1FA2');
+    useAuthStore.setState({ token: 'tok-1', collegeAccent: '#7A1FA2' });
+
+    await useAuthStore.getState().hydrate();
+
+    expect(useAuthStore.getState().collegeAccent).toBe('#7A1FA2');
+    expect(localStorage.getItem('collegeAccent')).toBe('#7A1FA2');
+    expect(useAuthStore.getState().hydrated).toBe(true);
   });
 });
 

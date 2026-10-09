@@ -56,6 +56,46 @@ export const E2E_TEST_PASSWORD = 'E2ETestPassword!';
 const E2E_COLLEGE_ID = process.env.DEV_COLLEGE_ID || '000000000000000000000001';
 const E2E_ACADEMIC_YEAR_CODE = 'E2E-AY';
 
+/**
+ * A second college that exists only to give the theming acceptance test a
+ * deterministic accent.
+ *
+ * Deliberately NOT the E2E College: `e2e/tests/juvi-admin.spec.ts` saves a
+ * *different* accent (`#0B5FA5`) onto that one, and this suite runs
+ * `fullyParallel` outside CI, so a theming assertion pinned to the shared
+ * college would be order-dependent in CI and a genuine race locally.
+ */
+export const E2E_THEME_COLLEGE_ID = '000000000000000000000002';
+export const E2E_THEME_ACCENT = '#7A1FA2';
+
+/**
+ * Upserts the theming college. Idempotent.
+ *
+ * `$set` rather than `$setOnInsert` for the row: the acceptance test's assertion
+ * depends on this accent, so a re-run must normalise it back even if something
+ * else has since changed it. `$set` on the whole `juvi` subdocument is deliberate
+ * for the same reason — it cannot leave a stale sibling key behind — even though it
+ * resets `juvi.enabled` to its default. This college exists only for this test.
+ */
+export async function seedE2EThemeCollege(): Promise<void> {
+  await College.updateOne(
+    { _id: E2E_THEME_COLLEGE_ID },
+    {
+      $set: {
+        name: 'E2E Theming College',
+        code: 'E2E-THEME',
+        address: { line1: '2 Test Road', city: 'Hyderabad', state: 'Telangana', pincode: '500001' },
+        contactEmail: 'e2e-theme@juvion.test',
+        contactPhone: '9000000200',
+        subscription: { plan: 'basic', status: 'active' },
+        status: 'active',
+        juvi: { accentColor: E2E_THEME_ACCENT },
+      },
+    },
+    { upsert: true },
+  );
+}
+
 /** The Playwright stack needs a College row for the e2e college id; settings and Juvi read it. */
 async function seedE2ECollege(collegeId: string): Promise<void> {
   await College.updateOne(
@@ -275,6 +315,9 @@ async function main() {
     const userResult = await seedE2EUsers();
     // The Juvi notices spec's audience and HOD login (kept out of seedE2EUsers, whose callers count three users).
     await seedE2ENoticeAudience(await bcrypt.hash(E2E_TEST_PASSWORD, 10));
+    // The theming acceptance test's fixture. Kept out of `seedE2EUsers` for the same
+    // reason the notices audience is: that function's callers count three users.
+    await seedE2EThemeCollege();
     // RBAC default policies are required for `authorize()` to grant access.
     // Without them every authenticated request 403s and the e2e suite fails
     // on the post-login fetches (admissions, governance, platform, etc.).
