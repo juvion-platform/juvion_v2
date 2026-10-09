@@ -6091,9 +6091,11 @@ describe('homeTeaching (§7.2)', () => {
     const out = await homeTeaching(ctxOf('faculty', w));
     expect(out.faculty).toEqual({ kind: 'regular' });
     expect(out.asOf).toBeTypeOf('string');
-    const first = out.nextTeachingDay ?? out.tomorrow;
-    expect(first.classes[0]!.registered).toBe(1);
-    expect(first.date === w.tomorrowDate || out.tomorrow.classes.length === 0).toBe(true);
+    // Read the field itself — no `?? out.tomorrow` fallback, which would make the day
+    // assertion trivially true and let a missing `nextTeachingDay` slip through.
+    expect(out.nextTeachingDay).toBeDefined();
+    expect(out.nextTeachingDay!.date).toBe(w.tomorrowDate);
+    expect(out.nextTeachingDay!.classes[0]!.registered).toBe(1);
   });
 
   it('kind adjunct wins over hod (precedence A4)', async () => {
@@ -6161,6 +6163,14 @@ describe('meAcademics (§7.3)', () => {
   it('staff is 403 FORBIDDEN (R24)', async () => {
     await seedHomeWorld(false);
     await expect(meAcademics(ctxOf('staff'))).rejects.toMatchObject({ statusCode: 403, code: 'FORBIDDEN' });
+  });
+
+  it('a faculty-kind account with no facultyId is 403, not a 500 from an empty ObjectId', async () => {
+    // An active semester must exist so `coursesTaughtOf` reaches `new Types.ObjectId('')`:
+    // with no active semester it returns [] and would 200, proving nothing. `ctxOf('faculty')`
+    // with no World omits facultyId (schema-legal — JuviAccount.facultyId is not required).
+    await seedHomeWorld(false);
+    await expect(meAcademics(ctxOf('faculty'))).rejects.toMatchObject({ statusCode: 403, code: 'FORBIDDEN' });
   });
 });
 ```
@@ -6324,7 +6334,14 @@ async function facultyKindOf(collegeId: string, facultyId: string): Promise<'reg
 
 export async function meAcademics(ctx: MobileContext): Promise<MeAcademicsResponse> {
   const id = requireNotStaff(ctx);
-  if (ctx.kind === 'faculty') return { coursesTaught: await coursesTaughtOf(ctx.collegeId, id) };
+  if (ctx.kind === 'faculty') {
+    // `JuviAccount.facultyId` is neither required nor cross-validated against `kind`, so a
+    // faculty-kind account can arrive with no facultyId. Without this, `coursesTaughtOf`
+    // would receive '' and `new Types.ObjectId('')` would throw a BSONError → 500. Siblings
+    // (requireFaculty, the student branch below) already re-check their empty id.
+    if (!id) throw new MobileApiError(403, 'FORBIDDEN', 'Available to students and faculty only.');
+    return { coursesTaught: await coursesTaughtOf(ctx.collegeId, id) };
+  }
 
   const studentId = id;
   if (!studentId) throw new MobileApiError(403, 'FORBIDDEN', 'Available to students and faculty only.');
@@ -6359,10 +6376,11 @@ export async function meAcademics(ctx: MobileContext): Promise<MeAcademicsRespon
 async function coursesTaughtOf(collegeId: string, facultyId: string): Promise<CoursesTaughtItem[]> {
   const semesterIds = await activeSemesterIds(collegeId);
   if (semesterIds.length === 0) return [];
+  const id = new Types.ObjectId(facultyId);
   const offerings = await CourseOffering.find({
     collegeId,
     semesterId: { $in: semesterIds.map((s) => new Types.ObjectId(s)) },
-    $or: [{ facultyId }, { coFacultyIds: facultyId }],
+    $or: [{ facultyId: id }, { coFacultyIds: id }],
   }).select('_id courseId sectionId').lean<{ _id: Types.ObjectId; courseId: Types.ObjectId; sectionId?: Types.ObjectId }[]>();
   if (offerings.length === 0) return [];
   const channels = await courseChannels(collegeId, offerings.map((o) => String(o._id)));
@@ -6385,18 +6403,7 @@ async function coursesTaughtOf(collegeId: string, facultyId: string): Promise<Co
 }
 ```
 
-Note on `$or: [{ facultyId }, { coFacultyIds: facultyId }]`: `facultyId`/`coFacultyIds` are ObjectIds in the schema, so the string must be cast — pass `new Types.ObjectId(facultyId)` in both arms:
-
-```typescript
-  const id = new Types.ObjectId(facultyId);
-  const offerings = await CourseOffering.find({
-    collegeId,
-    semesterId: { $in: semesterIds.map((s) => new Types.ObjectId(s)) },
-    $or: [{ facultyId: id }, { coFacultyIds: id }],
-  }).select('_id courseId sectionId').lean<{ _id: Types.ObjectId; courseId: Types.ObjectId; sectionId?: Types.ObjectId }[]>();
-```
-
-The first listing above is the version to type; apply this cast inside it (the `$or` arms are the only place the raw string is passed to an ObjectId field).
+Note on the `$or` arms: `facultyId`/`coFacultyIds` are ObjectIds in the schema, so the raw string must be cast. The fence above passes `new Types.ObjectId(facultyId)` in both arms — those arms are the only place a raw string would otherwise reach an ObjectId field.
 
 Create `backend/src/modules/juvi-app/home/controller.ts`:
 
@@ -8762,8 +8769,8 @@ the juvi_api Dart client are regenerated in the same commit."
 Verified facts this task builds on (all in `backend/src/seed.ts`): `CID` at L121 is the dev college; the giant deletion `Promise.all` wipes CID-scoped data (Timetable L323, TimetableSlot L324, AttendanceSession L311, AttendanceRecord L312, InternalAssessment L313, Invoice+Payment L153-154 …) but currently contains **no `ClassException` and no `AcademicCalendar` deletion**; the demo timetable rows (L2280-2284) carry a stale `effectiveFrom: new Date('2025-01-10')`; AttendanceSession demo rows (L2295-2299) set `totalPresent`/`totalAbsent`, which are NOT AttendanceSession model fields (Mongoose strict mode silently drops them — the rewrite drops them deliberately); `courseOfferings[0]` = sections[0] (CSE-A) taught by `faculties[0]` (FAC001, the demo faculty), `courseOfferings[1]` = sections[0] taught by `faculties[3]`; `demoStudent` (L3212) is the lowest-rollNumber **active** student — with the current data that is `students[6]` (`21B01A0301`), who has **no** enrollment today; `demoFaculty` (L3213) is faculties[0]; the admin user `admin@jit.edu.in` (L562) is created without a capture; invoices `INV-2024-001`…`INV-2024-004` are already in use (unique `(collegeId, invoiceNumber)`); `seed.ts` line 1 is `// @ts-nocheck`, so the block reads freely. There is **no** e2e-seed addition: the backend e2e harness (`provisionTestStudent` / `provisionTestFaculty` factories) plus per-test model creates already provide everything the e2e suites build, so `seed-e2e-users.ts` stays untouched (spec §10 "e2e seed = minimum for tests" — the minimum is already there).
 
 **Interfaces:**
-- Consumes: `ClassException`, `AcademicCalendar` from the models barrel (`./models`) — `AcademicCalendar` already on it (L49 of `models/index.ts`), `ClassException` added there by Task 1's barrel export; `ymd`, `addDays` from `./modules/academics/timetable-date` (Task 2, pure); `User` (already imported at L99 of seed.ts); in-scope seed constants `persons`, `students`, `faculties`, `sections`, `rooms`, `courseOfferings`, `sem2_24`, `ay2024`, `CID`.
-- Produces: a dev database in which the seeded demo sign-in (`JIT` / lowest-rollNumber student `21B01A0301` / `FAC001` faculty, temporary password `river-lamp-482`) sees, through the Task 12-16 readers: a published live timetable covering Monday–Saturday for the demo student's section and the demo faculty's offerings; ~8 weeks of closed attendance with the demo student below threshold on courseOfferings[0] (~67% → `at_risk` band) and above on courseOfferings[1] (~95% → `safe`); a published holiday covering tomorrow (which the demo student's resolveDay turns into `{ holiday, classes: [] }`); a cancelled class dated tomorrow (ClassException, created by the JIT admin, reason ERP-only); an open invoice `JUVI-DEMO-001` with a PaymentPlan instalment due in 5 days (dues + fee_due attention); a scheduled internal assessment ~36 h out (glance nextAssessment + 48 h attention window).
+- Consumes: `ClassException`, `AcademicCalendar` from the models barrel (`./models`) — `AcademicCalendar` already on it (L49 of `models/index.ts`), `ClassException` added there by Task 1's barrel export; `ymd`, `addDays` from `./modules/academics/timetable-date` (Task 2, pure); `User` (already imported at `seed.ts:112`); in-scope seed constants `persons`, `students`, `faculties`, `sections`, `rooms`, `courseOfferings`, `sem2_24`, `ay2024`, `CID`.
+- Produces: a dev database in which the seeded demo sign-in (`JIT` / lowest-rollNumber student `21B01A0301` / `FAC001` faculty, temporary password `river-lamp-482`) sees, through the Task 12-16 readers: a published live timetable covering Monday–Saturday for the demo student's section and the demo faculty's offerings; ~8 weeks of closed attendance with the demo student below threshold on courseOfferings[0] (~67% → `at_risk` band) and above on courseOfferings[1] (~91% → `safe`); a published holiday covering tomorrow (which the demo student's resolveDay turns into `{ holiday, classes: [] }`); a cancelled class dated tomorrow (ClassException, created by the JIT admin, reason ERP-only); an open invoice `JUVI-DEMO-001` with a PaymentPlan instalment due in 5 days (dues + fee_due attention); a scheduled internal assessment ~36 h out (glance nextAssessment + 48 h attention window).
 
 - [ ] **Step 1: Write the seed-verification script (failing)**
 
@@ -8844,7 +8851,7 @@ main().catch((err) => {
 });
 ```
 
-Then delete the mis-drawn first header block (the file contains only ONE import header — the second version). Run it:
+Run it:
 
 Run: `cd backend && node -r ts-node/register/transpile-only -r dotenv/config tmp-seed-check.ts; cd ..`
 Expected: FAIL — `check-seed: expected ≥3 published live timetables, got 2`… actually the exact first failure depends on the current dev DB state: the published-timetable count may already be 2 (stale window) or 0; whichever assertion fails first must be a **row-count/absence** failure (≥3 timetables, ≥20 slots, ≥40 sessions, ≥80 records, or one of the "missing" assertions). If the first run instead passes everything, the dev DB already contains the rows — stop, report it, and re-run after `npm run seed -w backend` resets to the pre-change baseline only if that pre-change seed still lacks the additions.
@@ -8920,7 +8927,7 @@ new:  const ttSlots = await TimetableSlot.create([
     ...(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const).map((day) => ({
       collegeId: CID, timetableId: timetables[2]._id, day, period: 1, startTime: '09:00', endTime: '10:00', courseOfferingId: courseOfferings[2]._id, roomId: rooms[2]._id, slotType: 'lecture',
     })),
-    // ECE-A (timetables[1]) keeps its lab + Monday lecture
+    // ECE-A (timetables[1]): the lab row moved here from timetables[0] + its Monday lecture
     { collegeId: CID, timetableId: timetables[1]._id, day: 'wednesday', period: 3, startTime: '11:00', endTime: '13:00', courseOfferingId: courseOfferings[3]._id, roomId: rooms[2]._id, slotType: 'lab' },
     { collegeId: CID, timetableId: timetables[1]._id, day: 'monday', period: 1, startTime: '09:00', endTime: '10:00', courseOfferingId: courseOfferings[4]._id, roomId: rooms[6]._id, slotType: 'lecture' },
   ]);
@@ -8971,10 +8978,10 @@ Insert after the `demoFaculty` provisionPerson line and **before** `const juviSu
       { collegeId: CID, studentId: demoStudent._id, courseOfferingId: courseOfferings[0]._id, semesterId: sem2_24._id, status: 'enrolled' },
       { collegeId: CID, studentId: demoStudent._id, courseOfferingId: courseOfferings[1]._id, semesterId: sem2_24._id, status: 'enrolled' },
     ]);
-    await Section.updateOne({ _id: courseOfferings[0].sectionId }, { $addToSet: { studentIds: demoStudent._id } });
+    await Section.updateOne({ _id: courseOfferings[0].sectionId, collegeId: CID }, { $addToSet: { studentIds: demoStudent._id } });
 
     // ~8 weeks of closed sessions (Mon–Sat), the demo student below threshold on
-    // courseOfferings[0] (~67% → at_risk at T=75) and above on courseOfferings[1] (~95% → safe).
+    // courseOfferings[0] (~67% → at_risk at T=75) and above on courseOfferings[1] (~91% → safe).
     const markerFor: Record<string, mongoose.Types.ObjectId> = {
       [String(courseOfferings[0]._id)]: persons[10]._id,
       [String(courseOfferings[1]._id)]: persons[13]._id,
@@ -9089,7 +9096,7 @@ Deletion block covers ClassException + AcademicCalendar for idempotency."
 - Consumes:
   - ERP side (Task 7): `POST /api/academics/class-exceptions` (body `{ timetableSlotId, date, type, reason }`); `DELETE /api/academics/class-exceptions/:id` (revokes, returns the row).
   - Juvi side (Tasks 14-16): `GET /api/juvi-app/v1/today`, `GET /api/juvi-app/v1/attention?kinds=all`, `GET /api/juvi-app/v1/me/academics` with the mobile session from `signInAs`/`mobileClient`.
-  - Harness: `getTestApp`/`cleanupTestApp`, `seedBase` (`fx.sem1` is the active semester), `createTestApi`/`TestApi` from `'../helpers/request'`, `createTestCourse`/`createTestCourseOffering`/`createTestFaculty` from `'../factories/academic.factory'`, `enableJuvi`/`provisionTestStudent`/`mobileClient` from `'../factories/juvi.factory'`, `activateAccount`/`signInAs` from `'../factories/notice.factory'`, models direct-path imported per the 2-up depth of `__e2e__/modules/`.
+  - Harness: `getTestApp`/`cleanupTestApp`, `seedBase` (`fx.sem1` is the active semester), `createTestApi`/`TestApi` from `'../helpers/request'`, `createTestCourse`/`createTestCourseOffering`/`createTestFaculty` from `'../factories/academic.factory'`, `enableJuvi`/`provisionTestStudent`/`mobileClient` from `'../factories/juvi.factory'`, `activateAccount`/`signInAs` from `'../factories/notice.factory'`; models from the `../../models` barrel, as the other `__e2e__/modules/` suites do (the barrel is allowed in e2e files — the direct-path rule is for unit fences).
 - Produces: the closing proof that the ERP write side and the Juvi read side share ONE truth — a class cancelled in the ERP appears as `cancelled` on the student's `/today` and as a `class_change` attention item (id = the exception's `_id`), restores on revoke, an invoice becomes a `fee_due` attention item and a dues invoice, and a scheduled assessment becomes the glance `nextAssessment` and an `assessment` attention item.
 
 - [ ] **Step 1: Write the parity suite**
@@ -9098,7 +9105,7 @@ Create `backend/src/__e2e__/modules/juvi-erp-parity.e2e.test.ts`:
 
 ```typescript
 // ERP↔Juvi parity (§11): the ERP write surface and the Juvi read surface share one truth.
-import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import type { Express } from 'express';
 import { getTestApp, cleanupTestApp } from '../setup/test-app';
 import { seedBase, BaseFixtures } from '../setup/seed-base';
@@ -9123,6 +9130,7 @@ beforeAll(async () => { app = await getTestApp(); api = createTestApi(app); });
 // clock. FIXED is a Tuesday. `toFake: ['Date']` only. R87.
 const FIXED = new Date('2026-11-10T04:00:00.000Z'); // 09:30 IST, Tuesday
 beforeEach(async () => { vi.useFakeTimers({ now: FIXED, toFake: ['Date'], shouldAdvanceTime: true }); await cleanupTestApp(); fx = await seedBase(); await enableJuvi(fx.collegeId); });
+afterEach(() => { vi.useRealTimers(); });
 afterAll(async () => { await cleanupTestApp(); });
 
 const DOW = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
@@ -9231,15 +9239,16 @@ Expected: PASS (all 3). This is a verification suite — everything it exercises
 ```bash
 npm run typecheck
 npm test -w backend
+npm run test:e2e -w backend -- -u src/__e2e__/modules/rbac-route-walk.test.ts
 npm run test:e2e -w backend
 ```
 
-Expected: typecheck 0 errors across all workspaces; the backend unit suite green; `test:e2e` green except the two pre-existing `fee-alerts` failures and `fee-configuration-http` (documented known-failing carry-over, out of scope). Any OTHER e2e failure is this plan's regression — fix it before declaring the task done.
+Expected: typecheck 0 errors across all workspaces; the backend unit suite green; `test:e2e` green except the two pre-existing `fee-alerts` failures and `fee-configuration-http` (documented known-failing carry-over, out of scope). The `-u` line is the plan's **one deliberate regeneration** of `rbac-route-walk`'s snapshot, and it must run **before** the full suite: that test enumerates every registered GET route from the live Express stack and snapshots the whole per-persona status matrix, and Task 14 mounted three new GET routes under `/api/juvi-app/v1/` (`/today`, `/teaching`, `/me/academics`). Its committed snapshot therefore predates them, and the full-suite run would otherwise fail on a snapshot mismatch — a plan artifact, not a regression. Regenerate it here and nowhere else; Task 19 is the only step that runs the full e2e suite. Any OTHER e2e failure is this plan's regression — fix it before declaring the task done.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add backend/src/__e2e__/modules/juvi-erp-parity.e2e.test.ts
+git add backend/src/__e2e__/modules/juvi-erp-parity.e2e.test.ts backend/src/__e2e__/modules/__snapshots__/rbac-route-walk.test.ts.snap
 git commit -m "test(juvi): ERP <-> Juvi parity e2e for class changes, dues and assessments (§11)
 
 One change, one surface: an ERP class-exception cancels the class on
