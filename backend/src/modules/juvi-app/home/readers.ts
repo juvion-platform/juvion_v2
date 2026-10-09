@@ -148,7 +148,7 @@ export async function duesFor(collegeId: string, studentId: string): Promise<Juv
   }).sort({ dueDate: 1 }).lean<RawInvoice[]>();
 
   const invoiceIds = invoices.map((i) => i._id);
-  const [payments, plans] = await Promise.all([
+  const [payments, plans, lastSuccessful] = await Promise.all([
     invoiceIds.length
       ? Payment.find({ collegeId, invoiceId: { $in: invoiceIds }, status: 'success' })
           .sort({ paymentDate: 1 }).lean<RawPayment[]>()
@@ -157,6 +157,15 @@ export async function duesFor(collegeId: string, studentId: string): Promise<Juv
       ? PaymentPlan.find({ collegeId, studentId: new Types.ObjectId(studentId), invoiceId: { $in: invoiceIds } })
           .lean<{ invoiceId: Types.ObjectId | null; installments: RawInstalment[] }[]>()
       : Promise.resolve([] as { invoiceId: Types.ObjectId | null; installments: RawInstalment[] }[]),
+    // Spec §6: `lastPayment` is the student's latest successful Payment for the
+    // STUDENT — read independently of invoice status so a fully-paid (closed)
+    // invoice still surfaces. `payments` above stays scoped to open invoices
+    // because it only feeds per-invoice outstanding.
+    Payment.findOne({
+      collegeId,
+      studentId: new Types.ObjectId(studentId),
+      status: 'success',
+    }).sort({ paymentDate: -1 }).limit(1).lean<RawPayment | null>(),
   ]);
 
   const paidByInvoice = new Map<string, number>();
@@ -214,19 +223,18 @@ export async function duesFor(collegeId: string, studentId: string): Promise<Juv
     .reduce<ReturnType<typeof nextInvoiceDue> | null>(
       (min, n) => (min === null || n.date < min.date ? n : min), null);
 
-  const last = payments.length ? payments[payments.length - 1] : null;
   return {
     available: (await Invoice.exists({ collegeId })) !== null,
     invoiceCount: duesInvoices.length,
     total,
     invoices: duesInvoices,
     nextDue: winner,
-    lastPayment: last
+    lastPayment: lastSuccessful
       ? {
-          invoiceId: last.invoiceId ? String(last.invoiceId) : '',
-          amount: toPaise(last.amount), // integer paise (R1)
-          date: last.paymentDate.toISOString(),
-          receiptNumber: last.receiptNumber,
+          invoiceId: lastSuccessful.invoiceId ? String(lastSuccessful.invoiceId) : '',
+          amount: toPaise(lastSuccessful.amount), // integer paise (R1)
+          date: lastSuccessful.paymentDate.toISOString(),
+          receiptNumber: lastSuccessful.receiptNumber,
         }
       : null,
   };

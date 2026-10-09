@@ -139,6 +139,20 @@ describe('juviAttendance', () => {
     expect(out.courses[0]!.pct).toBe(100);
     expect(out.courses[0]!.headroom).toBe(0);
   });
+
+  it('skips an enrollment whose offering was deleted instead of throwing (stale row)', async () => {
+    const w = await seedWorld();
+    // A dangling Enrollment (its CourseOffering no longer exists) must not blank the
+    // whole reader — courseAttendanceFor 404s on a named offering, so attendanceFor
+    // has to drop dead offering ids before it loops.
+    await Enrollment.create({
+      collegeId, studentId: new Types.ObjectId(w.studentId),
+      courseOfferingId: new Types.ObjectId(),
+      semesterId: new Types.ObjectId(w.semesterId), status: 'enrolled', enrolledAt: new Date(),
+    });
+    const out = await juviAttendance(collegeId.toString(), w.studentId);
+    expect(out.courses.map((c) => c.courseCode)).toEqual(['CS201']);
+  });
 });
 
 // --- dues ----------------------------------------------------------------------
@@ -287,6 +301,48 @@ describe('duesFor', () => {
     const out = await duesFor(collegeId.toString(), w.studentId);
     expect(out.invoices[0]!.outstanding).toBe(900000); // 9000 ₹ in paise (R1)
   });
+
+  it('reports lastPayment even when the only invoice is closed (latest successful Payment for the student)', async () => {
+    const w = await seedWorld();
+    const inv = await Invoice.create({
+      collegeId, studentId: new Types.ObjectId(w.studentId), invoiceNumber: 'INV-60',
+      type: 'fee', totalAmount: 12000, dueDate: new Date('2026-06-01T00:00:00Z'), status: 'paid',
+    });
+    await Payment.create({
+      collegeId, studentId: new Types.ObjectId(w.studentId), invoiceId: inv._id,
+      receiptNumber: 'RCP-60', amount: 12000, paymentMode: 'upi', status: 'success',
+      paymentDate: new Date('2026-06-02T00:00:00Z'),
+    });
+    const out = await duesFor(collegeId.toString(), w.studentId);
+    expect(out.invoiceCount).toBe(0);   // 'paid' is not an open invoice
+    expect(out.lastPayment).toMatchObject({ amount: 1200000, receiptNumber: 'RCP-60' });
+  });
+
+  it("picks the student's latest successful Payment by paymentDate, across open and closed invoices", async () => {
+    const w = await seedWorld();
+    const openInv = await Invoice.create({
+      collegeId, studentId: new Types.ObjectId(w.studentId), invoiceNumber: 'INV-70',
+      type: 'fee', totalAmount: 20000, dueDate: new Date('2027-01-01T00:00:00Z'), status: 'sent',
+    });
+    const closedInv = await Invoice.create({
+      collegeId, studentId: new Types.ObjectId(w.studentId), invoiceNumber: 'INV-71',
+      type: 'fee', totalAmount: 8000, dueDate: new Date('2026-05-01T00:00:00Z'), status: 'paid',
+    });
+    await Payment.create({
+      collegeId, studentId: new Types.ObjectId(w.studentId), invoiceId: openInv._id,
+      receiptNumber: 'RCP-70', amount: 5000, paymentMode: 'upi', status: 'success',
+      paymentDate: new Date('2026-06-01T00:00:00Z'),
+    });
+    await Payment.create({
+      collegeId, studentId: new Types.ObjectId(w.studentId), invoiceId: closedInv._id,
+      receiptNumber: 'RCP-71', amount: 8000, paymentMode: 'upi', status: 'success',
+      paymentDate: new Date('2026-07-01T00:00:00Z'),   // the student's actual latest
+    });
+    const out = await duesFor(collegeId.toString(), w.studentId);
+    expect(out.lastPayment).toMatchObject({
+      amount: 800000, receiptNumber: 'RCP-71', invoiceId: String(closedInv._id),
+    });
+  });
 });
 
 // --- assessments ---------------------------------------------------------------
@@ -333,10 +389,23 @@ describe('assessmentsFor', () => {
       collegeId, courseOfferingId: new Types.ObjectId(w.offeringId),
       name: 'No date', type: 'assignment', maxMarks: 10, weightage: 5, status: 'scheduled',
     });
-    await ExamSchedule.create({
-      collegeId, semesterId: new Types.ObjectId(w.semester2Id), courseId: new Types.ObjectId(w.courseId),
-      examType: 'regular', date: new Date('2026-11-25T00:00:00Z'), startTime: '10:00', endTime: '12:00',
-      status: 'scheduled',
+    // A stray item that would otherwise match on offering AND window: it hangs off a
+    // second offering for the same course, enrolled only in semester 2 (completed).
+    // The active-semester filter on the enrollment is the ONLY thing keeping it out —
+    // remove that clause and this row appears.
+    const pastOffering = await CourseOffering.create({
+      collegeId, courseId: new Types.ObjectId(w.courseId), semesterId: new Types.ObjectId(w.semester2Id),
+      sectionId: new Types.ObjectId(), facultyId: new Types.ObjectId(w.facultyId),
+      maxEnrollment: 60, enrolledCount: 1, status: 'active',
+    });
+    await Enrollment.create({
+      collegeId, studentId: new Types.ObjectId(w.studentId), courseOfferingId: pastOffering._id,
+      semesterId: new Types.ObjectId(w.semester2Id), status: 'enrolled', enrolledAt: new Date(),
+    });
+    await InternalAssessment.create({
+      collegeId, courseOfferingId: pastOffering._id,
+      name: 'Last Year Mid', type: 'mid1', maxMarks: 30, weightage: 20,
+      date: new Date('2026-11-22T09:00:00Z'), status: 'scheduled',
     });
     const items = await assessmentsFor(collegeId.toString(), w.studentId, new Date('2026-01-01T00:00:00Z'), new Date('2027-01-01T00:00:00Z'));
     expect(items).toEqual([]);
@@ -349,9 +418,18 @@ describe('assessmentsFor', () => {
       name: 'Mid 1', type: 'mid1', maxMarks: 30, weightage: 20,
       date: new Date('2026-11-20T09:00:00Z'), status: 'scheduled',
     });
+    await InternalAssessment.create({
+      collegeId, courseOfferingId: new Types.ObjectId(w.offeringId),
+      name: 'At Right Edge', type: 'mid2', maxMarks: 30, weightage: 20,
+      date: new Date('2026-11-21T00:00:00Z'), status: 'scheduled',   // exactly at `to`
+    });
     const past = await assessmentsFor(collegeId.toString(), w.studentId, new Date('2026-12-01T00:00:00Z'), new Date('2026-12-31T00:00:00Z'));
     expect(past).toEqual([]);
+    // `to` is exclusive: the item dated exactly at the right edge is excluded.
     const within = await assessmentsFor(collegeId.toString(), w.studentId, new Date('2026-11-20T09:00:00Z'), new Date('2026-11-21T00:00:00Z'));
-    expect(within).toHaveLength(1);
+    expect(within.map((i) => i.title)).toEqual(['Mid 1']);
+    // Widening `to` by a single millisecond brings the edge item in.
+    const widened = await assessmentsFor(collegeId.toString(), w.studentId, new Date('2026-11-20T09:00:00Z'), new Date('2026-11-21T00:00:01Z'));
+    expect(widened.map((i) => i.title)).toEqual(['Mid 1', 'At Right Edge']);
   });
 });

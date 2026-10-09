@@ -118,7 +118,19 @@ export async function attendanceFor(
     status: 'enrolled',
     semesterId: { $in: semesterIds },
   }).select('courseOfferingId').lean<{ courseOfferingId: Types.ObjectId }[]>();
-  const offeringIds = [...new Set(enrollments.map((e) => String(e.courseOfferingId)))];
+  const enrolledOfferingIds = [...new Set(enrollments.map((e) => String(e.courseOfferingId)))];
+  // Drop offering ids that no longer exist before looping. A stale Enrollment (its
+  // CourseOffering deleted after the student was enrolled) would otherwise make
+  // courseAttendanceFor throw 404 and blank the whole reader for that student.
+  // courseAttendanceFor keeps its 404 for callers that name a specific offering.
+  const liveOfferings = enrolledOfferingIds.length
+    ? await CourseOffering.find({
+        collegeId,
+        _id: { $in: enrolledOfferingIds.map((id) => new Types.ObjectId(id)) },
+      }).select('_id').lean<{ _id: Types.ObjectId }[]>()
+    : [];
+  const liveOfferingIds = new Set(liveOfferings.map((o) => String(o._id)));
+  const offeringIds = enrolledOfferingIds.filter((id) => liveOfferingIds.has(id));
   const courses: CourseAttendance[] = [];
   for (const id of offeringIds) courses.push(await courseAttendanceFor(collegeId, studentId, id, T));
   const held = courses.reduce((sum, c) => sum + c.held, 0);
