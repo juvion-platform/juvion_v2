@@ -20,8 +20,12 @@ export async function listClassExceptions(
 ) {
   try {
     const viewer = await svc.listClassExceptionViewer(req.collegeId!, req.user!);
-    // Office callers see every exception; teaching callers only their own (§5.5);
-    // anything else (no policy, no Faculty row) sees nothing.
+    // Office callers see every exception; teaching callers only their own (§5.5).
+    // The third case — neither office nor faculty — is unreachable in practice:
+    // the route admits on `academics:read` and the viewer checks that same key
+    // (R88), so anyone who passes the route is office. Kept as defence in depth:
+    // if it is ever reached, an explicit empty list beats leaking every class in
+    // the college.
     if (!viewer.isOffice && !viewer.facultyId) { res.json([]); return; }
     const scope = viewer.isOffice ? undefined : viewer.facultyId;
     res.json(await svc.listClassExceptions(req.collegeId!, { ...req.validatedQuery, ...(scope ? { viewerFacultyId: scope } : {}) }));

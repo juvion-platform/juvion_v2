@@ -273,12 +273,20 @@ export async function assertClassChangePermissionForSlot(
 
 export interface ClassExceptionViewer { isOffice: boolean; facultyId?: string }
 
-/** List scoping (§5.5): teaching callers see only their own classes; office callers see everything. */
+/**
+ * List scoping (§5.5): teaching callers see only their own classes; everyone
+ * else is office and sees everything — two categories, not three. The key is
+ * `academics:read` (R88), matching the policy the list route authorizes on, so
+ * read-only office personas that hold read without update — the Registrar
+ * (ST-REG), ST-TPO, ST-IQAC, ST-ACOPS-CR — are office here rather than falling
+ * into an empty list. The write path keeps `academics:update` in
+ * assertClassChangePermission.
+ */
 export async function listClassExceptionViewer(collegeId: string, actor: ClassChangeActor): Promise<ClassExceptionViewer> {
   if (process.env.RBAC_ENFORCE === 'false') return { isOffice: true };
   const fid = await actingFacultyId(collegeId, actor);
   if (fid) return { isOffice: false, facultyId: fid };
-  const policy = await evaluateAccess(collegeId, actor.role, personaCodesOf(actor), 'academics', 'update');
+  const policy = await evaluateAccess(collegeId, actor.role, personaCodesOf(actor), 'academics', 'read');
   return policy ? { isOffice: true } : { isOffice: false };
 }
 

@@ -134,4 +134,20 @@ describe('class exception permissions (§5.1/§11)', () => {
     const asAdmin = await api.as(fx.admin.token).get(`${A}/class-exceptions`).expect(200);
     expect(asAdmin.body).toHaveLength(1);
   });
+
+  it('a read-only office persona holding academics:read but not update sees the full list, not an empty one (R88)', async () => {
+    const w = await classWorld();
+    process.env.RBAC_ENFORCE = 'true';
+    await api.as(fx.admin.token).post(`${A}/class-exceptions`)
+      .send(cancelBody(String(w.slot._id), w.date)).expect(201);
+    // The Registrar (ST-REG) holds `academics:read` without `academics:update`
+    // and has no Faculty row — the persona the old `update`-keyed viewer stranded.
+    const registrar = await createTestUser({
+      collegeId: fx.collegeId, role: 'staff', personaType: 'ST-REG',
+      name: 'Registrar', email: 'registrar@college.test',
+    });
+    const res = await api.as(registrar.token).get(`${A}/class-exceptions`).expect(200);
+    expect(res.body).toHaveLength(1);
+    expect(res.body[0].timetableSlotId).toBe(String(w.slot._id));
+  });
 });
