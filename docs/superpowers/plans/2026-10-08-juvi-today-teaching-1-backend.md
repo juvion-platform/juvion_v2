@@ -4121,6 +4121,9 @@ async function seedTeachingWorld(): Promise<TeachingWorld> {
     collegeId, academicYearId: new Types.ObjectId(), number: 1, year: 2,
     startDate: new Date('2026-06-01T00:00:00Z'), endDate: new Date('2026-12-01T00:00:00Z'), status: 'active',
   });
+  // makeOffering/makeTimetable dereference the bare `semesterId`; bind it here, as the
+  // sibling seeds do (Task 11's seedWorld assigns `semesterId = semester._id as Types.ObjectId`).
+  const semesterId = semester._id as Types.ObjectId;
   const section = await Section.create({
     collegeId, name: 'CSE-A', branchId: new Types.ObjectId(), batchId: new Types.ObjectId(),
     year: 2, semester: 1, capacity: 60, studentIds: [],
