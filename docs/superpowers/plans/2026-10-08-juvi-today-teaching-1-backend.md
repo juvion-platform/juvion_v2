@@ -8753,7 +8753,7 @@ new:    { operationId: 'getAttention', method: 'get', path: '/attention', summar
 - [ ] **Step 5: Regenerate the committed document**
 
 Run: `npm run openapi:mobile -w backend`
-Expected: exits 0 and rewrites `mobile/api/openapi.json`. `git diff --stat -- mobile/api/openapi.json` shows: 3 new `/paths/today`, `/paths/teaching`, `/paths/me~1academics` (path keys are escaped); new components `AttentionItem DayClass DayView DueInvoiceItem CoursesTaughtItem FacultyCourses MeAcademics StudentAcademics StudentDues Today Teaching`; `EventsRequest` carrying the four new event names; and a rewrite of the **existing** `Attention` component, whose `items` currently carry the old inline notice-card shape — expect that extra diff hunk, it is Task 15's widening reaching the document.
+Expected: exits 0 and rewrites `mobile/api/openapi.json`. `git diff --stat -- mobile/api/openapi.json` shows: 3 new `/paths/today`, `/paths/teaching`, `/paths/me/academics` (literal keys — `~1` escaping applies to `$ref` JSON Pointers, not to `paths` keys); new components `AttentionItem DayClass DayView DueInvoiceItem CoursesTaughtItem FacultyCourses MeAcademics StudentAcademics StudentDues Today Teaching`; `EventsRequest` carrying the four new event names; and a rewrite of the **existing** `Attention` component, whose `items` currently carry the old inline notice-card shape — expect that extra diff hunk, it is Task 15's widening reaching the document.
 
 - [ ] **Step 6: Enforce the null-object guard and regenerate the Dart client**
 
@@ -8771,7 +8771,7 @@ cd mobile
 cd ..
 ```
 
-Expected: the guard inside `gen_api.sh` re-passes, `openapi-generator-cli dart-dio` regenerates `mobile/packages/juvi_api`, perl-fixes the pubspec, `dart pub get` + `build_runner build` succeed, `flutter pub get` succeeds. `git status` then shows `mobile/packages/juvi_api` changed; CI fails if the committed directory differs from a regeneration, so the regenerated output is committed in the next step. (The allow-list regex and the new Flutter routes are the Flutter sub-project's work; nothing else under `mobile/lib` changes here.)
+Expected: the guard inside `gen_api.sh` re-passes, `openapi-generator-cli dart-dio` regenerates `mobile/packages/juvi_api`, perl-fixes the pubspec, `dart pub get` + `build_runner build` succeed, `flutter pub get` succeeds. `git status` then shows `mobile/packages/juvi_api` changed; CI fails if the committed directory differs from a regeneration, so the regenerated output is committed in the next step. Expect one structural change in the Dart that has no counterpart hunk in the JSON: `attention_items_inner.dart` disappears and is replaced by `attention_item.dart` and `notice_list_items_inner.dart`. That is Task 15's widening reaching codegen — before it `Attention.items` and `NoticeList.items` were byte-identical inline shapes and the generator reused a single class for both, and now they differ so it cannot. It is not drift; do not chase it. (The allow-list regex and the new Flutter routes are the Flutter sub-project's work; nothing else under `mobile/lib` changes here.)
 
 - [ ] **Step 7: Run the contract tests + typecheck**
 
