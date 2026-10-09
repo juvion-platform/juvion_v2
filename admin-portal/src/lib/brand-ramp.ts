@@ -25,19 +25,25 @@ export interface BrandRamp {
 export const PRIMARY_STEPS: readonly PrimaryStep[] =
   ['50', '100', '200', '300', '400', '500', '600', '700', '800', '900'] as const;
 
-/** The palette frozen from `tailwind.config.js` before this feature landed. */
-export const LEGACY_RAMP: BrandRamp = {
-  primary: {
+/**
+ * The palette frozen from `tailwind.config.js` before this feature landed.
+ *
+ * Deep-frozen, and returned by reference on the no-accent path: a caller that
+ * mutated the ramp it was handed would otherwise corrupt this constant for the
+ * whole process and silently break the pixel-identical guarantee.
+ */
+export const LEGACY_RAMP: BrandRamp = Object.freeze({
+  primary: Object.freeze({
     '50': '240 244 255', '100': '219 234 254', '200': '186 212 242', '300': '123 174 212',
     '400': '74 141 192', '500': '43 108 176', '600': '37 99 160', '700': '30 79 130',
     '800': '26 54 93', '900': '15 39 68',
-  },
-  navy: { DEFAULT: '15 39 68', dark: '26 54 93', light: '45 74 111' },
+  }),
+  navy: Object.freeze({ DEFAULT: '15 39 68', dark: '26 54 93', light: '45 74 111' }),
   // The sidebar's active state is teal today. It becomes an accent tint when an
   // accent is set (see `resolveRamp`), and must stay teal when one is not — which
   // is why it is a token rather than a reuse of `primary-300`.
-  chrome: { soft: '94 234 212', wash: '56 178 172' },
-};
+  chrome: Object.freeze({ soft: '94 234 212', wash: '56 178 172' }),
+});
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
@@ -56,13 +62,23 @@ const S_SCALE = [0.35, 0.45, 0.60, 0.72, 0.85, 1, 1, 0.95, 0.85, 0.75];
  * The accent's own lightness replaces the ladder at index 5, so a band that
  * reached below 0.40 would place the 500 step lighter than the 600 step and
  * break the ramp's monotonicity — which is exactly what an accent like
- * `#0B5FA5` (lightness 0.345) would do. 0.44 and 0.58 keep ~0.04 of headroom on
- * both sides.
+ * `#0B5FA5` (lightness 0.345) would do. 0.44 and 0.58 leave 0.04 of headroom
+ * below and 0.07 above — room enough that 8-bit rounding cannot close either gap.
  */
 const L500_MIN = 0.44;
 const L500_MAX = 0.58;
 const S500_MIN = 0.35;
 const S500_MAX = 0.75;
+/**
+ * Saturation below which an accent is treated as achromatic.
+ *
+ * `rgbToHsl` reports hue 0 for a pure grey, and a grey's saturation sits far
+ * below `S500_MIN` — so clamping it up derives a fully saturated ramp at that
+ * arbitrary hue, handing a neutral brand a red identity. A threshold rather than
+ * `s === 0` so that near-greys like `#7F8080` (s ≈ 0.004) are caught too; they
+ * would otherwise derive an equally arbitrary saturated ramp.
+ */
+const ACHROMATIC_S = 0.04;
 /** Dark chrome is deliberately low-chroma: a red accent yields oxblood, not fire-engine. */
 const NAVY_S_MAX = 0.35;
 
@@ -134,15 +150,17 @@ export function resolveRamp(accentHex: string | null | undefined): BrandRamp {
   if (!isValidAccentHex(accentHex)) return LEGACY_RAMP;
 
   const [h, s, l] = rgbToHsl(...hexToRgb(accentHex));
-  // A grey accent reports hue 0, which would derive a red ramp. Keep it grey.
-  const hueDeg = s === 0 ? 0 : h;
-  const s500 = clamp(s, S500_MIN, S500_MAX);
+  // A neutral accent carries no hue worth preserving, so it keeps the grey it
+  // arrived with instead of acquiring a saturated identity at hue 0.
+  const achromatic = s < ACHROMATIC_S;
+  const hueDeg = achromatic ? 0 : h;
+  const s500 = achromatic ? 0 : clamp(s, S500_MIN, S500_MAX);
   const l500 = clamp(l, L500_MIN, L500_MAX);
 
   const primary = {} as Record<PrimaryStep, Triplet>;
   PRIMARY_STEPS.forEach((step, i) => {
     const stepL = i === 5 ? l500 : L_LADDER[i]!;
-    const stepS = i === 5 ? s500 : clamp(s500 * S_SCALE[i]!, 0.02, 0.95);
+    const stepS = i === 5 ? s500 : clamp(s500 * S_SCALE[i]!, achromatic ? 0 : 0.02, 0.95);
     primary[step] = triplet(hslToRgb(hueDeg, stepS, stepL));
   });
 

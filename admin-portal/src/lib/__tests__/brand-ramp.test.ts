@@ -37,6 +37,13 @@ describe('LEGACY_RAMP', () => {
     expect(LEGACY_RAMP.navy).toEqual({ DEFAULT: '15 39 68', dark: '26 54 93', light: '45 74 111' });
     expect(LEGACY_RAMP.chrome).toEqual({ soft: '94 234 212', wash: '56 178 172' });
   });
+
+  it('is frozen, so a caller cannot corrupt the no-accent path process-wide', () => {
+    expect(Object.isFrozen(LEGACY_RAMP)).toBe(true);
+    expect(Object.isFrozen(LEGACY_RAMP.primary)).toBe(true);
+    expect(Object.isFrozen(LEGACY_RAMP.navy)).toBe(true);
+    expect(Object.isFrozen(LEGACY_RAMP.chrome)).toBe(true);
+  });
 });
 
 describe('isValidAccentHex', () => {
@@ -121,11 +128,33 @@ describe('resolveRamp', () => {
     expect(ramp.chrome.soft).toBe(ramp.primary['300']);
     expect(ramp.chrome.wash).toBe(ramp.primary['500']);
   });
+
+  // A neutral accent must stay neutral in every slot. Before the achromatic
+  // guard, #808080 clamped its saturation up to S500_MIN and derived a maroon
+  // ramp at hue 0; white and black derived pink and oxblood ones.
+  it('keeps a neutral accent neutral rather than deriving a saturated ramp', () => {
+    for (const accent of ['#808080', '#7F8080', '#FFFFFF', '#000000']) {
+      const ramp = resolveRamp(accent);
+      const all = [...STEPS.map((s) => ramp.primary[s]), ...Object.values(ramp.navy), ...Object.values(ramp.chrome)];
+      for (const t of all) {
+        const [r, g, b] = t.split(' ').map(Number);
+        expect(Math.max(r!, g!, b!) - Math.min(r!, g!, b!), `${accent} emitted a tinted ${t}`).toBe(0);
+      }
+    }
+  });
 });
 
 describe('readableOn', () => {
   it('picks dark text on a light fill and white on a dark one', () => {
     expect(readableOn('240 244 255')).toBe('#0F172A');
     expect(readableOn('15 39 68')).toBe('#FFFFFF');
+  });
+
+  // The extremes above are satisfied by any monotone rule, including a fixed
+  // luminance cut. This grey has lightness 0.502 but relative luminance 0.216,
+  // so a 0.5 cut would give it white text — which is the bug the ratio
+  // comparison exists to prevent.
+  it('takes dark ink on a mid-lightness fill', () => {
+    expect(readableOn('128 128 128')).toBe('#0F172A');
   });
 });
