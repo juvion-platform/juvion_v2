@@ -2094,8 +2094,10 @@ export async function listClassExceptions(
 ) {
   try {
     const viewer = await svc.listClassExceptionViewer(req.collegeId!, req.user!);
-    // Office callers see every exception; teaching callers only their own (§5.5);
-    // anything else (no policy, no Faculty row) sees nothing.
+    // Office callers see every exception; teaching callers only their own (§5.5). After R88 the
+    // third case is unreachable in practice — the route already admits on `academics:read`, so a
+    // caller with no Faculty row resolves to office. The guard stays as defence in depth: if it is
+    // ever reached, an explicit empty list beats leaking every class in the college.
     if (!viewer.isOffice && !viewer.facultyId) { res.json([]); return; }
     const scope = viewer.isOffice ? undefined : viewer.facultyId;
     res.json(await svc.listClassExceptions(req.collegeId!, { ...req.validatedQuery, ...(scope ? { viewerFacultyId: scope } : {}) }));
@@ -2200,12 +2202,22 @@ export async function assertClassChangePermissionForSlot(
 
 export interface ClassExceptionViewer { isOffice: boolean; facultyId?: string }
 
-/** List scoping (§5.5): teaching callers see only their own classes; office callers see everything. */
+/**
+ * List scoping (§5.5): teaching callers see only their own classes; office callers see everything.
+ *
+ * The policy check is on 'read', NOT 'update' (R88). §5.5 names exactly two categories, and the
+ * route that reaches this function admits on `academics:read` (`routes.ts`). Keying office-ness on
+ * 'update' strands every read-only office persona — the Registrar (ST-REG), ST-TPO, ST-IQAC,
+ * ST-ACOPS-CR all hold `academics:read` without `update` (`shared/rbac/defaults.ts`) — into
+ * `{ isOffice: false }` with no `facultyId`, which the controller maps to a silent `200 []`. The
+ * `update` key belongs only to the write path (`assertClassChangePermission` above), where the
+ * caller really is asking to change someone's class.
+ */
 export async function listClassExceptionViewer(collegeId: string, actor: ClassChangeActor): Promise<ClassExceptionViewer> {
   if (process.env.RBAC_ENFORCE === 'false') return { isOffice: true };
   const fid = await actingFacultyId(collegeId, actor);
   if (fid) return { isOffice: false, facultyId: fid };
-  const policy = await evaluateAccess(collegeId, actor.role, personaCodesOf(actor), 'academics', 'update');
+  const policy = await evaluateAccess(collegeId, actor.role, personaCodesOf(actor), 'academics', 'read');
   return policy ? { isOffice: true } : { isOffice: false };
 }
 
@@ -2343,7 +2355,7 @@ git commit -m "feat(academics): class-exception routes with per-actor permission
 - Test: `backend/src/modules/juvi-app/spaces/__tests__/next-class-live.test.ts`
 
 **Interfaces:**
-- Consumes: `getLiveTimetables(collegeId, at, timezone)` (Task 3 — window judged on the college-LOCAL day, R53), `activeExceptionsFor` (Task 4), `ymd`, `addDays`, `dayEnumOf`, `instantOf` (Task 2); `Timetable`, `TimetableSlot` models.
+- Consumes: `getLiveTimetables(collegeId, at, timezone)` (Task 3 — window judged on the college-LOCAL day, R53), `activeExceptionsFor` (Task 4), `ymd`, `addDays`, `dayEnumOf`, `instantOf` (Task 2); `TimetableSlot` model.
 - Produces: `nextClassByOffering(collegeId, offeringIds, timezone): Promise<Map<string, Date>>` — **same name, same shape, new semantics** (§5.3); `formatNextClassLabel` unchanged. `spaces-service.ts` needs no change (same call sites at lines 10/44/54).
 - **`WeeklySlot` and `nextOccurrence` ARE referenced elsewhere** — the claim that they are unreferenced is false, and deleting them breaks a live test. `backend/src/__e2e__/modules/juvi-app-spaces.e2e.test.ts:11` imports `nextOccurrence` and calls it at `:58` and `:59`, where it is the **independent oracle** for the "courses ordered by next class" assertion: the e2e deliberately derives the expected OS-before-DBMS order from the server's own `asOf` rather than hard-coding it, so the ordering assertion stays wall-clock independent. Step 4 below expects that file to pass, so it must be updated in the same commit. Replace the two calls with a local pure helper built on Task 2's primitives — no new production export, and the oracle stays independent of the code under test:
 
@@ -2375,7 +2387,7 @@ function nextAt(day: string, hhmm: string, asOf: Date, tz: string): Date {
     const dbmsNext = nextFor('17:00');
 ```
 
-  `DAYS6`, `asOf` and `TZ` on the surrounding lines stay as they are; the two `!` non-null assertions go away because `nextFor` either returns a date or throws. The seeded rows are daily 08:00/17:00 across `DAYS6`, so the earliest-of-the-week fold is the same instant the old helper returned. **The comparison is `>=`, matching the reader's `at < nowMs → continue` (R81)** — both sides treat an occurrence starting exactly at the reference instant as next, so the oracle and the server cannot disagree at the boundary, which they would if one used `>` and the other `>=`.
+  `DAYS6`, `asOf` and `TZ` on the surrounding lines stay as they are; the two `!` non-null assertions go away because `nextFor` either returns a date or throws. The seeded rows are daily 08:00/17:00 across `DAYS6`, so the earliest-of-the-week fold has the same ordering the old helper returned. **The comparison is `>=`, matching the reader's `at < nowMs → continue` (R81)** — both sides treat an occurrence starting exactly at the reference instant as next, so the oracle and the server cannot disagree at the boundary, which they would if one used `>` and the other `>=`.
 - Import-direction check: `juvi-app/spaces/next-class.ts → academics/{live-timetable,class-exception-service,timetable-date}` — `class-exception-service` imports `juvi-app/config/institution-config`, which imports only `config/redis` and `models/College`, so there is no cycle.
 
 - [ ] **Step 1: Update the old test file and write the new tests**
@@ -2402,7 +2414,7 @@ const secId = new Types.ObjectId();
 const offerId = new Types.ObjectId();
 const userId = new Types.ObjectId('000000000000000000000002');
 
-async function seedSlot(opts: { tt?: Partial<Parameters<typeof Timetable.create>[0]> } = {}) {
+async function seedSlot(opts: { tt?: Partial<{ version: number; status: string; effectiveFrom: Date }> } = {}) {
   const tt = await Timetable.create({
     collegeId: cidO(), semesterId: new Types.ObjectId(), sectionId: secId,
     version: opts.tt?.version ?? 1, status: opts.tt?.status ?? 'published',
@@ -2493,7 +2505,7 @@ Note the two exception rows are created through the model directly (revokedAt/re
 - [ ] **Step 2: Run to verify failure**
 
 Run: `npm test -w backend -- --run modules/juvi-app/spaces/__tests__/next-class-live.test.ts`
-Expected: FAIL — the shipped `nextClassByOffering` is weekly arithmetic: it ignores exceptions (the cancelled and rescheduled cases return the wrong occurrence) and the draft-timetable case returns an entry instead of an empty map (`out.has` true). Tests 2, 3 and 4 fail **always**; test 1 fails only when it runs on a Monday after 09:00 IST (on any other run the weekly rule happens to return the same Monday the live rule must, so a green test 1 here is expected, not a problem).
+Expected: FAIL — the shipped `nextClassByOffering` is weekly arithmetic: it ignores exceptions, so the cancelled and rescheduled cases return the wrong occurrence, and it returns the occurrence plus now's sub-minute remainder, so an exact `hh:mm:00.000` expectation is red at essentially every instant. Tests 1, 2 and 3 fail; test 4 already passes (the shipped reader filters `status: 'published'`, so a draft-only fixture yields the empty map it expects).
 
 - [ ] **Step 3: Rewrite next-class.ts**
 
@@ -2510,7 +2522,6 @@ Replace the entire file content with:
  * `nextOccurrence` (window-blind, exception-blind) is gone.
  */
 import { Types } from 'mongoose';
-import { Timetable } from '../../../models/academic-ops/Timetable';
 import { TimetableSlot } from '../../../models/academic-ops/TimetableSlot';
 import { getLiveTimetables } from '../../academics/live-timetable';
 import { activeExceptionsFor } from '../../academics/class-exception-service';
@@ -2569,7 +2580,7 @@ export async function nextClassByOffering(
       if (cur === undefined || at < cur) best.set(String(s.courseOfferingId), at);
     }
     for (const e of rows) {
-      if (e.type !== 'rescheduled' || e.newDate !== date || !e.newStartTime) continue;
+      if (e.type !== 'rescheduled' || e.newDate !== date || !e.newStartTime || !ids.includes(String(e.courseOfferingId))) continue;
       const at = instantOf(date, e.newStartTime, timezone).getTime();
       if (at < nowMs) continue;
       const cur = best.get(String(e.courseOfferingId));
@@ -2594,7 +2605,7 @@ Expected: no errors.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add backend/src/modules/juvi-app/spaces/next-class.ts backend/src/modules/juvi-app/spaces/__tests__/next-class.test.ts backend/src/modules/juvi-app/spaces/__tests__/next-class-live.test.ts
+git add backend/src/modules/juvi-app/spaces/next-class.ts backend/src/modules/juvi-app/spaces/__tests__/next-class.test.ts backend/src/modules/juvi-app/spaces/__tests__/next-class-live.test.ts backend/src/__e2e__/modules/juvi-app-spaces.e2e.test.ts
 git commit -m "feat(juvi-app): next-class on the live timetable rule with exceptions (§5.3)"
 ```
 
@@ -4215,8 +4226,9 @@ describe('resolveDay', () => {
     const source = await resolveDay(collegeId.toString(), { kind: 'student', studentId: w.studentId }, '2026-11-13', 'Asia/Kolkata');
     expect(source.classes).toHaveLength(0);
     const moved = await resolveDay(collegeId.toString(), { kind: 'student', studentId: w.studentId }, '2026-11-09', 'Asia/Kolkata');
-    expect(moved.classes).toHaveLength(1);
-    expect(moved.classes[0]).toMatchObject({ status: 'rescheduled', start: '13:00', end: '14:00', movedFrom: { date: '2026-11-13', start: '14:00' } });
+    // Two classes: the offering's own Monday 09:00 slot is still live; the rescheduled 13:00 class is the addition.
+    expect(moved.classes).toHaveLength(2);
+    expect(moved.classes[1]).toMatchObject({ status: 'rescheduled', start: '13:00', end: '14:00', movedFrom: { date: '2026-11-13', start: '14:00' } });
   });
 
   it('returns a holiday day with no classes for a published holiday (§11 row 6)', async () => {
@@ -4273,7 +4285,10 @@ describe('resolveDay', () => {
     await Person.findByIdAndDelete(unlinked._id);
     const b = await w.makeOffering(ghostFaculty._id);
     await enrollIn(w.semesterId, w.studentId, b);
-    await w.makeTimetable(2, [{ day: 'monday', start: '11:00', end: '12:00', period: 3, offeringId: b }]);
+    await w.makeTimetable(2, [
+      { day: 'monday', start: '09:00', end: '10:00', period: 1, offeringId: a },
+      { day: 'monday', start: '11:00', end: '12:00', period: 3, offeringId: b },
+    ]);
     const day = await resolveDay(collegeId.toString(), { kind: 'student', studentId: w.studentId }, '2026-11-09', 'Asia/Kolkata');
     expect(day.classes).toHaveLength(1);
     expect(day.classes[0]!.faculty).toBeUndefined();
@@ -4285,11 +4300,15 @@ describe('resolveDay', () => {
     const w = await seedTeachingWorld();
     const a = await w.makeOffering(w.facultyId as unknown as Types.ObjectId);
     await enrollIn(w.semesterId, w.studentId, a);
+    const stray = await w.makeOffering(w.facultyId as unknown as Types.ObjectId);
     await w.makeTimetable(1, [
       { day: 'monday', start: '09:00', end: '10:00', period: 1, offeringId: a },
       { day: 'saturday', start: '09:00', end: '10:00', period: 1, offeringId: a },
+      { day: 'monday', start: '11:00', end: '12:00', period: 2, offeringId: stray },
     ]);
-    await enroll(w.studentId, a); // stray wrong-semester enrollment must not leak
+    // The stray zero-semester enrollment goes on a DIFFERENT offering: the Enrollment key
+    // (collegeId, courseOfferingId, studentId) is unique, so a second row for `a` collides (E11000).
+    await enroll(w.studentId, stray); // stray wrong-semester enrollment must not leak
     const sunday = await resolveDay(collegeId.toString(), { kind: 'student', studentId: w.studentId }, '2026-11-15', 'Asia/Kolkata');
     expect(sunday.classes).toHaveLength(0);
   });
@@ -4822,8 +4841,9 @@ describe('juviAttendance', () => {
   it('wraps the ERP formula with available/threshold/showHeadroom and adds channelId (R18)', async () => {
     const w = await seedWorld();
     const channel = await Channel.create({
-      collegeId, name: 'CS201 CSE-A', scopeType: 'course_offering',
-      scopeId: new Types.ObjectId(w.offeringId), status: 'active',
+      collegeId, type: 'official', templateCode: 'course', scopeType: 'course_offering',
+      scopeId: new Types.ObjectId(w.offeringId), name: 'CS201 CSE-A', about: 'Course discussion',
+      postingRule: 'publishers_only', replyRule: 'allowed', defaultPriority: 'routine', status: 'active',
     });
     const out = await juviAttendance(collegeId.toString(), w.studentId);
     expect(out).toMatchObject({ available: false, threshold: 60, showHeadroom: true, overall: { held: 0, attended: 0, pct: null } });
@@ -5017,8 +5037,9 @@ describe('assessmentsFor', () => {
   it('merges scheduled assessments and exams on active-semester offerings, sorted by at (R18 ids + channelId)', async () => {
     const w = await seedWorld();
     const channel = await Channel.create({
-      collegeId, name: 'CS201 CSE-A', scopeType: 'course_offering',
-      scopeId: new Types.ObjectId(w.offeringId), status: 'active',
+      collegeId, type: 'official', templateCode: 'course', scopeType: 'course_offering',
+      scopeId: new Types.ObjectId(w.offeringId), name: 'CS201 CSE-A', about: 'Course discussion',
+      postingRule: 'publishers_only', replyRule: 'allowed', defaultPriority: 'routine', status: 'active',
     });
     await InternalAssessment.create({
       collegeId, courseOfferingId: new Types.ObjectId(w.offeringId),
@@ -5659,7 +5680,9 @@ async function seedHomeWorld(withTimetable: boolean): Promise<World> {
     semesterId: semester._id, status: 'enrolled', enrolledAt: new Date(),
   });
   await Channel.create({
-    collegeId, name: 'CS301 A', scopeType: 'course_offering', scopeId: offering._id, status: 'active',
+    collegeId, type: 'official', templateCode: 'course', scopeType: 'course_offering',
+    scopeId: offering._id, name: 'CS301 A', about: 'Course discussion',
+    postingRule: 'publishers_only', replyRule: 'allowed', defaultPriority: 'routine', status: 'active',
   });
   if (withTimetable) {
     const building = await Building.create({ collegeId, name: 'Alpha Block', code: `JHAB${seq++}`, floors: 3, totalRooms: 30 });
@@ -5934,7 +5957,7 @@ function requireNotStaff(ctx: MobileContext): string {
 }
 
 export async function homeToday(ctx: MobileContext): Promise<TodayResponse> {
-  const viewer = requireStudent(ctx);
+  const viewer: DayViewer = requireStudent(ctx);
   const cfg = await getJuviConfig(ctx.collegeId);
   const tz = cfg?.timezone ?? 'Asia/Kolkata';
   const now = new Date();
@@ -5973,7 +5996,7 @@ export async function homeToday(ctx: MobileContext): Promise<TodayResponse> {
 }
 
 export async function homeTeaching(ctx: MobileContext): Promise<TeachingResponse> {
-  const viewer = requireFaculty(ctx);
+  const viewer: DayViewer = requireFaculty(ctx);
   const cfg = await getJuviConfig(ctx.collegeId);
   const tz = cfg?.timezone ?? 'Asia/Kolkata';
   const now = new Date();
@@ -6437,7 +6460,11 @@ async function seedWorld(): Promise<World> {
     sectionId: section._id, facultyId: faculty._id, maxEnrollment: 60, enrolledCount: 1, status: 'active',
   });
   await Enrollment.create({ collegeId, studentId: student._id, courseOfferingId: offering._id, semesterId: semester._id, status: 'enrolled', enrolledAt: FIXED });
-  await Channel.create({ collegeId, name: 'OOP101 A', scopeType: 'course_offering', scopeId: offering._id, status: 'active' });
+  await Channel.create({
+    collegeId, type: 'official', templateCode: 'course', scopeType: 'course_offering',
+    scopeId: offering._id, name: 'OOP101 A', about: 'Course discussion',
+    postingRule: 'publishers_only', replyRule: 'allowed', defaultPriority: 'routine', status: 'active',
+  });
   const building = await Building.create({ collegeId, name: 'Main Block', code: `ATMD${seq++}`, floors: 3, totalRooms: 30 });
   const room = await Room.create({ collegeId, buildingId: building._id, roomNumber: '101', floor: 1, type: 'classroom', capacity: 60 });
   const timetable = await Timetable.create({ collegeId, semesterId: semester._id, sectionId: section._id, version: 1, status: 'published', effectiveFrom: new Date('2026-06-01T00:00:00Z') });
@@ -7046,6 +7073,7 @@ otherwise). Faculty get notices + class changes only (R30)."
 - Modify: `backend/src/modules/juvi-app/notifications/payload.ts` (`buildClassChangePush`)
 - Modify: `backend/src/modules/juvi-app/notifications/events-service.ts` (4 new event names, §7.5)
 - Modify: `backend/src/modules/juvi-app/notifications/index.ts` (register the consumer)
+- Modify: `backend/src/shared/outbox/outbox.ts` (add optional `afterEvents?: boolean`, default `true`; `false` skips the `afterSweepers` pass so a fixture can drain events without the follow-up sender — existing callers unchanged)
 - Test: `backend/src/modules/juvi-app/notifications/__tests__/class-change-push.test.ts` (unit, 9 tests)
 - Test: `backend/src/__e2e__/modules/juvi-class-change-push.e2e.test.ts` (pipeline through the wired app)
 
@@ -7230,7 +7258,11 @@ async function seedWorld(now: Date): Promise<World> {
     studentAccountIds.push(String(acc._id));
   }
   const fAcc = await JuviAccount.create({ collegeId, personId: fPerson._id, userId: oid(), kind: 'faculty', facultyId: faculty._id, status: 'active', provisionedBy: 'test' });
-  const channel = await Channel.create({ collegeId, name: `CS10${s}`, scopeType: 'course_offering', scopeId: offering._id, status: 'active' });
+  const channel = await Channel.create({
+    collegeId, type: 'official', templateCode: 'course', scopeType: 'course_offering',
+    scopeId: offering._id, name: `CS10${s}`, about: 'Course discussion',
+    postingRule: 'publishers_only', replyRule: 'allowed', defaultPriority: 'routine', status: 'active',
+  });
   return {
     offeringId: String(offering._id), slotId: String(slot._id),
     facultyAccountId: String(fAcc._id), facultyAccountUserId: String(fAcc.userId),
@@ -7270,7 +7302,8 @@ async function makeException(w: World, now: Date, patch: ExceptionPatch = {}): P
 /** The event Task 4 emits, written through the real outbox and drained. */
 async function pipeline(exceptionId: string, action: 'created' | 'revoked'): Promise<void> {
   await emit(CLASS_CHANGE_EVENT, { collegeId: collegeId.toString(), exceptionId, action }, `class-exception:${exceptionId}:${action}`);
-  await drainOutbox();
+  // Drain events without the sender pass: each test's explicit runSender is the only send pass.
+  await drainOutbox({ afterEvents: false });
 }
 
 const rowsFor = (exceptionId: string) =>
@@ -7426,13 +7459,13 @@ import { NotificationTier } from '../../../models/juvi/NotificationDelivery';
 import { emit, OutboxPayload } from '../../../shared/outbox';
 import { addDays, instantOf, ymd } from '../../academics/timetable-date';
 import { CLASS_EVENTS } from '../../academics/class-exception-service';
+import { URGENT_WINDOW_MS } from '../../academics/push-tier';
 import { getJuviConfig } from '../config/institution-config';
 import { NOTIFICATION_REQUESTED } from './expand-consumer';
 
 export const CLASS_CHANGE_EVENT = CLASS_EVENTS.CHANGED; // 'class.exception.changed'
 
 const DEFAULT_TIMEZONE = 'Asia/Kolkata';
-const URGENT_WINDOW_MS = 2 * 3_600_000;
 
 /**
  * The affected dates of an exception (§8): the original date, and for a
@@ -7866,7 +7899,11 @@ async function seedPushWorld(offsetDays: number, startTime = '14:00'): Promise<P
     studentAccountIds.push(String(acc._id));
   }
   const fAcc = await JuviAccount.create({ collegeId, personId: fPerson._id, userId: oid(), kind: 'faculty', facultyId: faculty._id, status: 'active', provisionedBy: 'test' });
-  await Channel.create({ collegeId, name: 'PJ201', scopeType: 'course_offering', scopeId: offering._id, status: 'active' });
+  await Channel.create({
+    collegeId, type: 'official', templateCode: 'course', scopeType: 'course_offering',
+    scopeId: offering._id, name: 'PJ201', about: 'Course discussion',
+    postingRule: 'publishers_only', replyRule: 'allowed', defaultPriority: 'routine', status: 'active',
+  });
   return {
     offeringId: String(offering._id), slotId: String(slot._id),
     facultyAccountId: String(fAcc._id), facultyAccountUserId: String(fAcc.userId),
@@ -7898,7 +7935,8 @@ async function classChange(w: PushWorld, action: 'created' | 'revoked', patch: P
   });
   const exceptionId = String(doc._id);
   await emit(CLASS_CHANGE_EVENT, { collegeId: fx.collegeId, exceptionId, action }, `class-exception:${exceptionId}:${action}`);
-  await drainOutbox();
+  // Events only — the legs' explicit runSender(new Date(), fake) is the only send pass.
+  await drainOutbox({ afterEvents: false });
   return exceptionId;
 }
 
@@ -7953,7 +7991,7 @@ describe('class_change push through the real pipeline (Today&Teaching §8)', () 
     const w = await seedPushWorld(1, '10:00');
     const exceptionId = await classChange(w, 'created');
     await ClassException.updateOne({ _id: new Types.ObjectId(exceptionId) }, { $set: { revokedAt: new Date(), revokedBy: oid() } });
-    await classChange(w, 'revoked');
+    await classChange(w, 'revoked', { revoked: true });
     await deviceFor(w.studentAccountIds[0]!, oid().toString(), 'tok-r1');
     await NotificationDelivery.updateMany({ collegeId: fx.collegeId, 'source.type': 'class_change' }, { $set: { sendAfter: new Date(Date.now() - 1_000) } });
     await runSender(new Date(), fake);
@@ -8563,7 +8601,7 @@ Insert after the `demoFaculty` provisionPerson line and **before** `const juviSu
     const sessionDocs = [];
     for (let back = 8; back <= 60; back++) {
       const d = new Date(Date.now() - back * 86_400_000);
-      if (d.getUTCDay() === 0) continue; // Sundays: Mon–Sat weeks
+      if (new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Kolkata', weekday: 'short' }).format(d) === 'Sun') continue; // Sundays: Mon–Sat weeks
       sessionDocs.push(
         { collegeId: CID, courseOfferingId: courseOfferings[0]._id, date: d, period: 1, facultyId: courseOfferings[0].facultyId, status: 'closed' },
         { collegeId: CID, courseOfferingId: courseOfferings[1]._id, date: d, period: 2, facultyId: courseOfferings[1].facultyId, status: 'closed' },
