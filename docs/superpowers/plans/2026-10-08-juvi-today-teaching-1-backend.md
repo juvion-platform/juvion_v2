@@ -7392,7 +7392,7 @@ otherwise). Faculty get notices + class changes only (R30)."
 **Interfaces:**
 - Consumes:
   - `CLASS_EVENTS.CHANGED` (`'class.exception.changed'`) from `../../academics/class-exception-service` (Task 4). The emitted payload is `{ collegeId, exceptionId, action }` with `action: 'created' | 'revoked'`; it carries no actor — the actor is resolved from the exception's `createdBy`/`revokedBy`.
-  - `emit`, `OutboxPayload` from `'../../../shared/outbox'`; `decide` from `./policy`; `NOTIFICATION_REQUESTED` from `./expand-consumer` (imported by `class-change.ts`), and `settingsOf`, `mutedEverywhere` from `./expand-consumer` (imported by `sender.ts`; both become exported in this task); `PushMessage` type from `./transport`; `signReceipt`, `RECEIPT_TTL_MS` from `./receipts`.
+  - `emit`, `OutboxPayload` from `'../../../shared/outbox'`; `decide` from `./policy`; `NOTIFICATION_REQUESTED` from `./expand-consumer` (imported by `class-change.ts`), and `settingsOf`, `mutedEverywhere` from `./expand-consumer` (both become exported in this task and are used inside `expand-consumer.ts` by `expandClassChange` — policy is applied at expansion, and no other file imports them); `PushMessage` type from `./transport`; `signReceipt`, `RECEIPT_TTL_MS` from `./receipts`.
   - `instantOf(date: string, hhmm: string, timezone: string): Date`, `ymd(at: Date, timezone): string`, `addDays(date: string, n: number): string` from `'../../academics/timetable-date'` (Task 2).
   - `getJuviConfig` from `'../config/institution-config'` — timezone, with the module default `'Asia/Kolkata'` when unset.
   - Models (per-model paths — there is no `models/academic-ops/index.ts` or `models/juvi/index.ts` barrel; the code fences carry the exact imports): `ClassException`, `LeanClassException` from `'../../../models/academic-ops/ClassException'` (Task 1); `TimetableSlot` from `'../../../models/academic-ops/TimetableSlot'`; `CourseOffering`, `Course`, `Enrollment` from `'../../../models/academic-ops/<Model>'`; `JuviAccount`, `IAccountSettings`, `ELIGIBLE_STATUSES`, `Channel`, `ChannelMembership`, `MobileSession`, `NotificationDelivery`, `NotificationTier` from `'../../../models/juvi/<Model>'`.
@@ -8207,7 +8207,6 @@ Create `backend/src/__e2e__/modules/juvi-class-change-push.e2e.test.ts`. It driv
 ```typescript
 import { Types } from 'mongoose';
 import { describe, expect, it, beforeAll, afterAll, beforeEach, vi } from 'vitest';
-import type { Express } from 'express';
 import { getTestApp, cleanupTestApp } from '../setup/test-app';
 import { seedBase, BaseFixtures } from '../setup/seed-base';
 import { enableJuvi } from '../factories/juvi.factory';
@@ -8219,11 +8218,11 @@ import { NotificationDelivery } from '../../models/juvi/NotificationDelivery';
 import { drainOutbox, emit } from '../../shared/outbox';
 import { CLASS_CHANGE_EVENT } from '../../modules/juvi-app/notifications/class-change';
 import { runSender } from '../../modules/juvi-app/notifications/sender';
+import { instantOf } from '../../modules/academics/timetable-date';
 import { FakePushTransport, setPushTransport } from '../../modules/juvi-app/notifications/transport';
 
 process.env.E2E_TESTING = '1';
 
-let app: Express;
 let fx: BaseFixtures;
 const fake = new FakePushTransport();
 
@@ -8238,7 +8237,10 @@ const istDate = (offsetDays = 0) => new Date(FIXED.getTime() + 5.5 * 3_600_000 +
 const DOW = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
 const dow = (date: string) => DOW[new Date(`${date}T00:00:00Z`).getUTCDay()];
 
-beforeAll(async () => { app = await getTestApp(); setPushTransport(fake); });
+// This suite drives the outbox + sender directly, so it never holds the Express app;
+// `getTestApp()` runs only for its side effect — it mounts the routes that register the
+// notification consumers.
+beforeAll(async () => { await getTestApp(); setPushTransport(fake); });
 beforeEach(async () => { vi.useFakeTimers({ now: FIXED, toFake: ['Date'], shouldAdvanceTime: true }); await drainOutbox(); await cleanupTestApp(); fx = await seedBase(); await enableJuvi(fx.collegeId); fake.reset(); });
 afterAll(async () => { await drainOutbox(); await cleanupTestApp(); setPushTransport(null); });
 
@@ -8375,6 +8377,35 @@ describe('class_change push through the real pipeline (Today&Teaching §8)', () 
     });
     expect(message.data.when).toBeTypeOf('string');
     expect(message.data.newWhen).toBeUndefined();        // a cancellation has no new date
+    expect(JSON.stringify(fake.sent)).not.toContain('Venue flooded');
+    expect(await rowsFor(exceptionId)).toEqual(expect.arrayContaining([expect.objectContaining({ status: 'sent' })]));
+  });
+
+  it('a rescheduled send carries variant rescheduled and the newWhen instant, still never the reason (NFR-05)', async () => {
+    const w = await seedPushWorld(1, '10:00'); // original tomorrow 10:00 IST: a future start, so the re-check sends it
+    // The helper hardcodes the new* trio: newDate istDate(2) at 15:00. Both affected dates are in the §8 window
+    // (original tomorrow), and the original start is future, so R20 maps created+rescheduled → 'rescheduled'.
+    const exceptionId = await classChange(w, 'created', { type: 'rescheduled' });
+    await deviceFor(w.studentAccountIds[0]!, oid().toString(), 'tok-c3');
+    await deviceFor(w.studentAccountIds[1]!, oid().toString(), 'tok-c4');
+    await NotificationDelivery.updateMany({ collegeId: fx.collegeId, 'source.type': 'class_change' }, { $set: { sendAfter: new Date(Date.now() - 1_000) } });
+    await runSender(new Date(), fake);
+    expect(fake.sent).toHaveLength(2);
+    const { message } = fake.sent[0]!;
+    const row = (await rowsFor(exceptionId)).find((r) => message.data.deliveryId === String(r._id))!;
+    expect(message).toMatchObject({
+      data: {
+        deliveryId: String(row._id), kind: 'class_change', exceptionId, tier: 'important',
+        groupKey: `class:${w.offeringId}`, office: 'PJ201', variant: 'rescheduled',
+      },
+      priority: 'high', collapseKey: `class:${w.offeringId}`,
+    });
+    // The instants are derived by the same helper the sender uses. `enableJuvi` sets no timezone, so the
+    // college config falls back to the module default the suite already relies on.
+    const TZ = 'Asia/Kolkata';
+    expect(message.data.when).toBe(instantOf(w.exceptionDate, '10:00', TZ).toISOString());
+    expect(message.data.newWhen).toBe(instantOf(istDate(2), '15:00', TZ).toISOString());
+    expect(new Date(message.data.newWhen!).getTime()).toBeGreaterThan(new Date(message.data.when!).getTime());
     expect(JSON.stringify(fake.sent)).not.toContain('Venue flooded');
     expect(await rowsFor(exceptionId)).toEqual(expect.arrayContaining([expect.objectContaining({ status: 'sent' })]));
   });
@@ -8516,7 +8547,7 @@ Edit 3 — insert two its in front of the `stableStringify` it (the anchor line 
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `npm test -w backend -- --run src/modules/juvi-app/openapi/__tests__/document.test.ts`
-Expected: FAIL — `declares every v1 route and nothing else` (missing paths), `names every component and operation` (missing components), both new `it`s fail on `doc.paths['/today']` being undefined, and the committed-openapi.json match test fails because `mobile/api/openapi.json` still lacks the paths.
+Expected: FAIL — `declares every v1 route and nothing else` (missing paths), `names every component and operation` (missing components), the first new `it` fails on `doc.paths['/today']` being undefined, the second on `doc.paths['/attention']` being undefined (which makes its `parameters?.map(...)` undefined), and the committed-openapi.json match test fails because `mobile/api/openapi.json` still lacks the paths.
 
 - [ ] **Step 3: Create the wire schema module**
 
@@ -8722,7 +8753,7 @@ new:    { operationId: 'getAttention', method: 'get', path: '/attention', summar
 - [ ] **Step 5: Regenerate the committed document**
 
 Run: `npm run openapi:mobile -w backend`
-Expected: exits 0 and rewrites `mobile/api/openapi.json`. `git diff --stat -- mobile/api/openapi.json` shows: 3 new `/paths/today`, `/paths/teaching`, `/paths/me~1academics` (path keys are escaped); new components `AttentionItem DayClass DayView DueInvoiceItem CoursesTaughtItem FacultyCourses MeAcademics StudentAcademics StudentDues Today Teaching`; `EventsRequest` carrying the four new event names.
+Expected: exits 0 and rewrites `mobile/api/openapi.json`. `git diff --stat -- mobile/api/openapi.json` shows: 3 new `/paths/today`, `/paths/teaching`, `/paths/me~1academics` (path keys are escaped); new components `AttentionItem DayClass DayView DueInvoiceItem CoursesTaughtItem FacultyCourses MeAcademics StudentAcademics StudentDues Today Teaching`; `EventsRequest` carrying the four new event names; and a rewrite of the **existing** `Attention` component, whose `items` currently carry the old inline notice-card shape — expect that extra diff hunk, it is Task 15's widening reaching the document.
 
 - [ ] **Step 6: Enforce the null-object guard and regenerate the Dart client**
 
