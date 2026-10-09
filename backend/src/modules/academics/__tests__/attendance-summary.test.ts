@@ -352,4 +352,44 @@ describe('attendance summary wiring', { timeout: 30_000 }, () => {
     expect(reasons.filter((r) => r.includes('Attendance below'))).toHaveLength(1);
     expect(reasons.join('; ')).toContain(b.offeringIds[1]!);
   });
+
+  // held counts SESSIONS (attendance-formula.ts), so a status flip or a delete
+  // changes it for every enrolled student — including those with no record.
+  it('closing an existing open session recomputes unmarked enrolled students (fix1)', async () => {
+    const b = await seedBase();
+    const ses = await AttendanceSession.create({
+      collegeId, courseOfferingId: new Types.ObjectId(b.offeringIds[0]!),
+      date: new Date('2026-07-01T00:00:00Z'), period: 1,
+      facultyId: new Types.ObjectId(b.facultyId), status: 'open',
+    });
+    // Student B is enrolled in offering a but has NO record for this session.
+    await updateAttendanceSession(collegeId.toString(), String(ses._id), { status: 'closed' }, 'user-1');
+    const s = await AttendanceSummary.findOne(summaryFilter(b.studentIds[1]!, b.offeringIds[0]!));
+    expect(s?.totalClasses).toBe(1);
+    expect(s?.percentage).toBe(0);
+  });
+
+  it('reopening a closed session lowers unmarked enrolled students back to null (fix1)', async () => {
+    const b = await seedBase();
+    const ses = await createAttendanceSession(collegeId.toString(), {
+      courseOfferingId: b.offeringIds[0], date: '2026-07-01', period: 1, facultyId: b.facultyId, status: 'closed',
+    }, 'user-1');
+    expect((await AttendanceSummary.findOne(summaryFilter(b.studentIds[1]!, b.offeringIds[0]!)))?.totalClasses).toBe(1);
+    await updateAttendanceSession(collegeId.toString(), String(ses._id), { status: 'open' }, 'user-1');
+    const s = await AttendanceSummary.findOne(summaryFilter(b.studentIds[1]!, b.offeringIds[0]!));
+    expect(s?.totalClasses).toBe(0);
+    expect(s?.percentage).toBeNull();
+  });
+
+  it('deleting the only closed session lowers unmarked enrolled students back to null (fix1)', async () => {
+    const b = await seedBase();
+    const sesId = await closedSession(b.offeringIds[0]!, b.facultyId, 1);
+    // Student B is enrolled in offering a and has no record for the session.
+    await updateAttendanceSummary(collegeId.toString(), b.studentIds[1]!, b.offeringIds[0]!);
+    expect((await AttendanceSummary.findOne(summaryFilter(b.studentIds[1]!, b.offeringIds[0]!)))?.percentage).toBe(0);
+    await deleteAttendanceSession(collegeId.toString(), String(sesId), 'user-1');
+    const s = await AttendanceSummary.findOne(summaryFilter(b.studentIds[1]!, b.offeringIds[0]!));
+    expect(s?.totalClasses).toBe(0);
+    expect(s?.percentage).toBeNull();
+  });
 });

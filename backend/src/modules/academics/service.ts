@@ -612,18 +612,37 @@ export async function createAttendanceSession(collegeId: string, data: any, perf
 }
 export async function updateAttendanceSession(collegeId: string, id: string, data: any, _performedBy: string) {
   const before = await AttendanceSession.findOne({ _id: id, collegeId })
-    .select('courseOfferingId').lean<{ courseOfferingId?: unknown } | null>();
+    .select('courseOfferingId status').lean<{ courseOfferingId?: unknown; status?: string } | null>();
   const doc = await AttendanceSession.findOneAndUpdate({ _id: id, collegeId }, { $set: data }, { new: true });
   if (!doc) throw new AppError(404, 'Attendance session not found');
+
+  // held counts SESSIONS, not records (attendance-formula.ts), so a status flip
+  // (open↔closed) or an offering move changes held for EVERY enrolled student —
+  // not just the marked ones. Collect the offerings whose rosters must recompute.
+  const affectedOfferings = new Set<string>();
+  const offeringChanged = Boolean(before?.courseOfferingId)
+    && String(before!.courseOfferingId) !== String(doc.courseOfferingId);
+  if (String(doc.status) === 'closed' || before?.status === 'closed') {
+    affectedOfferings.add(String(doc.courseOfferingId));
+  }
+  if (offeringChanged) affectedOfferings.add(String(before!.courseOfferingId));
+
   const marked = await AttendanceRecord.find({ collegeId, sessionId: doc._id })
     .select('studentId').lean<{ studentId: Types.ObjectId }[]>();
-  const pairs = marked.flatMap((m) => {
+  const pairs: { studentId: string; courseOfferingId: string }[] = marked.flatMap((m) => {
     const list = [{ studentId: String(m.studentId), courseOfferingId: String(doc.courseOfferingId) }];
-    if (before?.courseOfferingId && String(before.courseOfferingId) !== String(doc.courseOfferingId)) {
-      list.push({ studentId: String(m.studentId), courseOfferingId: String(before.courseOfferingId) });
+    if (offeringChanged) {
+      list.push({ studentId: String(m.studentId), courseOfferingId: String(before!.courseOfferingId) });
     }
     return list;
   });
+  if (affectedOfferings.size > 0) {
+    const enrolled = await Enrollment.find({ collegeId, courseOfferingId: { $in: [...affectedOfferings] }, status: 'enrolled' })
+      .select('studentId courseOfferingId').lean<{ studentId: Types.ObjectId; courseOfferingId: Types.ObjectId }[]>();
+    for (const e of enrolled) {
+      pairs.push({ studentId: String(e.studentId), courseOfferingId: String(e.courseOfferingId) });
+    }
+  }
   await recomputeSummaries(collegeId, pairs);
   return doc;
 }
@@ -633,7 +652,19 @@ export async function deleteAttendanceSession(collegeId: string, id: string, _pe
   const marked = await AttendanceRecord.find({ collegeId, sessionId: id })
     .select('studentId').lean<{ studentId: Types.ObjectId }[]>();
   await AttendanceRecord.deleteMany({ sessionId: id, collegeId });
-  await recomputeSummaries(collegeId, marked.map((m) => ({ studentId: String(m.studentId), courseOfferingId: String(doc.courseOfferingId) })));
+  const pairs: { studentId: string; courseOfferingId: string }[] = marked.map((m) => ({
+    studentId: String(m.studentId), courseOfferingId: String(doc.courseOfferingId),
+  }));
+  // A deleted CLOSED session lowers held for every enrolled student, unmarked
+  // ones included. An open session never counted toward held — no roster needed.
+  if (String(doc.status) === 'closed') {
+    const enrolled = await Enrollment.find({ collegeId, courseOfferingId: doc.courseOfferingId, status: 'enrolled' })
+      .select('studentId').lean<{ studentId: Types.ObjectId }[]>();
+    for (const e of enrolled) {
+      pairs.push({ studentId: String(e.studentId), courseOfferingId: String(doc.courseOfferingId) });
+    }
+  }
+  await recomputeSummaries(collegeId, pairs);
   return { deleted: true };
 }
 
