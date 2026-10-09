@@ -8,7 +8,20 @@ import { Enrollment, Timetable, TimetableSlot } from '../../models';
 import { Channel } from '../../models/juvi/Channel';
 import { ChannelMembership } from '../../models/juvi/ChannelMembership';
 import { reconcileCollege } from '../../modules/juvi-app/spaces/reconcile-service';
-import { nextOccurrence } from '../../modules/juvi-app/spaces/next-class';
+import { ymd, addDays, dayEnumOf, instantOf } from '../../modules/academics/timetable-date';
+
+/** Earliest instant at-or-after `asOf` at which `hhmm` starts on weekday `day`. */
+function nextAt(day: string, hhmm: string, asOf: Date, tz: string): Date {
+  let date = ymd(asOf, tz);
+  for (let i = 0; i <= 7; i++) {
+    if (dayEnumOf(date) === day) {
+      const at = instantOf(date, hhmm, tz);
+      if (at.getTime() >= asOf.getTime()) return at;
+    }
+    date = addDays(date, 1);
+  }
+  throw new Error(`no upcoming ${day} ${hhmm}`);
+}
 
 let app: Express; let fx: BaseFixtures;
 const V1 = '/api/juvi-app/v1';
@@ -55,8 +68,11 @@ describe('GET /spaces', () => {
     const DAYS6 = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
     const asOf = new Date(res.body.asOf); // the server's clock for this response
     const TZ = 'Asia/Kolkata'; // the seeded college's Juvi timezone (see config/institution-config.ts)
-    const osNext = nextOccurrence(DAYS6.map((day) => ({ day, startTime: '08:00' })), asOf, TZ)!;
-    const dbmsNext = nextOccurrence(DAYS6.map((day) => ({ day, startTime: '17:00' })), asOf, TZ)!;
+    const nextFor = (hhmm: string) => DAYS6
+      .map((day) => nextAt(day, hhmm, asOf, TZ))
+      .reduce((a, b) => (a.getTime() <= b.getTime() ? a : b));
+    const osNext = nextFor('08:00');
+    const dbmsNext = nextFor('17:00');
     const osFirst = osNext.getTime() <= dbmsNext.getTime();
     const expectedOrder = osFirst ? ['CS202 OS · A', 'CS201 DBMS · A'] : ['CS201 DBMS · A', 'CS202 OS · A'];
     expect(courses.channels.map((c: any) => c.name)).toEqual(expectedOrder);
