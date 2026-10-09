@@ -28,6 +28,10 @@ export const settingsUpdateSchema = z.object({
   featureFlags: z.object({ languageRoadmap: z.boolean().optional() }).optional(),
   /** Published `purpose: 'welcome'` notice per kind; null clears the slot (the default is used). */
   welcomeNotice: z.object({ studentNoticeId: objectId.nullable().optional(), facultyNoticeId: objectId.nullable().optional() }).strict().optional(),
+  /** Spec §4.2: academics-in-the-app settings; null clears the portal link. */
+  attendanceThreshold: z.number().int('Use a whole number between 50 and 95').min(50, 'Between 50 and 95').max(95, 'Between 50 and 95').optional(),
+  showAttendanceHeadroom: z.boolean().optional(),
+  paymentPortalUrl: z.string().trim().url('Enter a full https:// URL').refine((u) => u.startsWith('https://'), 'Use an https:// URL').nullable().optional(),
 }).strict();
 
 export const createRunSchema = z.object({

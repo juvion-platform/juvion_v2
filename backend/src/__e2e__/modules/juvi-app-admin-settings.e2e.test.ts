@@ -16,7 +16,7 @@ afterAll(async () => { await cleanupTestApp(); });
 describe('admin settings', () => {
   it('GET returns defaults for a college that never enabled Juvi', async () => {
     const res = await api.as(fx.admin.token).get(`${A}/settings`).expect(200);
-    expect(res.body.juvi).toMatchObject({ enabled: false, paused: false, quietHoursDefault: { start: '22:00', end: '07:00' }, timezone: 'Asia/Kolkata' });
+    expect(res.body.juvi).toMatchObject({ enabled: false, paused: false, quietHoursDefault: { start: '22:00', end: '07:00' }, timezone: 'Asia/Kolkata', attendanceThreshold: 75, showAttendanceHeadroom: true });
     expect(res.body.college).toEqual({ name: 'JIT Test College', code: 'JIT-TEST' });
     expect(res.body.lastReconcile).toBeNull();
   });
@@ -71,5 +71,35 @@ describe('admin settings', () => {
   it('renders the ERP 404 shape for an unmatched admin path', async () => {
     const res = await api.as(fx.admin.token).get(`${A}/nope`).expect(404);
     expect(res.body).toEqual({ error: 'Not found' });
+  });
+
+  it('GET returns the attendance defaults for a college that never set them', async () => {
+    const res = await api.as(fx.admin.token).get(`${A}/settings`).expect(200);
+    expect(res.body.juvi).toMatchObject({ attendanceThreshold: 75, showAttendanceHeadroom: true });
+    expect(res.body.juvi.paymentPortalUrl ?? null).toBeNull();
+  });
+
+  it('PUT round-trips the academics-in-app settings', async () => {
+    const res = await api.as(fx.admin.token).put(`${A}/settings`).send({
+      attendanceThreshold: 70, showAttendanceHeadroom: false, paymentPortalUrl: 'https://pay.juvion.test/college',
+    }).expect(200);
+    expect(res.body.juvi).toMatchObject({ attendanceThreshold: 70, showAttendanceHeadroom: false, paymentPortalUrl: 'https://pay.juvion.test/college' });
+    expect((await College.findById(fx.collegeId).lean())?.juvi.attendanceThreshold).toBe(70);
+  });
+
+  it('PUT bounds the threshold to 50–95 (integer) and refuses non-https portals', async () => {
+    await api.as(fx.admin.token).put(`${A}/settings`).send({ attendanceThreshold: 49 }).expect(400);
+    await api.as(fx.admin.token).put(`${A}/settings`).send({ attendanceThreshold: 96 }).expect(400);
+    await api.as(fx.admin.token).put(`${A}/settings`).send({ attendanceThreshold: 75.5 }).expect(400);
+    await api.as(fx.admin.token).put(`${A}/settings`).send({ paymentPortalUrl: 'http://pay.example.test' }).expect(400);
+    const res = await api.as(fx.admin.token).put(`${A}/settings`).send({ attendanceThreshold: 95 }).expect(200);
+    expect(res.body.juvi.attendanceThreshold).toBe(95);
+  });
+
+  it('PUT clears paymentPortalUrl with null', async () => {
+    await api.as(fx.admin.token).put(`${A}/settings`).send({ paymentPortalUrl: 'https://pay.juvion.test/college' }).expect(200);
+    const res = await api.as(fx.admin.token).put(`${A}/settings`).send({ paymentPortalUrl: null }).expect(200);
+    expect(res.body.juvi.paymentPortalUrl ?? null).toBeNull();
+    expect((await College.findById(fx.collegeId).lean())?.juvi.paymentPortalUrl).toBeNull();
   });
 });
