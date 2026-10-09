@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { User } from '../../models/User';
+import mongoose from 'mongoose';
 import { AppError } from '../../middleware/errorHandler';
 import { resolvePermissions, resolveSensitivity } from '../../shared/rbac/resolve-permissions';
 import { personaCodesOf, loadPersonas } from '../../shared/rbac/persona-registry';
@@ -66,13 +67,21 @@ export async function login(email: string, password: string, collegeId?: string)
     // Return list of colleges for the selector
     const { College } = await import('../../models/College');
     const colleges = await College.find({ status: 'active' })
-      .select('_id name code status')
+      .select('_id name code status logo juvi')
       .sort({ name: 1 })
       .lean();
-    result.colleges = colleges;
+    result.colleges = colleges.map((c) => ({
+      _id: String(c._id),
+      name: c.name,
+      code: c.code,
+      status: c.status,
+      logo: c.logo,
+      accentColor: c.juvi?.accentColor ?? null,
+    }));
     result.isSuperAdmin = true;
   } else {
     result.collegeId = String(user.collegeId);
+    result.college = await readCollegeBranding(String(user.collegeId));
   }
 
   const targetCollegeId = isSuperAdmin ? undefined : String(user.collegeId);
@@ -98,7 +107,40 @@ export async function login(email: string, password: string, collegeId?: string)
   return result;
 }
 
-export async function getMe(userId: string) {
+export interface CollegeBranding {
+  id: string;
+  name: string;
+  code: string;
+  logo?: string;
+  accentColor: string | null;
+}
+
+/**
+ * Reads the branding a portal session needs to theme itself.
+ *
+ * Deliberately NOT the juvi-app config reader: every authenticated portal user
+ * must reach this, and `GET /juvi-app/admin/settings` requires `platform:read`,
+ * which staff are explicitly denied (see DEFAULT_POLICIES). Riding `/auth/me`
+ * needs no new route and no new permission.
+ *
+ * Returns null — never throws — so an unresolvable college degrades to the
+ * portal's default palette instead of failing the whole session bootstrap.
+ */
+async function readCollegeBranding(collegeId?: string): Promise<CollegeBranding | null> {
+  if (!collegeId || !mongoose.isValidObjectId(collegeId)) return null;
+  const { College } = await import('../../models/College');
+  const college = await College.findById(collegeId).select('name code logo juvi').lean();
+  if (!college) return null;
+  return {
+    id: String(college._id),
+    name: college.name,
+    code: college.code,
+    logo: college.logo,
+    accentColor: college.juvi?.accentColor ?? null,
+  };
+}
+
+export async function getMe(userId: string, requestedCollegeId?: string) {
   const user = await User.findById(userId).select('-password');
   if (!user) throw new AppError(404, 'User not found');
   const personas = personaCodesOf(user);
@@ -114,6 +156,19 @@ export async function getMe(userId: string) {
   const dashboardWidgets = [...new Set(userPersonaRows.flatMap((p) => p.dashboardWidgets || []))];
   const accessibleModules = [...new Set(userPersonaRows.flatMap((p) => p.accessibleModules || []))];
 
+  // Branding for the portal's runtime theming.
+  //
+  // Deliberately NOT folded into the `collegeId` on line 105: that variable feeds
+  // `resolvePermissions` and `loadPersonas` below, and widening it to a
+  // superadmin's *selected* college would silently change which persona rows and
+  // policies they resolve against. The portal's chrome is the only thing that
+  // should follow a superadmin's college selection.
+  //
+  // A superadmin has no `collegeId` of their own, so the college they have
+  // selected (`x-college-id` -> `req.collegeId`, resolved by `authenticate`) is
+  // what supplies their branding. Everyone else is branded by their own college.
+  const college = await readCollegeBranding(collegeId ?? requestedCollegeId);
+
   return {
     id: String(user._id),
     name: user.name,
@@ -125,6 +180,9 @@ export async function getMe(userId: string) {
     permissions,
     sensitivity,
     primaryModule,
+    // Null for a superadmin who has not selected a college; the portal then keeps
+    // its default palette.
+    college,
     dashboardWidgets: dashboardWidgets.length > 0 ? dashboardWidgets : undefined,
     accessibleModules: accessibleModules.length > 0 ? accessibleModules : undefined,
   };
