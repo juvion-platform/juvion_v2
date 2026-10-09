@@ -5,7 +5,7 @@
 // ignore_for_file: unused_element
 import 'package:json_annotation/json_annotation.dart';
 
-part 'attention_items_inner.g.dart';
+part 'notice_list_items_inner.g.dart';
 
 
 @JsonSerializable(
@@ -14,9 +14,9 @@ part 'attention_items_inner.g.dart';
   disallowUnrecognizedKeys: false,
   explicitToJson: true,
 )
-class AttentionItemsInner {
-  /// Returns a new [AttentionItemsInner] instance.
-  AttentionItemsInner({
+class NoticeListItemsInner {
+  /// Returns a new [NoticeListItemsInner] instance.
+  NoticeListItemsInner({
 
     required  this.ackAt,
 
@@ -209,7 +209,7 @@ class AttentionItemsInner {
   )
 
 
-  final AttentionItemsInnerPriorityEnum priority;
+  final NoticeListItemsInnerPriorityEnum priority;
 
 
 
@@ -233,7 +233,7 @@ class AttentionItemsInner {
   )
 
 
-  final AttentionItemsInnerPurposeEnum purpose;
+  final NoticeListItemsInnerPurposeEnum purpose;
 
 
 
@@ -269,7 +269,7 @@ class AttentionItemsInner {
   )
 
 
-  final AttentionItemsInnerStateEnum state;
+  final NoticeListItemsInnerStateEnum state;
 
 
 
@@ -288,7 +288,7 @@ class AttentionItemsInner {
 
 
     @override
-    bool operator ==(Object other) => identical(this, other) || other is AttentionItemsInner &&
+    bool operator ==(Object other) => identical(this, other) || other is NoticeListItemsInner &&
       other.ackAt == ackAt &&
       other.ackCommentAllowed == ackCommentAllowed &&
       other.ackRequired == ackRequired &&
@@ -331,9 +331,9 @@ class AttentionItemsInner {
         state.hashCode +
         title.hashCode;
 
-  factory AttentionItemsInner.fromJson(Map<String, dynamic> json) => _$AttentionItemsInnerFromJson(json);
+  factory NoticeListItemsInner.fromJson(Map<String, dynamic> json) => _$NoticeListItemsInnerFromJson(json);
 
-  Map<String, dynamic> toJson() => _$AttentionItemsInnerToJson(this);
+  Map<String, dynamic> toJson() => _$NoticeListItemsInnerToJson(this);
 
   @override
   String toString() {
@@ -343,7 +343,7 @@ class AttentionItemsInner {
 }
 
 
-enum AttentionItemsInnerPriorityEnum {
+enum NoticeListItemsInnerPriorityEnum {
 @JsonValue(r'routine')
 routine(r'routine'),
 @JsonValue(r'important')
@@ -351,7 +351,7 @@ important(r'important'),
 @JsonValue(r'urgent')
 urgent(r'urgent');
 
-const AttentionItemsInnerPriorityEnum(this.value);
+const NoticeListItemsInnerPriorityEnum(this.value);
 
 final String value;
 
@@ -361,13 +361,13 @@ String toString() => value;
 
 
 
-enum AttentionItemsInnerPurposeEnum {
+enum NoticeListItemsInnerPurposeEnum {
 @JsonValue(r'standard')
 standard(r'standard'),
 @JsonValue(r'welcome')
 welcome(r'welcome');
 
-const AttentionItemsInnerPurposeEnum(this.value);
+const NoticeListItemsInnerPurposeEnum(this.value);
 
 final String value;
 
@@ -377,7 +377,7 @@ String toString() => value;
 
 
 
-enum AttentionItemsInnerStateEnum {
+enum NoticeListItemsInnerStateEnum {
 @JsonValue(r'received')
 received(r'received'),
 @JsonValue(r'seen')
@@ -387,7 +387,7 @@ acknowledged(r'acknowledged'),
 @JsonValue(r'dismissed')
 dismissed(r'dismissed');
 
-const AttentionItemsInnerStateEnum(this.value);
+const NoticeListItemsInnerStateEnum(this.value);
 
 final String value;
 

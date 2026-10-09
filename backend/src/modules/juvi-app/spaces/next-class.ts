@@ -1,35 +1,25 @@
-import { Timetable } from '../../../models/academic-ops/Timetable';
+// backend/src/modules/juvi-app/spaces/next-class.ts
+/**
+ * §5.3: the next class per offering now resolves on the live-read rule —
+ * for each day in a 15-day horizon (today through today+14), the highest-version published timetable
+ * whose effective window covers the date — and then applies that day's
+ * exceptions: a cancelled occurrence is never "next", and a rescheduled one
+ * counts at its new time on its new date. The old weekly-arithmetic
+ * `nextOccurrence` (window-blind, exception-blind) is gone.
+ */
+import { Types } from 'mongoose';
 import { TimetableSlot } from '../../../models/academic-ops/TimetableSlot';
+import { getLiveTimetables } from '../../academics/live-timetable';
+import { activeExceptionsFor } from '../../academics/class-exception-service';
+import { ymd, addDays, dayEnumOf, instantOf } from '../../academics/timetable-date';
 
-export interface WeeklySlot { day: string; startTime: string }
-
-const DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-const SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const MINUTES_PER_WEEK = 7 * 1440;
-
-function zonedNow(now: Date, timezone: string): { dayIndex: number; minutes: number } {
-  const parts = new Intl.DateTimeFormat('en-US', { timeZone: timezone, weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(now);
-  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? '';
-  const dayIndex = SHORT.indexOf(get('weekday'));
-  const minutes = (Number.parseInt(get('hour'), 10) % 24) * 60 + Number.parseInt(get('minute'), 10);
-  return { dayIndex, minutes };
-}
-
-/** Earliest occurrence at or after `now` of any weekly slot, as an instant. IST has no DST, so minute arithmetic is exact. */
-export function nextOccurrence(slots: WeeklySlot[], now: Date, timezone: string): Date | null {
-  const { dayIndex, minutes } = zonedNow(now, timezone);
-  let best = Number.POSITIVE_INFINITY;
-  for (const s of slots) {
-    const d = DAYS.indexOf(s.day.toLowerCase());
-    const m = /^(\d{1,2}):(\d{2})$/.exec(s.startTime);
-    if (d < 0 || !m) continue;
-    const slotMinutes = Number(m[1]) * 60 + Number(m[2]);
-    let delta = ((d - dayIndex + 7) % 7) * 1440 + (slotMinutes - minutes);
-    if (delta < 0) delta += MINUTES_PER_WEEK;
-    if (delta < best) best = delta;
-  }
-  return Number.isFinite(best) ? new Date(now.getTime() + best * 60_000) : null;
-}
+/**
+ * 15 entries = today..today+14 inclusive. The horizon must contain the writer's whole accepted
+ * reschedule range — `createClassException` admits a `newDate` while
+ * `diffDays(newDate, today) > 14` is false — or a class moved to exactly today+14 is invisible
+ * to this reader (R92).
+ */
+const HORIZON_DAYS = 15;
 
 export function formatNextClassLabel(at: Date, now: Date, timezone: string): string {
   const dayKey = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
@@ -39,21 +29,57 @@ export function formatNextClassLabel(at: Date, now: Date, timezone: string): str
   return `Next: ${word} ${time}`;
 }
 
-/** Next class per offering from published weekly timetables. Offerings with no usable slot are absent from the map. */
-export async function nextClassByOffering(collegeId: string, offeringIds: string[], timezone: string): Promise<Map<string, Date>> {
+type SlotLean = { _id: Types.ObjectId; courseOfferingId: Types.ObjectId; startTime: string; endTime: string };
+
+/** Next class per offering on the live rule; offerings with no usable occurrence in the horizon are absent. */
+export async function nextClassByOffering(
+  collegeId: string, offeringIds: string[], timezone: string,
+): Promise<Map<string, Date>> {
+  const ids = [...new Set(offeringIds)];
   const out = new Map<string, Date>();
-  if (offeringIds.length === 0) return out;
-  const published = await Timetable.find({ collegeId, status: 'published' }).select('_id').lean();
-  if (published.length === 0) return out;
-  const slots = await TimetableSlot.find({
-    collegeId, timetableId: { $in: published.map((t) => t._id) }, courseOfferingId: { $in: offeringIds }, slotType: { $ne: 'free' },
-  }).select('courseOfferingId day startTime').lean();
-  const byOffering = new Map<string, WeeklySlot[]>();
-  for (const s of slots) byOffering.set(String(s.courseOfferingId), [...(byOffering.get(String(s.courseOfferingId)) ?? []), { day: s.day, startTime: s.startTime }]);
-  const now = new Date();
-  for (const [id, list] of byOffering) {
-    const at = nextOccurrence(list, now, timezone);
-    if (at) out.set(id, at);
+  if (ids.length === 0) return out;
+  const best = new Map<string, number>();
+
+  // "Next" means at-or-after now. The horizon starts TODAY, so without this bound a class that
+  // already started today (08:00 when it is 15:00) is the minimum over the horizon and gets
+  // returned — and `formatNextClassLabel` then renders the past as "Next: Today 08:00". The
+  // weekly rule this replaces (`nextOccurrence`'s `delta < 0 → += week`) never returned a past
+  // occurrence either, so this preserves shipped semantics rather than changing them (R81).
+  const nowMs = Date.now();
+  const today = ymd(new Date(nowMs), timezone);
+  const dates = Array.from({ length: HORIZON_DAYS }, (_, i) => addDays(today, i));
+
+  for (const date of dates) {
+    const live = await getLiveTimetables(collegeId, instantOf(date, '12:00', timezone), timezone);
+    const winners = [...live.values()].map((t) => String(t._id));
+    if (winners.length === 0) continue;
+
+    const slots = await TimetableSlot.find({
+      collegeId, timetableId: { $in: winners }, day: dayEnumOf(date),
+      slotType: { $ne: 'free' }, courseOfferingId: { $in: ids.map((id) => new Types.ObjectId(id)) },
+    }).lean<SlotLean[]>();
+
+    const rows = await activeExceptionsFor(collegeId, { dates: [date] });
+    const vacated = new Set<string>();
+    for (const e of rows) if (e.date === date) vacated.add(String(e.timetableSlotId));
+
+    for (const s of slots) {
+      const sid = String(s._id);
+      if (vacated.has(sid)) continue;
+      const at = instantOf(date, s.startTime, timezone).getTime();
+      if (at < nowMs) continue;
+      const cur = best.get(String(s.courseOfferingId));
+      if (cur === undefined || at < cur) best.set(String(s.courseOfferingId), at);
+    }
+    for (const e of rows) {
+      if (e.type !== 'rescheduled' || e.newDate !== date || !e.newStartTime || !ids.includes(String(e.courseOfferingId))) continue;
+      const at = instantOf(date, e.newStartTime, timezone).getTime();
+      if (at < nowMs) continue;
+      const cur = best.get(String(e.courseOfferingId));
+      if (cur === undefined || at < cur) best.set(String(e.courseOfferingId), at);
+    }
   }
+
+  for (const [offeringId, at] of best) out.set(offeringId, new Date(at));
   return out;
 }

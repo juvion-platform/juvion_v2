@@ -58,7 +58,8 @@ import { IntegrationLog } from '../../models/platform/IntegrationLog';
 import { paginate } from '../../shared/pagination';
 import { createAuditLog } from '../../shared/audit';
 import { AppError } from '../../middleware/errorHandler';
-import { FilterQuery } from 'mongoose';
+import { attendanceCategory, courseAttendanceFor } from './attendance-formula';
+import { FilterQuery, Types } from 'mongoose';
 import { IAttendanceSummary } from '../../models/academic-ops/AttendanceSummary';
 import { IAttendanceAlert } from '../../models/academic-ops/AttendanceAlert';
 import { AuthScope } from '../../shared/rbac/types';
@@ -601,17 +602,69 @@ export async function getAttendanceSession(collegeId: string, id: string) {
 export async function createAttendanceSession(collegeId: string, data: any, performedBy: string) {
   const doc = await AttendanceSession.create({ ...data, collegeId });
   await createAuditLog({ collegeId, entityType: 'AttendanceSession', entityId: String(doc._id), entityName: `${data.date} P${data.period}`, action: 'create', changes: [], performedBy });
+  // Closing a session is the first time held can rise: recompute every enrolled student.
+  if (data?.status === 'closed') {
+    const students = await Enrollment.find({ collegeId, courseOfferingId: doc.courseOfferingId, status: 'enrolled' })
+      .select('studentId').lean<{ studentId: Types.ObjectId }[]>();
+    await recomputeSummaries(collegeId, students.map((e) => ({ studentId: String(e.studentId), courseOfferingId: String(doc.courseOfferingId) })));
+  }
   return doc;
 }
 export async function updateAttendanceSession(collegeId: string, id: string, data: any, _performedBy: string) {
+  const before = await AttendanceSession.findOne({ _id: id, collegeId })
+    .select('courseOfferingId status').lean<{ courseOfferingId?: unknown; status?: string } | null>();
   const doc = await AttendanceSession.findOneAndUpdate({ _id: id, collegeId }, { $set: data }, { new: true });
   if (!doc) throw new AppError(404, 'Attendance session not found');
+
+  // held counts SESSIONS, not records (attendance-formula.ts), so a status flip
+  // (open↔closed) or an offering move changes held for EVERY enrolled student —
+  // not just the marked ones. Collect the offerings whose rosters must recompute.
+  const affectedOfferings = new Set<string>();
+  const offeringChanged = Boolean(before?.courseOfferingId)
+    && String(before!.courseOfferingId) !== String(doc.courseOfferingId);
+  if (String(doc.status) === 'closed' || before?.status === 'closed') {
+    affectedOfferings.add(String(doc.courseOfferingId));
+  }
+  if (offeringChanged) affectedOfferings.add(String(before!.courseOfferingId));
+
+  const marked = await AttendanceRecord.find({ collegeId, sessionId: doc._id })
+    .select('studentId').lean<{ studentId: Types.ObjectId }[]>();
+  const pairs: { studentId: string; courseOfferingId: string }[] = marked.flatMap((m) => {
+    const list = [{ studentId: String(m.studentId), courseOfferingId: String(doc.courseOfferingId) }];
+    if (offeringChanged) {
+      list.push({ studentId: String(m.studentId), courseOfferingId: String(before!.courseOfferingId) });
+    }
+    return list;
+  });
+  if (affectedOfferings.size > 0) {
+    const enrolled = await Enrollment.find({ collegeId, courseOfferingId: { $in: [...affectedOfferings] }, status: 'enrolled' })
+      .select('studentId courseOfferingId').lean<{ studentId: Types.ObjectId; courseOfferingId: Types.ObjectId }[]>();
+    for (const e of enrolled) {
+      pairs.push({ studentId: String(e.studentId), courseOfferingId: String(e.courseOfferingId) });
+    }
+  }
+  await recomputeSummaries(collegeId, pairs);
   return doc;
 }
 export async function deleteAttendanceSession(collegeId: string, id: string, _performedBy: string) {
   const doc = await AttendanceSession.findOneAndDelete({ _id: id, collegeId });
   if (!doc) throw new AppError(404, 'Attendance session not found');
+  const marked = await AttendanceRecord.find({ collegeId, sessionId: id })
+    .select('studentId').lean<{ studentId: Types.ObjectId }[]>();
   await AttendanceRecord.deleteMany({ sessionId: id, collegeId });
+  const pairs: { studentId: string; courseOfferingId: string }[] = marked.map((m) => ({
+    studentId: String(m.studentId), courseOfferingId: String(doc.courseOfferingId),
+  }));
+  // A deleted CLOSED session lowers held for every enrolled student, unmarked
+  // ones included. An open session never counted toward held — no roster needed.
+  if (String(doc.status) === 'closed') {
+    const enrolled = await Enrollment.find({ collegeId, courseOfferingId: doc.courseOfferingId, status: 'enrolled' })
+      .select('studentId').lean<{ studentId: Types.ObjectId }[]>();
+    for (const e of enrolled) {
+      pairs.push({ studentId: String(e.studentId), courseOfferingId: String(doc.courseOfferingId) });
+    }
+  }
+  await recomputeSummaries(collegeId, pairs);
   return { deleted: true };
 }
 
@@ -661,11 +714,33 @@ export async function listAttendanceRecords(collegeId: string, sessionId: string
 }
 export async function createAttendanceRecord(collegeId: string, data: any, _performedBy: string) {
   const doc = await AttendanceRecord.create({ ...data, collegeId });
+  await recomputeSummaries(collegeId, [{
+    studentId: String(doc.studentId),
+    courseOfferingId: await courseOfferingIdOfSession(collegeId, String(doc.sessionId)),
+  }]);
   return doc;
 }
 export async function updateAttendanceRecord(collegeId: string, id: string, data: any, _performedBy: string) {
+  const before = await AttendanceRecord.findOne({ _id: id, collegeId })
+    .select('sessionId studentId').lean<{ sessionId: unknown; studentId: unknown } | null>();
   const doc = await AttendanceRecord.findOneAndUpdate({ _id: id, collegeId }, { $set: data }, { new: true });
   if (!doc) throw new AppError(404, 'Attendance record not found');
+  const pairs: { studentId: string; courseOfferingId: string }[] = [];
+  if (before) {
+    pairs.push({
+      studentId: String(before.studentId),
+      courseOfferingId: await courseOfferingIdOfSession(collegeId, String(before.sessionId)),
+    });
+  }
+  if (!before
+    || String(before.sessionId) !== String(doc.sessionId)
+    || String(before.studentId) !== String(doc.studentId)) {
+    pairs.push({
+      studentId: String(doc.studentId),
+      courseOfferingId: await courseOfferingIdOfSession(collegeId, String(doc.sessionId)),
+    });
+  }
+  await recomputeSummaries(collegeId, pairs);
   return doc;
 }
 /**
@@ -713,6 +788,16 @@ export async function bulkUpsertAttendanceRecords(
   }));
 
   const res = await AttendanceRecord.bulkWrite(ops, { ordered: false });
+  // One offering lookup per distinct session, then recompute every marked student.
+  const sessionOfferings = new Map<string, string>();
+  for (const r of records) {
+    const key = String(r.sessionId);
+    if (!sessionOfferings.has(key)) sessionOfferings.set(key, await courseOfferingIdOfSession(collegeId, key));
+  }
+  await recomputeSummaries(collegeId, records.map((r) => ({
+    studentId: String(r.studentId),
+    courseOfferingId: sessionOfferings.get(String(r.sessionId)) ?? '',
+  })));
   return {
     upserted: res.upsertedCount ?? 0,
     modified: res.modifiedCount ?? 0,
@@ -730,9 +815,43 @@ async function resolvePersonIdForUser(userId: string): Promise<string | undefine
   const personId = (user as { personId?: unknown } | null)?.personId;
   return personId ? String(personId) : undefined;
 }
+
+/** The offering a session belongs to; '' when the session row is already gone. */
+async function courseOfferingIdOfSession(collegeId: string, sessionId: string): Promise<string> {
+  const session = await AttendanceSession.findOne({ _id: sessionId, collegeId })
+    .select('courseOfferingId').lean<{ courseOfferingId: unknown } | null>();
+  return session && session.courseOfferingId ? String(session.courseOfferingId) : '';
+}
+
+/**
+ * Recomputes AttendanceSummary rows for (studentId, courseOfferingId) pairs so
+ * §5.4 stays true after any attendance mutation. Dedupes pairs, skips pairs
+ * whose offering vanished, and lets one bad pair fail without failing the rest.
+ */
+export async function recomputeSummaries(
+  collegeId: string,
+  pairs: { studentId: string; courseOfferingId: string }[],
+): Promise<void> {
+  const unique = new Map<string, { studentId: string; courseOfferingId: string }>();
+  for (const p of pairs) {
+    if (!p.courseOfferingId) continue;
+    unique.set(`${p.studentId}:${p.courseOfferingId}`, p);
+  }
+  for (const p of unique.values()) {
+    try {
+      await updateAttendanceSummary(collegeId, p.studentId, p.courseOfferingId);
+    } catch (err) {
+      console.error(`[attendance] summary recompute failed for student ${p.studentId} offering ${p.courseOfferingId}:`, err);
+    }
+  }
+}
 export async function deleteAttendanceRecord(collegeId: string, id: string, _performedBy: string) {
   const doc = await AttendanceRecord.findOneAndDelete({ _id: id, collegeId });
   if (!doc) throw new AppError(404, 'Attendance record not found');
+  await recomputeSummaries(collegeId, [{
+    studentId: String(doc.studentId),
+    courseOfferingId: await courseOfferingIdOfSession(collegeId, String(doc.sessionId)),
+  }]);
   return { deleted: true };
 }
 
@@ -1839,16 +1958,6 @@ export async function finalizeElectiveAllocations(
 // ═══ W02: Attendance Summary Auto-Update + Threshold Monitoring ═══
 
 /**
- * Determine attendance category based on percentage.
- */
-function categorizeAttendance(percentage: number): 'safe' | 'warning' | 'at_risk' | 'detained' {
-  if (percentage >= 85) return 'safe';
-  if (percentage >= 75) return 'warning';
-  if (percentage >= 65) return 'at_risk';
-  return 'detained';
-}
-
-/**
  * Check attendance thresholds and create alerts when student crosses warning/at-risk/detained levels.
  * W02-L2-009
  */
@@ -1913,53 +2022,23 @@ export async function updateAttendanceSummary(
   collegeId: string,
   studentId: string,
   courseOfferingId: string,
+  threshold?: number,
 ) {
-  // 1. Find CourseOffering to get semesterId
+  // 1. Same 404 as before.
   const offering = await CourseOffering.findOne({ _id: courseOfferingId, collegeId });
   if (!offering) throw new AppError(404, 'Course offering not found');
   const semesterId = String(offering.semesterId);
 
-  // 2. Count total AttendanceSessions for this courseOffering
-  const totalClasses = await AttendanceSession.countDocuments({
-    collegeId,
-    courseOfferingId,
-  });
+  // 2-4. The ONE formula (spec §5.4). held = closed sessions; attended = present|late|od.
+  const calc = await courseAttendanceFor(collegeId, studentId, courseOfferingId, threshold);
+  const category = attendanceCategory(calc.pct, calc.threshold);
 
-  // 3. Count attended records (present, late, od count as attended)
-  // We need session IDs for this courseOffering first
-  const sessionIds = await AttendanceSession.find(
-    { collegeId, courseOfferingId },
-    { _id: 1 },
-  ).lean();
-  const sessionIdList = sessionIds.map(s => s._id);
-
-  const attended = await AttendanceRecord.countDocuments({
-    collegeId,
-    studentId,
-    sessionId: { $in: sessionIdList },
-    status: { $in: ['present', 'late', 'od'] },
-  });
-
-  // 4. Calculate percentage (handle division by zero)
-  const percentage = totalClasses > 0
-    ? Math.round((attended / totalClasses) * 10000) / 100
-    : 0;
-
-  // 5. Determine category
-  const category = categorizeAttendance(percentage);
-
-  // 6. Simple projection (stub for AI forecast)
-  const projectedFinal = percentage;
-
-  // 7. Get previous summary to detect category change
-  const previousSummary = await AttendanceSummary.findOne({
-    collegeId,
-    studentId,
-    courseOfferingId,
-  }).lean();
+  // 5. Previous summary, to detect a category change.
+  const previousSummary = await AttendanceSummary.findOne({ collegeId, studentId, courseOfferingId })
+    .select('category').lean<{ category?: string } | null>();
   const previousCategory = previousSummary?.category;
 
-  // 8. Upsert AttendanceSummary
+  // 6. Upsert — bare fields, as before.
   const summary = await AttendanceSummary.findOneAndUpdate(
     { collegeId, studentId, courseOfferingId },
     {
@@ -1967,23 +2046,21 @@ export async function updateAttendanceSummary(
       studentId,
       courseOfferingId,
       semesterId,
-      totalClasses,
-      attended,
-      percentage,
+      totalClasses: calc.held,
+      attended: calc.attended,
+      percentage: calc.pct,
       category,
-      projectedFinal,
+      projectedFinal: calc.pct ?? 0,
       lastUpdatedAt: new Date(),
     },
     { upsert: true, new: true, setDefaultsOnInsert: true },
   );
 
-  // 9. If category changed (or first time), check thresholds
-  if (category !== previousCategory) {
-    await checkAttendanceThresholds(
-      collegeId, studentId, courseOfferingId, semesterId, percentage, category,
-    );
+  // 7. Category changed → threshold alert. Ruling R9: the alert thresholds stay
+  //    hard-coded 75/65 inside checkAttendanceThresholds; a null pct never alerts.
+  if (calc.pct !== null && category !== previousCategory) {
+    await checkAttendanceThresholds(collegeId, studentId, courseOfferingId, semesterId, calc.pct, category);
   }
-
   return summary;
 }
 
@@ -2790,8 +2867,8 @@ export async function checkHallTicketEligibility(
     });
 
     if (summary) {
-      attendancePercent = summary.percentage;
-      if (summary.percentage < 75) {
+      attendancePercent = summary.percentage ?? 0;
+      if (summary.percentage !== null && summary.percentage < 75) {
         // Check for approved condonation
         const condonation = await CondonationRequest.findOne({
           collegeId,
@@ -4612,7 +4689,7 @@ export async function computeProgrammeHealth(
   // 5. Attendance average
   const attendanceSummaries = await AttendanceSummary.find({ collegeId, semesterId }).lean();
   const attendanceAvg = attendanceSummaries.length > 0
-    ? Math.round((attendanceSummaries.reduce((s, a) => s + a.percentage, 0) / attendanceSummaries.length) * 100) / 100
+    ? Math.round((attendanceSummaries.reduce((s, a) => s + (a.percentage ?? 0), 0) / attendanceSummaries.length) * 100) / 100
     : 0;
 
   // 6. CO Attainment average — get offerings for this programme's courses
@@ -4792,7 +4869,7 @@ export async function feedComplianceEvidence(
   const attendanceSummaries = await AttendanceSummary.find({ collegeId, semesterId }).lean();
   if (attendanceSummaries.length > 0) {
     const avgAttendance = Math.round(
-      (attendanceSummaries.reduce((s, a) => s + a.percentage, 0) / attendanceSummaries.length) * 100,
+      (attendanceSummaries.reduce((s, a) => s + (a.percentage ?? 0), 0) / attendanceSummaries.length) * 100,
     ) / 100;
     evidenceRecords.push({
       collegeId,
@@ -4928,7 +5005,7 @@ export async function getAttendanceAnalyticsDashboard(
   // 1. AttendanceSummary → averages and category counts
   const summaries = await AttendanceSummary.find({ collegeId, semesterId }).lean();
   const overallAvgAttendance = summaries.length > 0
-    ? Math.round((summaries.reduce((s, a) => s + a.percentage, 0) / summaries.length) * 100) / 100
+    ? Math.round((summaries.reduce((s, a) => s + (a.percentage ?? 0), 0) / summaries.length) * 100) / 100
     : 0;
 
   const categoryDistribution = { safe: 0, warning: 0, at_risk: 0, detained: 0 };
@@ -4945,10 +5022,10 @@ export async function getAttendanceAnalyticsDashboard(
     const key = String(s.courseOfferingId);
     const existing = courseMap.get(key);
     if (existing) {
-      existing.total += s.percentage;
+      existing.total += s.percentage ?? 0;
       existing.count++;
     } else {
-      courseMap.set(key, { total: s.percentage, count: 1 });
+      courseMap.set(key, { total: s.percentage ?? 0, count: 1 });
     }
   }
   const courseWiseAttendance: Array<{ courseOfferingId: string; avgAttendance: number }> = [];
@@ -4994,7 +5071,7 @@ export async function generateRiskAlerts(
   const lowAttendance = await AttendanceSummary.find({
     collegeId,
     semesterId,
-    percentage: { $lt: 65 },
+    percentage: { $gte: 0, $lt: 65 }, // §5.4: null (never held) must not read as low
   }).lean();
   for (const summary of lowAttendance) {
     alerts.push({

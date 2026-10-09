@@ -15,6 +15,8 @@ export const EVENT_NAMES = [
   'notice.seen', 'notice.acknowledged', 'notice.dismissed',
   'notification.opened', 'notification.permission',
   'permission_card.shown', 'permission_card.dismissed',
+  'timeline.class_opened', 'glance.opened',
+  'post_class_prompt.shown', 'post_class_prompt.opened',
 ] as const;
 
 export const EVENTS_MAX = 100;

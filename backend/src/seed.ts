@@ -14,6 +14,7 @@ import {
   Enrollment, AttendanceSession, AttendanceRecord, InternalAssessment, InternalMark,
   ExamSchedule, ExamRegistration, ExternalMark, GradeCard, SemesterResult,
   ElectiveAllocation, LessonPlan, CourseFeedback, Timetable, TimetableSlot,
+  ClassException, AcademicCalendar,
   Assignment, Submission, Quiz, QuizAttempt, Backlog, RevaluationRequest,
   HallTicket, SeatingPlan, InvigilationRoster, PromotionDecision,
   AttendanceSummary, AttendanceAlert, CondonationRequest,
@@ -114,6 +115,7 @@ import { College } from './models/College';
 import { seedPolicies, snapshotPoliciesForCollege } from './shared/seed/policies';
 import { seedPersonas, snapshotPersonasForCollege } from './shared/seed/personas';
 import { seedChannelTemplates } from './shared/seed/channel-templates';
+import { addDays, ymd } from './modules/academics/timetable-date';
 import { provisionPerson } from './modules/juvi-app/accounts/provisioning-service';
 import { reconcileCollege } from './modules/juvi-app/spaces/reconcile-service';
 import bcrypt from 'bcryptjs';
@@ -322,6 +324,8 @@ async function seed() {
     CourseFeedback.deleteMany({ collegeId: CID }),
     Timetable.deleteMany({ collegeId: CID }),
     TimetableSlot.deleteMany({ collegeId: CID }),
+    ClassException.deleteMany({ collegeId: CID }),
+    AcademicCalendar.deleteMany({ collegeId: CID }),
     Assignment.deleteMany({ collegeId: CID }),
     Submission.deleteMany({ collegeId: CID }),
     Quiz.deleteMany({ collegeId: CID }),
@@ -2277,37 +2281,31 @@ async function seed() {
   ]);
   console.log('Enrollments created');
 
+  // §10: live-window timetables (published, effectiveFrom ≤ now, no effectiveTo) so the
+  // Today/Teaching readers resolve them for the demo student's section (CSE-A), the demo
+  // faculty's offering (CSE-B, FAC001) and the ECE-A section that already had slots.
   const timetables = await Timetable.create([
-    { collegeId: CID, semesterId: sem2_24._id, sectionId: sections[0]._id, version: 1, status: 'published', effectiveFrom: new Date('2025-01-10') },
-    { collegeId: CID, semesterId: sem2_24._id, sectionId: sections[2]._id, version: 1, status: 'published', effectiveFrom: new Date('2025-01-10') },
+    { collegeId: CID, semesterId: sem2_24._id, sectionId: sections[0]._id, version: 1, status: 'published', effectiveFrom: new Date(Date.now() - 60 * 86_400_000) },
+    { collegeId: CID, semesterId: sem2_24._id, sectionId: sections[2]._id, version: 1, status: 'published', effectiveFrom: new Date(Date.now() - 60 * 86_400_000) },
+    { collegeId: CID, semesterId: sem2_24._id, sectionId: sections[1]._id, version: 1, status: 'published', effectiveFrom: new Date(Date.now() - 60 * 86_400_000) },
   ]);
   console.log('Timetables created');
 
-  await TimetableSlot.create([
-    { collegeId: CID, timetableId: timetables[0]._id, day: 'monday', period: 1, startTime: '09:00', endTime: '10:00', courseOfferingId: courseOfferings[0]._id, roomId: rooms[0]._id, slotType: 'lecture' },
-    { collegeId: CID, timetableId: timetables[0]._id, day: 'monday', period: 2, startTime: '10:00', endTime: '11:00', courseOfferingId: courseOfferings[1]._id, roomId: rooms[0]._id, slotType: 'lecture' },
-    { collegeId: CID, timetableId: timetables[0]._id, day: 'tuesday', period: 1, startTime: '09:00', endTime: '10:00', courseOfferingId: courseOfferings[0]._id, roomId: rooms[0]._id, slotType: 'lecture' },
-    { collegeId: CID, timetableId: timetables[0]._id, day: 'wednesday', period: 3, startTime: '11:00', endTime: '13:00', courseOfferingId: courseOfferings[3]._id, roomId: rooms[2]._id, slotType: 'lab' },
+  const ttSlots = await TimetableSlot.create([
+    // CSE-A (timetables[0]): period 1 = offerings[0] (demo faculty + demo student's course), period 2 = offerings[1] — Mon–Sat
+    ...(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const).flatMap((day) => [
+      { collegeId: CID, timetableId: timetables[0]._id, day, period: 1, startTime: '09:00', endTime: '10:00', courseOfferingId: courseOfferings[0]._id, roomId: rooms[0]._id, slotType: 'lecture' },
+      { collegeId: CID, timetableId: timetables[0]._id, day, period: 2, startTime: '10:00', endTime: '11:00', courseOfferingId: courseOfferings[1]._id, roomId: rooms[0]._id, slotType: 'lecture' },
+    ]),
+    // CSE-B (timetables[2]): period 1 = offerings[2], taught by the demo faculty FAC001 — Mon–Sat
+    ...(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const).map((day) => ({
+      collegeId: CID, timetableId: timetables[2]._id, day, period: 1, startTime: '09:00', endTime: '10:00', courseOfferingId: courseOfferings[2]._id, roomId: rooms[2]._id, slotType: 'lecture',
+    })),
+    // ECE-A (timetables[1]): the lab row moved here from timetables[0] + its Monday lecture
+    { collegeId: CID, timetableId: timetables[1]._id, day: 'wednesday', period: 3, startTime: '11:00', endTime: '13:00', courseOfferingId: courseOfferings[3]._id, roomId: rooms[2]._id, slotType: 'lab' },
     { collegeId: CID, timetableId: timetables[1]._id, day: 'monday', period: 1, startTime: '09:00', endTime: '10:00', courseOfferingId: courseOfferings[4]._id, roomId: rooms[6]._id, slotType: 'lecture' },
   ]);
   console.log('TimetableSlots created');
-
-  const attendanceSessions = await AttendanceSession.create([
-    { collegeId: CID, courseOfferingId: courseOfferings[0]._id, date: new Date('2025-03-10'), period: 1, facultyId: faculties[0]._id, status: 'closed', totalPresent: 50, totalAbsent: 5 },
-    { collegeId: CID, courseOfferingId: courseOfferings[1]._id, date: new Date('2025-03-10'), period: 2, facultyId: faculties[3]._id, status: 'closed', totalPresent: 52, totalAbsent: 6 },
-    { collegeId: CID, courseOfferingId: courseOfferings[0]._id, date: new Date('2025-03-11'), period: 1, facultyId: faculties[0]._id, status: 'closed', totalPresent: 48, totalAbsent: 7 },
-  ]);
-  console.log('AttendanceSessions created');
-
-  await AttendanceRecord.create([
-    { collegeId: CID, sessionId: attendanceSessions[0]._id, studentId: students[0]._id, status: 'present', markedBy: persons[10]._id },
-    { collegeId: CID, sessionId: attendanceSessions[0]._id, studentId: students[1]._id, status: 'present', markedBy: persons[10]._id },
-    { collegeId: CID, sessionId: attendanceSessions[1]._id, studentId: students[0]._id, status: 'present', markedBy: persons[13]._id },
-    { collegeId: CID, sessionId: attendanceSessions[1]._id, studentId: students[7]._id, status: 'absent', markedBy: persons[13]._id },
-    { collegeId: CID, sessionId: attendanceSessions[2]._id, studentId: students[0]._id, status: 'late', markedBy: persons[10]._id },
-    { collegeId: CID, sessionId: attendanceSessions[2]._id, studentId: students[1]._id, status: 'absent', markedBy: persons[10]._id },
-  ]);
-  console.log('AttendanceRecords created');
 
   const internalAssessments = await InternalAssessment.create([
     { collegeId: CID, courseOfferingId: courseOfferings[0]._id, name: 'Mid-1 Exam - Compiler Design', type: 'mid1', maxMarks: 30, weightage: 15, date: new Date('2025-02-20'), status: 'finalized', coMappings: [{ coCode: 'CO1', weight: 0.5 }, { coCode: 'CO2', weight: 0.5 }] },
@@ -3213,6 +3211,101 @@ async function seed() {
   const demoFaculty = await Faculty.findOne({ collegeId: CID, status: 'active' }).sort({ employeeCode: 1 }).lean();
   if (demoStudent) await provisionPerson({ collegeId: String(CID), personId: String(demoStudent.personId), kind: 'student', source: 'admin', performedBy: 'seed', temporaryPassword: DEMO_TEMP_PASSWORD });
   if (demoFaculty) await provisionPerson({ collegeId: String(CID), personId: String(demoFaculty.personId), kind: 'faculty', source: 'admin', performedBy: 'seed', temporaryPassword: DEMO_TEMP_PASSWORD });
+
+  // ========================================================================
+  // TODAY & TEACHING demo (spec §10) — live readers for the demo sign-in
+  // ========================================================================
+  if (demoStudent && demoFaculty) {
+    const adminUser = await User.findOne({ collegeId: CID, email: 'admin@jit.edu.in' });
+    const todayDate = ymd(new Date(), 'Asia/Kolkata');
+    const tomorrowDate = addDays(todayDate, 1);
+    const DOW = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
+    const dow = (date: string) => DOW[new Date(`${date}T00:00:00Z`).getUTCDay()];
+
+    // The demo student (lowest rollNumber = 21B01A0301) has no enrollment in the
+    // generic rows above — enrol them into the two CSE-A offerings the timetable covers.
+    await Enrollment.create([
+      { collegeId: CID, studentId: demoStudent._id, courseOfferingId: courseOfferings[0]._id, semesterId: sem2_24._id, status: 'enrolled' },
+      { collegeId: CID, studentId: demoStudent._id, courseOfferingId: courseOfferings[1]._id, semesterId: sem2_24._id, status: 'enrolled' },
+    ]);
+    await Section.updateOne({ _id: courseOfferings[0].sectionId, collegeId: CID }, { $addToSet: { studentIds: demoStudent._id } });
+
+    // ~8 weeks of closed sessions (Mon–Sat), the demo student below threshold on
+    // courseOfferings[0] (~67% → at_risk at T=75) and above on courseOfferings[1] (~91% → safe).
+    const markerFor: Record<string, mongoose.Types.ObjectId> = {
+      [String(courseOfferings[0]._id)]: persons[10]._id,
+      [String(courseOfferings[1]._id)]: persons[13]._id,
+    };
+    const sessionDocs = [];
+    for (let back = 8; back <= 60; back++) {
+      const d = new Date(Date.now() - back * 86_400_000);
+      if (new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Kolkata', weekday: 'short' }).format(d) === 'Sun') continue; // Sundays: Mon–Sat weeks
+      sessionDocs.push(
+        { collegeId: CID, courseOfferingId: courseOfferings[0]._id, date: d, period: 1, facultyId: courseOfferings[0].facultyId, status: 'closed' },
+        { collegeId: CID, courseOfferingId: courseOfferings[1]._id, date: d, period: 2, facultyId: courseOfferings[1].facultyId, status: 'closed' },
+      );
+    }
+    const createdSessions = await AttendanceSession.create(sessionDocs);
+    const markedFor: Record<string, number> = {
+      [String(courseOfferings[0]._id)]: 0,
+      [String(courseOfferings[1]._id)]: 0,
+    };
+    const recordDocs = [];
+    for (const session of createdSessions) {
+      const key = String(session.courseOfferingId);
+      const order = markedFor[key] ?? 0;
+      markedFor[key] = order + 1;
+      recordDocs.push({
+        collegeId: CID, sessionId: session._id, studentId: demoStudent._id,
+        status: key === String(courseOfferings[0]._id) ? (order % 3 === 0 ? 'absent' : 'present') : (order % 12 === 0 ? 'absent' : 'present'),
+        markedBy: markerFor[key],
+      });
+    }
+    await AttendanceRecord.create(recordDocs);
+
+    // Published holiday covering tomorrow (§10) — Task 12's holidayCovering window.
+    await AcademicCalendar.create({
+      collegeId: CID, academicYearId: ay2024._id, title: 'Demo College Holiday',
+      eventType: 'holiday', startDate: new Date(`${tomorrowDate}T00:00:00Z`), endDate: new Date(`${tomorrowDate}T00:00:00Z`),
+      isHoliday: true, status: 'published',
+    });
+
+    // A cancellation dated tomorrow, on the demo student's first course
+    // (skipped gracefully when tomorrow is a Sunday — no weekday slot exists).
+    const cancelledSlot = ttSlots.find(
+      (s) => s.day === dow(tomorrowDate) && String(s.courseOfferingId) === String(courseOfferings[0]._id),
+    );
+    if (adminUser && cancelledSlot) {
+      await ClassException.create({
+        collegeId: CID, timetableSlotId: cancelledSlot._id, courseOfferingId: cancelledSlot.courseOfferingId,
+        date: tomorrowDate, type: 'cancelled',
+        reason: 'Demo seeded cancellation for the Today timeline', createdBy: adminUser._id,
+      });
+    }
+
+    // Open invoice with a plan instalment due in 5 days (dues + fee_due attention).
+    const demoInvoice = await Invoice.create({
+      collegeId: CID, studentId: demoStudent._id, invoiceNumber: 'JUVI-DEMO-001', type: 'fee',
+      totalAmount: 43500, dueDate: new Date(Date.now() + 30 * 86_400_000), status: 'sent',
+    });
+    await PaymentPlan.create({
+      collegeId: CID, studentId: demoStudent._id, invoiceId: demoInvoice._id,
+      totalAmount: 43500, status: 'active',
+      installments: [
+        { dueDate: new Date(Date.now() + 5 * 86_400_000), amount: 21750, status: 'pending' },
+        { dueDate: new Date(Date.now() + 35 * 86_400_000), amount: 21750, status: 'pending' },
+      ],
+    });
+
+    // Scheduled internal assessment ~36 h out (glance nextAssessment, 48 h attention window).
+    await InternalAssessment.create({
+      collegeId: CID, courseOfferingId: courseOfferings[0]._id, name: 'Mid-2 Examination', type: 'mid2',
+      maxMarks: 30, weightage: 15, date: new Date(Date.now() + 36 * 60 * 60 * 1000), status: 'scheduled',
+    });
+
+    console.log('Today & Teaching demo created (enrolments, 8-week attendance, holiday, cancellation, open dues, scheduled assessment)');
+  }
+
   const juviSummary = await reconcileCollege(String(CID));
   console.log(`Juvi: ${juviSummary.channels.total} channels, ${juviSummary.memberships.added} memberships${juviSummary.skipped ? ' (skipped: another reconcile holds the lock)' : ''}`);
   console.log(`Juvi demo sign-in — institution code JIT; student ${demoStudent?.rollNumber ?? '(none)'} / faculty ${demoFaculty?.employeeCode ?? '(none)'}; temporary password ${DEMO_TEMP_PASSWORD}`);

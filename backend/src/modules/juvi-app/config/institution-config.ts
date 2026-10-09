@@ -30,6 +30,9 @@ export function normalizeJuviConfig(raw: Partial<IJuviConfig> | undefined): IJuv
     timezone: j.timezone ?? 'Asia/Kolkata',
     featureFlags: { languageRoadmap: Boolean(j.featureFlags?.languageRoadmap) },
     welcomeNotice: j.welcomeNotice,
+    attendanceThreshold: j.attendanceThreshold ?? 75,
+    showAttendanceHeadroom: j.showAttendanceHeadroom ?? true,
+    paymentPortalUrl: j.paymentPortalUrl,
   };
 }
 

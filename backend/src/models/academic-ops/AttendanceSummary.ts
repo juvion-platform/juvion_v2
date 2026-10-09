@@ -7,7 +7,8 @@ export interface IAttendanceSummary extends Document {
   semesterId: Schema.Types.ObjectId;
   totalClasses: number;
   attended: number;
-  percentage: number;
+  /** §5.4: null = nothing held (no closed session yet); never alerts. */
+  percentage: number | null;
   category: string;
   projectedFinal?: number;
   lastUpdatedAt?: Date;
@@ -20,7 +21,8 @@ const schema = new Schema<IAttendanceSummary>({
   semesterId: { type: Schema.Types.ObjectId, ref: 'Semester', required: true },
   totalClasses: { type: Number, default: 0 },
   attended: { type: Number, default: 0 },
-  percentage: { type: Number, default: 0, min: 0, max: 100 },
+  /** §5.4: null = nothing held (no closed session yet); never alerts. */
+  percentage: { type: Number, default: null, min: 0, max: 100 },
   category: { type: String, enum: ['safe', 'warning', 'at_risk', 'detained'], default: 'safe' },
   projectedFinal: { type: Number, min: 0, max: 100 },
   lastUpdatedAt: Date,

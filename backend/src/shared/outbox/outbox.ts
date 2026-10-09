@@ -94,7 +94,7 @@ export async function processEvent(event: IOutboxEvent): Promise<void> {
  * number processed. The dispatcher sweeps on its scheduled tick only; the inline
  * path has no tick, so it sweeps. `afterEvents` sweepers run on every pass.
  */
-export async function processOnce(limit = 500, opts: { sweep?: boolean } = {}): Promise<number> {
+export async function processOnce(limit = 500, opts: { sweep?: boolean; afterEvents?: boolean } = {}): Promise<number> {
   if (opts.sweep !== false) {
     for (const sweep of sweepers) {
       try { await sweep(); } catch (err) { console.error('[outbox] sweeper failed', err); }
@@ -107,15 +107,17 @@ export async function processOnce(limit = 500, opts: { sweep?: boolean } = {}): 
     await processEvent(event);
     n += 1;
   }
-  for (const sweep of afterSweepers) {
-    try { await sweep(); } catch (err) { console.error('[outbox] sweeper failed', err); }
+  if (opts.afterEvents !== false) {
+    for (const sweep of afterSweepers) {
+      try { await sweep(); } catch (err) { console.error('[outbox] sweeper failed', err); }
+    }
   }
   return n;
 }
 
 /** One inline run per process at a time; a concurrent caller shares the running promise. */
-function runInline(): Promise<number> {
-  if (!inflight) inflight = processOnce().finally(() => { inflight = null; });
+function runInline(opts: { afterEvents?: boolean } = {}): Promise<number> {
+  if (!inflight) inflight = processOnce(500, { afterEvents: opts.afterEvents }).finally(() => { inflight = null; });
   return inflight;
 }
 
@@ -129,12 +131,17 @@ export async function kick(): Promise<void> {
   void runInline().catch((err) => console.error('[outbox] inline processing failed', err));
 }
 
-/** Waits for any inline run in flight, then processes until the outbox is quiet. Tests and inline callers use this. */
-export async function drainOutbox(): Promise<number> {
+/**
+ * Waits for any inline run in flight, then processes until the outbox is quiet.
+ * Tests and inline callers use this. `afterEvents: false` skips the after-events
+ * sweepers — the follow-up send pass — so a fixture can observe the expansion
+ * without the sender claiming the rows it just wrote.
+ */
+export async function drainOutbox(opts: { afterEvents?: boolean } = {}): Promise<number> {
   let total = 0;
   if (inflight) total += await inflight;
   for (;;) {
-    const n = await runInline();
+    const n = await runInline(opts);
     total += n;
     if (n === 0) return total;
   }

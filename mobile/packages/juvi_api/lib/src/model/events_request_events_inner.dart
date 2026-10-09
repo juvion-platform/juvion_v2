@@ -114,7 +114,15 @@ notificationPeriodPermission(r'notification.permission'),
 @JsonValue(r'permission_card.shown')
 permissionCardPeriodShown(r'permission_card.shown'),
 @JsonValue(r'permission_card.dismissed')
-permissionCardPeriodDismissed(r'permission_card.dismissed');
+permissionCardPeriodDismissed(r'permission_card.dismissed'),
+@JsonValue(r'timeline.class_opened')
+timelinePeriodClassOpened(r'timeline.class_opened'),
+@JsonValue(r'glance.opened')
+glancePeriodOpened(r'glance.opened'),
+@JsonValue(r'post_class_prompt.shown')
+postClassPromptPeriodShown(r'post_class_prompt.shown'),
+@JsonValue(r'post_class_prompt.opened')
+postClassPromptPeriodOpened(r'post_class_prompt.opened');
 
 const EventsRequestEventsInnerNameEnum(this.value);
 

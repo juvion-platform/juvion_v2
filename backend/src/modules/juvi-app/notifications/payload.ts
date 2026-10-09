@@ -30,3 +30,31 @@ export function buildNoticePush(i: NoticePushInput): PushMessage {
   if (!i.confidential && i.count === 1) data.title = i.title;
   return { data, priority: i.tier === 'routine' ? 'normal' : 'high', collapseKey: i.groupKey };
 }
+
+export interface ClassChangePushInput {
+  deliveryId: string;
+  receipt: string;
+  exceptionId: string;
+  tier: NotificationTier;
+  groupKey: string;
+  office: string;
+  variant: 'cancelled' | 'rescheduled' | 'restored';
+  /** The original class start as an ISO instant. */
+  when: string;
+  /** For a reschedule: the new class start as an ISO instant. */
+  newWhen?: string;
+}
+
+/**
+ * The §8 push (NFR-05). Only opaque ids, the course code as the office, the when
+ * instants and the variant — the reason never goes out, and a restore announces
+ * itself by the restored variant alone.
+ */
+export function buildClassChangePush(i: ClassChangePushInput): PushMessage {
+  const data: Record<string, string> = {
+    deliveryId: i.deliveryId, receipt: i.receipt, kind: 'class_change', exceptionId: i.exceptionId,
+    tier: i.tier, groupKey: i.groupKey, office: i.office, variant: i.variant, when: i.when,
+  };
+  if (i.newWhen) data.newWhen = i.newWhen;
+  return { data, priority: i.tier === 'routine' ? 'normal' : 'high', collapseKey: i.groupKey };
+}

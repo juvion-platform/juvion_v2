@@ -686,3 +686,34 @@ export const generateSeatingPlanSchema = z.object({ venues: z.array(z.string()).
 export const assignInvigilationSchema = z.object({ facultyIds: z.array(z.string()).min(1) });
 export const aggregatePOAttainmentSchema = z.object({ programmeId: z.string().min(1), semesterId: z.string().min(1) });
 export const createAttainmentRunSchema = z.object({ semesterId: z.string().min(1), programmeId: z.string().min(1), runType: z.string().min(1) });
+
+// ─── Class exceptions (spec §5.2) ───────────────────────────
+export const createClassExceptionBodySchema = z.object({
+  timetableSlotId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid id'),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'date must be YYYY-MM-DD'),
+  type: z.enum(['cancelled', 'rescheduled']),
+  newDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'newDate must be YYYY-MM-DD').optional(),
+  newStartTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'newStartTime must be HH:MM').optional(),
+  newEndTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'newEndTime must be HH:MM').optional(),
+  newRoomId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid id').optional(),
+  reason: z.string().trim().min(5, 'Give a reason (at least 5 characters)').max(300),
+}).strict().superRefine((v, ctx) => {
+  if (v.type === 'rescheduled' && !(v.newDate && v.newStartTime && v.newEndTime)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'A reschedule requires newDate, newStartTime and newEndTime' });
+  }
+  if (v.type === 'cancelled' && (v.newDate ?? v.newStartTime ?? v.newEndTime)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'A cancellation excludes newDate, newStartTime and newEndTime' });
+  }
+});
+
+export const classExceptionListQuerySchema = z.object({
+  offeringId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid id').optional(),
+  from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'from must be YYYY-MM-DD').optional(),
+  to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'to must be YYYY-MM-DD').optional(),
+});
+
+export const classExceptionPreviewQuerySchema = z.object({
+  slotId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid id'),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'date must be YYYY-MM-DD'),
+  newDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'newDate must be YYYY-MM-DD').optional(),
+});

@@ -7,7 +7,7 @@ void main() {
   // TODO add properties to the entity
 
   group(NoticeList, () {
-    // List<AttentionItemsInner> items
+    // List<NoticeListItemsInner> items
     test('to test the property `items`', () async {
       // TODO
     });

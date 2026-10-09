@@ -72,15 +72,18 @@ Class | Method | HTTP request | Description
 [*MobileApi*](doc/MobileApi.md) | [**changePassword**](doc/MobileApi.md#changepassword) | **POST** /auth/change-password | Change password; revokes other sessions
 [*MobileApi*](doc/MobileApi.md) | [**clearPushToken**](doc/MobileApi.md#clearpushtoken) | **DELETE** /me/devices/current/push-token | Remove this device&#39;s FCM token
 [*MobileApi*](doc/MobileApi.md) | [**dismissNotice**](doc/MobileApi.md#dismissnotice) | **POST** /notices/{id}/dismiss | Dismiss a notice that needs no acknowledgement
-[*MobileApi*](doc/MobileApi.md) | [**getAttention**](doc/MobileApi.md#getattention) | **GET** /attention | Due acknowledgement notices: count and the first three
+[*MobileApi*](doc/MobileApi.md) | [**getAttention**](doc/MobileApi.md#getattention) | **GET** /attention | Due items: the notice stack, or every attention item with kinds&#x3D;all
 [*MobileApi*](doc/MobileApi.md) | [**getChannel**](doc/MobileApi.md#getchannel) | **GET** /channels/{id} | Channel header and About
 [*MobileApi*](doc/MobileApi.md) | [**getConfig**](doc/MobileApi.md#getconfig) | **GET** /config | Institution configuration for the signed-in user
 [*MobileApi*](doc/MobileApi.md) | [**getFirstNotice**](doc/MobileApi.md#getfirstnotice) | **GET** /onboarding/first-notice | Onboarding step 4: the welcome notice
 [*MobileApi*](doc/MobileApi.md) | [**getMe**](doc/MobileApi.md#getme) | **GET** /me | Identity card, account state, settings, institution
+[*MobileApi*](doc/MobileApi.md) | [**getMeAcademics**](doc/MobileApi.md#getmeacademics) | **GET** /me/academics | Attendance and dues (student) or courses taught (faculty)
 [*MobileApi*](doc/MobileApi.md) | [**getNotice**](doc/MobileApi.md#getnotice) | **GET** /notices/{id} | Notice detail with my state (does not mark it seen)
 [*MobileApi*](doc/MobileApi.md) | [**getNoticeAttachmentUrl**](doc/MobileApi.md#getnoticeattachmenturl) | **GET** /notices/{id}/attachments/{key} | A 5-minute download URL for one attachment (key URL-encoded)
 [*MobileApi*](doc/MobileApi.md) | [**getNoticeReach**](doc/MobileApi.md#getnoticereach) | **GET** /notices/{id}/reach | Reach for the publisher
 [*MobileApi*](doc/MobileApi.md) | [**getSettings**](doc/MobileApi.md#getsettings) | **GET** /me/settings | Notification and language settings
+[*MobileApi*](doc/MobileApi.md) | [**getTeaching**](doc/MobileApi.md#getteaching) | **GET** /teaching | Faculty today: today + tomorrow classes, next teaching day, faculty kind
+[*MobileApi*](doc/MobileApi.md) | [**getToday**](doc/MobileApi.md#gettoday) | **GET** /today | Student today: today + tomorrow class lists and the glance
 [*MobileApi*](doc/MobileApi.md) | [**listDevices**](doc/MobileApi.md#listdevices) | **GET** /me/devices | Signed-in devices
 [*MobileApi*](doc/MobileApi.md) | [**listNoticePending**](doc/MobileApi.md#listnoticepending) | **GET** /notices/{id}/reach/pending | Pending members for the publisher, grouped and searchable
 [*MobileApi*](doc/MobileApi.md) | [**listNotices**](doc/MobileApi.md#listnotices) | **GET** /notices | Notice cards by segment (due, done, all, published), cursor-paged
@@ -108,7 +111,7 @@ Class | Method | HTTP request | Description
  - [AckRequest](doc/AckRequest.md)
  - [AckResult](doc/AckResult.md)
  - [Attention](doc/Attention.md)
- - [AttentionItemsInner](doc/AttentionItemsInner.md)
+ - [AttentionItem](doc/AttentionItem.md)
  - [ChangePasswordRequest](doc/ChangePasswordRequest.md)
  - [ChannelDetail](doc/ChannelDetail.md)
  - [ChannelDetailLinkedObject](doc/ChannelDetailLinkedObject.md)
@@ -117,9 +120,15 @@ Class | Method | HTTP request | Description
  - [ConfigMinAppVersion](doc/ConfigMinAppVersion.md)
  - [ConfigQuietHoursDefault](doc/ConfigQuietHoursDefault.md)
  - [ConfigSupportContact](doc/ConfigSupportContact.md)
+ - [CoursesTaughtItem](doc/CoursesTaughtItem.md)
+ - [DayClass](doc/DayClass.md)
+ - [DayClassMovedFrom](doc/DayClassMovedFrom.md)
+ - [DayView](doc/DayView.md)
  - [Devices](doc/Devices.md)
  - [DevicesItemsInner](doc/DevicesItemsInner.md)
  - [DismissResult](doc/DismissResult.md)
+ - [DueInvoiceItem](doc/DueInvoiceItem.md)
+ - [DueInvoiceItemNextDue](doc/DueInvoiceItemNextDue.md)
  - [ErrorEnvelope](doc/ErrorEnvelope.md)
  - [ErrorEnvelopeError](doc/ErrorEnvelopeError.md)
  - [ErrorEnvelopeErrorAck](doc/ErrorEnvelopeErrorAck.md)
@@ -127,8 +136,10 @@ Class | Method | HTTP request | Description
  - [EventsRequest](doc/EventsRequest.md)
  - [EventsRequestEventsInner](doc/EventsRequestEventsInner.md)
  - [EventsResult](doc/EventsResult.md)
+ - [FacultyCourses](doc/FacultyCourses.md)
  - [InstitutionLookup](doc/InstitutionLookup.md)
  - [Me](doc/Me.md)
+ - [MeAcademics](doc/MeAcademics.md)
  - [MeAccount](doc/MeAccount.md)
  - [MeFaculty](doc/MeFaculty.md)
  - [MeInstitution](doc/MeInstitution.md)
@@ -144,6 +155,7 @@ Class | Method | HTTP request | Description
  - [NoticeDetail](doc/NoticeDetail.md)
  - [NoticeDetailAttachmentsInner](doc/NoticeDetailAttachmentsInner.md)
  - [NoticeList](doc/NoticeList.md)
+ - [NoticeListItemsInner](doc/NoticeListItemsInner.md)
  - [NoticePending](doc/NoticePending.md)
  - [NoticePendingGroupsInner](doc/NoticePendingGroupsInner.md)
  - [NoticePendingItemsInner](doc/NoticePendingItemsInner.md)
@@ -182,6 +194,20 @@ Class | Method | HTTP request | Description
  - [Spaces](doc/Spaces.md)
  - [SpacesGroupsInner](doc/SpacesGroupsInner.md)
  - [SpacesGroupsInnerChannelsInner](doc/SpacesGroupsInnerChannelsInner.md)
+ - [StudentAcademics](doc/StudentAcademics.md)
+ - [StudentAcademicsAttendance](doc/StudentAcademicsAttendance.md)
+ - [StudentAcademicsAttendanceCoursesInner](doc/StudentAcademicsAttendanceCoursesInner.md)
+ - [StudentAcademicsAttendanceOverall](doc/StudentAcademicsAttendanceOverall.md)
+ - [StudentDues](doc/StudentDues.md)
+ - [Teaching](doc/Teaching.md)
+ - [TeachingFaculty](doc/TeachingFaculty.md)
+ - [TeachingNextTeachingDay](doc/TeachingNextTeachingDay.md)
+ - [TeachingNextTeachingDayClassesInner](doc/TeachingNextTeachingDayClassesInner.md)
+ - [Today](doc/Today.md)
+ - [TodayGlance](doc/TodayGlance.md)
+ - [TodayGlanceAttendance](doc/TodayGlanceAttendance.md)
+ - [TodayGlanceDues](doc/TodayGlanceDues.md)
+ - [TodayGlanceNextAssessment](doc/TodayGlanceNextAssessment.md)
  - [Tokens](doc/Tokens.md)
 
 

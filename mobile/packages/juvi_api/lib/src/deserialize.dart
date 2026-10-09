@@ -1,7 +1,7 @@
 import 'package:juvi_api/src/model/ack_request.dart';
 import 'package:juvi_api/src/model/ack_result.dart';
 import 'package:juvi_api/src/model/attention.dart';
-import 'package:juvi_api/src/model/attention_items_inner.dart';
+import 'package:juvi_api/src/model/attention_item.dart';
 import 'package:juvi_api/src/model/change_password_request.dart';
 import 'package:juvi_api/src/model/channel_detail.dart';
 import 'package:juvi_api/src/model/channel_detail_linked_object.dart';
@@ -10,9 +10,15 @@ import 'package:juvi_api/src/model/config_feature_flags.dart';
 import 'package:juvi_api/src/model/config_min_app_version.dart';
 import 'package:juvi_api/src/model/config_quiet_hours_default.dart';
 import 'package:juvi_api/src/model/config_support_contact.dart';
+import 'package:juvi_api/src/model/courses_taught_item.dart';
+import 'package:juvi_api/src/model/day_class.dart';
+import 'package:juvi_api/src/model/day_class_moved_from.dart';
+import 'package:juvi_api/src/model/day_view.dart';
 import 'package:juvi_api/src/model/devices.dart';
 import 'package:juvi_api/src/model/devices_items_inner.dart';
 import 'package:juvi_api/src/model/dismiss_result.dart';
+import 'package:juvi_api/src/model/due_invoice_item.dart';
+import 'package:juvi_api/src/model/due_invoice_item_next_due.dart';
 import 'package:juvi_api/src/model/error_envelope.dart';
 import 'package:juvi_api/src/model/error_envelope_error.dart';
 import 'package:juvi_api/src/model/error_envelope_error_ack.dart';
@@ -20,8 +26,10 @@ import 'package:juvi_api/src/model/error_envelope_error_reminders.dart';
 import 'package:juvi_api/src/model/events_request.dart';
 import 'package:juvi_api/src/model/events_request_events_inner.dart';
 import 'package:juvi_api/src/model/events_result.dart';
+import 'package:juvi_api/src/model/faculty_courses.dart';
 import 'package:juvi_api/src/model/institution_lookup.dart';
 import 'package:juvi_api/src/model/me.dart';
+import 'package:juvi_api/src/model/me_academics.dart';
 import 'package:juvi_api/src/model/me_account.dart';
 import 'package:juvi_api/src/model/me_faculty.dart';
 import 'package:juvi_api/src/model/me_institution.dart';
@@ -37,6 +45,7 @@ import 'package:juvi_api/src/model/notice_card.dart';
 import 'package:juvi_api/src/model/notice_detail.dart';
 import 'package:juvi_api/src/model/notice_detail_attachments_inner.dart';
 import 'package:juvi_api/src/model/notice_list.dart';
+import 'package:juvi_api/src/model/notice_list_items_inner.dart';
 import 'package:juvi_api/src/model/notice_pending.dart';
 import 'package:juvi_api/src/model/notice_pending_groups_inner.dart';
 import 'package:juvi_api/src/model/notice_pending_items_inner.dart';
@@ -75,6 +84,20 @@ import 'package:juvi_api/src/model/sign_in_response.dart';
 import 'package:juvi_api/src/model/spaces.dart';
 import 'package:juvi_api/src/model/spaces_groups_inner.dart';
 import 'package:juvi_api/src/model/spaces_groups_inner_channels_inner.dart';
+import 'package:juvi_api/src/model/student_academics.dart';
+import 'package:juvi_api/src/model/student_academics_attendance.dart';
+import 'package:juvi_api/src/model/student_academics_attendance_courses_inner.dart';
+import 'package:juvi_api/src/model/student_academics_attendance_overall.dart';
+import 'package:juvi_api/src/model/student_dues.dart';
+import 'package:juvi_api/src/model/teaching.dart';
+import 'package:juvi_api/src/model/teaching_faculty.dart';
+import 'package:juvi_api/src/model/teaching_next_teaching_day.dart';
+import 'package:juvi_api/src/model/teaching_next_teaching_day_classes_inner.dart';
+import 'package:juvi_api/src/model/today.dart';
+import 'package:juvi_api/src/model/today_glance.dart';
+import 'package:juvi_api/src/model/today_glance_attendance.dart';
+import 'package:juvi_api/src/model/today_glance_dues.dart';
+import 'package:juvi_api/src/model/today_glance_next_assessment.dart';
 import 'package:juvi_api/src/model/tokens.dart';
 
 final _regList = RegExp(r'^List<(.*)>$');
@@ -101,8 +124,8 @@ final _regMap = RegExp(r'^Map<String,(.*)>$');
           return AckResult.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'Attention':
           return Attention.fromJson(value as Map<String, dynamic>) as ReturnType;
-        case 'AttentionItemsInner':
-          return AttentionItemsInner.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'AttentionItem':
+          return AttentionItem.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'ChangePasswordRequest':
           return ChangePasswordRequest.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'ChannelDetail':
@@ -119,12 +142,24 @@ final _regMap = RegExp(r'^Map<String,(.*)>$');
           return ConfigQuietHoursDefault.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'ConfigSupportContact':
           return ConfigSupportContact.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'CoursesTaughtItem':
+          return CoursesTaughtItem.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'DayClass':
+          return DayClass.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'DayClassMovedFrom':
+          return DayClassMovedFrom.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'DayView':
+          return DayView.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'Devices':
           return Devices.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'DevicesItemsInner':
           return DevicesItemsInner.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'DismissResult':
           return DismissResult.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'DueInvoiceItem':
+          return DueInvoiceItem.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'DueInvoiceItemNextDue':
+          return DueInvoiceItemNextDue.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'ErrorEnvelope':
           return ErrorEnvelope.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'ErrorEnvelopeError':
@@ -139,10 +174,14 @@ final _regMap = RegExp(r'^Map<String,(.*)>$');
           return EventsRequestEventsInner.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'EventsResult':
           return EventsResult.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'FacultyCourses':
+          return FacultyCourses.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'InstitutionLookup':
           return InstitutionLookup.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'Me':
           return Me.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'MeAcademics':
+          return MeAcademics.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'MeAccount':
           return MeAccount.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'MeFaculty':
@@ -173,6 +212,8 @@ final _regMap = RegExp(r'^Map<String,(.*)>$');
           return NoticeDetailAttachmentsInner.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'NoticeList':
           return NoticeList.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'NoticeListItemsInner':
+          return NoticeListItemsInner.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'NoticePending':
           return NoticePending.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'NoticePendingGroupsInner':
@@ -249,6 +290,34 @@ final _regMap = RegExp(r'^Map<String,(.*)>$');
           return SpacesGroupsInner.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'SpacesGroupsInnerChannelsInner':
           return SpacesGroupsInnerChannelsInner.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'StudentAcademics':
+          return StudentAcademics.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'StudentAcademicsAttendance':
+          return StudentAcademicsAttendance.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'StudentAcademicsAttendanceCoursesInner':
+          return StudentAcademicsAttendanceCoursesInner.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'StudentAcademicsAttendanceOverall':
+          return StudentAcademicsAttendanceOverall.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'StudentDues':
+          return StudentDues.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'Teaching':
+          return Teaching.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'TeachingFaculty':
+          return TeachingFaculty.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'TeachingNextTeachingDay':
+          return TeachingNextTeachingDay.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'TeachingNextTeachingDayClassesInner':
+          return TeachingNextTeachingDayClassesInner.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'Today':
+          return Today.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'TodayGlance':
+          return TodayGlance.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'TodayGlanceAttendance':
+          return TodayGlanceAttendance.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'TodayGlanceDues':
+          return TodayGlanceDues.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'TodayGlanceNextAssessment':
+          return TodayGlanceNextAssessment.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'Tokens':
           return Tokens.fromJson(value as Map<String, dynamic>) as ReturnType;
         default:

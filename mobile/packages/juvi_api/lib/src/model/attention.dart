@@ -3,7 +3,7 @@
 //
 
 // ignore_for_file: unused_element
-import 'package:juvi_api/src/model/attention_items_inner.dart';
+import 'package:juvi_api/src/model/attention_item.dart';
 import 'package:json_annotation/json_annotation.dart';
 
 part 'attention.g.dart';
@@ -44,7 +44,7 @@ class Attention {
   )
 
 
-  final List<AttentionItemsInner> items;
+  final List<AttentionItem> items;
 
 
 

@@ -9,7 +9,7 @@ import 'package:juvi_api/api.dart';
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **dueCount** | **int** |  | 
-**items** | [**List&lt;AttentionItemsInner&gt;**](AttentionItemsInner.md) |  | 
+**items** | [**List&lt;AttentionItem&gt;**](AttentionItem.md) |  | 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
 

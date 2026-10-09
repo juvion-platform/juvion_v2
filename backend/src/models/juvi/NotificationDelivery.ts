@@ -2,16 +2,18 @@ import { Schema, model, Document, Types } from 'mongoose';
 
 export type NotificationTier = 'urgent' | 'important' | 'routine';
 export type DeliveryStatus = 'suppressed' | 'scheduled' | 'sent' | 'delivered' | 'opened' | 'cancelled' | 'failed';
-export type DeliveryReason = 'muted' | 'tier_off' | 'no_device' | 'acknowledged' | 'dismissed' | 'archived';
-export type NotificationSourceKind = 'published' | 'reminder-1' | 'reminder-2';
+/** `superseded` and `already_started` are class-change send-time cancellations (Today&Teaching §8). */
+export type DeliveryReason = 'muted' | 'tier_off' | 'no_device' | 'acknowledged' | 'dismissed' | 'archived' | 'superseded' | 'already_started';
+/** `created` and `revoked` are class-change notification kinds (Today&Teaching §8). */
+export type NotificationSourceKind = 'published' | 'reminder-1' | 'reminder-2' | 'created' | 'revoked';
 
 export const NOTIFICATION_TIERS: readonly NotificationTier[] = ['urgent', 'important', 'routine'];
 export const DELIVERY_STATUSES: readonly DeliveryStatus[] = ['suppressed', 'scheduled', 'sent', 'delivered', 'opened', 'cancelled', 'failed'];
-export const DELIVERY_REASONS: readonly DeliveryReason[] = ['muted', 'tier_off', 'no_device', 'acknowledged', 'dismissed', 'archived'];
-export const NOTIFICATION_SOURCE_KINDS: readonly NotificationSourceKind[] = ['published', 'reminder-1', 'reminder-2'];
+export const DELIVERY_REASONS: readonly DeliveryReason[] = ['muted', 'tier_off', 'no_device', 'acknowledged', 'dismissed', 'archived', 'superseded', 'already_started'];
+export const NOTIFICATION_SOURCE_KINDS: readonly NotificationSourceKind[] = ['published', 'reminder-1', 'reminder-2', 'created', 'revoked'];
 
-/** Sub-project 5 adds `post` and `mention` to `type`. */
-export interface INotificationSource { type: 'notice'; id: Types.ObjectId; kind: NotificationSourceKind }
+/** `class_change` (Today&Teaching §8): id is the exception id, kind is created|revoked. Sub-project 5 adds `post` and `mention` to `type`. */
+export interface INotificationSource { type: 'notice' | 'class_change'; id: Types.ObjectId; kind: NotificationSourceKind }
 
 /**
  * One row per person per notification (notifications spec §4.1). The unique
@@ -44,7 +46,7 @@ const schema = new Schema<INotificationDelivery>(
     collegeId: { type: Schema.Types.ObjectId, required: true, index: true },
     accountId: { type: Schema.Types.ObjectId, ref: 'JuviAccount', required: true },
     source: {
-      type: { type: String, enum: ['notice'], required: true },
+      type: { type: String, enum: ['notice', 'class_change'], required: true },
       id: { type: Schema.Types.ObjectId, required: true },
       kind: { type: String, enum: NOTIFICATION_SOURCE_KINDS, required: true },
     },

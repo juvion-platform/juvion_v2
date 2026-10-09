@@ -12,7 +12,7 @@ void main() {
       // TODO
     });
 
-    // List<AttentionItemsInner> items
+    // List<AttentionItem> items
     test('to test the property `items`', () async {
       // TODO
     });
