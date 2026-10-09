@@ -12,6 +12,7 @@ const EXPECTED_PATHS = [
   '/notices/{id}/attachments/{key}', '/notices/{id}/reach', '/notices/{id}/reach/pending', '/notices/{id}/remind',
   '/onboarding/first-notice',
   '/me/devices/current/push-token', '/notifications/receipts', '/events',
+  '/today', '/teaching', '/me/academics',
 ];
 
 describe('mobile OpenAPI document', () => {
@@ -33,11 +34,13 @@ describe('mobile OpenAPI document', () => {
 
   it('names every component and operation so the Dart client is predictable', () => {
     expect(Object.keys(doc.components.schemas).sort()).toEqual([
-      'AckRequest', 'AckResult', 'Attention', 'ChangePasswordRequest', 'ChannelDetail', 'Config', 'Devices', 'DismissResult',
-      'ErrorEnvelope', 'EventsRequest', 'EventsResult', 'InstitutionLookup', 'Me', 'MuteResult', 'NoticeAttachment', 'NoticeAttachmentUrl', 'NoticeCard',
+      'AckRequest', 'AckResult', 'Attention', 'AttentionItem', 'ChangePasswordRequest', 'ChannelDetail', 'Config',
+      'CoursesTaughtItem', 'DayClass', 'DayView', 'Devices', 'DismissResult', 'DueInvoiceItem', 'ErrorEnvelope', 'EventsRequest', 'EventsResult',
+      'FacultyCourses', 'InstitutionLookup', 'Me', 'MeAcademics', 'MuteResult', 'NoticeAttachment', 'NoticeAttachmentUrl', 'NoticeCard',
       'NoticeDetail', 'NoticeList', 'NoticePending', 'NoticeReach', 'NoticeReminders', 'OnboardingAdvance', 'OnboardingState',
       'PendingPerson', 'PhotoResult', 'PushTokenRequest', 'ReachComment', 'ReachGroup', 'ReachPerson', 'ReadResult', 'ReceiptsRequest', 'ReceiptsResult',
-      'RefreshRequest', 'RemindResult', 'RevokedCount', 'SeenResult', 'SettingsPatch', 'Settings', 'SignInRequest', 'SignInResponse', 'Spaces', 'Tokens',
+      'RefreshRequest', 'RemindResult', 'RevokedCount', 'SeenResult', 'SettingsPatch', 'Settings', 'SignInRequest', 'SignInResponse', 'Spaces',
+      'StudentAcademics', 'StudentDues', 'Teaching', 'Today', 'Tokens',
     ].sort());
     expect(doc.paths['/auth/sign-in'].post.operationId).toBe('signIn');
     expect(doc.paths['/channels/{id}/mute'].delete.operationId).toBe('unmuteChannel');
@@ -79,6 +82,24 @@ describe('mobile OpenAPI document', () => {
     expect(doc.components.schemas.NoticeReach.properties.delivery.properties.suppressed.required).toEqual(['muted', 'tierOff', 'noDevice']);
     expect(doc.components.schemas.PendingPerson.properties.delivery.enum).toEqual(
       ['not_delivered', 'delivered', 'opened', 'muted', 'tier_off', 'no_device', 'scheduled', 'none'],
+    );
+  });
+
+  it('names the Today, Teaching and MeAcademics endpoints (§7.1-§7.3)', () => {
+    expect(doc.paths['/today'].get.operationId).toBe('getToday');
+    expect(doc.paths['/teaching'].get.operationId).toBe('getTeaching');
+    expect(doc.paths['/me/academics'].get.operationId).toBe('getMeAcademics');
+    expect(doc.paths['/today'].get.responses['403']).toBeDefined();
+    expect(doc.components.schemas.Today.properties.glance).toBeDefined();
+    const refTargets = JSON.stringify(doc.components.schemas.MeAcademics);
+    expect(refTargets).toContain('#/components/schemas/StudentAcademics');
+    expect(refTargets).toContain('#/components/schemas/FacultyCourses');
+  });
+
+  it('documents attention kinds=all and the timeline event names (§7.4, §7.5)', () => {
+    expect(doc.paths['/attention'].get.parameters?.map((p: { name: string }) => p.name)).toContain('kinds');
+    expect(doc.components.schemas.EventsRequest.properties.events.items.properties.name.enum).toEqual(
+      expect.arrayContaining(['timeline.class_opened', 'glance.opened', 'post_class_prompt.shown', 'post_class_prompt.opened']),
     );
   });
 

@@ -14,15 +14,18 @@ Method | HTTP request | Description
 [**changePassword**](MobileApi.md#changepassword) | **POST** /auth/change-password | Change password; revokes other sessions
 [**clearPushToken**](MobileApi.md#clearpushtoken) | **DELETE** /me/devices/current/push-token | Remove this device&#39;s FCM token
 [**dismissNotice**](MobileApi.md#dismissnotice) | **POST** /notices/{id}/dismiss | Dismiss a notice that needs no acknowledgement
-[**getAttention**](MobileApi.md#getattention) | **GET** /attention | Due acknowledgement notices: count and the first three
+[**getAttention**](MobileApi.md#getattention) | **GET** /attention | Due items: the notice stack, or every attention item with kinds&#x3D;all
 [**getChannel**](MobileApi.md#getchannel) | **GET** /channels/{id} | Channel header and About
 [**getConfig**](MobileApi.md#getconfig) | **GET** /config | Institution configuration for the signed-in user
 [**getFirstNotice**](MobileApi.md#getfirstnotice) | **GET** /onboarding/first-notice | Onboarding step 4: the welcome notice
 [**getMe**](MobileApi.md#getme) | **GET** /me | Identity card, account state, settings, institution
+[**getMeAcademics**](MobileApi.md#getmeacademics) | **GET** /me/academics | Attendance and dues (student) or courses taught (faculty)
 [**getNotice**](MobileApi.md#getnotice) | **GET** /notices/{id} | Notice detail with my state (does not mark it seen)
 [**getNoticeAttachmentUrl**](MobileApi.md#getnoticeattachmenturl) | **GET** /notices/{id}/attachments/{key} | A 5-minute download URL for one attachment (key URL-encoded)
 [**getNoticeReach**](MobileApi.md#getnoticereach) | **GET** /notices/{id}/reach | Reach for the publisher
 [**getSettings**](MobileApi.md#getsettings) | **GET** /me/settings | Notification and language settings
+[**getTeaching**](MobileApi.md#getteaching) | **GET** /teaching | Faculty today: today + tomorrow classes, next teaching day, faculty kind
+[**getToday**](MobileApi.md#gettoday) | **GET** /today | Student today: today + tomorrow class lists and the glance
 [**listDevices**](MobileApi.md#listdevices) | **GET** /me/devices | Signed-in devices
 [**listNoticePending**](MobileApi.md#listnoticepending) | **GET** /notices/{id}/reach/pending | Pending members for the publisher, grouped and searchable
 [**listNotices**](MobileApi.md#listnotices) | **GET** /notices | Notice cards by segment (due, done, all, published), cursor-paged
@@ -247,18 +250,19 @@ Name | Type | Description  | Notes
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **getAttention**
-> Attention getAttention()
+> Attention getAttention(kinds)
 
-Due acknowledgement notices: count and the first three
+Due items: the notice stack, or every attention item with kinds=all
 
 ### Example
 ```dart
 import 'package:juvi_api/api.dart';
 
 final api = JuviApi().getMobileApi();
+final String kinds = kinds_example; // String | 
 
 try {
-    final response = api.getAttention();
+    final response = api.getAttention(kinds);
     print(response);
 } catch on DioException (e) {
     print('Exception when calling MobileApi->getAttention: $e\n');
@@ -266,7 +270,10 @@ try {
 ```
 
 ### Parameters
-This endpoint does not need any parameter.
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **kinds** | **String**|  | [optional] 
 
 ### Return type
 
@@ -435,6 +442,43 @@ This endpoint does not need any parameter.
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
+# **getMeAcademics**
+> MeAcademics getMeAcademics()
+
+Attendance and dues (student) or courses taught (faculty)
+
+### Example
+```dart
+import 'package:juvi_api/api.dart';
+
+final api = JuviApi().getMobileApi();
+
+try {
+    final response = api.getMeAcademics();
+    print(response);
+} catch on DioException (e) {
+    print('Exception when calling MobileApi->getMeAcademics: $e\n');
+}
+```
+
+### Parameters
+This endpoint does not need any parameter.
+
+### Return type
+
+[**MeAcademics**](MeAcademics.md)
+
+### Authorization
+
+[bearerAuth](../README.md#bearerAuth)
+
+### HTTP request headers
+
+ - **Content-Type**: Not defined
+ - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
 # **getNotice**
 > NoticeDetail getNotice(id)
 
@@ -585,6 +629,80 @@ This endpoint does not need any parameter.
 ### Return type
 
 [**Settings**](Settings.md)
+
+### Authorization
+
+[bearerAuth](../README.md#bearerAuth)
+
+### HTTP request headers
+
+ - **Content-Type**: Not defined
+ - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **getTeaching**
+> Teaching getTeaching()
+
+Faculty today: today + tomorrow classes, next teaching day, faculty kind
+
+### Example
+```dart
+import 'package:juvi_api/api.dart';
+
+final api = JuviApi().getMobileApi();
+
+try {
+    final response = api.getTeaching();
+    print(response);
+} catch on DioException (e) {
+    print('Exception when calling MobileApi->getTeaching: $e\n');
+}
+```
+
+### Parameters
+This endpoint does not need any parameter.
+
+### Return type
+
+[**Teaching**](Teaching.md)
+
+### Authorization
+
+[bearerAuth](../README.md#bearerAuth)
+
+### HTTP request headers
+
+ - **Content-Type**: Not defined
+ - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **getToday**
+> Today getToday()
+
+Student today: today + tomorrow class lists and the glance
+
+### Example
+```dart
+import 'package:juvi_api/api.dart';
+
+final api = JuviApi().getMobileApi();
+
+try {
+    final response = api.getToday();
+    print(response);
+} catch on DioException (e) {
+    print('Exception when calling MobileApi->getToday: $e\n');
+}
+```
+
+### Parameters
+This endpoint does not need any parameter.
+
+### Return type
+
+[**Today**](Today.md)
 
 ### Authorization
 

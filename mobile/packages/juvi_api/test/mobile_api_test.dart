@@ -42,9 +42,9 @@ void main() {
       // TODO
     });
 
-    // Due acknowledgement notices: count and the first three
+    // Due items: the notice stack, or every attention item with kinds=all
     //
-    //Future<Attention> getAttention() async
+    //Future<Attention> getAttention({ String kinds }) async
     test('test getAttention', () async {
       // TODO
     });
@@ -77,6 +77,13 @@ void main() {
       // TODO
     });
 
+    // Attendance and dues (student) or courses taught (faculty)
+    //
+    //Future<MeAcademics> getMeAcademics() async
+    test('test getMeAcademics', () async {
+      // TODO
+    });
+
     // Notice detail with my state (does not mark it seen)
     //
     //Future<NoticeDetail> getNotice(String id) async
@@ -102,6 +109,20 @@ void main() {
     //
     //Future<Settings> getSettings() async
     test('test getSettings', () async {
+      // TODO
+    });
+
+    // Faculty today: today + tomorrow classes, next teaching day, faculty kind
+    //
+    //Future<Teaching> getTeaching() async
+    test('test getTeaching', () async {
+      // TODO
+    });
+
+    // Student today: today + tomorrow class lists and the glance
+    //
+    //Future<Today> getToday() async
+    test('test getToday', () async {
       // TODO
     });
 

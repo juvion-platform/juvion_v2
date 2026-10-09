@@ -54,4 +54,11 @@ const _$EventsRequestEventsInnerNameEnumEnumMap = {
       'permission_card.shown',
   EventsRequestEventsInnerNameEnum.permissionCardPeriodDismissed:
       'permission_card.dismissed',
+  EventsRequestEventsInnerNameEnum.timelinePeriodClassOpened:
+      'timeline.class_opened',
+  EventsRequestEventsInnerNameEnum.glancePeriodOpened: 'glance.opened',
+  EventsRequestEventsInnerNameEnum.postClassPromptPeriodShown:
+      'post_class_prompt.shown',
+  EventsRequestEventsInnerNameEnum.postClassPromptPeriodOpened:
+      'post_class_prompt.opened',
 };

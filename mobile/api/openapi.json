@@ -78,117 +78,7 @@
           },
           "items": {
             "items": {
-              "properties": {
-                "ackAt": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "ackCommentAllowed": {
-                  "type": "boolean"
-                },
-                "ackRequired": {
-                  "type": "boolean"
-                },
-                "archived": {
-                  "type": "boolean"
-                },
-                "attachmentCount": {
-                  "type": "integer"
-                },
-                "audienceLine": {
-                  "type": "string"
-                },
-                "deadline": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "id": {
-                  "type": "string"
-                },
-                "isPublisher": {
-                  "type": "boolean"
-                },
-                "late": {
-                  "type": "boolean"
-                },
-                "office": {
-                  "type": "string"
-                },
-                "preview": {
-                  "type": "string"
-                },
-                "priority": {
-                  "enum": [
-                    "routine",
-                    "important",
-                    "urgent"
-                  ],
-                  "type": "string"
-                },
-                "publishedAt": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "purpose": {
-                  "enum": [
-                    "standard",
-                    "welcome"
-                  ],
-                  "type": "string"
-                },
-                "remindedAt": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "seenAt": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "state": {
-                  "enum": [
-                    "received",
-                    "seen",
-                    "acknowledged",
-                    "dismissed"
-                  ],
-                  "type": "string"
-                },
-                "title": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "id",
-                "title",
-                "preview",
-                "office",
-                "audienceLine",
-                "priority",
-                "purpose",
-                "ackRequired",
-                "ackCommentAllowed",
-                "deadline",
-                "publishedAt",
-                "archived",
-                "attachmentCount",
-                "state",
-                "seenAt",
-                "ackAt",
-                "late",
-                "remindedAt",
-                "isPublisher"
-              ],
-              "type": "object"
+              "$ref": "#/components/schemas/AttentionItem"
             },
             "type": "array"
           }
@@ -196,6 +86,157 @@
         "required": [
           "dueCount",
           "items"
+        ],
+        "type": "object"
+      },
+      "AttentionItem": {
+        "properties": {
+          "ackAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ackCommentAllowed": {
+            "type": "boolean"
+          },
+          "ackRequired": {
+            "type": "boolean"
+          },
+          "amount": {
+            "type": "integer"
+          },
+          "archived": {
+            "type": "boolean"
+          },
+          "at": {
+            "type": "string"
+          },
+          "attachmentCount": {
+            "type": "integer"
+          },
+          "audienceLine": {
+            "type": "string"
+          },
+          "channelId": {
+            "type": "string"
+          },
+          "courseCode": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "deadline": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dueDate": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "invoiceNumber": {
+            "type": "string"
+          },
+          "isPublisher": {
+            "type": "boolean"
+          },
+          "kind": {
+            "enum": [
+              "notice",
+              "class_change",
+              "fee_due",
+              "assessment"
+            ],
+            "type": "string"
+          },
+          "late": {
+            "type": "boolean"
+          },
+          "newDate": {
+            "type": "string"
+          },
+          "newStart": {
+            "type": "string"
+          },
+          "offeringId": {
+            "type": "string"
+          },
+          "office": {
+            "type": "string"
+          },
+          "overdue": {
+            "type": "boolean"
+          },
+          "preview": {
+            "type": "string"
+          },
+          "priority": {
+            "enum": [
+              "routine",
+              "important",
+              "urgent"
+            ],
+            "type": "string"
+          },
+          "publishedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "purpose": {
+            "enum": [
+              "standard",
+              "welcome"
+            ],
+            "type": "string"
+          },
+          "remindedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "room": {
+            "type": "string"
+          },
+          "seenAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "start": {
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "received",
+              "seen",
+              "acknowledged",
+              "dismissed"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "cancelled",
+              "rescheduled"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "id"
         ],
         "type": "object"
       },
@@ -441,6 +482,124 @@
         ],
         "type": "object"
       },
+      "CoursesTaughtItem": {
+        "properties": {
+          "channelId": {
+            "type": "string"
+          },
+          "courseCode": {
+            "type": "string"
+          },
+          "offeringId": {
+            "type": "string"
+          },
+          "section": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "offeringId",
+          "courseCode",
+          "title",
+          "section"
+        ],
+        "type": "object"
+      },
+      "DayClass": {
+        "properties": {
+          "channelId": {
+            "type": "string"
+          },
+          "courseCode": {
+            "type": "string"
+          },
+          "end": {
+            "type": "string"
+          },
+          "faculty": {
+            "type": "string"
+          },
+          "movedFrom": {
+            "properties": {
+              "date": {
+                "type": "string"
+              },
+              "start": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "date",
+              "start"
+            ],
+            "type": "object"
+          },
+          "offeringId": {
+            "type": "string"
+          },
+          "registered": {
+            "type": "integer"
+          },
+          "room": {
+            "type": "string"
+          },
+          "section": {
+            "type": "string"
+          },
+          "slotType": {
+            "type": "string"
+          },
+          "start": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "cancelled",
+              "rescheduled",
+              "scheduled"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "offeringId",
+          "courseCode",
+          "title",
+          "section",
+          "start",
+          "end",
+          "slotType",
+          "status"
+        ],
+        "type": "object"
+      },
+      "DayView": {
+        "properties": {
+          "classes": {
+            "items": {
+              "$ref": "#/components/schemas/DayClass"
+            },
+            "type": "array"
+          },
+          "date": {
+            "type": "string"
+          },
+          "holiday": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "date",
+          "classes"
+        ],
+        "type": "object"
+      },
       "Devices": {
         "properties": {
           "items": {
@@ -495,6 +654,45 @@
         },
         "required": [
           "dismissedAt"
+        ],
+        "type": "object"
+      },
+      "DueInvoiceItem": {
+        "properties": {
+          "nextDue": {
+            "properties": {
+              "amount": {
+                "type": "integer"
+              },
+              "date": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "amount",
+              "date"
+            ],
+            "type": "object"
+          },
+          "number": {
+            "type": "string"
+          },
+          "outstanding": {
+            "type": "integer"
+          },
+          "overdue": {
+            "type": "boolean"
+          },
+          "type": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "number",
+          "type",
+          "outstanding",
+          "nextDue",
+          "overdue"
         ],
         "type": "object"
       },
@@ -631,7 +829,11 @@
                     "notification.opened",
                     "notification.permission",
                     "permission_card.shown",
-                    "permission_card.dismissed"
+                    "permission_card.dismissed",
+                    "timeline.class_opened",
+                    "glance.opened",
+                    "post_class_prompt.shown",
+                    "post_class_prompt.opened"
                   ],
                   "type": "string"
                 },
@@ -669,6 +871,20 @@
         "required": [
           "accepted",
           "rejected"
+        ],
+        "type": "object"
+      },
+      "FacultyCourses": {
+        "properties": {
+          "coursesTaught": {
+            "items": {
+              "$ref": "#/components/schemas/CoursesTaughtItem"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "coursesTaught"
         ],
         "type": "object"
       },
@@ -1009,6 +1225,16 @@
           "asOf"
         ],
         "type": "object"
+      },
+      "MeAcademics": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/StudentAcademics"
+          },
+          {
+            "$ref": "#/components/schemas/FacultyCourses"
+          }
+        ]
       },
       "MuteResult": {
         "properties": {
@@ -2630,6 +2856,377 @@
         ],
         "type": "object"
       },
+      "StudentAcademics": {
+        "properties": {
+          "attendance": {
+            "properties": {
+              "available": {
+                "type": "boolean"
+              },
+              "courses": {
+                "items": {
+                  "properties": {
+                    "attended": {
+                      "type": "number"
+                    },
+                    "channelId": {
+                      "type": "string"
+                    },
+                    "courseCode": {
+                      "type": "string"
+                    },
+                    "headroom": {
+                      "type": "number"
+                    },
+                    "held": {
+                      "type": "number"
+                    },
+                    "offeringId": {
+                      "type": "string"
+                    },
+                    "pct": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "title": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "offeringId",
+                    "courseCode",
+                    "title",
+                    "held",
+                    "attended",
+                    "pct",
+                    "headroom"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "overall": {
+                "properties": {
+                  "attended": {
+                    "type": "number"
+                  },
+                  "held": {
+                    "type": "number"
+                  },
+                  "pct": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "held",
+                  "attended",
+                  "pct"
+                ],
+                "type": "object"
+              },
+              "showHeadroom": {
+                "type": "boolean"
+              },
+              "threshold": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "available",
+              "threshold",
+              "showHeadroom",
+              "overall",
+              "courses"
+            ],
+            "type": "object"
+          },
+          "dues": {
+            "$ref": "#/components/schemas/StudentDues"
+          }
+        },
+        "required": [
+          "attendance",
+          "dues"
+        ],
+        "type": "object"
+      },
+      "StudentDues": {
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "invoices": {
+            "items": {
+              "$ref": "#/components/schemas/DueInvoiceItem"
+            },
+            "type": "array"
+          },
+          "lastPayment": {
+            "properties": {
+              "amount": {
+                "type": "integer"
+              },
+              "date": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "amount",
+              "date"
+            ],
+            "type": "object"
+          },
+          "payUrl": {
+            "type": "string"
+          },
+          "totalOutstanding": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "available",
+          "totalOutstanding",
+          "invoices"
+        ],
+        "type": "object"
+      },
+      "Teaching": {
+        "properties": {
+          "asOf": {
+            "type": "string"
+          },
+          "faculty": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "regular",
+                  "hod",
+                  "adjunct"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "type": "object"
+          },
+          "nextTeachingDay": {
+            "properties": {
+              "classes": {
+                "items": {
+                  "properties": {
+                    "channelId": {
+                      "type": "string"
+                    },
+                    "courseCode": {
+                      "type": "string"
+                    },
+                    "end": {
+                      "type": "string"
+                    },
+                    "faculty": {
+                      "type": "string"
+                    },
+                    "movedFrom": {
+                      "properties": {
+                        "date": {
+                          "type": "string"
+                        },
+                        "start": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "date",
+                        "start"
+                      ],
+                      "type": "object"
+                    },
+                    "offeringId": {
+                      "type": "string"
+                    },
+                    "registered": {
+                      "type": "integer"
+                    },
+                    "room": {
+                      "type": "string"
+                    },
+                    "section": {
+                      "type": "string"
+                    },
+                    "slotType": {
+                      "type": "string"
+                    },
+                    "start": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "enum": [
+                        "cancelled",
+                        "rescheduled",
+                        "scheduled"
+                      ],
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "offeringId",
+                    "courseCode",
+                    "title",
+                    "section",
+                    "start",
+                    "end",
+                    "slotType",
+                    "status"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "date": {
+                "type": "string"
+              },
+              "holiday": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "date",
+              "classes"
+            ],
+            "type": "object"
+          },
+          "today": {
+            "$ref": "#/components/schemas/DayView"
+          },
+          "tomorrow": {
+            "$ref": "#/components/schemas/DayView"
+          }
+        },
+        "required": [
+          "asOf",
+          "today",
+          "tomorrow",
+          "faculty"
+        ],
+        "type": "object"
+      },
+      "Today": {
+        "properties": {
+          "asOf": {
+            "type": "string"
+          },
+          "glance": {
+            "properties": {
+              "attendance": {
+                "properties": {
+                  "available": {
+                    "type": "boolean"
+                  },
+                  "belowThreshold": {
+                    "type": "boolean"
+                  },
+                  "overallPct": {
+                    "type": "number"
+                  },
+                  "threshold": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "available",
+                  "threshold",
+                  "belowThreshold"
+                ],
+                "type": "object"
+              },
+              "dues": {
+                "properties": {
+                  "available": {
+                    "type": "boolean"
+                  },
+                  "nextDue": {
+                    "properties": {
+                      "amount": {
+                        "type": "integer"
+                      },
+                      "date": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "amount",
+                      "date"
+                    ],
+                    "type": "object"
+                  },
+                  "totalOutstanding": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "available",
+                  "totalOutstanding"
+                ],
+                "type": "object"
+              },
+              "nextAssessment": {
+                "properties": {
+                  "at": {
+                    "type": "string"
+                  },
+                  "channelId": {
+                    "type": "string"
+                  },
+                  "courseCode": {
+                    "type": "string"
+                  },
+                  "offeringId": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "offeringId",
+                  "courseCode",
+                  "title",
+                  "at"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "attendance",
+              "dues"
+            ],
+            "type": "object"
+          },
+          "today": {
+            "$ref": "#/components/schemas/DayView"
+          },
+          "tomorrow": {
+            "$ref": "#/components/schemas/DayView"
+          }
+        },
+        "required": [
+          "asOf",
+          "today",
+          "tomorrow",
+          "glance"
+        ],
+        "type": "object"
+      },
       "Tokens": {
         "properties": {
           "accessExpiresIn": {
@@ -2668,6 +3265,19 @@
     "/attention": {
       "get": {
         "operationId": "getAttention",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "kinds",
+            "required": false,
+            "schema": {
+              "enum": [
+                "all"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -2678,6 +3288,16 @@
               }
             },
             "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 400"
           },
           "401": {
             "content": {
@@ -2695,7 +3315,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Due acknowledgement notices: count and the first three",
+        "summary": "Due items: the notice stack, or every attention item with kinds=all",
         "tags": [
           "mobile"
         ]
@@ -3383,6 +4003,52 @@
           }
         ],
         "summary": "Identity card, account state, settings, institution",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/me/academics": {
+      "get": {
+        "operationId": "getMeAcademics",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeAcademics"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 401"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 403"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Attendance and dues (student) or courses taught (faculty)",
         "tags": [
           "mobile"
         ]
@@ -4619,6 +5285,98 @@
           }
         ],
         "summary": "Grouped channel list",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/teaching": {
+      "get": {
+        "operationId": "getTeaching",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Teaching"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 401"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 403"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Faculty today: today + tomorrow classes, next teaching day, faculty kind",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/today": {
+      "get": {
+        "operationId": "getToday",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Today"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 401"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 403"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Student today: today + tomorrow class lists and the glance",
         "tags": [
           "mobile"
         ]

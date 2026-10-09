@@ -1,12 +1,12 @@
 import 'package:test/test.dart';
 import 'package:juvi_api/juvi_api.dart';
 
-// tests for AttentionItemsInner
+// tests for NoticeListItemsInner
 void main() {
-  final AttentionItemsInner? instance = /* AttentionItemsInner(...) */ null;
+  final NoticeListItemsInner? instance = /* NoticeListItemsInner(...) */ null;
   // TODO add properties to the entity
 
-  group(AttentionItemsInner, () {
+  group(NoticeListItemsInner, () {
     // String ackAt
     test('to test the property `ackAt`', () async {
       // TODO

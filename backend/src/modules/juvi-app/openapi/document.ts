@@ -5,9 +5,13 @@ import {
   meResponseSchema, settingsSchema, settingsPatchSchema, onboardingAdvanceSchema, onboardingStateSchema, devicesResponseSchema,
 } from '../accounts/schemas';
 import { spacesResponseSchema, channelDetailSchema, muteResponseSchema, readResponseSchema } from '../spaces/schemas';
+import {
+  coursesTaughtItemSchema, dayClassSchema, dayViewSchema, dueInvoiceItemSchema,
+  studentAcademicsSchema, studentDuesSchema, teachingSchema, todaySchema,
+} from '../home/schemas';
 import { institutionLookupResponseSchema, configResponseSchema } from '../config/schemas';
 import {
-  noticeAttachmentSchema, noticeCardSchema, noticeDetailSchema, attentionResponseSchema, noticeListQuerySchema, noticeListResponseSchema,
+  noticeAttachmentSchema, noticeCardSchema, noticeDetailSchema, attentionItemSchema, attentionResponseSchema, noticeListQuerySchema, noticeListResponseSchema,
   seenResponseSchema, attachmentUrlResponseSchema, ackRequestSchema, ackResponseSchema, dismissResponseSchema,
   remindersSchema, reachPersonSchema, reachCommentSchema, reachGroupSchema, reachResponseSchema,
   pendingQuerySchema, pendingPersonSchema, pendingResponseSchema, remindResponseSchema,
@@ -57,6 +61,23 @@ export function buildOpenApiDocument(): OpenApiDocument {
   // object `.register()` returned, not merely the same schema used elsewhere by value.
   const NoticeCardComponent = registry.register('NoticeCard', noticeCardSchema);
 
+  // §7.1–§7.4: item schemas are registered first; every consumer of them re-registers
+  // with the registered component in place of the raw nested schema — same pattern as
+  // ChannelDetail's rebuild below, since zod-to-openapi only $refs the instance that
+  // `.register()` returned, never a plain equal-valued schema.
+  const AttentionItemComponent = registry.register('AttentionItem', attentionItemSchema);
+  const Attention = registry.register('Attention', z.object({ ...attentionResponseSchema.shape, items: z.array(AttentionItemComponent) }));
+  const DayClassComponent = registry.register('DayClass', dayClassSchema);
+  const DayView = registry.register('DayView', z.object({ ...dayViewSchema.shape, classes: z.array(DayClassComponent) }));
+  const DueInvoiceItemComponent = registry.register('DueInvoiceItem', dueInvoiceItemSchema);
+  const StudentDues = registry.register('StudentDues', z.object({ ...studentDuesSchema.shape, invoices: z.array(DueInvoiceItemComponent) }));
+  const StudentAcademics = registry.register('StudentAcademics', z.object({ ...studentAcademicsSchema.shape, dues: StudentDues }));
+  const CoursesTaughtItemComponent = registry.register('CoursesTaughtItem', coursesTaughtItemSchema);
+  const FacultyCourses = registry.register('FacultyCourses', z.object({ coursesTaught: z.array(CoursesTaughtItemComponent) }));
+  const MeAcademics = registry.register('MeAcademics', z.union([StudentAcademics, FacultyCourses]));
+  const Today = registry.register('Today', z.object({ ...todaySchema.shape, today: DayView, tomorrow: DayView }));
+  const Teaching = registry.register('Teaching', z.object({ ...teachingSchema.shape, today: DayView, tomorrow: DayView }));
+
   // Every schema is a named component so the generated Dart models have stable class names
   // (SignInRequest, Me, Spaces, ChannelDetail, …) instead of derived inline names.
   const C = {
@@ -90,7 +111,18 @@ export function buildOpenApiDocument(): OpenApiDocument {
     PendingPerson: registry.register('PendingPerson', pendingPersonSchema),
     NoticeCard: NoticeCardComponent,
     NoticeDetail: registry.register('NoticeDetail', noticeDetailSchema),
-    Attention: registry.register('Attention', attentionResponseSchema),
+    Attention,
+    AttentionItem: AttentionItemComponent,
+    CoursesTaughtItem: CoursesTaughtItemComponent,
+    DayClass: DayClassComponent,
+    DayView,
+    DueInvoiceItem: DueInvoiceItemComponent,
+    FacultyCourses,
+    MeAcademics,
+    StudentAcademics,
+    StudentDues,
+    Teaching,
+    Today,
     NoticeList: registry.register('NoticeList', noticeListResponseSchema),
     SeenResult: registry.register('SeenResult', seenResponseSchema),
     AckRequest: registry.register('AckRequest', ackRequestSchema),
@@ -127,7 +159,10 @@ export function buildOpenApiDocument(): OpenApiDocument {
     { operationId: 'muteChannel', method: 'put', path: '/channels/{id}/mute', summary: 'Mute a channel', auth: true, params: ['id'], response: C.MuteResult, errors: [400, 401, 404] },
     { operationId: 'unmuteChannel', method: 'delete', path: '/channels/{id}/mute', summary: 'Unmute a channel', auth: true, params: ['id'], response: C.MuteResult, errors: [400, 401, 404] },
     { operationId: 'markChannelRead', method: 'post', path: '/channels/{id}/read', summary: 'Mark a channel read', auth: true, params: ['id'], response: C.ReadResult, errors: [400, 401, 404] },
-    { operationId: 'getAttention', method: 'get', path: '/attention', summary: 'Due acknowledgement notices: count and the first three', auth: true, response: C.Attention, errors: [401] },
+    { operationId: 'getAttention', method: 'get', path: '/attention', summary: 'Due items: the notice stack, or every attention item with kinds=all', auth: true, query: z.object({ kinds: z.literal('all').optional() }), response: C.Attention, errors: [400, 401] },
+    { operationId: 'getToday', method: 'get', path: '/today', summary: 'Student today: today + tomorrow class lists and the glance', auth: true, response: C.Today, errors: [401, 403] },
+    { operationId: 'getTeaching', method: 'get', path: '/teaching', summary: 'Faculty today: today + tomorrow classes, next teaching day, faculty kind', auth: true, response: C.Teaching, errors: [401, 403] },
+    { operationId: 'getMeAcademics', method: 'get', path: '/me/academics', summary: 'Attendance and dues (student) or courses taught (faculty)', auth: true, response: C.MeAcademics, errors: [401, 403] },
     { operationId: 'listNotices', method: 'get', path: '/notices', summary: 'Notice cards by segment (due, done, all, published), cursor-paged', auth: true, query: noticeListQuerySchema, response: C.NoticeList, errors: [400, 401] },
     { operationId: 'getNotice', method: 'get', path: '/notices/{id}', summary: 'Notice detail with my state (does not mark it seen)', auth: true, params: ['id'], response: C.NoticeDetail, errors: [401, 404] },
     { operationId: 'markNoticeSeen', method: 'post', path: '/notices/{id}/seen', summary: 'Mark a notice seen (once)', auth: true, params: ['id'], response: C.SeenResult, errors: [401, 404] },

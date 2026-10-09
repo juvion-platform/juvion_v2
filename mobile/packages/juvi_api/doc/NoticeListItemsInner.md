@@ -1,4 +1,4 @@
-# juvi_api.model.AttentionItemsInner
+# juvi_api.model.NoticeListItemsInner
 
 ## Load the model package
 ```dart
