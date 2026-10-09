@@ -2735,7 +2735,7 @@ git commit -m "feat(juvi-app): attendance threshold, headroom and payment portal
 
 **Interfaces:**
 - Consumes:
-  - Models: `CourseOffering` (`courseId`, `semesterId`, `sectionId`, `facultyId`, `coFacultyIds`, `enrolledCount`, `status`), `AttendanceSession` (`status: 'open' | 'closed'`), `AttendanceRecord` (`sessionId`, `studentId`, `status`), `Enrollment` (`studentId`, `courseOfferingId`, `semesterId`, `status: 'enrolled' | 'dropped' | 'withdrawn' | 'completed'`), `Semester` (`status: 'upcoming' | 'active' | 'completed'`, default `'-upcoming'`), `Course` (`code`, `name`) — exported from the `../../../models` barrel; `College` is NOT in the barrel: import it from `'../../../models/College'`.
+  - Models: `CourseOffering` (`courseId`, `semesterId`, `sectionId`, `facultyId`, `coFacultyIds`, `enrolledCount`, `status`), `AttendanceSession` (`status: 'open' | 'closed'`), `AttendanceRecord` (`sessionId`, `studentId`, `status`), `Enrollment` (`studentId`, `courseOfferingId`, `semesterId`, `status: 'enrolled' | 'dropped' | 'withdrawn' | 'completed'`), `Semester` (`status: 'upcoming' | 'active' | 'completed'`, default `'-upcoming'`), `Course` (`code`, `name`) — each imported by direct path from `models/<dir>/<Name>` (R86/R94), never the `../../../models` barrel; `College` from `'../../../models/College'`.
   - `getJuviConfig(collegeId: string): Promise<JuviConfigView | null>` from `../juvi-app/config/institution-config` — returns `null` when the College row is absent (falls back to Mongo when Redis is down; Redis reads are caught). Reads `attendanceThreshold?: number` on `juvi`, which Task 9 adds to `IJuviConfig` **and to `normalizeJuviConfig`**.
   - `activeSemesterIds(collegeId: string): Promise<string[]>` from `./live-timetable` (Task 3, already exported there).
   - `AppError` from `'../../middleware/errorHandler'` (statusCode first).
@@ -3284,12 +3284,12 @@ async function seedBase(withThreshold?: number): Promise<SeedBase> {
   ]);
   const [byPerson, sA, sB] = people;
   const faculty = await Faculty.create({
-    collegeId, personId: byPerson._id, employeeCode: `FAC${codeSeq++}`,
+    collegeId, personId: byPerson!._id, employeeCode: `FAC${codeSeq++}`,
     designation: 'Assistant Professor', contractType: 'regular', status: 'active',
   });
   const students = await Student.create([
-    { collegeId, personId: sA._id, admissionYear: 2026, rollNumber: `26JITA${codeSeq++}`, status: 'active', onboardingStatus: 'not_started' },
-    { collegeId, personId: sB._id, admissionYear: 2026, rollNumber: `26JITB${codeSeq++}`, status: 'active', onboardingStatus: 'not_started' },
+    { collegeId, personId: sA!._id, admissionYear: 2026, rollNumber: `26JITA${codeSeq++}`, status: 'active', onboardingStatus: 'not_started' },
+    { collegeId, personId: sB!._id, admissionYear: 2026, rollNumber: `26JITB${codeSeq++}`, status: 'active', onboardingStatus: 'not_started' },
   ]);
   const course = await Course.create({
     collegeId, code: `CS${codeSeq++}`, name: 'Intro',
@@ -3308,7 +3308,7 @@ async function seedBase(withThreshold?: number): Promise<SeedBase> {
   await Enrollment.create({ collegeId, studentId: students[1]!._id, courseOfferingId: a, semesterId, status: 'enrolled' });
   return {
     studentIds: [String(students[0]!._id), String(students[1]!._id)],
-    byPersonId: String(byPerson._id),
+    byPersonId: String(byPerson!._id),
     facultyId: String(faculty._id),
     courseId: String(course._id),
     offeringIds: [String(a), String(b)],
@@ -3336,7 +3336,14 @@ function summaryFilter(studentId: string, offeringId: string) {
   return { collegeId: collegeId.toString(), studentId, courseOfferingId: offeringId };
 }
 
-describe('attendance summary wiring', () => {
+// This suite imports ../service + ../academic-delivery-service, which register ~60 models on
+// the connection; mongoose builds their indexes lazily on the FIRST write, so under the full
+// parallel suite the first test overruns vitest's 5 s default even though the file passes
+// standalone in ~1.5 s. Same shape and same remedy as the sibling `promote-students-pin.test.ts`
+// (identical import graph): a describe-level timeout, not a `vi.setConfig` override. This is the
+// case R93 excludes — the registration is transitive from the production modules the test must
+// exercise, so no import change can remove it.
+describe('attendance summary wiring', { timeout: 30_000 }, () => {
   beforeEach(async () => { await clearCollections(); });
 
   it('stores a null percentage and safe category when nothing was held, and never alerts (R13)', async () => {
@@ -3985,7 +3992,7 @@ hall tickets no longer block on never-held courses."
   - From Task 2 (`backend/src/modules/academics/timetable-date.ts`): `startOfDay(date: string, timezone: string): Date`, `addDays(date: string, n: number): string`, `ymd(at: Date, timezone: string): string`, `hhmmToMinutes(hhmm: string): number`.
   - From Task 3 (`backend/src/modules/academics/live-timetable.ts`): `liveSlotsForDay(collegeId: string, sectionIds: string[], at: Date, timezone: string): Promise<LeanTimetableSlot[]>`, `getLiveTimetables(collegeId: string, at: Date, timezone: string): Promise<Map<string, LeanTimetable>>`, `activeSemesterIds(collegeId: string): Promise<string[]>`, type `LeanTimetableSlot`.
   - From Task 4 (`backend/src/modules/academics/class-exception-service.ts`): `activeExceptionsFor(collegeId: string, filter: { slotIds?: string[]; offeringIds?: string[]; dates?: string[] })` — rows are non-revoked `ClassException` docs with fields `timetableSlotId`, `courseOfferingId`, `date`, `type: 'cancelled' | 'rescheduled'`, `newDate?`, `newStartTime?`, `newEndTime?`, `newRoomId?`.
-  - Models (barrel `../../../models` except `College`): `AcademicCalendar`, `Course`, `CourseOffering`, `Enrollment`, `TimetableSlot`, `Section`, `Person`, `Faculty`, `Building`, `Room`, `Channel`.
+  - Models (direct paths — R86/R94, never the `../../../models` barrel; `College` from `'../../../models/College'`): `AcademicCalendar`, `Course`, `CourseOffering`, `Enrollment`, `TimetableSlot`, `Section`, `Person`, `Faculty`, `Building`, `Room`, `Channel`.
 - Produces (Task 14's home service imports exactly these):
   - `type DayViewer = { kind: 'student'; studentId: string } | { kind: 'faculty'; facultyId: string }` (Ruling R27 — account-kind routing happens in the controller, resolveDay takes the viewer).
   - `interface DayClass { offeringId: string; courseCode: string; title: string; section: string; start: string; end: string; slotType: string; status: 'cancelled' | 'rescheduled' | 'scheduled'; room?: string; faculty?: string; channelId?: string; registered?: number; movedFrom?: { date: string; start: string } }`
@@ -4725,7 +4732,7 @@ ahead skipping Sundays and holidays."
   - `Channel` from `'../../../models/juvi/Channel'` — `scopeType: 'course_offering'`, `scopeId`, `status: 'active'` (R18: every course-scoped item carries the channel it links to).
   - `Invoice` from `'../../../models/finance/Invoice'`, `Payment` from `'../../../models/finance/Payment'`, `PaymentPlan` from `'../../../models/finance/PaymentPlan'`.
   - `InternalAssessment` from `'../../../models/academic-ops/InternalAssessment'`, `ExamSchedule` from `'../../../models/academic-ops/ExamSchedule'`, `CourseOffering` from `'../../../models/academic-ops/CourseOffering'`, `Course` from `'../../../models/academic-ops/Course'`.
-  - `Enrollment`, `AttendanceSession`, `AttendanceRecord` from the `'../../../models'` barrel (same imports Task 10 verified).
+  - `Enrollment`, `AttendanceSession`, `AttendanceRecord`, imported by direct path from `models/academic-ops/<Name>` (never the `../../../models` barrel — R86/R94).
   - `ymd`, `instantOf` from `../../academics/timetable-date` (Task 2); `activeSemesterIds(collegeId)` from `../../academics/live-timetable` (Task 3).
 - Produces (Task 14's `home/service.ts` imports these):
   - `toPaise(amount: number | null): number | null` from `./money` — R1's single money converter (rupees ×100, rounded half-up, null passthrough). `duesFor` outputs integer paise through it; Task 14's glance/me-academics and Task 15's fee_due forward paise unchanged. Unit-tested in Step 1.
@@ -5506,7 +5513,7 @@ time, each carrying id and course channel."
   - From `./readers` (Task 13): `juviAttendance(collegeId, studentId)`, `duesFor(collegeId, studentId): Promise<JuviDues>` (fields `available`, `total`, `nextDue: { invoiceId, amount, date, overdue } | null`, `lastPayment: { invoiceId, amount, date, receiptNumber } | null`), `assessmentsFor(collegeId, studentId, from: Date, to: Date)`, `courseChannels(collegeId, offeringIds)`, `nextInvoiceDue(invoice: DuesInvoice)`, types `JuviAttendance`, `DuesInvoice` — every money value (`total`, `DuesInvoice.amount`/`outstanding`, `instalments[].amount`, `nextDue.amount`, `lastPayment.amount`) is integer paise (R1); forward it, never re-convert.
   - From `../../academics/timetable-date` (Task 2): `ymd(at: Date, timezone: string): string`, `addDays(date: string, n: number): string`.
   - `getJuviConfig` from `../config/institution-config`.
-  - Models: `Department` from the `'../../../models'` barrel; direct files `College` from `'../../../models/College'`, `Faculty` from `'../../../models/people/Faculty'`, `Course` from `'../../../models/academic-ops/Course'`, `CourseOffering` from `'../../../models/academic-ops/CourseOffering'`, `Section` from `'../../../models/academic-structure/Section'`.
+  - Models: `Department` from `'../../../models/academic-structure/Department'` (direct path, not the barrel — R86/R94); direct files `College` from `'../../../models/College'`, `Faculty` from `'../../../models/people/Faculty'`, `Course` from `'../../../models/academic-ops/Course'`, `CourseOffering` from `'../../../models/academic-ops/CourseOffering'`, `Section` from `'../../../models/academic-structure/Section'`.
   - `MobileContext` (type) and `requireMobile(req)` from `'../middleware/authenticate-mobile'`; `MobileApiError` from `'../errors'`.
 - Produces (Task 15's controller, Task 17's contract, and the e2e rely on these):
   - `homeRouter` mounted via `v1Router.use(homeRouter)` BETWEEN `notificationsRouter` and `spacesRouter` in `backend/src/modules/juvi-app/routes.ts` (§7: before `spacesRouter`, whose router-wide `authenticateMobile` would otherwise run first).
