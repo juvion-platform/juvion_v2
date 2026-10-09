@@ -7392,10 +7392,10 @@ otherwise). Faculty get notices + class changes only (R30)."
 **Interfaces:**
 - Consumes:
   - `CLASS_EVENTS.CHANGED` (`'class.exception.changed'`) from `../../academics/class-exception-service` (Task 4). The emitted payload is `{ collegeId, exceptionId, action }` with `action: 'created' | 'revoked'`; it carries no actor — the actor is resolved from the exception's `createdBy`/`revokedBy`.
-  - `emit`, `OutboxPayload` from `'../../../shared/outbox'`; `decide` from `./policy`; `NOTIFICATION_REQUESTED`, `settingsOf`, `mutedEverywhere` from `./expand-consumer` (the last two become exported in this task); `PushMessage` type from `./transport`; `signReceipt`, `RECEIPT_TTL_MS` from `./receipts`.
+  - `emit`, `OutboxPayload` from `'../../../shared/outbox'`; `decide` from `./policy`; `NOTIFICATION_REQUESTED` from `./expand-consumer` (imported by `class-change.ts`), and `settingsOf`, `mutedEverywhere` from `./expand-consumer` (imported by `sender.ts`; both become exported in this task); `PushMessage` type from `./transport`; `signReceipt`, `RECEIPT_TTL_MS` from `./receipts`.
   - `instantOf(date: string, hhmm: string, timezone: string): Date`, `ymd(at: Date, timezone): string`, `addDays(date: string, n: number): string` from `'../../academics/timetable-date'` (Task 2).
   - `getJuviConfig` from `'../config/institution-config'` — timezone, with the module default `'Asia/Kolkata'` when unset.
-  - Models: `ClassException`, `LeanClassException` from `'../../../models/academic-ops/ClassException'` (Task 1); `TimetableSlot` from `'../../../models/academic-ops/TimetableSlot'`; `CourseOffering`, `Course`, `Enrollment` from `'../../../models/academic-ops/'`; `JuviAccount`, `IAccountSettings`, `ELIGIBLE_STATUSES`, `Channel`, `ChannelMembership`, `MobileSession`, `NotificationDelivery`, `NotificationTier` from `'../../../models/juvi/'`.
+  - Models (per-model paths — there is no `models/academic-ops/index.ts` or `models/juvi/index.ts` barrel; the code fences carry the exact imports): `ClassException`, `LeanClassException` from `'../../../models/academic-ops/ClassException'` (Task 1); `TimetableSlot` from `'../../../models/academic-ops/TimetableSlot'`; `CourseOffering`, `Course`, `Enrollment` from `'../../../models/academic-ops/<Model>'`; `JuviAccount`, `IAccountSettings`, `ELIGIBLE_STATUSES`, `Channel`, `ChannelMembership`, `MobileSession`, `NotificationDelivery`, `NotificationTier` from `'../../../models/juvi/<Model>'`.
 - Produces (Task 17's payload contract and the Flutter push rendering rely on these):
   - `NotificationDelivery.source` gains `type: 'class_change'` (`id` = the exception id, `kind: 'created' | 'revoked'`); delivery reasons gain `'superseded'` and `'already_started'`.
   - Request dedupe key `notif:class_change:<exceptionId>:<action>`; row `batchKey = 'class'`, `groupKey = 'class:<offeringId>'`.
@@ -8228,10 +8228,10 @@ let fx: BaseFixtures;
 const fake = new FakePushTransport();
 
 const oid = () => new Types.ObjectId();
-// Pin the clock. `seedPushWorld(1)` puts its slot on *tomorrow's* weekday, and `TimetableSlot.day`'s
-// enum has no 'sunday' member (TimetableSlot.ts:14) — on a Saturday run "tomorrow" is Sunday and the
-// create throws. The send legs also re-check start instants against `Date.now()`, so the service's
-// clock has to match the fixture's, not merely agree on the date. FIXED is a Tuesday.
+// Pin the clock. The send legs re-check start instants against `Date.now()`, so the service's clock
+// has to match the fixture's, not merely agree on the date. FIXED is a Tuesday, so these offsets
+// land on Tue/Wed/Sun — and `TimetableSlot.day`'s enum has no 'sunday' member (TimetableSlot.ts:14),
+// which is why `seedPushWorld` clamps a Sunday-derived weekday to Monday.
 // `toFake: ['Date']` only, exactly as in this task's first file. R87.
 const FIXED = new Date('2026-11-10T04:00:00.000Z'); // 09:30 IST, Tuesday
 const istDate = (offsetDays = 0) => new Date(FIXED.getTime() + 5.5 * 3_600_000 + offsetDays * 86_400_000).toISOString().slice(0, 10);
@@ -8274,8 +8274,12 @@ async function seedPushWorld(offsetDays: number, startTime = '14:00'): Promise<P
     facultyId: faculty._id, maxEnrollment: 60, enrolledCount: 2, status: 'active',
   });
   const exceptionDate = istDate(offsetDays);
+  // `TimetableSlot.day`'s enum has no 'sunday' (TimetableSlot.ts:14), and the §8 gate reads only the
+  // exception's `date` — never the slot's weekday — so a Sunday-derived day is clamped to Monday
+  // rather than failing the fixture. Offset 5 is Sunday under this file's pinned Tuesday clock.
+  const slotDay = dow(exceptionDate);
   const slot = await TimetableSlot.create({
-    collegeId, timetableId: oid(), day: dow(exceptionDate), period: 2,
+    collegeId, timetableId: oid(), day: slotDay === 'sunday' ? 'monday' : slotDay, period: 2,
     startTime, endTime: '15:00', slotType: 'lecture', courseOfferingId: offering._id,
   });
   const studentAccountIds: string[] = [];
@@ -8414,7 +8418,7 @@ Expected: PASS with 0 errors.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add backend/src/models/juvi/NotificationDelivery.ts backend/src/modules/juvi-app/notifications/class-change.ts backend/src/modules/juvi-app/notifications/expand-consumer.ts backend/src/modules/juvi-app/notifications/sender.ts backend/src/modules/juvi-app/notifications/payload.ts backend/src/modules/juvi-app/notifications/events-service.ts backend/src/modules/juvi-app/notifications/index.ts backend/src/modules/juvi-app/notifications/__tests__/class-change-push.test.ts backend/src/__e2e__/modules/juvi-class-change-push.e2e.test.ts
+git add backend/src/models/juvi/NotificationDelivery.ts backend/src/modules/juvi-app/notifications/class-change.ts backend/src/modules/juvi-app/notifications/expand-consumer.ts backend/src/modules/juvi-app/notifications/sender.ts backend/src/modules/juvi-app/notifications/payload.ts backend/src/modules/juvi-app/notifications/events-service.ts backend/src/modules/juvi-app/notifications/index.ts backend/src/shared/outbox/outbox.ts backend/src/modules/juvi-app/notifications/__tests__/class-change-push.test.ts backend/src/__e2e__/modules/juvi-class-change-push.e2e.test.ts
 git commit -m "feat(juvi): class-change push (§8) - gate, audience, tier, re-check, payload
 
 class.exception.changed requests a notification only when the affected
