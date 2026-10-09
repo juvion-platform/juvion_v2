@@ -341,13 +341,10 @@ export async function previewClassException(
 /** Display names for the occurrence's faculty: the substitution first, then the offering's. */
 async function facultyNames(collegeId: string, slot: LeanSlot): Promise<string[]> {
   const offering = await CourseOffering.findOne({ _id: slot.courseOfferingId, collegeId }).select('facultyId coFacultyIds').lean<{ facultyId: Types.ObjectId; coFacultyIds?: Types.ObjectId[] } | null>();
-  const ids: Types.ObjectId[] = [];
-  if (offering) ids.push(offering.facultyId, ...(offering.coFacultyIds ?? []));
-  // `LeanSlot` exposes the model interface's `Schema.Types.ObjectId`, not `Types.ObjectId`;
-  // the value is only ever `String()`-ified below, so bridge the two here (the model's own
-  // `service.ts` setter casts the same field for the same reason).
-  if (slot.substituteFacultyId) ids.unshift(slot.substituteFacultyId as unknown as Types.ObjectId);
-  const unique = [...new Set(ids.map(String))];
+  const ids: string[] = [];
+  if (slot.substituteFacultyId) ids.push(String(slot.substituteFacultyId));
+  if (offering) ids.push(String(offering.facultyId), ...(offering.coFacultyIds ?? []).map(String));
+  const unique = [...new Set(ids)];
   if (unique.length === 0) return [];
   const rows = await Faculty.find({ _id: { $in: unique }, collegeId }).select('personId').lean<{ _id: Types.ObjectId; personId: Types.ObjectId }[]>();
   const people = await Person.find({ _id: { $in: rows.map((r) => r.personId) }, collegeId }).select('name').lean<{ _id: Types.ObjectId; name: string }[]>();

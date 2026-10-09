@@ -1,20 +1,29 @@
-import { beforeAll, afterAll, afterEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, afterAll, afterEach, describe, expect, it } from 'vitest';
 import { Types } from 'mongoose';
 import { classifyExceptionPushTier } from '../push-tier';
 import { previewClassException } from '../class-exception-service';
 import { Timetable } from '../../../models/academic-ops/Timetable';
 import { TimetableSlot } from '../../../models/academic-ops/TimetableSlot';
-import { Course, CourseOffering, Enrollment } from '../../../models';
-import { Person, Faculty, Student } from '../../../models';
+import { Course } from '../../../models/academic-ops/Course';
+import { CourseOffering } from '../../../models/academic-ops/CourseOffering';
+import { Enrollment } from '../../../models/academic-ops/Enrollment';
+import { Person } from '../../../models/people/Person';
+import { Faculty } from '../../../models/people/Faculty';
+import { Student } from '../../../models/people/Student';
+import { AppError } from '../../../middleware/errorHandler';
 import { setupMongo, teardownMongo, clearCollections } from '../../../__tests__/helpers/mongoMemory';
 
-// The `../../../models` barrel registers every model, so mongoose kicks off index
-// builds for all of them against the memory server; the first `clearCollections`
-// then queues behind that work and overruns vitest's 10s hook default. Same remedy
-// as scripts/demo-seed/__tests__/breadth.test.ts (the repo's other barrel importer).
-vi.setConfig({ testTimeout: 60_000, hookTimeout: 120_000 });
+// Direct model paths, NOT the `../../../models` barrel: the barrel registers every model, so
+// mongoose kicks off index builds for all ~387 of them against the memory server and the first
+// `clearCollections` queues behind that and overruns vitest's 10s hook default — which forces a
+// 120s `hookTimeout` that would also hide a genuine hang. This file uses six models; importing them
+// by path keeps the run at ~2s with no override, and matches the sibling
+// `modules/academics/__tests__/class-exception.test.ts`. (`scripts/demo-seed/__tests__/breadth.test.ts`
+// does import the barrel and does carry `vi.setConfig({ testTimeout: 60_000, hookTimeout: 120_000 })`
+// — it seeds two dozen models, so its override is earned; this file's would not be.) R86.
 
 const TZ = 'Asia/Kolkata';
+const CID = '000000000000000000000001';
 const base = new Date('2026-10-08T05:00:00.000Z'); // 10:30 IST
 
 describe('classifyExceptionPushTier (§8)', () => {
@@ -99,6 +108,23 @@ describe('previewClassException (§5.1)', () => {
     const out = await previewClassException(CID2, String(slot._id), ist(9), new Date(), ist(1));
     expect(out.pushTier).toBe('important'); // affected = [9 days out, tomorrow]
     expect(out.newDate).toBe(ist(1));
+  });
+
+  it('rejects an unknown slot with 404', async () => {
+    const err = await previewClassException(CID2, new Types.ObjectId().toString(), ist(9)).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(AppError);
+    expect((err as AppError).statusCode).toBe(404);
+    expect((err as AppError).message).toBe('Class slot not found');
+  });
+
+  it('scopes the slot lookup by collegeId', async () => {
+    const { slot } = await seedPreview({ enrolled: true });
+    // The row exists — seeded under CID2, queried under CID. A lookup missing its
+    // `collegeId` filter would find it and return a preview instead of 404.
+    const err = await previewClassException(CID, String(slot._id), ist(9)).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(AppError);
+    expect((err as AppError).statusCode).toBe(404);
+    expect((err as AppError).message).toBe('Class slot not found');
   });
 });
 
