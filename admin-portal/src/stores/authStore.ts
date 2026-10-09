@@ -105,8 +105,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } else {
       localStorage.removeItem('permissions');
     }
-    if (accentColor) {
-      localStorage.setItem('collegeAccent', accentColor);
+    // `''`, undefined and null are all "no accent"; normalise once so the store
+    // field and the persisted key can never disagree about it.
+    const accent = accentColor || null;
+    if (accent) {
+      localStorage.setItem('collegeAccent', accent);
     } else {
       localStorage.removeItem('collegeAccent');
     }
@@ -119,7 +122,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       isSuperAdmin,
       permissions: resolvedPermissions,
       sensitivity: storeSensitivity(sensitivity),
-      collegeAccent: accentColor ?? null,
+      collegeAccent: accent,
       hydrated: true,
     });
   },
@@ -135,9 +138,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   selectCollege: (collegeId, collegeName, accentColor) => {
     localStorage.setItem('collegeId', collegeId);
     localStorage.setItem('collegeName', collegeName);
-    if (accentColor) localStorage.setItem('collegeAccent', accentColor);
+    const accent = accentColor || null;
+    if (accent) localStorage.setItem('collegeAccent', accent);
     else localStorage.removeItem('collegeAccent');
-    set({ collegeId, collegeName, collegeAccent: accentColor ?? null });
+    set({ collegeId, collegeName, collegeAccent: accent });
   },
   clearCollege: () => {
     localStorage.removeItem('collegeId');
@@ -147,7 +151,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
   hydrate: async () => {
     if (!get().token) {
-      set({ hydrated: true });
+      // No session, so any accent still cached from a previous one is stale.
+      // Safe precisely because this branch cannot run with a live token.
+      localStorage.removeItem('collegeAccent');
+      set({ hydrated: true, collegeAccent: null });
       return;
     }
     try {

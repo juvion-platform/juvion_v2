@@ -55,6 +55,42 @@ describe('authStore.canSeeClass', () => {
   });
 });
 
+describe('authStore college accent', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useAuthStore.setState({ token: null, collegeAccent: null });
+  });
+
+  // Fix 2 — `collegeAccent` is seeded from localStorage at store construction, so
+  // the tokenless boot is the one path that could leave an accent with no session
+  // behind it. It must clear both halves.
+  it('drops a cached accent when there is no token to back it', async () => {
+    localStorage.setItem('collegeAccent', '#7A1FA2');
+    useAuthStore.setState({ collegeAccent: '#7A1FA2' });
+    await useAuthStore.getState().hydrate();
+    expect(useAuthStore.getState().collegeAccent).toBeNull();
+    expect(localStorage.getItem('collegeAccent')).toBeNull();
+  });
+
+  // Fix 1 — `''` used to reach the store verbatim (`'' ?? null === ''`) while
+  // localStorage had the key removed. Both halves must read as the same absent
+  // state, so each case asserts both.
+  it('an empty accent lands as null in the store and absent in localStorage (setAuth)', () => {
+    useAuthStore.getState().setAuth(
+      { id: 'u1', name: 'Admin', email: 'a@jit.edu.in', role: 'admin', personaType: 'L-PRIN' },
+      'token-1', 'c1', undefined, undefined, undefined, '',
+    );
+    expect(localStorage.getItem('collegeAccent')).toBeNull();
+    expect(useAuthStore.getState().collegeAccent).toBeNull();
+  });
+
+  it('an empty accent lands as null in the store and absent in localStorage (selectCollege)', () => {
+    useAuthStore.getState().selectCollege('c1', 'College', '');
+    expect(localStorage.getItem('collegeAccent')).toBeNull();
+    expect(useAuthStore.getState().collegeAccent).toBeNull();
+  });
+});
+
 describe('authStore user persona fields', () => {
   it('stores accessibleModules, dashboardWidgets, and primaryModule on user', () => {
     useAuthStore.getState().setAuth(
