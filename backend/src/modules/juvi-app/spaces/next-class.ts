@@ -1,7 +1,7 @@
 // backend/src/modules/juvi-app/spaces/next-class.ts
 /**
  * §5.3: the next class per offering now resolves on the live-read rule —
- * for each day in a 14-day horizon, the highest-version published timetable
+ * for each day in a 15-day horizon (today through today+14), the highest-version published timetable
  * whose effective window covers the date — and then applies that day's
  * exceptions: a cancelled occurrence is never "next", and a rescheduled one
  * counts at its new time on its new date. The old weekly-arithmetic
@@ -13,7 +13,13 @@ import { getLiveTimetables } from '../../academics/live-timetable';
 import { activeExceptionsFor } from '../../academics/class-exception-service';
 import { ymd, addDays, dayEnumOf, instantOf } from '../../academics/timetable-date';
 
-const HORIZON_DAYS = 14;
+/**
+ * 15 entries = today..today+14 inclusive. The horizon must contain the writer's whole accepted
+ * reschedule range — `createClassException` admits a `newDate` while
+ * `diffDays(newDate, today) > 14` is false — or a class moved to exactly today+14 is invisible
+ * to this reader (R92).
+ */
+const HORIZON_DAYS = 15;
 
 export function formatNextClassLabel(at: Date, now: Date, timezone: string): string {
   const dayKey = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);

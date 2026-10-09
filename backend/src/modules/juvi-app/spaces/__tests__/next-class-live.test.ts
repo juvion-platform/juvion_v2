@@ -1,4 +1,4 @@
-import { beforeAll, afterAll, afterEach, describe, expect, it } from 'vitest';
+import { beforeAll, afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import { Types } from 'mongoose';
 import { Timetable } from '../../../../models/academic-ops/Timetable';
 import { TimetableSlot } from '../../../../models/academic-ops/TimetableSlot';
@@ -13,6 +13,16 @@ const TZ = 'Asia/Kolkata';
 const secId = new Types.ObjectId();
 const offerId = new Types.ObjectId();
 const userId = new Types.ObjectId('000000000000000000000002');
+
+/**
+ * Monday 2026-11-09T02:00Z = 2026-11-09 07:30 IST. Pinned so `today` is a Monday and
+ * `today+14` (2026-11-23) is a Monday too — `seedSlot` hardcodes `day: 'monday'`, so without a
+ * pinned clock the day+14 case would only hold on one weekday per week. 07:30 IST is chosen
+ * deliberately: today's 09:00 is still AHEAD, so the R81 `at < nowMs` bound does not silently
+ * skip it and tests 2-3 (which cancel/move today's occurrence) prove their point rather than
+ * passing because the occurrence was already past.
+ */
+const FIXED = new Date('2026-11-09T02:00:00.000Z');
 
 async function seedSlot(opts: { tt?: Partial<{ version: number; status: string; effectiveFrom: Date }> } = {}) {
   const tt = await Timetable.create({
@@ -52,17 +62,27 @@ function nextMondayAfter(hhmm: string): string {
   return '';
 }
 
-beforeAll(async () => { await setupMongo(); });
-afterAll(async () => { await teardownMongo(); });
+beforeAll(async () => {
+  // `toFake: ['Date']` only — faking the Mongo driver's timers hangs the suite.
+  vi.useFakeTimers({ now: FIXED, toFake: ['Date'], shouldAdvanceTime: true });
+  await setupMongo();
+});
+afterAll(async () => { await teardownMongo(); vi.useRealTimers(); });
 afterEach(async () => { await clearCollections(); });
 
 describe('nextClassByOffering on the live rule (§5.3)', () => {
   it('the highest-version published timetable covering today wins', async () => {
-    // v1 also covers today; the winner must be the slot of the higher version.
+    // v1 also covers today AND carries its own Monday slot at 14:00, so a reader that picks the
+    // wrong version cannot pass just by finding some slot: only v2's 09:00 slot satisfies the
+    // assertion. (A v1 with no slots would only catch a reader that landed on an empty timetable.)
     await seedSlot({ tt: { version: 2 } });
-    await Timetable.create({
+    const v1 = await Timetable.create({
       collegeId: cidO(), semesterId: new Types.ObjectId(), sectionId: secId,
       version: 1, status: 'published', effectiveFrom: new Date('2026-01-01T00:00:00Z'),
+    });
+    await TimetableSlot.create({
+      collegeId: cidO(), timetableId: v1._id, day: 'monday', period: 2,
+      startTime: '14:00', endTime: '15:00', courseOfferingId: offerId,
     });
     const out = await nextClassByOffering(CID, [String(offerId)], TZ);
     expect(out.get(String(offerId))?.toISOString()).toBe(instantOf(nextMondayAfter('09:00'), '09:00', TZ).toISOString());
@@ -96,5 +116,24 @@ describe('nextClassByOffering on the live rule (§5.3)', () => {
     await seedSlot({ tt: { status: 'draft' } });
     const out = await nextClassByOffering(CID, [String(offerId)], TZ);
     expect(out.has(String(offerId))).toBe(false);
+  });
+
+  // R92 boundary: the writer accepts a reschedule target through today+14 inclusive
+  // (class-exception-service throws only when diffDays(newDate, today) > 14), so the reader's
+  // horizon must reach that far. The timetable's effectiveFrom is midnight of today+14, so that
+  // is the ONE horizon day it covers — on a 14-day horizon (today..today+13) the reader finds
+  // nothing and returns an empty map, and this test fails; on 15 days it returns the 09:00 slot.
+  it('a timetable whose window starts on today+14 is still inside the reader horizon', async () => {
+    const target = addDays(ymd(new Date(), TZ), 14);
+    const tt = await Timetable.create({
+      collegeId: cidO(), semesterId: new Types.ObjectId(), sectionId: secId,
+      version: 1, status: 'published', effectiveFrom: instantOf(target, '00:00', TZ),
+    });
+    await TimetableSlot.create({
+      collegeId: cidO(), timetableId: tt._id, day: dayEnumOf(target), period: 1,
+      startTime: '09:00', endTime: '10:00', courseOfferingId: offerId,
+    });
+    const out = await nextClassByOffering(CID, [String(offerId)], TZ);
+    expect(out.get(String(offerId))?.toISOString()).toBe(instantOf(target, '09:00', TZ).toISOString());
   });
 });
