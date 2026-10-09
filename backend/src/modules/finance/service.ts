@@ -3662,7 +3662,7 @@ export async function computeDistressScore(collegeId: string, defaulterRecordId:
   const attendanceSummary = await AttendanceSummary.findOne({ collegeId, studentId: record.studentId })
     .sort({ createdAt: -1 })
     .lean();
-  const attendanceSignal = attendanceSummary
+  const attendanceSignal = attendanceSummary && attendanceSummary.percentage !== null
     ? Math.max(0, Math.min(1, (75 - attendanceSummary.percentage) / 75))
     : 0;
   signals.push({ type: 'attendance_drop', value: attendanceSignal, weight: 0.2 });

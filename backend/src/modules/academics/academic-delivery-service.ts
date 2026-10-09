@@ -1,8 +1,6 @@
 import { CourseOffering } from '../../models/academic-ops/CourseOffering';
 import { Enrollment } from '../../models/academic-ops/Enrollment';
 import { CurriculumMap } from '../../models/academic-ops/CurriculumMap';
-import { AttendanceRecord } from '../../models/academic-ops/AttendanceRecord';
-import { AttendanceSession } from '../../models/academic-ops/AttendanceSession';
 import { AttendanceSummary } from '../../models/academic-ops/AttendanceSummary';
 import { AttendanceAlert } from '../../models/academic-ops/AttendanceAlert';
 import { emitRiskSignal } from '../welfare/risk-emitters';
@@ -33,6 +31,7 @@ import { LessonPlan } from '../../models/academic-ops/LessonPlan';
 import { Student } from '../../models/people/Student';
 import { FinancialHold } from '../../models/finance/FinancialHold';
 import { AppError } from '../../middleware/errorHandler';
+import { attendanceCategory, courseAttendanceFor } from './attendance-formula';
 import { createAuditLog } from '../../shared/audit';
 import { paginate as _paginate } from '../../shared/pagination';
 import * as feePinService from '../finance/fee-pin-service';
@@ -338,51 +337,26 @@ export async function computeAttendanceSummary(
   studentId: string,
   courseOfferingId: string,
 ) {
-  const sessions = await AttendanceSession.find({
-    collegeId,
-    courseOfferingId,
-    status: 'closed',
-  }).select('_id').lean();
-
-  const sessionIds = sessions.map(s => s._id);
-  const totalClasses = sessionIds.length;
-
-  const attended = await AttendanceRecord.countDocuments({
-    collegeId,
-    studentId,
-    sessionId: { $in: sessionIds },
-    status: { $in: ['present', 'late', 'od'] },
-  });
-
-  const percentage = totalClasses > 0 ? Math.round((attended / totalClasses) * 10000) / 100 : 0;
-
-  let category: string;
-  if (percentage >= 85) category = 'safe';
-  else if (percentage >= 75) category = 'warning';
-  else if (percentage >= 65) category = 'at_risk';
-  else category = 'detained';
-
-  // Get the offering to find semesterId
-  const offering = await CourseOffering.findOne({ _id: courseOfferingId, collegeId }).select('semesterId').lean();
+  // The ONE formula (spec §5.4). Unlike updateAttendanceSummary this reader path
+  // never sets projectedFinal and never alerts.
+  const calc = await courseAttendanceFor(collegeId, studentId, courseOfferingId);
+  const offering = await CourseOffering.findOne({ _id: courseOfferingId, collegeId }).select('semesterId');
   const semesterId = offering ? String(offering.semesterId) : '';
-
-  const summary = await AttendanceSummary.findOneAndUpdate(
+  return AttendanceSummary.findOneAndUpdate(
     { collegeId, studentId, courseOfferingId },
     {
       collegeId,
       studentId,
       courseOfferingId,
       semesterId,
-      totalClasses,
-      attended,
-      percentage,
-      category,
+      totalClasses: calc.held,
+      attended: calc.attended,
+      percentage: calc.pct,
+      category: attendanceCategory(calc.pct, calc.threshold),
       lastUpdatedAt: new Date(),
     },
-    { upsert: true, new: true },
+    { upsert: true, new: true, setDefaultsOnInsert: true },
   );
-
-  return summary;
 }
 
 /**
@@ -403,15 +377,15 @@ export async function checkAttendanceThreshold(
   if (!summary) {
     const computed = await computeAttendanceSummary(collegeId, studentId, courseOfferingId);
     return {
-      meetsThreshold: computed.percentage >= threshold,
-      percentage: computed.percentage,
+      meetsThreshold: (computed.percentage ?? 0) >= threshold,
+      percentage: computed.percentage ?? 0,
       threshold,
     };
   }
 
   return {
-    meetsThreshold: summary.percentage >= threshold,
-    percentage: summary.percentage,
+    meetsThreshold: (summary.percentage ?? 0) >= threshold,
+    percentage: summary.percentage ?? 0,
     threshold,
   };
 }
@@ -439,7 +413,7 @@ export async function generateAttendanceAlerts(
     const summary = await computeAttendanceSummary(collegeId, String(enrollment.studentId), courseOfferingId);
     const pct = summary.percentage;
 
-    if (pct < 75) {
+    if (pct !== null && pct < 75) {
       let alertType: string;
       if (pct < 65) alertType = 'detained';
       else if (pct < 75) alertType = 'at_risk';
@@ -1317,7 +1291,7 @@ export async function checkHallTicketEligibility(
       courseOfferingId: enrollment.courseOfferingId,
     }).lean();
 
-    if (summary && summary.percentage < 75) {
+    if (summary && summary.percentage !== null && summary.percentage < 75) {
       // Check for approved condonation
       const condonation = await CondonationRequest.findOne({
         collegeId,

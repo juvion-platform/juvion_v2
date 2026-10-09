@@ -37,7 +37,7 @@ export async function getAcademicHomeWidgets(
   const totalCourses = attendanceSummaries.length;
   const averageAttendance =
     totalCourses > 0
-      ? attendanceSummaries.reduce((sum, s) => sum + s.percentage, 0) / totalCourses
+      ? attendanceSummaries.reduce((sum, s) => sum + (s.percentage ?? 0), 0) / totalCourses
       : 0;
 
   // Count unread notice cards (active, for semester, no ack from this student)
@@ -103,7 +103,7 @@ export async function generateStudyRecommendations(
   for (const summary of attendanceSummaries) {
     // AttendanceSummary links via courseOfferingId, not courseId directly.
     // We key by courseOfferingId string so grade cards can cross-reference if needed.
-    attendanceMap.set(String(summary.courseOfferingId), summary.percentage);
+    attendanceMap.set(String(summary.courseOfferingId), summary.percentage ?? 0);
   }
 
   type RecommendationInput = {
@@ -147,7 +147,8 @@ export async function generateStudyRecommendations(
     const matchedSummary = attendanceSummaries.find(
       (s) => String(s.courseOfferingId) === courseIdStr,
     );
-    if (matchedSummary && matchedSummary.percentage < 75) {
+    const matchedPct = matchedSummary?.percentage ?? 0;
+    if (matchedSummary && matchedPct < 75) {
       newRecs.push({
         collegeId,
         studentId,
@@ -156,7 +157,7 @@ export async function generateStudyRecommendations(
         recommendationType: 'time_management',
         title: 'Improve Attendance',
         description:
-          `Your attendance is ${matchedSummary.percentage.toFixed(1)}%. You must attend more classes to avoid detention.`,
+          `Your attendance is ${matchedPct.toFixed(1)}%. You must attend more classes to avoid detention.`,
         priority: 'high',
         basedOn: 'Low attendance',
         isRead: false,
@@ -183,7 +184,7 @@ export async function generateStudyRecommendations(
     // Excellent performer → general / low
     if (
       matchedSummary &&
-      matchedSummary.percentage >= 90 &&
+      matchedPct >= 90 &&
       (grade.grade === 'A' ||
         grade.grade === 'A+' ||
         grade.grade === 'O' ||
