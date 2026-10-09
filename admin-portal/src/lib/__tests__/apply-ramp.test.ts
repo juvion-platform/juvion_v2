@@ -11,7 +11,16 @@ describe('rampToCssVars', () => {
     expect(vars['--c-navy-light']).toBe('45 74 111');
     expect(vars['--c-chrome-soft']).toBe('94 234 212');
     expect(vars['--c-chrome-wash']).toBe('56 178 172');
-    expect(Object.keys(vars)).toHaveLength(15);
+    // The full name set, not a count: `rampToCssVars` builds 9 of the 15 keys
+    // from a template literal, so a single rename would leave `bg-primary-600`
+    // (612 buttons) rendering transparent in themed mode while a count assertion
+    // still passed. This must match `index.css`'s `:root` block exactly.
+    expect(Object.keys(vars).sort()).toEqual([
+      '--c-chrome-soft', '--c-chrome-wash',
+      '--c-navy', '--c-navy-dark', '--c-navy-light',
+      '--c-primary-100', '--c-primary-200', '--c-primary-300', '--c-primary-400', '--c-primary-50',
+      '--c-primary-500', '--c-primary-600', '--c-primary-700', '--c-primary-800', '--c-primary-900',
+    ]);
   });
 });
 

@@ -28,6 +28,20 @@ function rootVar(name: string): string | undefined {
   return root ? new RegExp(`--${name}\\s*:\\s*([^;]+);`).exec(root)?.[1]?.trim() : undefined;
 }
 
+/**
+ * Parses a named semantic colour ramp out of the config source, keyed by step.
+ *
+ * A step repointed at `rgb(var(...))` does not match the hex pattern, so it drops
+ * out of the object and the equality fails — which is the mutation the old
+ * spot-checks missed.
+ */
+function semanticRamp(name: string): Record<string, string> {
+  const block = new RegExp(`${name}\\s*:\\s*\\{([\\s\\S]*?)\\}`).exec(tailwindSrc)?.[1] ?? '';
+  const ramp: Record<string, string> = {};
+  for (const [, key, hex] of block.matchAll(/(\w+)\s*:\s*'(#[0-9A-Fa-f]{6})'/g)) ramp[key!] = hex!;
+  return ramp;
+}
+
 describe('tailwind colour contract', () => {
   it('routes every brand ramp through a custom property, preserving alpha support', () => {
     for (const step of PRIMARY_STEPS) {
@@ -41,10 +55,23 @@ describe('tailwind colour contract', () => {
   });
 
   it('leaves the semantic ramps as literal hexes', () => {
-    expect(tailwindSrc).toContain("'#38B2AC'");
-    expect(tailwindSrc).toContain("'#FF6B35'");
-    expect(tailwindSrc).toContain("'#6C3BE4'");
-    expect(tailwindSrc).toContain("'#F0F4F8'");
+    // Equality on the whole ramp, not a spot-check: the old form asserted a
+    // handful of hexes anywhere in the file, so a mutation repointing a single
+    // step (`teal-300`, say) at a custom property passed every case.
+    expect(semanticRamp('teal')).toEqual({
+      50: '#F0FDFA', 100: '#CCFBF1', 200: '#99F6E4', 300: '#5EEAD4', 400: '#2DD4BF',
+      500: '#38B2AC', 600: '#2C9A94', 700: '#0F766E', 800: '#115E59', 900: '#134E4A',
+    });
+    expect(semanticRamp('accent')).toEqual({
+      50: '#F5F3FF', 100: '#EDE9FE', 200: '#DDD6FE', 300: '#C4B5FD', 400: '#A78BFA',
+      500: '#6C3BE4', 600: '#5B21B6', 700: '#4C1D95', 800: '#3B0764', 900: '#2E1065',
+    });
+    expect(semanticRamp('orange')).toEqual({
+      50: '#FFF7ED', 100: '#FFEDD5', 200: '#FED7AA', 300: '#FDBA74', 400: '#FB923C',
+      500: '#FF6B35', 600: '#EA580C', 700: '#C2410C', 800: '#9A3412', 900: '#7C2D12',
+    });
+    // `bg-app` is a single neutral surface, not a ramp — same hex as shipped.
+    expect(/'bg-app'\s*:\s*'(#[0-9A-Fa-f]{6})'/.exec(tailwindSrc)?.[1]).toBe('#F0F4F8');
     expect(tailwindSrc).not.toMatch(/teal\s*:\s*'rgb\(var\(/);
   });
 
