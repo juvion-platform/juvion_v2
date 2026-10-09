@@ -1,18 +1,16 @@
 import { Types } from 'mongoose';
 
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { College } from '../../../models/College';
-import {
-  AttendanceRecord,
-  AttendanceSession,
-  Course,
-  CourseOffering,
-  Enrollment,
-  Faculty,
-  Person,
-  Semester,
-  Student,
-} from '../../../models';
+import { AttendanceRecord } from '../../../models/academic-ops/AttendanceRecord';
+import { AttendanceSession } from '../../../models/academic-ops/AttendanceSession';
+import { Course } from '../../../models/academic-ops/Course';
+import { CourseOffering } from '../../../models/academic-ops/CourseOffering';
+import { Enrollment } from '../../../models/academic-ops/Enrollment';
+import { Semester } from '../../../models/academic-structure/Semester';
+import { Faculty } from '../../../models/people/Faculty';
+import { Person } from '../../../models/people/Person';
+import { Student } from '../../../models/people/Student';
 import { clearCollections, setupMongo, teardownMongo } from '../../../__tests__/helpers/mongoMemory';
 import {
   attendanceAvailableFor,
@@ -23,10 +21,12 @@ import {
   round1,
 } from '../attendance-formula';
 
-// The `../../../models` barrel registers every model, so Mongoose builds all
-// their indexes on connect; the first DB test absorbs that warmup (~10 s here).
-// Matches the repo's other barrel-importing test (demo-seed/breadth.test.ts).
-vi.setConfig({ testTimeout: 60_000, hookTimeout: 120_000 });
+// Models are imported by direct path, NOT the `../../../models` barrel (plan
+// ruling R86): the barrel registers every model, so mongoose kicks off index
+// builds for all of them against the memory server and the first
+// `clearCollections` queues behind that and overruns vitest's hook default.
+// This file seeds five models, so it earns no timeout override — same choice as
+// the sibling `class-exception.test.ts`. Do not "fix" this back to the barrel.
 
 beforeAll(async () => { await setupMongo(); });
 afterAll(async () => { await teardownMongo(); });
