@@ -7303,7 +7303,7 @@ otherwise). Faculty get notices + class changes only (R30)."
   - `CLASS_CHANGE_EVENT` re-exported as the consumer registration key; `requestClassChangeNotification` re-exported from `./index`.
   - Events allow-list gains `timeline.class_opened`, `glance.opened`, `post_class_prompt.shown`, `post_class_prompt.opened` (§7.5).
 
-- [ ] **Step 1: Widen the delivery model and add the payload builder**
+- [ ] **Step 1: Widen the delivery model, add the payload builder, and give `drainOutbox` its `afterEvents` escape hatch**
 
 In `backend/src/models/juvi/NotificationDelivery.ts`:
 
@@ -7344,6 +7344,75 @@ new:
 ```
 
 The reason enum line already spreads `DELIVERY_REASONS` (`enum: [...DELIVERY_REASONS, null]`), so it needs no edit. The existing indexes need none either: the sender's scan (`status: 1, sendAfter: 1`), the urgent-first scan (`status: 1, tier: 1, sendAfter: 1`) and the expansion's uniqueness key (`source.type, source.id, source.kind, accountId`) all serve the new rows unchanged.
+
+In `backend/src/shared/outbox/outbox.ts` — the `afterEvents` escape hatch the unit fixture needs. The flag has to reach `processOnce`, which owns the `afterSweepers` pass, and it has to survive `runInline`'s memo: if it stops at `drainOutbox`'s signature the after-events send pass still runs, claims the rows the test just wrote, and every `status: 'scheduled'` assertion fails. Four edits:
+
+```typescript
+old: export async function processOnce(limit = 500, opts: { sweep?: boolean } = {}): Promise<number> {
+new: export async function processOnce(limit = 500, opts: { sweep?: boolean; afterEvents?: boolean } = {}): Promise<number> {
+```
+
+```typescript
+old:
+  for (const sweep of afterSweepers) {
+    try { await sweep(); } catch (err) { console.error('[outbox] sweeper failed', err); }
+  }
+  return n;
+new:
+  if (opts.afterEvents !== false) {
+    for (const sweep of afterSweepers) {
+      try { await sweep(); } catch (err) { console.error('[outbox] sweeper failed', err); }
+    }
+  }
+  return n;
+```
+
+```typescript
+old:
+/** One inline run per process at a time; a concurrent caller shares the running promise. */
+function runInline(): Promise<number> {
+  if (!inflight) inflight = processOnce().finally(() => { inflight = null; });
+  return inflight;
+}
+new:
+/** One inline run per process at a time; a concurrent caller shares the running promise. */
+function runInline(opts: { afterEvents?: boolean } = {}): Promise<number> {
+  if (!inflight) inflight = processOnce(500, { afterEvents: opts.afterEvents }).finally(() => { inflight = null; });
+  return inflight;
+}
+```
+
+```typescript
+old:
+/** Waits for any inline run in flight, then processes until the outbox is quiet. Tests and inline callers use this. */
+export async function drainOutbox(): Promise<number> {
+  let total = 0;
+  if (inflight) total += await inflight;
+  for (;;) {
+    const n = await runInline();
+    total += n;
+    if (n === 0) return total;
+  }
+}
+new:
+/**
+ * Waits for any inline run in flight, then processes until the outbox is quiet.
+ * Tests and inline callers use this. `afterEvents: false` skips the after-events
+ * sweepers — the follow-up send pass — so a fixture can observe the expansion
+ * without the sender claiming the rows it just wrote.
+ */
+export async function drainOutbox(opts: { afterEvents?: boolean } = {}): Promise<number> {
+  let total = 0;
+  if (inflight) total += await inflight;
+  for (;;) {
+    const n = await runInline(opts);
+    total += n;
+    if (n === 0) return total;
+  }
+}
+```
+
+`afterEvents` is optional everywhere, so every existing caller is untouched: `processOnce()` with the option unset still runs the after-events sweepers exactly as before, and `kick()` still gets the default pass through `runInline()`.
 
 In `backend/src/modules/juvi-app/notifications/payload.ts` append:
 
@@ -7393,7 +7462,7 @@ Create `backend/src/modules/juvi-app/notifications/__tests__/class-change-push.t
 //   LATE  2026-11-09T20:00:00Z = 01:30 IST on Nov 10 (UTC is still on Nov 9: a
 //         gate that reads the UTC day would miss IST-tomorrow Nov 11 — the RF#1 pin)
 import { Types } from 'mongoose';
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { clearCollections, setupMongo, teardownMongo } from '../../../../__tests__/helpers/mongoMemory';
 import { Course } from '../../../../models/academic-ops/Course';
@@ -8464,10 +8533,10 @@ export const coursesTaughtItemSchema = z.object({
   channelId: z.string().optional(),
 });
 
-export const meAcademicsSchema = z.union([
-  studentAcademicsSchema,
-  z.object({ coursesTaught: z.array(coursesTaughtItemSchema) }),
-]);
+// There is deliberately no `meAcademicsSchema` union here: `/me/academics` is
+// registered in document.ts as `z.union([StudentAcademics, FacultyCourses])`
+// over the two *registered* arms, because a union of these raw schemas would
+// inline both arms instead of emitting the `$ref`s the contract test pins.
 ```
 
 - [ ] **Step 4: Register the components and routes in `document.ts`**
@@ -8486,7 +8555,7 @@ old: import { spacesResponseSchema, channelDetailSchema, muteResponseSchema, rea
 new: import { spacesResponseSchema, channelDetailSchema, muteResponseSchema, readResponseSchema } from '../spaces/schemas';
 import {
   coursesTaughtItemSchema, dayClassSchema, dayViewSchema, dueInvoiceItemSchema,
-  meAcademicsSchema, studentAcademicsSchema, studentDuesSchema, teachingSchema, todaySchema,
+  studentAcademicsSchema, studentDuesSchema, teachingSchema, todaySchema,
 } from '../home/schemas';
 ```
 
