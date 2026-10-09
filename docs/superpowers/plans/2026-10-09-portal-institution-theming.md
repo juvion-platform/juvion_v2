@@ -397,12 +397,18 @@ Create `admin-portal/src/lib/__tests__/theme-contract.test.ts`. This is the guar
 ```ts
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import tailwindConfig from '../../../tailwind.config.js';
 import { LEGACY_RAMP, PRIMARY_STEPS, type Triplet } from '../brand-ramp';
 
+// Read as text rather than imported. `tsconfig.json` includes only "src" and does
+// not set allowJs, so importing '../../../tailwind.config.js' would fail
+// `npm run typecheck` with TS2307. The wiring is a literal contract either way.
+const tailwindSrc = readFileSync(new URL('../../../tailwind.config.js', import.meta.url), 'utf8');
 const css = readFileSync(new URL('../../index.css', import.meta.url), 'utf8');
-const colors = (tailwindConfig as { theme: { extend: { colors: Record<string, unknown> } } })
-  .theme.extend.colors;
+
+/** True when `key` is mapped to the custom property `varName`. */
+function wired(key: string, varName: string): boolean {
+  return new RegExp(`${key}\\s*:\\s*'rgb\\(var\\(--${varName}\\) / <alpha-value>\\)'`).test(tailwindSrc);
+}
 
 /** Reads a custom property's value out of the `:root` block. */
 function rootVar(name: string): string | undefined {
@@ -413,23 +419,21 @@ function rootVar(name: string): string | undefined {
 describe('tailwind colour contract', () => {
   it('routes every brand ramp through a custom property, preserving alpha support', () => {
     for (const step of PRIMARY_STEPS) {
-      expect((colors.primary as Record<string, string>)[step])
-        .toBe(`rgb(var(--c-primary-${step}) / <alpha-value>)`);
+      expect(wired(step, `c-primary-${step}`), `primary.${step} is not wired to a custom property`).toBe(true);
     }
-    const navy = colors.navy as Record<string, string>;
-    expect(navy.DEFAULT).toBe('rgb(var(--c-navy) / <alpha-value>)');
-    expect(navy.dark).toBe('rgb(var(--c-navy-dark) / <alpha-value>)');
-    expect(navy.light).toBe('rgb(var(--c-navy-light) / <alpha-value>)');
-    const chrome = colors.chrome as Record<string, string>;
-    expect(chrome.soft).toBe('rgb(var(--c-chrome-soft) / <alpha-value>)');
-    expect(chrome.wash).toBe('rgb(var(--c-chrome-wash) / <alpha-value>)');
+    expect(wired('DEFAULT', 'c-navy')).toBe(true);
+    expect(wired('dark', 'c-navy-dark')).toBe(true);
+    expect(wired('light', 'c-navy-light')).toBe(true);
+    expect(wired('soft', 'c-chrome-soft')).toBe(true);
+    expect(wired('wash', 'c-chrome-wash')).toBe(true);
   });
 
   it('leaves the semantic ramps as literal hexes', () => {
-    expect((colors.teal as Record<string, string>)['500']).toBe('#38B2AC');
-    expect((colors.orange as Record<string, string>)['500']).toBe('#FF6B35');
-    expect((colors.accent as Record<string, string>)['500']).toBe('#6C3BE4');
-    expect(colors['bg-app']).toBe('#F0F4F8');
+    expect(tailwindSrc).toContain("'#38B2AC'");
+    expect(tailwindSrc).toContain("'#FF6B35'");
+    expect(tailwindSrc).toContain("'#6C3BE4'");
+    expect(tailwindSrc).toContain("'#F0F4F8'");
+    expect(tailwindSrc).not.toMatch(/teal\s*:\s*'rgb\(var\(/);
   });
 
   it('defines every referenced variable in :root, with the legacy palette as its value', () => {
@@ -447,6 +451,10 @@ describe('tailwind colour contract', () => {
   });
 });
 ```
+
+> `wired()` matches on the key, not the variable alone. That matters for the `50`
+> step: `500:` contains `50` but not `50` followed by a colon, so the two cannot
+> collide. The same holds for `--c-navy` against `--c-navy-dark` in `rootVar`.
 
 - [ ] **Step 2: Run the test to verify it fails**
 
@@ -1326,8 +1334,13 @@ test('a college accent reaches the portal as a themed custom property', async ({
 
 - [ ] **Step 2: Run it**
 
-Run: `npm run test:e2e -w e2e -- portal-theming`
+Run: `npm run test -w e2e -- portal-theming`
 Expected: PASS. Requires the backend on `:3003` and the portal on `:5173`.
+
+> The `e2e` workspace's script is `test` (`e2e/package.json:8`). `test:e2e` belongs
+> to the **backend** workspace and runs its Vitest e2e suite — running it here
+> would silently exercise the wrong thing. `testDir` is `./tests`, so the spec sits
+> flat beside `auth.spec.ts` and friends.
 
 - [ ] **Step 3: Document it**
 
