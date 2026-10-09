@@ -126,7 +126,41 @@ describe('resolveRamp', () => {
   it('derives chrome from the accent ramp so the sidebar stays coherent', () => {
     const ramp = resolveRamp('#7A1FA2');
     expect(ramp.chrome.soft).toBe(ramp.primary['300']);
-    expect(ramp.chrome.wash).toBe(ramp.primary['500']);
+    // `wash` is drawn from the fixed-lightness 700 step rather than the accent's own
+    // 500 — the contrast guard below is the reason.
+    expect(ramp.chrome.wash).toBe(ramp.primary['700']);
+  });
+
+  // Review Focus 1. The sidebar's active label sits on the wash tint composited over the
+  // sidebar gradient, not on the wash itself. An operator may type any accent, so this
+  // sweeps the ones that converge the 300/500 pair hardest. Both alphas matter: top-level
+  // items use `/20` and submenu items `/15`, and for some accents `/15` is the binding one.
+  it('keeps the themed sidebar label above AA contrast for any accent', () => {
+    // WCAG 2.1 relative luminance and contrast ratio.
+    const lin = (c: number) => (c / 255 <= 0.03928 ? c / 255 / 12.92 : Math.pow((c / 255 + 0.055) / 1.055, 2.4));
+    const lum = (t: string) => {
+      const [r, g, b] = t.split(' ').map(Number);
+      return 0.2126 * lin(r!) + 0.7152 * lin(g!) + 0.0722 * lin(b!);
+    };
+    const contrast = (a: string, b: string) => {
+      const [hi, lo] = lum(a) > lum(b) ? [lum(a), lum(b)] : [lum(b), lum(a)];
+      return (hi + 0.05) / (lo + 0.05);
+    };
+    // CSS alpha compositing, in sRGB, as the browser blends `bg-chrome-wash/20` and `/15`.
+    const over = (fg: string, alpha: number, bg: string) => {
+      const f = fg.split(' ').map(Number);
+      const b = bg.split(' ').map(Number);
+      return f.map((v, i) => Math.round(alpha * v! + (1 - alpha) * b![i]!)).join(' ');
+    };
+
+    for (const accent of ['#BDB76B', '#C8B560', '#FFCC00', '#88DD88', '#7A1FA2', '#0B5FA5', '#000080']) {
+      const ramp = resolveRamp(accent);
+      for (const alpha of [0.15, 0.2]) {
+        const bg = over(ramp.chrome.wash, alpha, ramp.navy.dark);
+        expect(contrast(ramp.chrome.soft, bg), `${accent} at /${Math.round(alpha * 100)} dropped below AA`)
+          .toBeGreaterThanOrEqual(4.5);
+      }
+    }
   });
 
   // A neutral accent must stay neutral in every slot. Before the achromatic

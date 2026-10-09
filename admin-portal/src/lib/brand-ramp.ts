@@ -172,6 +172,9 @@ export function resolveRamp(accentHex: string | null | undefined): BrandRamp {
       dark: triplet(hslToRgb(hueDeg, navyS, 0.233)),
       light: triplet(hslToRgb(hueDeg, navyS, 0.306)),
     },
-    chrome: { soft: primary['300'], wash: primary['500'] },
+    // `wash` is the active nav item's background, drawn from a fixed-lightness step
+    // rather than from the accent's own 500: the 300/500 pair converges for light
+    // accents and drops the label below AA. 600 is still too close, so it is 700.
+    chrome: { soft: primary['300'], wash: primary['700'] },
   };
 }
