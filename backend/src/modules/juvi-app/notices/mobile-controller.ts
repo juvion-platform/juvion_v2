@@ -1,5 +1,6 @@
 import { Response, NextFunction } from 'express';
 import { MobileRequest, requireMobile } from '../middleware/authenticate-mobile';
+import { MobileApiError } from '../errors';
 import { noticeListQuerySchema, ackRequestSchema, pendingQuerySchema } from './schemas';
 import * as svc from './mobile-service';
 import * as acks from './ack-service';
@@ -11,7 +12,13 @@ import { getFirstNotice } from './welcome-service';
 const id = (req: MobileRequest) => String(req.params.id);
 
 export async function attention(req: MobileRequest, res: Response, next: NextFunction) {
-  try { res.json(await svc.attention(requireMobile(req))); } catch (e) { next(e); }
+  try {
+    // R31: a missing kinds returns the legacy shape; the only widened value is all.
+    const kinds = req.query.kinds;
+    if (kinds !== undefined && kinds !== 'all') throw new MobileApiError(400, 'VALIDATION_FAILED', 'kinds must be "all"');
+    const ctx = requireMobile(req);
+    res.json(kinds === 'all' ? await svc.attentionAll(ctx) : await svc.attention(ctx));
+  } catch (e) { next(e); }
 }
 export async function list(req: MobileRequest, res: Response, next: NextFunction) {
   try { res.json(await svc.listNotices(requireMobile(req), noticeListQuerySchema.parse(req.query))); } catch (e) { next(e); }

@@ -46,7 +46,64 @@ export const noticeDetailSchema = z.object({
 });
 export type NoticeDetail = z.infer<typeof noticeDetailSchema>;
 
-export const attentionResponseSchema = z.object({ dueCount: z.number().int(), items: z.array(noticeCardSchema) });
+export const ATTENTION_KINDS = ['notice', 'class_change', 'fee_due', 'assessment'] as const;
+export type AttentionKind = (typeof ATTENTION_KINDS)[number];
+
+/**
+ * §7.4 in the flat form (R33): kind is the discriminator, every other field is
+ * optional so each kind carries only its own fields. Notice-card nullable
+ * scalars stay `.nullable().optional()` (Foundation R57/R61: nullable values
+ * are scalars; objects are never null in any response).
+ */
+export const attentionItemSchema = z.object({
+  kind: z.enum(ATTENTION_KINDS),
+  id: z.string(),
+  // notice card fields (kind=notice) — the existing NoticeCard, flattened:
+  title: z.string().optional(),
+  preview: z.string().optional(),
+  office: z.string().optional(),
+  audienceLine: z.string().optional(),
+  priority: z.enum(['routine', 'important', 'urgent']).optional(),
+  purpose: z.enum(['standard', 'welcome']).optional(),
+  ackRequired: z.boolean().optional(),
+  ackCommentAllowed: z.boolean().optional(),
+  // All deadlines are ISO instants (R14/R15/R16): class_change = original start,
+  // fee_due = the due date at college-tz midnight, assessment = its at instant;
+  // the notice's deadline is its ack deadline (nullable when there is none).
+  deadline: z.string().nullable().optional(),
+  publishedAt: z.string().nullable().optional(),
+  archived: z.boolean().optional(),
+  attachmentCount: z.number().int().optional(),
+  state: z.enum(NOTICE_STATES).optional(),
+  seenAt: z.string().nullable().optional(),
+  ackAt: z.string().nullable().optional(),
+  late: z.boolean().optional(),
+  remindedAt: z.string().nullable().optional(),
+  isPublisher: z.boolean().optional(),
+  // class_change (§7.4): date/start are the ORIGINAL slot; newDate/newStart the replacement.
+  type: z.enum(['cancelled', 'rescheduled']).optional(),
+  offeringId: z.string().optional(),
+  courseCode: z.string().optional(),
+  date: z.string().optional(),
+  start: z.string().optional(),
+  newDate: z.string().optional(),
+  newStart: z.string().optional(),
+  room: z.string().optional(),
+  channelId: z.string().optional(),
+  // fee_due (§7.4/§6): deadline is the next due date at college-tz midnight as an ISO
+  // instant (R15 — same convention as R14/R16, so kinds sort together); dueDate is the
+  // display 'YYYY-MM-DD' the app renders. amount is integer paise (R1): forwarded
+  // unchanged from duesFor/nextInvoiceDue — never re-converted.
+  invoiceNumber: z.string().optional(),
+  amount: z.number().int().optional(),
+  dueDate: z.string().optional(), // 'YYYY-MM-DD' display string only — deadline carries the instant (R15)
+  overdue: z.boolean().optional(),
+  // assessment (§7.4): the row's internal kind (internal|exam) is not sent (A6).
+  at: z.string().optional(),
+});
+export type AttentionItem = z.infer<typeof attentionItemSchema>;
+
+export const attentionResponseSchema = z.object({ dueCount: z.number().int(), items: z.array(attentionItemSchema) });
 export type AttentionResponse = z.infer<typeof attentionResponseSchema>;
 
 export const noticeListQuerySchema = z.object({

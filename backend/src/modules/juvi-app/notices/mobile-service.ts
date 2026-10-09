@@ -9,7 +9,8 @@ import { getPresignedUrl, isS3Configured } from '../../../shared/s3/s3-client';
 import { MobileContext } from '../middleware/authenticate-mobile';
 import { MobileApiError } from '../errors';
 import { toCard, toDetail } from './cards';
-import { AttentionResponse, NoticeCard, NoticeDetail, NoticeListQuery, NoticeListResponse } from './schemas';
+import { AttentionItem, AttentionResponse, NoticeCard, NoticeDetail, NoticeListQuery, NoticeListResponse } from './schemas';
+import { attentionItems } from '../home/attention';
 
 export const ATTENTION_ITEMS = 3;
 export const DUE_SCAN_MAX = 500;
@@ -85,7 +86,30 @@ async function loadDue(ctx: MobileContext): Promise<Pair[]> {
 
 export async function attention(ctx: MobileContext): Promise<AttentionResponse> {
   const due = await loadDue(ctx);
-  return { dueCount: due.length, items: due.slice(0, ATTENTION_ITEMS).map(({ notice, row }) => toCard(notice, row, ctx.userId)) };
+  return { dueCount: due.length, items: due.slice(0, ATTENTION_ITEMS).map(({ notice, row }) => ({ kind: 'notice' as const, ...toCard(notice, row, ctx.userId) })) };
+}
+
+/** §7.4 kinds=all: every due notice card (uncapped), in loadDue order. */
+export async function dueNoticeCards(ctx: MobileContext): Promise<NoticeCard[]> {
+  const due = await loadDue(ctx);
+  return due.map(({ notice, row }) => toCard(notice, row, ctx.userId));
+}
+
+/** deadline ascending; missing deadlines last; stable on ties (notice-first composition order). */
+function byDeadline(a: AttentionItem, b: AttentionItem): number {
+  const da = a.deadline;
+  const db = b.deadline;
+  if (da && db) return da === db ? 0 : da < db ? -1 : 1;
+  if (da) return -1;
+  if (db) return 1;
+  return 0;
+}
+
+export async function attentionAll(ctx: MobileContext): Promise<AttentionResponse> {
+  const [cards, erp] = await Promise.all([dueNoticeCards(ctx), attentionItems(ctx)]);
+  const items: AttentionItem[] = [...cards.map((c) => ({ kind: 'notice' as const, ...c })), ...erp];
+  items.sort(byDeadline);
+  return { dueCount: items.length, items };
 }
 
 async function officeNoticeIds(collegeId: string, office: string): Promise<Types.ObjectId[]> {
