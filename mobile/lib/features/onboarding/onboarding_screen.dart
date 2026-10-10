@@ -38,6 +38,15 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   Future<void> _advance(AccountSummary account) async {
     final l = context.l10n;
+    // R54 deliberately lets the back button land on a step the account has already completed.
+    // The server refuses any step below account.onboardingStep (`advanceOnboarding` answers
+    // "That step is out of order."), so replaying one here would be a dead end — re-entering a
+    // step is not progress. Send the user forward to the step the account is actually on
+    // instead, without a call.
+    if (widget.step < account.onboardingStep) {
+      GoRouter.maybeOf(context)?.go('/onboarding/${account.onboardingStep}');
+      return;
+    }
     setState(() {
       _busy = true;
       _error = null;
