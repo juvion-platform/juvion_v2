@@ -70,15 +70,25 @@ class _PendingDeletionBannerState extends ConsumerState<PendingDeletionBanner> {
 
   @override
   Widget build(BuildContext context) {
-    // `_tooLate` is terminal for one *request*, not for this element: the banner returns
-    // `SizedBox.shrink` rather than unmounting, so this State outlives a request that is cancelled
-    // on another device and then made again — and without the reset that second request would
-    // render with Cancel already dead, the 409 that set the flag nowhere in sight. Only the
-    // absent → present edge resets it, so a 409 on the request standing now still sticks.
+    // `_tooLate` and `_error` are terminal for one *request*, not for this element: the banner
+    // returns `SizedBox.shrink` rather than unmounting, so this State outlives a request that is
+    // cancelled on another device and then made again — and without the reset that second request
+    // would render with Cancel already dead and, worse, the previous request's "no longer can be
+    // cancelled" line still above it.
+    //
+    // The edge is a *changed* request, not merely a present one: a request cancelled elsewhere and
+    // re-made while this device was away is never observed as absent here, only as a different
+    // timestamp, so keying on presence would leave Cancel dead for the genuinely-new request. And
+    // never on the present → absent edge, where there is no request to re-arm for.
     ref.listen(meProvider, (prev, next) {
-      final was = prev?.value?.data.deletionRequestedAt != null;
-      final now = next.value?.data.deletionRequestedAt != null;
-      if (!was && now && _tooLate) setState(() => _tooLate = false);
+      final was = prev?.value?.data.deletionRequestedAt;
+      final now = next.value?.data.deletionRequestedAt;
+      if (now != null && now != was && (_tooLate || _error != null)) {
+        setState(() {
+          _tooLate = false;
+          _error = null;
+        });
+      }
     });
     final l = context.l10n;
     final me = ref.watch(meProvider).value?.data;

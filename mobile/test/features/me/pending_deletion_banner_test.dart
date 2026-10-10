@@ -45,10 +45,15 @@ const _tooLate = 'Too late — this deletion is already being processed and can 
 TextButton _cancelButton(WidgetTester t) =>
     t.widget<TextButton>(find.ancestor(of: find.text(_cancel), matching: find.byType(TextButton)));
 
+/// Two distinct request timestamps. The banner re-arms on a *changed* request, not merely on the
+/// field being present, so a test that needs "a different request" needs a different value.
+const _requestedAt = '2026-11-03T04:00:00.000Z';
+const _reRequestedAt = '2026-11-05T09:30:00.000Z';
+
 /// A `/me` payload with the public-web request recorded on the account (spec §3.5.3).
-Map<String, dynamic> _pending({bool pending = true}) => {
+Map<String, dynamic> _pending({bool pending = true, String at = _requestedAt}) => {
       ...meJson,
-      'deletionRequestedAt': pending ? '2026-11-03T04:00:00.000Z' : null,
+      'deletionRequestedAt': pending ? at : null,
       'deletionRequestedVia': pending ? 'public_web' : null,
     };
 
@@ -235,6 +240,36 @@ void main() {
     await t.pumpAndSettle();
     expect(find.text(_title), findsOneWidget);
     expect(_cancelButton(t).onPressed, isNotNull);
+    // …and the previous request's "no longer can be cancelled" line went with the reset: leaving it
+    // up would print it directly above a live Cancel button for the request standing now.
+    expect(find.text(_tooLate), findsNothing);
+  });
+
+  // The reset keys on the request, not on the field being present: a request cancelled elsewhere and
+  // re-made while this device was away is never observed as absent here — only as a *different*
+  // timestamp — so presence-keying would leave Cancel dead for the request standing now.
+  testWidgets('a different request, never seen as absent, still re-arms Cancel', (t) async {
+    var at = _requestedAt;
+    final c = await pumpShell(t, (a) => a
+      ..onGet('/me', (s) => s.replyCallback(200, (_) => _pending(at: at)))
+      ..onDelete(
+        '/me/account/deletion-request',
+        (s) => s.reply(409, {
+          'error': {'code': 'DELETION_NOT_CANCELLABLE', 'message': _serverTooLate},
+        }),
+      ));
+
+    await t.tap(find.text(_cancel));
+    await t.pumpAndSettle();
+    expect(_cancelButton(t).onPressed, isNull);
+
+    at = _reRequestedAt;
+    c.invalidate(meProvider);
+    await t.pumpAndSettle();
+
+    expect(find.text(_title), findsOneWidget);
+    expect(_cancelButton(t).onPressed, isNotNull);
+    expect(find.text(_tooLate), findsNothing);
   });
 
   // Only a 204 counts. Anything else — offline here — leaves the request exactly where it was.
