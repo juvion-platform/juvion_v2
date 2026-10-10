@@ -998,6 +998,18 @@
           "asOf": {
             "type": "string"
           },
+          "deletionRequestedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "deletionRequestedVia": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "faculty": {
             "properties": {
               "department": {
@@ -1222,6 +1234,8 @@
           "faculty",
           "settings",
           "institution",
+          "deletionRequestedAt",
+          "deletionRequestedVia",
           "asOf"
         ],
         "type": "object"

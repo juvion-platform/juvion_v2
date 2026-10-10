@@ -63,6 +63,26 @@ void main() {
     expect(me.toJson()['student'], isA<Map<String, dynamic>>());
   });
 
+  // 011 T14 — the deletion banner's trigger has to survive parsing *here*, not just on the wire
+  // model: /me is parsed into this local freezed `Me` (see `me_repository.dart`), and freezed drops
+  // unknown keys silently, so a server-only field leaves the banner permanently dark with no error
+  // anywhere to notice.
+  test('Me exposes the nullable deletion-request fields', () {
+    final pending = Me.fromJson({
+      ...meJson,
+      'deletionRequestedAt': '2026-11-03T04:00:00.000Z',
+      'deletionRequestedVia': 'public_web',
+    });
+    expect(pending.deletionRequestedAt, '2026-11-03T04:00:00.000Z');
+    expect(pending.deletionRequestedVia, 'public_web');
+
+    // R61: an account with no request gets a real `null` from the server, for the key as well as the
+    // value — so mock and assert `null`, never an omitted key.
+    final none = Me.fromJson({...meJson, 'deletionRequestedAt': null, 'deletionRequestedVia': null});
+    expect(none.deletionRequestedAt, isNull);
+    expect(none.deletionRequestedVia, isNull);
+  });
+
   // I3: offline, the optimistic value must survive the `meProvider` rebuild the patch
   // triggers; otherwise the switch snaps back and a second tap queues the opposite value.
   test('an offline settings patch keeps the new value and queues one action', () async {

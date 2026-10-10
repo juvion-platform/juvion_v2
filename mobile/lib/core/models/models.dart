@@ -122,6 +122,11 @@ abstract class InstitutionInfo with _$InstitutionInfo {
 /// `juvi_api` client's `Me`, which (a generator gap for `type: ["object", "null"]`
 /// properties) declares them non-nullable and crashes decoding a real payload. See
 /// core/repos/me_repository.dart.
+///
+/// `deletionRequestedAt` / `deletionRequestedVia` (011 §3.5.3) are nullable for the same
+/// reason and must be declared **here**, not only on the wire model: freezed's `fromJson`
+/// drops unknown keys silently, so a server-only change would leave this `Me` without the
+/// field and the deletion banner would simply never fire — no error, no warning.
 @freezed
 abstract class Me with _$Me {
   const factory Me({
@@ -132,6 +137,8 @@ abstract class Me with _$Me {
     required String asOf,
     StudentCard? student,
     FacultyCard? faculty,
+    String? deletionRequestedAt,
+    String? deletionRequestedVia,
   }) = _Me;
   factory Me.fromJson(Map<String, dynamic> json) => _$MeFromJson(json);
 }

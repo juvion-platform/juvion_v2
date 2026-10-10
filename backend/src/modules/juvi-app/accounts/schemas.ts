@@ -93,6 +93,13 @@ export const meResponseSchema = z.object({
     supportContact: z.object({ name: z.string(), phone: z.string().optional(), email: z.string().optional() }).nullable(),
     timezone: z.string(),
   }),
+  /**
+   * 011 §3.5.3 — the trigger for the "deletion scheduled" banner. Top-level rather than inside
+   * `account`, because `accountSummarySchema` is the *sign-in* identity card too and carries no
+   * deletion state. Both are null until someone asks, and stay null after a cancellation.
+   */
+  deletionRequestedAt: z.string().nullable(),
+  deletionRequestedVia: z.string().nullable(),
   asOf: z.string(),
 });
 export type MeResponse = z.infer<typeof meResponseSchema>;

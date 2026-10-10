@@ -3400,7 +3400,7 @@ $SupportContactCopyWith<$Res>? get supportContact {
 /// @nodoc
 mixin _$Me {
 
- AccountSummary get account; PersonCard get person; Settings get settings; InstitutionInfo get institution; String get asOf; StudentCard? get student; FacultyCard? get faculty;
+ AccountSummary get account; PersonCard get person; Settings get settings; InstitutionInfo get institution; String get asOf; StudentCard? get student; FacultyCard? get faculty; String? get deletionRequestedAt; String? get deletionRequestedVia;
 /// Create a copy of Me
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -3413,16 +3413,16 @@ $MeCopyWith<Me> get copyWith => _$MeCopyWithImpl<Me>(this as Me, _$identity);
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Me&&(identical(other.account, account) || other.account == account)&&(identical(other.person, person) || other.person == person)&&(identical(other.settings, settings) || other.settings == settings)&&(identical(other.institution, institution) || other.institution == institution)&&(identical(other.asOf, asOf) || other.asOf == asOf)&&(identical(other.student, student) || other.student == student)&&(identical(other.faculty, faculty) || other.faculty == faculty));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Me&&(identical(other.account, account) || other.account == account)&&(identical(other.person, person) || other.person == person)&&(identical(other.settings, settings) || other.settings == settings)&&(identical(other.institution, institution) || other.institution == institution)&&(identical(other.asOf, asOf) || other.asOf == asOf)&&(identical(other.student, student) || other.student == student)&&(identical(other.faculty, faculty) || other.faculty == faculty)&&(identical(other.deletionRequestedAt, deletionRequestedAt) || other.deletionRequestedAt == deletionRequestedAt)&&(identical(other.deletionRequestedVia, deletionRequestedVia) || other.deletionRequestedVia == deletionRequestedVia));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,account,person,settings,institution,asOf,student,faculty);
+int get hashCode => Object.hash(runtimeType,account,person,settings,institution,asOf,student,faculty,deletionRequestedAt,deletionRequestedVia);
 
 @override
 String toString() {
-  return 'Me(account: $account, person: $person, settings: $settings, institution: $institution, asOf: $asOf, student: $student, faculty: $faculty)';
+  return 'Me(account: $account, person: $person, settings: $settings, institution: $institution, asOf: $asOf, student: $student, faculty: $faculty, deletionRequestedAt: $deletionRequestedAt, deletionRequestedVia: $deletionRequestedVia)';
 }
 
 
@@ -3433,7 +3433,7 @@ abstract mixin class $MeCopyWith<$Res>  {
   factory $MeCopyWith(Me value, $Res Function(Me) _then) = _$MeCopyWithImpl;
 @useResult
 $Res call({
- AccountSummary account, PersonCard person, Settings settings, InstitutionInfo institution, String asOf, StudentCard? student, FacultyCard? faculty
+ AccountSummary account, PersonCard person, Settings settings, InstitutionInfo institution, String asOf, StudentCard? student, FacultyCard? faculty, String? deletionRequestedAt, String? deletionRequestedVia
 });
 
 
@@ -3450,7 +3450,7 @@ class _$MeCopyWithImpl<$Res>
 
 /// Create a copy of Me
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? account = null,Object? person = null,Object? settings = null,Object? institution = null,Object? asOf = null,Object? student = freezed,Object? faculty = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? account = null,Object? person = null,Object? settings = null,Object? institution = null,Object? asOf = null,Object? student = freezed,Object? faculty = freezed,Object? deletionRequestedAt = freezed,Object? deletionRequestedVia = freezed,}) {
   return _then(Me(
 account: null == account ? _self.account : account // ignore: cast_nullable_to_non_nullable
 as AccountSummary,person: null == person ? _self.person : person // ignore: cast_nullable_to_non_nullable
@@ -3459,7 +3459,9 @@ as Settings,institution: null == institution ? _self.institution : institution /
 as InstitutionInfo,asOf: null == asOf ? _self.asOf : asOf // ignore: cast_nullable_to_non_nullable
 as String,student: freezed == student ? _self.student : student // ignore: cast_nullable_to_non_nullable
 as StudentCard?,faculty: freezed == faculty ? _self.faculty : faculty // ignore: cast_nullable_to_non_nullable
-as FacultyCard?,
+as FacultyCard?,deletionRequestedAt: freezed == deletionRequestedAt ? _self.deletionRequestedAt : deletionRequestedAt // ignore: cast_nullable_to_non_nullable
+as String?,deletionRequestedVia: freezed == deletionRequestedVia ? _self.deletionRequestedVia : deletionRequestedVia // ignore: cast_nullable_to_non_nullable
+as String?,
   ));
 }
 /// Create a copy of Me
@@ -3604,10 +3606,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( AccountSummary account,  PersonCard person,  Settings settings,  InstitutionInfo institution,  String asOf,  StudentCard? student,  FacultyCard? faculty)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( AccountSummary account,  PersonCard person,  Settings settings,  InstitutionInfo institution,  String asOf,  StudentCard? student,  FacultyCard? faculty,  String? deletionRequestedAt,  String? deletionRequestedVia)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Me() when $default != null:
-return $default(_that.account,_that.person,_that.settings,_that.institution,_that.asOf,_that.student,_that.faculty);case _:
+return $default(_that.account,_that.person,_that.settings,_that.institution,_that.asOf,_that.student,_that.faculty,_that.deletionRequestedAt,_that.deletionRequestedVia);case _:
   return orElse();
 
 }
@@ -3625,10 +3627,10 @@ return $default(_that.account,_that.person,_that.settings,_that.institution,_tha
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( AccountSummary account,  PersonCard person,  Settings settings,  InstitutionInfo institution,  String asOf,  StudentCard? student,  FacultyCard? faculty)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( AccountSummary account,  PersonCard person,  Settings settings,  InstitutionInfo institution,  String asOf,  StudentCard? student,  FacultyCard? faculty,  String? deletionRequestedAt,  String? deletionRequestedVia)  $default,) {final _that = this;
 switch (_that) {
 case _Me():
-return $default(_that.account,_that.person,_that.settings,_that.institution,_that.asOf,_that.student,_that.faculty);case _:
+return $default(_that.account,_that.person,_that.settings,_that.institution,_that.asOf,_that.student,_that.faculty,_that.deletionRequestedAt,_that.deletionRequestedVia);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -3645,10 +3647,10 @@ return $default(_that.account,_that.person,_that.settings,_that.institution,_tha
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( AccountSummary account,  PersonCard person,  Settings settings,  InstitutionInfo institution,  String asOf,  StudentCard? student,  FacultyCard? faculty)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( AccountSummary account,  PersonCard person,  Settings settings,  InstitutionInfo institution,  String asOf,  StudentCard? student,  FacultyCard? faculty,  String? deletionRequestedAt,  String? deletionRequestedVia)?  $default,) {final _that = this;
 switch (_that) {
 case _Me() when $default != null:
-return $default(_that.account,_that.person,_that.settings,_that.institution,_that.asOf,_that.student,_that.faculty);case _:
+return $default(_that.account,_that.person,_that.settings,_that.institution,_that.asOf,_that.student,_that.faculty,_that.deletionRequestedAt,_that.deletionRequestedVia);case _:
   return null;
 
 }
@@ -3660,7 +3662,7 @@ return $default(_that.account,_that.person,_that.settings,_that.institution,_tha
 @JsonSerializable()
 
 class _Me implements Me {
-  const _Me({required this.account, required this.person, required this.settings, required this.institution, required this.asOf, this.student, this.faculty});
+  const _Me({required this.account, required this.person, required this.settings, required this.institution, required this.asOf, this.student, this.faculty, this.deletionRequestedAt, this.deletionRequestedVia});
   factory _Me.fromJson(Map<String, dynamic> json) => _$MeFromJson(json);
 
 @override final  AccountSummary account;
@@ -3670,6 +3672,8 @@ class _Me implements Me {
 @override final  String asOf;
 @override final  StudentCard? student;
 @override final  FacultyCard? faculty;
+@override final  String? deletionRequestedAt;
+@override final  String? deletionRequestedVia;
 
 /// Create a copy of Me
 /// with the given fields replaced by the non-null parameter values.
@@ -3684,16 +3688,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Me&&(identical(other.account, account) || other.account == account)&&(identical(other.person, person) || other.person == person)&&(identical(other.settings, settings) || other.settings == settings)&&(identical(other.institution, institution) || other.institution == institution)&&(identical(other.asOf, asOf) || other.asOf == asOf)&&(identical(other.student, student) || other.student == student)&&(identical(other.faculty, faculty) || other.faculty == faculty));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Me&&(identical(other.account, account) || other.account == account)&&(identical(other.person, person) || other.person == person)&&(identical(other.settings, settings) || other.settings == settings)&&(identical(other.institution, institution) || other.institution == institution)&&(identical(other.asOf, asOf) || other.asOf == asOf)&&(identical(other.student, student) || other.student == student)&&(identical(other.faculty, faculty) || other.faculty == faculty)&&(identical(other.deletionRequestedAt, deletionRequestedAt) || other.deletionRequestedAt == deletionRequestedAt)&&(identical(other.deletionRequestedVia, deletionRequestedVia) || other.deletionRequestedVia == deletionRequestedVia));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,account,person,settings,institution,asOf,student,faculty);
+int get hashCode => Object.hash(runtimeType,account,person,settings,institution,asOf,student,faculty,deletionRequestedAt,deletionRequestedVia);
 
 @override
 String toString() {
-  return 'Me(account: $account, person: $person, settings: $settings, institution: $institution, asOf: $asOf, student: $student, faculty: $faculty)';
+  return 'Me(account: $account, person: $person, settings: $settings, institution: $institution, asOf: $asOf, student: $student, faculty: $faculty, deletionRequestedAt: $deletionRequestedAt, deletionRequestedVia: $deletionRequestedVia)';
 }
 
 
@@ -3704,7 +3708,7 @@ abstract mixin class _$MeCopyWith<$Res> implements $MeCopyWith<$Res> {
   factory _$MeCopyWith(_Me value, $Res Function(_Me) _then) = __$MeCopyWithImpl;
 @override @useResult
 $Res call({
- AccountSummary account, PersonCard person, Settings settings, InstitutionInfo institution, String asOf, StudentCard? student, FacultyCard? faculty
+ AccountSummary account, PersonCard person, Settings settings, InstitutionInfo institution, String asOf, StudentCard? student, FacultyCard? faculty, String? deletionRequestedAt, String? deletionRequestedVia
 });
 
 
@@ -3721,7 +3725,7 @@ class __$MeCopyWithImpl<$Res>
 
 /// Create a copy of Me
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? account = null,Object? person = null,Object? settings = null,Object? institution = null,Object? asOf = null,Object? student = freezed,Object? faculty = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? account = null,Object? person = null,Object? settings = null,Object? institution = null,Object? asOf = null,Object? student = freezed,Object? faculty = freezed,Object? deletionRequestedAt = freezed,Object? deletionRequestedVia = freezed,}) {
   return _then(_Me(
 account: null == account ? _self.account : account // ignore: cast_nullable_to_non_nullable
 as AccountSummary,person: null == person ? _self.person : person // ignore: cast_nullable_to_non_nullable
@@ -3730,7 +3734,9 @@ as Settings,institution: null == institution ? _self.institution : institution /
 as InstitutionInfo,asOf: null == asOf ? _self.asOf : asOf // ignore: cast_nullable_to_non_nullable
 as String,student: freezed == student ? _self.student : student // ignore: cast_nullable_to_non_nullable
 as StudentCard?,faculty: freezed == faculty ? _self.faculty : faculty // ignore: cast_nullable_to_non_nullable
-as FacultyCard?,
+as FacultyCard?,deletionRequestedAt: freezed == deletionRequestedAt ? _self.deletionRequestedAt : deletionRequestedAt // ignore: cast_nullable_to_non_nullable
+as String?,deletionRequestedVia: freezed == deletionRequestedVia ? _self.deletionRequestedVia : deletionRequestedVia // ignore: cast_nullable_to_non_nullable
+as String?,
   ));
 }
 
