@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 #
-# deploy.sh — build & restart the Juvion v2 API (backend under pm2) and rebuild
-# the admin portal (nginx serves admin-portal/dist in place).
+# deploy.sh — build & restart the Juvion v2 API (backend under pm2) and publish
+# the admin portal to the web root nginx serves.
 #
-# Steps: git pull → workspace install → backend build → pm2 restart → portal build → API health check.
+# Steps: git pull → workspace install → backend build → pm2 restart → portal build →
+#        publish (atomic releases/ + current symlink) → API health check.
 # Fail-fast: any failing step aborts the deploy (the running pm2 process is only touched at the restart step).
 #
 # Which pm2 process gets restarted is resolved from *this folder's* backend/.env
@@ -20,6 +21,8 @@
 #   npm run deploy                                   # same, via the root package.json
 #   PM2_NAME=juvion-qa-api ./scripts/deploy.sh       # force a specific pm2 process name (skips auto-detect)
 #   PORTAL_BUILD_SCRIPT=build:qa ./scripts/deploy.sh # build the portal with --mode qa (.env.qa)
+#   WEB_ROOT=/srv/www/juvion ./scripts/deploy.sh     # publish the portal elsewhere
+#   WEB_ROOT= ./scripts/deploy.sh                    # skip publishing (in-place build only)
 #   HEALTH_URL=http://localhost:3004/api/health ./scripts/deploy.sh   # force the health endpoint
 
 set -euo pipefail
@@ -126,9 +129,70 @@ log "Restarting pm2 service: $PM2_NAME"
 # --update-env so any changed env vars are picked up on restart.
 pm2 restart "$PM2_NAME" --update-env
 
-# vite empties admin-portal/dist before writing, so nginx has a brief 404 window here.
+# vite empties admin-portal/dist before writing. That no longer costs a 404
+# window, because nginx serves the published release below rather than dist/
+# — dist/ is now only a staging directory. Keep WEB_ROOT set.
 log "Admin portal: npm run $PORTAL_BUILD_SCRIPT -w admin-portal"
 npm run "$PORTAL_BUILD_SCRIPT" -w admin-portal
+
+# ---------------------------------------------------------------------------
+# Publish the freshly built portal to the web root nginx serves.
+#
+# Without this the deploy builds admin-portal/dist and stops: nginx keeps
+# serving the PREVIOUS bundle and the deploy looks like it worked. nginx cannot
+# read the repo directly (/home/ubuntu is 0750, so www-data cannot traverse into
+# it), so the build has to be copied out.
+#
+# Layout:
+#   $WEB_ROOT/releases/<timestamp>/   one directory per deploy
+#   $WEB_ROOT/current -> releases/... the symlink nginx's `root` points at
+#
+# The swap is a symlink replacement, which is atomic: no request can ever see a
+# half-copied bundle, and index.html never references an asset that has not
+# landed yet. Rolling back is re-pointing the symlink — no rebuild:
+#
+#   ln -sfn /var/www/packkme/juvion/releases/<older> /var/www/packkme/juvion/current.tmp
+#   mv -T /var/www/packkme/juvion/current.tmp /var/www/packkme/juvion/current
+#
+# Set WEB_ROOT= (empty) to skip publishing — e.g. on a QA checkout whose portal
+# nobody serves, where the in-place build is enough.
+# ---------------------------------------------------------------------------
+WEB_ROOT="${WEB_ROOT-/var/www/packkme/juvion}"
+KEEP_RELEASES="${KEEP_RELEASES:-5}"
+
+if [ -z "$WEB_ROOT" ]; then
+  log "Publish: skipped (WEB_ROOT is empty)"
+elif [ ! -d "$WEB_ROOT" ]; then
+  die "Publish: $WEB_ROOT does not exist. Create it once with:
+    sudo mkdir -p $WEB_ROOT/releases && sudo chown -R \$(id -un):www-data $WEB_ROOT && sudo chmod 2775 $WEB_ROOT $WEB_ROOT/releases
+  ...then point nginx's 'root' for the portal at $WEB_ROOT/current (not at admin-portal/dist),
+  or pass WEB_ROOT= to skip publishing."
+else
+  [ -d "$ROOT_DIR/admin-portal/dist" ] || die "Publish: $ROOT_DIR/admin-portal/dist is missing — the portal build did not produce output."
+  [ -f "$ROOT_DIR/admin-portal/dist/index.html" ] || die "Publish: $ROOT_DIR/admin-portal/dist/index.html is missing — refusing to publish an incomplete build."
+
+  RELEASE="$WEB_ROOT/releases/$(date +%Y%m%d-%H%M%S)"
+  log "Publish: $ROOT_DIR/admin-portal/dist -> $RELEASE"
+  mkdir -p "$RELEASE"
+  # -a keeps perms/times; no --delete needed, the directory is new every time.
+  rsync -a "$ROOT_DIR/admin-portal/dist/" "$RELEASE/"
+
+  # ln -sfn alone is NOT atomic when the target is an existing symlink-to-directory
+  # (it would create a link INSIDE it). Build a temp link, then mv -T over the old
+  # one — a single rename syscall, so nginx sees one or the other, never neither.
+  ln -sfn "$RELEASE" "$WEB_ROOT/current.tmp"
+  mv -T "$WEB_ROOT/current.tmp" "$WEB_ROOT/current"
+  log "Publish: current -> $(readlink "$WEB_ROOT/current")"
+
+  # Keep the last $KEEP_RELEASES so a rollback target always exists. Never prunes
+  # whatever `current` points at, however old it is.
+  CURRENT_TARGET="$(readlink -f "$WEB_ROOT/current")"
+  ls -1d "$WEB_ROOT"/releases/*/ 2>/dev/null | sort -r | tail -n +$((KEEP_RELEASES + 1)) | while read -r old; do
+    [ "$(readlink -f "$old")" = "$CURRENT_TARGET" ] && continue
+    log "Publish: pruning old release $(basename "$old")"
+    rm -rf "$old"
+  done
+fi
 
 log "Health check: $HEALTH_URL"
 attempt=1
