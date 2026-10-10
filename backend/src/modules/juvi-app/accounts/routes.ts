@@ -20,3 +20,6 @@ accountsRouter.get('/me/devices', authenticateMobile, meCtrl.listDevices);
 accountsRouter.delete('/me/devices/:id', authenticateMobile, meCtrl.revokeDevice);
 accountsRouter.post('/me/devices/revoke-others', authenticateMobile, meCtrl.revokeOtherDevices);
 accountsRouter.post('/me/photo', authenticateMobile, photoUpload.single('file'), multerErrorHandler, meCtrl.uploadPhoto);
+// 011: the in-app delete. The public path (a web form + a 7-day sweep) is the other door onto the
+// same `runAccountDeletion`; this one is immediate because a live session is proof enough.
+accountsRouter.delete('/me/account', authenticateMobile, meCtrl.deleteAccount);

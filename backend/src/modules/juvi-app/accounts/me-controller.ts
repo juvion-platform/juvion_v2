@@ -1,7 +1,9 @@
 import { Response, NextFunction } from 'express';
 import { MobileRequest, requireMobile } from '../middleware/authenticate-mobile';
 import { MobileApiError } from '../errors';
+import { JuviAccount } from '../../../models/juvi/JuviAccount';
 import { settingsPatchSchema, onboardingAdvanceSchema, objectId } from './schemas';
+import { runAccountDeletion } from './deletion-service';
 import * as me from './me-service';
 
 export async function getMe(req: MobileRequest, res: Response, next: NextFunction) {
@@ -29,5 +31,23 @@ export async function uploadPhoto(req: MobileRequest, res: Response, next: NextF
   try {
     if (!req.file) throw new MobileApiError(400, 'VALIDATION_FAILED', 'No file uploaded');
     res.json(await me.uploadMyPhoto(requireMobile(req), req.file.buffer, req.file.mimetype));
+  } catch (e) { next(e); }
+}
+/**
+ * `DELETE /v1/me/account` (011 T5) — the in-app delete. The account comes from the JWT and
+ * nowhere else (Story 2 AC1), so the re-read is scoped by the `collegeId` the token carries.
+ *
+ * Deliberately unconditional: no grace-period check, no `deletionClaimedAt` consultation, no
+ * look at `User.isActive`. A pending public request collapses the window rather than blocking
+ * this call (plan §7), and an ERP login the college disabled is not a reason to strand the
+ * Juvi account.
+ */
+export async function deleteAccount(req: MobileRequest, res: Response, next: NextFunction) {
+  try {
+    const ctx = requireMobile(req);
+    const account = await JuviAccount.findOne({ _id: ctx.accountId, collegeId: ctx.collegeId });
+    if (!account) throw new MobileApiError(404, 'NOT_FOUND', 'Account not found');
+    await runAccountDeletion(account);
+    res.status(204).end();
   } catch (e) { next(e); }
 }
