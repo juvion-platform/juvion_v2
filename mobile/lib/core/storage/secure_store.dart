@@ -100,6 +100,10 @@ class SecureStore {
   Future<String?> readLastAccount() => _readOrNull(_lastAccount);
   Future<void> writeLastAccount(String owner) => _s.write(key: _lastAccount, value: owner);
 
+  /// 011 Story 1 AC3: the deletion wipe drops this too. Kept across a sign-out on purpose (above),
+  /// but once the account is deleted the marker can only name an account that no longer exists.
+  Future<void> clearLastAccount() => _deleteQuietly(_lastAccount);
+
   /// Sign-out and deactivation: forget the session, keep the device identity and the DB key.
   /// Each entry is deleted best effort, so one failing delete does not keep the others.
   Future<void> wipeAll() async {

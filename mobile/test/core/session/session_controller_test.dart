@@ -10,13 +10,16 @@ import 'package:juvi/core/http/api_failure.dart';
 import 'package:juvi/core/http/api_providers.dart';
 import 'package:juvi/core/models/models.dart';
 import 'package:juvi/core/push/push_registration.dart';
+import 'package:juvi/core/push/receipts.dart';
 import 'package:juvi/core/repos/auth_repository.dart';
 import 'package:juvi/core/session/session_controller.dart';
 import 'package:juvi/core/session/session_state.dart';
 import 'package:juvi/core/storage/app_database.dart';
 import 'package:juvi/core/storage/secure_store.dart';
+import 'package:juvi/core/sync/pending_action.dart';
 import 'package:juvi_api/juvi_api.dart' show JuviApi;
 import 'package:mocktail/mocktail.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../push/push_fixtures.dart';
 
@@ -119,6 +122,61 @@ void main() {
     await s.handleFailure(const ApiFailure(ApiErrorCode.sessionInvalidated, 'x', detail: {'reason': 'password_changed'}));
     expect(c.read(sessionControllerProvider), const SessionState.signedOut(reason: 'password_changed'));
     expect(mem['juvi.access'], isNull);
+  });
+
+  // 011 Story 1 AC3/AC6 (T18). A *deletion* wipe, so it also clears what a sign-out is required
+  // to keep: `juvi.pending_link` outlives the sign-out it is waiting behind, and
+  // `juvi.last_account` is what makes a held destination specific to its account. Neither is in
+  // `wipeAll()`'s 3-key allowlist, and the receipt queue lives in shared preferences rather than
+  // in the database, so all three need naming here. The device id and the database key are not
+  // the account's: clearing them would orphan the encrypted database and make the app look like
+  // a fresh install to the server.
+  test('the deletion wipe empties every surface 011 AC3 names, keeping the device identity', () async {
+    SharedPreferences.setMockInitialValues({});
+    final store = c.read(secureStoreProvider);
+    final queue = ReceiptQueue();
+    final deviceId = await store.deviceId();
+    final databaseKey = await store.databaseKey();
+
+    mem['juvi.access'] = 'a';
+    mem['juvi.refresh'] = 'r';
+    mem['juvi.college_id'] = 'c1';
+    await db.writeDoc('me', {'id': 'a1'}, DateTime.now().toUtc());
+    final action = PendingAction.create('settings.patch', {'k': 'v'});
+    await db.enqueueAction(action);
+    await db.enqueueEvent('glance.opened', DateTime.now().toUtc(), {'n': 1});
+    await queue.add(ReceiptItem(deliveryId: 'd1', receipt: 'sig.1', event: 'delivered', at: DateTime.now().toUtc()));
+    await store.writePendingLink('{"route":"/notices/n1"}');
+    await store.writeLastAccount('c1:a1');
+
+    // Every surface is genuinely loaded first, so the assertions after the wipe cannot pass
+    // by having had nothing to clear.
+    expect(await store.readTokens(), isNotNull);
+    expect(await db.readDoc('me'), isNotNull);
+    expect(await db.hasAction(action.id), isTrue);
+    expect(await db.eventCount(), 1);
+    expect(await queue.read(), hasLength(1));
+    expect(await store.readPendingLink(), isNotNull);
+    expect(await store.readLastAccount(), isNotNull);
+
+    await c.read(sessionControllerProvider.notifier).handleFailure(
+          const ApiFailure(ApiErrorCode.sessionInvalidated, 'x', detail: {'reason': 'account_deleted'}),
+        );
+
+    expect(c.read(sessionControllerProvider), const SessionState.signedOut(reason: 'account_deleted'));
+    expect(await store.readTokens(), isNull);
+    expect(mem['juvi.college_id'], isNull);
+    expect(await db.readDoc('me'), isNull);
+    expect(await db.hasAction(action.id), isFalse);
+    expect(await db.eventCount(), 0);
+    expect(await queue.read(), isEmpty);
+    // Removed rather than left as an empty list: nothing about the queue should remain.
+    expect((await SharedPreferences.getInstance()).getString(ReceiptQueue.key), isNull);
+    expect(await store.readPendingLink(), isNull);
+    expect(await store.readLastAccount(), isNull);
+
+    expect(await store.deviceId(), deviceId);
+    expect(await store.databaseKey(), databaseKey);
   });
 
   test('accountDeactivated then sessionInvalidated keeps the deactivated state', () async {

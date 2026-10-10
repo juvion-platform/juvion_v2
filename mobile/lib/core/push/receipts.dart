@@ -67,6 +67,11 @@ class ReceiptQueue {
     final items = await read();
     await _write(items.where((i) => !keys.contains(i.key)).toList());
   }
+
+  /// 011 Story 1 AC3: the deletion wipe. Removes the key rather than writing an empty list, so
+  /// nothing about the queue — not even a marker that there was one — outlives the account.
+  /// Receipts authorise themselves by HMAC, so a queued one is usable by whoever holds it.
+  Future<void> clear() => _write(const []);
 }
 
 /// Posts receipts through the generated client on a Dio with no session (the foreground's

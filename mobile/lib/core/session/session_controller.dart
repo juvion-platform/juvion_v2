@@ -3,6 +3,7 @@ import 'package:juvi/core/http/api_failure.dart';
 import 'package:juvi/core/http/api_providers.dart';
 import 'package:juvi/core/models/models.dart';
 import 'package:juvi/core/push/push_registration.dart';
+import 'package:juvi/core/push/receipts.dart';
 import 'package:juvi/core/repos/auth_repository.dart';
 import 'package:juvi/core/session/session_state.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -156,11 +157,29 @@ class SessionController extends _$SessionController {
 
   /// Best effort, each part on its own: a storage error must not stop the rest of the
   /// wipe, nor escape as an uncaught error from the interceptor's `onFatal`.
+  ///
+  /// 011 Story 1 AC3: this is a *deletion* wipe, so it also clears what a sign-out keeps. The
+  /// secure store's `wipeAll()` is a 3-key allowlist and deliberately keeps the held
+  /// notification destination and the last-account marker — a sign-out has to leave them for the
+  /// account that signs back in — and the receipt queue never reaches `db.wipe()` because it
+  /// lives in shared preferences, so it can be added to by the background isolate.
   Future<void> _wipe() async {
+    final store = ref.read(secureStoreProvider);
     try {
-      await ref.read(secureStoreProvider).wipeAll();
+      await store.wipeAll();
     } on Object {
       // Tokens that cannot be deleted cannot be read either (see SecureStore).
+    }
+    try {
+      await store.clearPendingLink();
+      await store.clearLastAccount();
+    } on Object {
+      // Defensive: both deletes are already best effort, so this only covers the read above.
+    }
+    try {
+      await ReceiptQueue().clear();
+    } on Object {
+      // An undrained receipt is unusable without the account it belongs to.
     }
     try {
       final db = await ref.read(appDatabaseProvider.future);
