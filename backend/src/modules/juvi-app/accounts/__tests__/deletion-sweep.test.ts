@@ -7,19 +7,31 @@ vi.mock('../deletion-service', async (importOriginal) => ({
   runAccountDeletion: deletion.runAccountDeletion,
 }));
 
+// The real deleter (`deletion-service.ts:96`) calls `redis.del`; the last test here runs it for
+// real, so the connection needs the same stub its own test file gives it.
+const redisMock = vi.hoisted(() => ({ get: vi.fn(), set: vi.fn(), del: vi.fn(), status: 'ready' }));
+vi.mock('../../../../config/redis', () => ({ default: redisMock }));
+
 import { setupMongo, teardownMongo, clearCollections } from '../../../../__tests__/helpers/mongoMemory';
 import { ELIGIBLE_STATUSES, JuviAccount } from '../../../../models/juvi/JuviAccount';
+import { User } from '../../../../models/User';
+import { Person } from '../../../../models/people/Person';
 import { sweepAccountDeletions } from '../deletion-sweep-worker';
 import { DELETION_GRACE_DAYS } from '../deletion-service';
 
 /**
- * 011 T12 — the two ways the sweep's query shapes can be *wrong* while looking right.
+ * The sweep, from the two directions it can be wrong.
  *
- * Both are one-line "improvements" a reader would plausibly make, and neither would fail any other
- * test in the suite: a `status` predicate looks like tidiness, and a `deletionClaimedAt` predicate
- * looks like the same double-processing guard the claim already gives. They are not equivalent, and
- * the difference is a person's account either surviving forever or being destroyed after they
- * cancelled. Hence a test each, and hence a mutation run rather than a reading.
+ * **T12 — the query shapes.** Two one-line "improvements" a reader would plausibly make, and neither
+ * would fail any other test in the suite: a `status` predicate looks like tidiness, and a
+ * `deletionClaimedAt` predicate looks like the same double-processing guard the claim already gives.
+ * They are not equivalent, and the difference is a person's account either surviving forever or
+ * being destroyed after they cancelled. Hence a test each, and hence a mutation run rather than a
+ * reading.
+ *
+ * **T4 — the AC3 guard.** The sweep is one of the two paths into the real deleter, so it is also
+ * where "the person's ERP login survives" has to be re-proved rather than assumed from the in-app
+ * test. That one runs the real deleter instead of the spy, and needs the Redis stub above.
  */
 
 const NOW = new Date('2026-11-10T04:00:00.000Z');
@@ -27,7 +39,12 @@ const PAST_DEADLINE = new Date(NOW.getTime() - (DELETION_GRACE_DAYS + 1) * 86_40
 const oid = () => new Types.ObjectId();
 
 beforeAll(async () => { await setupMongo(); });
-beforeEach(() => { deletion.runAccountDeletion.mockClear(); });
+beforeEach(() => {
+  // `mockReset` *and* the default, not `mockClear`: `afterEach`'s `restoreAllMocks` drops the
+  // implementation, so a later test would otherwise inherit whichever one the previous test set.
+  deletion.runAccountDeletion.mockReset();
+  deletion.runAccountDeletion.mockResolvedValue(undefined);
+});
 afterAll(async () => { await teardownMongo(); });
 afterEach(async () => { await clearCollections(); vi.restoreAllMocks(); });
 
@@ -117,5 +134,47 @@ describe('the sweep\'s query shapes (011 T12)', () => {
     expect(deletion.runAccountDeletion).not.toHaveBeenCalled();
     expect(result.deleted).toBe(0);
     expect(await JuviAccount.findById(account._id)).not.toBeNull();
+  });
+});
+
+describe('the sweep\'s AC3 guard (011 T4, both paths)', () => {
+  it('leaves the person\'s ERP login intact when the sweep is what runs the deletion', async () => {
+    // The AC3 guard — the person's web login must survive their Juvi account being deleted — is the
+    // one worst failure mode in this feature, and 011 requires it to hold on **both** paths into
+    // `runAccountDeletion`: the in-app call and this sweep. The sibling `deletion-service.test.ts`
+    // proves it for the in-app call; this proves it for the sweep.
+    //
+    // It has to run the *real* deleter to do that. The tests above are happy with the spy — they ask
+    // whether the sweep reached the deleter, which the spy answers — but "was handed over" is not
+    // "was handed over safely", and the spy would report a deleter that destroyed the login exactly
+    // as it reports a correct one.
+    const actual = await vi.importActual<typeof import('../deletion-service')>('../deletion-service');
+    deletion.runAccountDeletion.mockImplementation(actual.runAccountDeletion as never);
+
+    const collegeId = oid();
+    const personId = oid();
+    const user = await new User({
+      email: 'swept@x.test', password: 'plain-secret', name: 'swept', role: 'student', personaType: 'L-STU',
+    }).save();
+    await Person.create({ _id: personId, collegeId, name: 'Person swept', phone: '1' });
+    const account = await JuviAccount.create({
+      collegeId, personId, userId: user._id, kind: 'student', provisionedBy: 'test',
+      deletionRequestedAt: PAST_DEADLINE, deletionRequestedVia: 'public_web',
+    });
+    const hashBefore = user.password;
+
+    const result = await sweepAccountDeletions(NOW);
+
+    // The real deleter ran, so the account row going is a deletion and not the sweep skipping it.
+    expect(result.deleted).toBe(1);
+    expect(await JuviAccount.findById(account._id)).toBeNull();
+
+    // `not.toBeNull()`, not `toBeDefined()`: a deleted user comes back as `null`, and `null` is
+    // defined. Written the weaker way this assertion would pass on precisely the failure it exists
+    // to catch — an account whose owner no longer exists anywhere.
+    const after = await User.findById(user._id).lean();
+    expect(after).not.toBeNull();
+    expect(after!.isActive).toBe(true);
+    expect(after!.password).toBe(hashBefore);
   });
 });

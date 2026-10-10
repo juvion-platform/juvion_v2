@@ -37,10 +37,14 @@ describe('DELETE /me/account (011 T5)', () => {
     expect(await JuviAccount.countDocuments({ collegeId: fx.collegeId })).toBe(0);
     expect(await MobileSession.countDocuments({ collegeId: fx.collegeId })).toBe(0);
 
-    // The ERP login is untouched — the same assertion T4 guards, at the HTTP path.
+    // The ERP login is untouched — the same assertion T4 guards, at the HTTP path. Written as
+    // `toBe(true)` on a row that must still *exist*: `expect(user?.isActive).not.toBe(false)` reads
+    // as the same guard but passes when `user` is null, i.e. it would go green on precisely the
+    // failure — the person deleted outright — that this line is here to catch.
     const user = await User.findById(s.account.userId).lean();
-    expect(user?.isActive).not.toBe(false);
-    expect(user?.password).toBeTruthy();
+    expect(user).not.toBeNull();
+    expect(user!.isActive).toBe(true);
+    expect(user!.password).toBeTruthy();
 
     // The token was live seconds ago; the row it resolves against is gone, so it is refused.
     const after = await mobileClient(app, s.token).get(`${V1}/me`);

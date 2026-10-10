@@ -75,9 +75,11 @@ describe('runAccountDeletion (011 T4)', () => {
 
     await runAccountDeletion(account);
 
-    // AC3 — the single worst failure mode: the person's ERP login must survive.
+    // AC3 — the single worst failure mode: the person's ERP login must survive. The existence check
+    // is `not.toBeNull()`, not `toBeDefined()`: a deleted user comes back as `null`, and `null` is
+    // defined, so the weaker form would pass on exactly the failure this guards.
     const after = await User.findById(user._id).lean();
-    expect(after).toBeDefined();
+    expect(after).not.toBeNull();
     expect(after!.isActive).toBe(true);
     expect(after!.password).toBe(hashBefore);
 
