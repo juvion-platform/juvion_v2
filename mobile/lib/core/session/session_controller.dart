@@ -107,7 +107,7 @@ class SessionController extends _$SessionController {
   /// surfaces (AC6) — including on the other device whose copy of the account this is.
   Future<void> deleteAccount() async {
     await ref.read(authRepositoryProvider).deleteAccount();
-    await _wipe();
+    await _wipeForDeletion();
     state = const SessionState.signedOut(reason: 'account_deleted');
   }
 
@@ -133,7 +133,9 @@ class SessionController extends _$SessionController {
         // later sign-out (e.g. a second in-flight request that also 401s).
         if (state is Deactivated) return;
         state = SessionState.signedOut(reason: f.reason);
-        await _wipe();
+        // 011 AC6: an invalidation is how a deletion on *another* device reaches this one, and it
+        // triggers the same wipe a local deletion does — so the deletion one, not the sign-out one.
+        await _wipeForDeletion();
       case ApiErrorCode.accountDeactivated:
         final sc = f.detail['supportContact'];
         state = SessionState.deactivated(
@@ -178,18 +180,38 @@ class SessionController extends _$SessionController {
   /// Best effort, each part on its own: a storage error must not stop the rest of the
   /// wipe, nor escape as an uncaught error from the interceptor's `onFatal`.
   ///
-  /// 011 Story 1 AC3: this is a *deletion* wipe, so it also clears what a sign-out keeps. The
-  /// secure store's `wipeAll()` is a 3-key allowlist and deliberately keeps the held
-  /// notification destination and the last-account marker — a sign-out has to leave them for the
-  /// account that signs back in — and the receipt queue never reaches `db.wipe()` because it
-  /// lives in shared preferences, so it can be added to by the background isolate.
+  /// This is the *sign-out* wipe, and it is deliberately not the whole of what a deletion clears
+  /// ([_wipeForDeletion] is). It leaves `juvi.pending_link` and `juvi.last_account` — a
+  /// notification tapped while signed out parks its destination in the first, under the account
+  /// named by the second, and the next sign-in is what opens it (notifications §12) — and it
+  /// leaves the receipt queue, which lives in shared preferences rather than the drift database.
+  /// `wipeAll()` is a 3-key allowlist for the same reason; the device identity is not the
+  /// account's, and clearing it would orphan the encrypted database.
   Future<void> _wipe() async {
-    final store = ref.read(secureStoreProvider);
     try {
-      await store.wipeAll();
+      await ref.read(secureStoreProvider).wipeAll();
     } on Object {
       // Tokens that cannot be deleted cannot be read either (see SecureStore).
     }
+    try {
+      final db = await ref.read(appDatabaseProvider.future);
+      await db.wipe();
+    } on Object {
+      // The cache is disposable; an unopenable one holds nothing to leak.
+    }
+  }
+
+  /// 011 Story 1 AC3/AC6: [the account is being deleted], either by this device or by another —
+  /// so this is [_wipe] **plus** the three surfaces a sign-out has to keep. Once the account is
+  /// gone there is no next sign-in for a held destination to open under, and an undrained
+  /// receipt is unusable without the account it belongs to.
+  ///
+  /// Kept separate from [_wipe] rather than folded into it: [signOut] and [refreshTokens]'s
+  /// expiry branch call that one, and clearing the held destination on an ordinary sign-out would
+  /// drop the destination a notification tapped while signed out was parked for.
+  Future<void> _wipeForDeletion() async {
+    await _wipe();
+    final store = ref.read(secureStoreProvider);
     try {
       await store.clearPendingLink();
       await store.clearLastAccount();
@@ -200,12 +222,6 @@ class SessionController extends _$SessionController {
       await ReceiptQueue().clear();
     } on Object {
       // An undrained receipt is unusable without the account it belongs to.
-    }
-    try {
-      final db = await ref.read(appDatabaseProvider.future);
-      await db.wipe();
-    } on Object {
-      // The cache is disposable; an unopenable one holds nothing to leak.
     }
   }
 }

@@ -179,6 +179,55 @@ void main() {
     expect(await store.databaseKey(), databaseKey);
   });
 
+  // The deletion wipe is *not* the sign-out wipe. 011 AC3 adds three surfaces **on top of** the
+  // wipe for a deletion, and two of them — `juvi.pending_link` and `juvi.last_account` — are
+  // exactly what a sign-out is required to keep: a notification tapped while signed out parks its
+  // destination in the first, under the account named by the second, and the next sign-in is what
+  // opens it (notifications §12). A sign-out that cleared them drops that destination on the floor.
+  test('an ordinary sign-out keeps the destination and last-account markers', () async {
+    SharedPreferences.setMockInitialValues({});
+    mem.clear();
+    final dio = Dio(BaseOptions(baseUrl: 'https://api.test/v1'));
+    DioAdapter(dio: dio).onDelete('/me/devices/current/push-token', (s) => s.reply(204, null));
+    final container = ProviderContainer(retry: (_, _) => null, overrides: [
+      authRepositoryProvider.overrideWithValue(auth),
+      secureStoreProvider.overrideWithValue(SecureStore(_storageOver(mem))),
+      appDatabaseProvider.overrideWith((_) async => db),
+      pushRegistrationProvider.overrideWithValue(PushRegistration(
+        messaging: FakePushMessaging(),
+        local: FakeLocalNotifications(),
+        api: () => JuviApi(dio: dio, basePathOverride: 'https://api.test/v1').getMobileApi(),
+        signedIn: () => true,
+        allowed: () async => true,
+      )),
+    ]);
+    addTearDown(container.dispose);
+
+    final store = container.read(secureStoreProvider);
+    mem['juvi.access'] = 'a';
+    mem['juvi.refresh'] = 'r';
+    mem['juvi.college_id'] = 'c1';
+    await db.writeDoc('me', {'id': 'a1'}, DateTime.now().toUtc());
+    await ReceiptQueue().add(ReceiptItem(deliveryId: 'd1', receipt: 'sig.1', event: 'delivered', at: DateTime.now().toUtc()));
+    await store.writePendingLink('{"route":"/notices/n1"}');
+    await store.writeLastAccount('c1:a1');
+    when(() => auth.signOut()).thenAnswer((_) async {});
+
+    await container.read(sessionControllerProvider.notifier).signOut();
+
+    // The wipe really ran: the session's own surfaces are gone, so nothing below can pass by the
+    // sign-out having wiped nothing at all.
+    expect(container.read(sessionControllerProvider), const SessionState.signedOut());
+    expect(await store.readTokens(), isNull);
+    expect(mem['juvi.college_id'], isNull);
+    expect(await db.readDoc('me'), isNull);
+
+    // …and the surfaces a sign-out must leave for the account that signs back in are still here.
+    expect(await store.readPendingLink(), isNotNull);
+    expect(await store.readLastAccount(), 'c1:a1');
+    expect(await ReceiptQueue().read(), hasLength(1));
+  });
+
   // 011 Story 1 AC3/AC4 (T20). The server call is what authorises the wipe, and it is the only
   // thing that does: a deletion must not go through `signOut()`, because the push-token revoke
   // and the logout call both 401 against an account that no longer exists.
