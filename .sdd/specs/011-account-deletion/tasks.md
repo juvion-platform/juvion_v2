@@ -2,7 +2,7 @@
 
 ## STATUS
 **Complete.** T1–T22 are implemented, tested and committed on `feat/juvi-account-deletion` (branched
-from `origin/main`; 29 commits, `ba197a5` … `ea6f902`). GATE 2 and GATE 3 were met before T1
+from `origin/main`; 34 commits, `ba197a5` … `0d33b57`). GATE 2 and GATE 3 were met before T1
 (round 4: 0 CRITICAL / 0 HIGH on all three validators; `gate3-audit.md` reads PASS) — see
 `gate2-resolution.md` and `gate3-audit.md`.
 
@@ -14,8 +14,28 @@ by which point the post-invalidate refetch had already rewritten it, so deleting
 cache clear left the test green (reproduced, then `e4a8ee3`: the refetch is now held open and the
 cache read while it is in flight, so the clear is the only writer of a null at that moment); the
 third (`ea6f902`) finished the re-arm — clearing `_error` with `_tooLate`, and keying the reset on
-a *changed* `deletionRequestedAt` rather than its presence. Full mobile suite 351/351,
+a *changed* `deletionRequestedAt` rather than its presence. Full mobile suite 352/352,
 `flutter analyze lib test` clean.
+
+**Whole-branch review, split in two** — 12,162 insertions is past what one context reviews honestly
+— backend half and clients half, each on the most capable model, both **APPROVED** with zero
+correctness defects and every named invariant falsified by mutation. The two things they left open
+are now closed. The clients half found the *shared* `_wipe()`: extended with 011's three
+deletion-only clears, it is also the sign-out wipe, so an ordinary sign-out began clearing
+`juvi.pending_link` and `juvi.last_account` — the two `SecureStore` documents as kept across
+sign-out, because a notification tapped while signed out parks its destination in the first under
+the account the second names, and the next sign-in is what opens it (notifications §12). AC3 had
+already drawn the line (the deletion wipe is `_wipe()` **plus** the three); the plan's "extend
+`_wipe()`" folded them together. `_wipe()` is back to the session wipe and `_wipeForDeletion()` adds
+the three, `93fc3f8` — both halves falsified by mutation (commenting out the deletion path's
+`clearLastAccount()` reddens T18 by name; a live `clearLastAccount()` in `_wipe()` reddens the new
+sign-out test by name). The backend half's note that `deleteAccount` declared only 401 while
+`me-controller.ts:49` can return 404 is `0d33b57`, where the generated Dart was *verified* unchanged
+by a scratch generation with the pinned generator rather than assumed.
+
+One thing to know, not a defect: `batching_analytics_test.dart` (untouched by this branch) failed
+once for the clients reviewer under full-suite load and passes 10/10 in isolation and in every
+uncontended full run — a load-sensitive flake, not drift.
 
 **Both feature gates discharged**, each by mutation rather than by reading, each with the mutated
 file restored byte-identically (`diff -q`):
