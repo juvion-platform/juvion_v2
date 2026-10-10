@@ -20,6 +20,7 @@ import { CourseOffering } from '../../../models/academic-ops/CourseOffering';
 import { Enrollment } from '../../../models/academic-ops/Enrollment';
 import { Channel } from '../../../models/juvi/Channel';
 import { ELIGIBLE_STATUSES } from '../../../models/juvi/JuviAccount'; // JuviAccount and IAccountSettings are already imported
+import { AccountDeletionSource, ACCOUNT_DELETION_KIND, ACCOUNT_DELETION_TIER, ACCOUNT_DELETION_GROUP_KEY } from './account-deletion';
 
 export const NOTIFICATION_REQUESTED = 'notification.requested';
 export const EXPAND_BATCH_SIZE = 1000;
@@ -43,7 +44,7 @@ export const groupKeyOf = (noticeId: string): string => `notice:${noticeId}`;
 export interface NoticeSource { type: 'notice'; id: string; kind: NotificationSourceKind }
 /** Today&Teaching §8: the tier travels in the request, so expansion does not recompute it. */
 export interface ClassChangeSource { type: 'class_change'; id: string; kind: 'created' | 'revoked'; tier: NotificationTier }
-export type NotificationSource = NoticeSource | ClassChangeSource;
+export type NotificationSource = NoticeSource | ClassChangeSource | AccountDeletionSource;
 
 /** Records notification.requested for a notice; idempotent on its dedupe key. */
 export async function requestNoticeNotification(collegeId: string, noticeId: string, kind: NotificationSourceKind, accountId?: string): Promise<boolean> {
@@ -136,6 +137,7 @@ export async function expandNotification(payload: OutboxPayload, now: Date = new
   const source = payload.source as NotificationSource | undefined;
   if (!source || !Types.ObjectId.isValid(source.id)) return 0;
   if (source.type === 'class_change') return expandClassChange(payload, now);
+  if (source.type === 'account_deletion') return expandAccountDeletion(payload, now);
   if (source.type !== 'notice') return 0;
   const notice = await Notice.findOne({ _id: source.id, collegeId }).select('status priority publisher channelIds').lean<LeanNotice>();
   if (!notice || notice.status !== 'published') return 0;
@@ -237,4 +239,52 @@ export async function expandClassChange(payload: OutboxPayload, now: Date = new 
     };
   }), { ordered: false });
   return audience.length;
+}
+
+/**
+ * notification.requested → one row for a deletion request (011 §3.5.2).
+ *
+ * The audience is exactly one account, named by the request itself — there is nothing to expand,
+ * which is why this is a function of its own rather than a branch inside the notice walk.
+ *
+ * The row is written with `$setOnInsert` on the unique `(source, accountId)` key like the other two,
+ * so a re-delivered outbox event changes nothing; and it is dropped entirely if the account no
+ * longer exists (deleted in the meantime) or its request has already been cleared — scheduling a
+ * "your account will be deleted" push for an account nobody is deleting would be worse than no push
+ * at all.
+ *
+ * The account's own policy still applies: a `tier_off` user suppresses an Important notification, so
+ * the push is genuinely best-effort (spec §3.5.2's bullet list).
+ */
+export async function expandAccountDeletion(payload: OutboxPayload, now: Date = new Date()): Promise<number> {
+  const collegeId = payload.collegeId;
+  const source = payload.source as AccountDeletionSource | undefined;
+  if (!source || source.type !== 'account_deletion' || source.kind !== ACCOUNT_DELETION_KIND) return 0;
+  if (!Types.ObjectId.isValid(source.id)) return 0;
+
+  const accountId = new Types.ObjectId(source.id);
+  const account = await JuviAccount.findOne({ _id: accountId, collegeId })
+    .select('deletionRequestedAt settings').lean<{ _id: Types.ObjectId; deletionRequestedAt?: Date | null; settings?: IAccountSettings } | null>();
+  if (!account?.deletionRequestedAt) return 0;
+
+  const tier: NotificationTier = ACCOUNT_DELETION_TIER;
+  const timezone = (await getJuviConfig(collegeId))?.timezone ?? DEFAULT_TIMEZONE;
+  const settings = settingsOf(account.settings);
+  // No channel is involved, so nothing can be muted; `mutedAllMatchingChannels` is false by fact.
+  const d = decide({ tier, settings, mutedAllMatchingChannels: false, now, collegeTimezone: timezone });
+
+  const row = d.status === 'suppressed'
+    ? { tier, status: 'suppressed' as const, reason: d.reason, sendAfter: now }
+    : { tier, status: 'scheduled' as const, reason: null, sendAfter: d.sendAfter };
+
+  await NotificationDelivery.updateOne(
+    { collegeId: new Types.ObjectId(collegeId), 'source.type': 'account_deletion', 'source.id': accountId, 'source.kind': source.kind, accountId },
+    // `batchKey` groups nothing (one row per account). `groupKey` is a **constant**, unlike the class
+    // rows' `class:<offeringId>`: this notification is addressed to one account by its own device
+    // token, so the tray entry it collapses already belongs to that account, and putting the account
+    // id here would be the one identifier NFR-05 forbids from ever reaching a payload.
+    { $setOnInsert: { ...row, batchKey: 'account', groupKey: ACCOUNT_DELETION_GROUP_KEY, sentAt: null, deliveredAt: null, openedAt: null, attempts: 0, lastError: null, lockedUntil: null, createdAt: now, updatedAt: now } },
+    { upsert: true, timestamps: false },
+  );
+  return 1;
 }

@@ -6,6 +6,7 @@ import { allowedOrigins } from '../../../shared/http/allowed-origins';
 import { Person } from '../../../models/people/Person';
 import { IJuviAccount } from '../../../models/juvi/JuviAccount';
 import { MobileApiError } from '../errors';
+import { notifyDeletionRequestedBestEffort } from '../notifications';
 import { lookupInstitutionByCode } from '../config/institution-config';
 import { deletionVerifyLimiter } from '../middleware/rate-limits';
 import { accountDeletionRequestSchema } from './schemas';
@@ -131,6 +132,10 @@ export async function requestDeletionFromWeb(req: Request, res: Response, next: 
         // module precisely so they never reach Redis or a log (`cooldown.ts:7`).
         performedBy: String(account._id),
       });
+
+      // Best-effort and last (§3.5.2): the notification goes out only on the transition, so a
+      // repeat POST cannot make the phone buzz, and it cannot fail the request that just succeeded.
+      await notifyDeletionRequestedBestEffort(collegeId, String(account._id));
     }
 
     // Identical on both branches — a repeat requester is not told that someone already asked, and a

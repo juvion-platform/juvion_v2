@@ -20,9 +20,11 @@ import { instantOf } from '../../academics/timetable-date';
 import { Notice, LeanNotice } from '../../../models/juvi/Notice';
 import { NoticeRecipient, LeanNoticeRecipient } from '../../../models/juvi/NoticeRecipient';
 import { MobileSession } from '../../../models/juvi/MobileSession';
+import { JuviAccount } from '../../../models/juvi/JuviAccount';
+import { DELETION_GRACE_DAYS } from '../accounts/deletion-service';
 import { getPushTransport, PushTransport, PushResult, TOKEN_ERRORS } from './transport';
 import { signReceipt, RECEIPT_TTL_MS } from './receipts';
-import { buildNoticePush, buildClassChangePush } from './payload';
+import { buildNoticePush, buildClassChangePush, buildAccountDeletionPush } from './payload';
 
 export const SEND_BATCH_MAX = 500;
 /** Account groups in flight at once within a pass; claims are atomic, so workers never share a row. */
@@ -93,8 +95,10 @@ const cancelReason = (notice: LeanNotice | undefined, row: LeanNoticeRecipient |
 
 async function sendGroup(primary: Row, transport: PushTransport, now: Date, clock: Clock, stats: SenderStats): Promise<void> {
   // A class-change row is never Routine, so it has no digest to gather — its own
-  // group function re-checks the exception instead of the notice.
+  // group function re-checks the exception instead of the notice. A deletion row is
+  // not about a notice at all: it re-checks the request's own state.
   if (primary.source.type === 'class_change') return sendClassChangeGroup(primary, transport, now, stats);
+  if (primary.source.type === 'account_deletion') return sendAccountDeletionGroup(primary, transport, now, stats);
   const rows = primary.tier === 'routine' ? [primary, ...(await claimDigest(primary, now, clock))] : [primary];
   stats.claimed += rows.length - 1;
   const collegeId = primary.collegeId;
@@ -171,6 +175,73 @@ async function sendGroup(primary: Row, transport: PushTransport, now: Date, cloc
       stats.retried += 1;
     }
   }
+}
+
+/**
+ * 011 §3.5.2: the send-time re-check for a deletion row. `source.id` is the account, so the question
+ * is simply whether that account is still scheduled for deletion. It is not — the owner signed in,
+ * changed their password, or explicitly cancelled — or the account is already gone: the row is
+ * `superseded` and no device is touched.
+ *
+ * `superseded` rather than `cancelled`+null because `DeliveryReason` has no "obsolete" member and
+ * the meaning is the same one the class-change rows use: a newer state replaced this notification.
+ * A suppressed `no_device` row for the same account is left alone either way — it is already
+ * terminal, and the sender only ever claims `scheduled` rows.
+ */
+async function sendAccountDeletionGroup(primary: Row, transport: PushTransport, now: Date, stats: SenderStats): Promise<void> {
+  const account = await JuviAccount.findOne({ collegeId: primary.collegeId, _id: primary.source.id })
+    .select('deletionRequestedAt').lean<{ _id: Types.ObjectId; deletionRequestedAt?: Date | null } | null>();
+  if (!account?.deletionRequestedAt) {
+    await settle([primary], { status: 'cancelled', reason: 'superseded' });
+    stats.cancelled += 1;
+    return;
+  }
+  const sessions = await MobileSession.find({ collegeId: primary.collegeId, accountId: primary.accountId, revokedAt: null, refreshExpiresAt: { $gt: now }, pushToken: { $type: 'string' } })
+    .select('pushToken').lean();
+  const tokens = [...new Set(sessions.map((s) => s.pushToken!))];
+  if (tokens.length === 0) {
+    // The case the whole feature exists for: the person who uninstalled the app has no device to
+    // reach. Suppressed, not failed — nothing downstream depends on this row.
+    await settle([primary], { status: 'suppressed', reason: 'no_device' });
+    stats.noDevice += 1;
+    return;
+  }
+  const deliveryId = String(primary._id);
+  // Days actually left, counted from the request rather than assumed to be the full window: a row
+  // can be sent hours after the request, and the app must not over-promise.
+  const deadline = account.deletionRequestedAt.getTime() + DELETION_GRACE_DAYS * 86_400_000;
+  const message = buildAccountDeletionPush({
+    deliveryId, receipt: signReceipt(deliveryId, new Date(now.getTime() + RECEIPT_TTL_MS)),
+    tier: primary.tier, groupKey: primary.groupKey,
+    graceDays: Math.max(0, Math.ceil((deadline - now.getTime()) / 86_400_000)),
+  });
+  let results: PushResult[];
+  try {
+    results = await transport.send(tokens, message);
+  } catch {
+    results = tokens.map((token) => ({ token, ok: false, error: 'UNAVAILABLE' as const }));
+  }
+  const dead = results.filter((r) => !r.ok && r.error && TOKEN_ERRORS.has(r.error)).map((r) => r.token);
+  if (dead.length > 0) await MobileSession.updateMany({ collegeId: primary.collegeId, pushToken: { $in: dead } }, { $unset: { pushToken: 1 } });
+  if (results.some((r) => r.ok)) {
+    await settle([primary], { status: 'sent', sentAt: now, lastError: null });
+    stats.sent += 1;
+    return;
+  }
+  const transient = results.find((r) => !r.ok && !(r.error && TOKEN_ERRORS.has(r.error)));
+  if (!transient) {
+    await settle([primary], { status: 'suppressed', reason: 'no_device' });
+    stats.noDevice += 1;
+    return;
+  }
+  const attempts = primary.attempts + 1;
+  if (attempts >= MAX_SEND_ATTEMPTS) {
+    await settle([primary], { status: 'failed', attempts, lastError: transient.error ?? 'UNKNOWN' });
+    stats.failed += 1;
+    return;
+  }
+  await settle([primary], { attempts, lastError: transient.error ?? 'UNKNOWN', sendAfter: new Date(now.getTime() + sendBackoffMs(attempts)) });
+  stats.retried += 1;
 }
 
 /** R20: created+cancelled → cancelled, created+rescheduled → rescheduled, revoked → restored. */

@@ -18,6 +18,10 @@ import { College } from '../../../../models/College';
 import { JuviAccount } from '../../../../models/juvi/JuviAccount';
 import { MobileSession } from '../../../../models/juvi/MobileSession';
 import { AuditLog } from '../../../../shared/audit';
+import { OutboxEvent } from '../../../../shared/outbox/OutboxEvent';
+import { drainOutbox } from '../../../../shared/outbox';
+import { registerNotificationConsumers } from '../../notifications';
+import { NotificationDelivery } from '../../../../models/juvi/NotificationDelivery';
 import { DELETION_GRACE_DAYS } from '../deletion-service';
 
 /**
@@ -74,6 +78,8 @@ afterAll(async () => { await teardownMongo(); });
 beforeEach(() => { redisMock.get.mockResolvedValue(null); redisMock.incr.mockResolvedValue(1); });
 afterEach(async () => { await clearCollections(); vi.clearAllMocks(); });
 
+registerNotificationConsumers();
+
 describe('POST /v1/account-deletion (011 T9)', () => {
   it('schedules deletion from a native form POST, and needs no Authorization header', async () => {
     const college = await seedCollege();
@@ -90,6 +96,15 @@ describe('POST /v1/account-deletion (011 T9)', () => {
     expect(after?.deletionRequestedVia).toBe('public_web');
     // The claim is the sweep's, not the request's — a request must never look already-executing.
     expect(after?.deletionClaimedAt ?? null).toBeNull();
+
+    // The request also asks the notification stack for the owner's "your account will be deleted"
+    // push (011 §3.5.2). Best-effort on top of the request, never instead of it — but the wiring is
+    // the route's, so it is pinned here: remove the call and this row never appears.
+    expect(await OutboxEvent.countDocuments({ type: 'notification.requested' })).toBe(1);
+    await drainOutbox({ afterEvents: false });
+    const pushed = await NotificationDelivery.find({ 'source.type': 'account_deletion' }).lean();
+    expect(pushed).toHaveLength(1);
+    expect(String(pushed[0]!.accountId)).toBe(String(s.account._id));
   });
 
   it('records the request against the account, never the submitted identifier', async () => {
