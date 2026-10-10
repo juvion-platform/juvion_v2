@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { Types } from 'mongoose';
 import { JuviAccount } from '../JuviAccount';
-import { MobileSession } from '../MobileSession';
+import { MobileSession, REVOKE_REASONS } from '../MobileSession';
 import { ChannelTemplate } from '../ChannelTemplate';
 import { Channel } from '../Channel';
 import { ChannelMembership } from '../ChannelMembership';
@@ -82,6 +82,13 @@ describe('juvi-app models', () => {
     expect(c.juvi.enabled).toBe(false);
     expect(c.juvi.quietHoursDefault).toEqual({ start: '22:00', end: '07:00' });
     expect(c.juvi.timezone).toBe('Asia/Kolkata');
+  });
+
+  it('MobileSession accepts the account_deleted revoke reason and rejects a bogus one (011 T2)', () => {
+    expect(REVOKE_REASONS).toContain('account_deleted');
+    const base = { collegeId: oid(), accountId: oid(), userId: oid(), deviceId: 'd1', deviceName: 'Pixel', platform: 'android' as const, appVersion: '1.0.0', osVersion: '14', refreshTokenHash: 'h', refreshExpiresAt: new Date() };
+    expect(new MobileSession({ ...base, revokedReason: 'account_deleted' }).validateSync()).toBeUndefined();
+    expect(new MobileSession({ ...base, revokedReason: 'cleanup' }).validateSync()?.errors.revokedReason).toBeDefined();
   });
 
   it('JuviAccount deletion fields are absent (never null) and the sweep index is sparse', () => {

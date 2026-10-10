@@ -10,7 +10,9 @@ export type MobileErrorCode =
   | 'NOTICE_NOT_FOUND' | 'ALREADY_ACKNOWLEDGED' | 'NOTICE_ARCHIVED' | 'NOT_PUBLISHER'
   | 'REMINDER_LIMIT' | 'ACK_REQUIRED' | 'ACK_NOT_REQUIRED'
   // Juvi notifications (notifications spec §7.2): every receipt in the request failed verification
-  | 'RECEIPT_INVALID';
+  | 'RECEIPT_INVALID'
+  // Juvi account deletion (011): a pending public deletion request is past the point of cancellation
+  | 'DELETION_NOT_CANCELLABLE';
 
 /**
  * Mobile-facing error. `detail` keys are spread into the envelope next to
@@ -33,7 +35,7 @@ export function notFound(what: string): MobileApiError {
 }
 
 const STATUS_TO_CODE: Record<number, MobileErrorCode> = {
-  400: 'VALIDATION_FAILED', 401: 'INVALID_CREDENTIALS', 403: 'FORBIDDEN', 404: 'NOT_FOUND', 410: 'GONE', 429: 'COOLDOWN',
+  400: 'VALIDATION_FAILED', 401: 'INVALID_CREDENTIALS', 403: 'FORBIDDEN', 404: 'NOT_FOUND', 409: 'DELETION_NOT_CANCELLABLE', 410: 'GONE', 429: 'COOLDOWN',
 };
 
 export function mobileErrorHandler(err: unknown, _req: Request, res: Response, _next: NextFunction): void {
