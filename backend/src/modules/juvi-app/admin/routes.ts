@@ -28,6 +28,10 @@ adminRouter.get('/provisioning/runs/:id/credential-groups', authorize('platform'
 adminRouter.get('/provisioning/runs/:id/credentials.csv', authorize('platform', 'create'), provisioningCtrl.credentialsCsv);
 
 adminRouter.get('/accounts', authorize('platform', 'read'), accountsCtrl.listAccounts);
+// The detection surface for a stalled deletion sweep (011 Story 4 AC5, §3.5.1). Declared in prose
+// rather than in an OpenAPI document: the only generator here is the *mobile* contract, whose base
+// is /api/juvi-app/v1, and this route lives on the sibling /api/juvi-app/admin mount (§3.6).
+adminRouter.get('/accounts/pending-deletion', authorize('platform', 'read'), accountsCtrl.listPendingDeletions);
 adminRouter.post('/accounts/:id/deactivate', authorize('platform', 'update'), accountsCtrl.deactivate);
 adminRouter.post('/accounts/:id/reset-password', authorize('platform', 'update'), accountsCtrl.resetPassword);
 adminRouter.post('/accounts/:id/reveal-credential', authorize('platform', 'create'), accountsCtrl.revealCredential);

@@ -9,6 +9,11 @@ const who = (req: AuthRequest) => req.user?.name || 'System';
 export async function listAccounts(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await svc.listAccounts(req.collegeId!, accountsQuerySchema.parse(req.query))); } catch (e) { next(e); }
 }
+// No query input: the only scope this list has is the caller's college (011 Story 4 AC5), so there
+// is nothing to parse and nothing a caller could widen.
+export async function listPendingDeletions(req: AuthRequest, res: Response, next: NextFunction) {
+  try { res.json(await svc.listPendingDeletions(req.collegeId!)); } catch (e) { next(e); }
+}
 export async function deactivate(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json(await deactivateAccount(req.collegeId!, objectId.parse(req.params.id), 'admin', who(req))); } catch (e) { next(e); }
 }

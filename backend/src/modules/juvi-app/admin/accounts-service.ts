@@ -13,6 +13,7 @@ import { PaginatedResult } from '../../../shared/types';
 import { generateTemporaryPassword } from '../accounts/temp-password';
 import { storeCredential, revealLatestForAccount } from '../accounts/credential-store';
 import { revokeOtherSessions } from '../accounts/session-service';
+import { DELETION_GRACE_DAYS } from '../accounts/deletion-service';
 
 export interface AccountRow {
   id: string; kind: AccountKind; status: AccountStatus; name: string; identifier: string; email: string;
@@ -70,6 +71,52 @@ export async function listAccounts(
     credentialExpiresAt: credBy.get(String(a._id))?.toISOString() ?? null,
   }));
   return { items, total, page: q.page, pages: Math.max(1, Math.ceil(total / q.limit)) };
+}
+
+export interface PendingDeletionRow {
+  id: string;
+  /** ISO. The age of this row is the whole detection rule (see below). */
+  requestedAt: string;
+  requestedVia: 'public_web' | null;
+  /** Informational only — a non-null value does **not** mean the deletion ran. */
+  claimedAt: string | null;
+}
+
+export interface PendingDeletionList {
+  /** Returned so the portal never hardcodes the window it must compare an age against. */
+  graceDays: number;
+  items: PendingDeletionRow[];
+}
+
+/**
+ * 011 §3.5.1 / Story 4 AC5 — the detection surface for a stalled sweep.
+ *
+ * Scoped to the caller's college, exactly like `listAccounts` above: the sweep is the only sanctioned
+ * cross-tenant read (§5) and this route is reachable from a request path, so it does not inherit that
+ * carve-out. `req.collegeId` is the only input — there is no scope the caller can widen.
+ *
+ * `deletionClaimedAt` comes back but is **not** the detection rule; age is. A request claimed by an
+ * executor that then died still carries a claim and is still stalled, so a client keying on "claim is
+ * null" would label that row healthy. `claimedAt` is returned for the operator's diagnosis only.
+ */
+export async function listPendingDeletions(collegeId: string): Promise<PendingDeletionList> {
+  const pending = await JuviAccount.find({ collegeId, deletionRequestedAt: { $ne: null } })
+    .select('deletionRequestedAt deletionRequestedVia deletionClaimedAt')
+    .sort({ deletionRequestedAt: 1 })
+    .lean();
+  return {
+    graceDays: DELETION_GRACE_DAYS,
+    items: pending.flatMap((a) =>
+      a.deletionRequestedAt
+        ? [{
+            id: String(a._id),
+            requestedAt: a.deletionRequestedAt.toISOString(),
+            requestedVia: a.deletionRequestedVia ?? null,
+            claimedAt: a.deletionClaimedAt ? a.deletionClaimedAt.toISOString() : null,
+          }]
+        : [],
+    ),
+  };
 }
 
 async function identifierFor(collegeId: string, account: { kind: AccountKind; studentId?: Types.ObjectId; facultyId?: Types.ObjectId; staffId?: Types.ObjectId; userId: Types.ObjectId }): Promise<string> {
