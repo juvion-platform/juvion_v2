@@ -49,6 +49,24 @@ export interface AccountRow {
   onboardingComplete: boolean; lastSeenAt: string | null; provisionedAt: string;
   hasLiveCredential: boolean; credentialExpiresAt: string | null;
 }
+
+/**
+ * 011 §3.5.1 / Story 4 AC5. No name, roll number or email: the exposed fields carry no PII, and
+ * `collegeId` is deliberately absent too — the caller's college is the only one this list can see.
+ */
+export interface PendingDeletionRow {
+  id: string;
+  /** ISO. Age is the whole detection rule. */
+  requestedAt: string;
+  requestedVia: 'public_web' | null;
+  /** Informational only — a non-null value does **not** mean the deletion ran. */
+  claimedAt: string | null;
+}
+export interface PendingDeletionList {
+  /** Returned by the server so this UI never hardcodes the window it compares an age against. */
+  graceDays: number;
+  items: PendingDeletionRow[];
+}
 export interface AccountsQuery { kind?: AccountKind; status?: AccountStatus; q?: string; page: number; limit: number }
 export interface Paginated<T> { items: T[]; total: number; page: number; pages: number }
 
@@ -87,6 +105,18 @@ export async function downloadCredentialsCsv(runId: string, group: { key: Creden
 
 export const listAccounts = (q: AccountsQuery): Promise<Paginated<AccountRow>> =>
   api.get(`${BASE}/accounts`, { params: clean(q) }).then((r) => r.data);
+
+/**
+ * 011 Story 4 AC5 — the detection surface for a stalled sweep. No params: the only scope is the
+ * caller's college, which the request already carries.
+ *
+ * There is no generated client for this (011 §3.6): the admin router is mounted at
+ * `/api/juvi-app/admin`, a sibling of the `/v1` the mobile OpenAPI document describes, so a
+ * `/admin/…` entry there would resolve to a 404. Hand-written, like every other ERP call here.
+ */
+export const listPendingDeletions = (): Promise<PendingDeletionList> =>
+  api.get(`${BASE}/accounts/pending-deletion`).then((r) => r.data);
+
 export const deactivateAccount = (id: string): Promise<{ status: AccountStatus }> => api.post(`${BASE}/accounts/${id}/deactivate`).then((r) => r.data);
 export const resetAccountPassword = (id: string): Promise<{ credentialId: string; expiresAt: string }> => api.post(`${BASE}/accounts/${id}/reset-password`).then((r) => r.data);
 export const revealAccountCredential = (id: string): Promise<{ identifier: string; password: string; expiresAt: string }> =>
