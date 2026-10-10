@@ -23,3 +23,6 @@ accountsRouter.post('/me/photo', authenticateMobile, photoUpload.single('file'),
 // 011: the in-app delete. The public path (a web form + a 7-day sweep) is the other door onto the
 // same `runAccountDeletion`; this one is immediate because a live session is proof enough.
 accountsRouter.delete('/me/account', authenticateMobile, meCtrl.deleteAccount);
+// Cancel a pending public request (Story 4 AC1) — the same clear a successful sign-in and a
+// password change perform, but explicit, so a claimed row is a 409 rather than a silent 204.
+accountsRouter.delete('/me/account/deletion-request', authenticateMobile, meCtrl.cancelDeletion);

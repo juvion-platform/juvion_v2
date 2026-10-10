@@ -2,6 +2,7 @@ import { FilterQuery, Model, Types } from 'mongoose';
 
 import redis from '../../../config/redis';
 import { AuditLog, createAuditLog } from '../../../shared/audit';
+import { MobileApiError } from '../errors';
 import { IJuviAccount, JuviAccount } from '../../../models/juvi/JuviAccount';
 import { MobileSession } from '../../../models/juvi/MobileSession';
 import { ChannelMembership } from '../../../models/juvi/ChannelMembership';
@@ -96,5 +97,62 @@ export async function runAccountDeletion(account: IJuviAccount): Promise<void> {
 
   // 5. The account row(s) last, by { collegeId, userId } — not by _id (AC8).
   await deleteScoped(JuviAccount, { collegeId, userId });
+}
+
+/**
+ * The one clear shape (011 §3.5.1, Story 4 AC1). Three callers — the explicit cancel below, a
+ * successful sign-in, a successful password change — and every one of them goes through here so
+ * the three fields move together and a reader never has to ask which of them a clear touches.
+ *
+ * Two properties are load-bearing:
+ *  - `deletionClaimedAt: null` in **this** filter, and only here. It is the cancellation deadline:
+ *    a clear landing after the executor claimed the row matches nothing and is refused, while one
+ *    landing before it matches and wins. Adding it to the *sweep's* claim filter instead would
+ *    strand a row whose executor crashed.
+ *  - `$unset`, never `$set: null`. The sweep's `{ deletionRequestedAt: 1 }` index is sparse, and a
+ *    sparse index still indexes an explicit null — `$set: null` would put every cleared account
+ *    back into the scan.
+ *
+ * Returns whether the clear matched, which is what lets the explicit path tell "too late" from
+ * "nothing was pending".
+ */
+export async function clearDeletionRequest(collegeId: string, accountId: string): Promise<boolean> {
+  const res = await JuviAccount.updateOne(
+    { _id: accountId, collegeId, deletionRequestedAt: { $ne: null }, deletionClaimedAt: null },
+    { $unset: { deletionRequestedAt: 1, deletionRequestedVia: 1, deletionClaimedAt: 1 } },
+  );
+  return (res.matchedCount ?? 0) > 0;
+}
+
+/**
+ * The explicit *Cancel deletion* action (Story 4 AC1). Unlike the two best-effort callers, a
+ * no-match here is not swallowed: a row that is still set but could not be cleared has been
+ * claimed by the executor, so the UI is told *too late* rather than shown a 204 that lies.
+ *
+ * The re-read happens after the failed clear, which is the order that stays honest under a
+ * concurrent claim — if the clear matched, we won and nothing else matters.
+ */
+export async function cancelDeletionRequest(collegeId: string, accountId: string): Promise<void> {
+  if (await clearDeletionRequest(collegeId, accountId)) return;
+  const stillPending = await JuviAccount.exists({ _id: accountId, collegeId, deletionRequestedAt: { $ne: null } });
+  if (stillPending) {
+    throw new MobileApiError(409, 'DELETION_NOT_CANCELLABLE', 'This deletion is already being processed and can no longer be cancelled.');
+  }
+}
+
+/**
+ * The best-effort clear used after a successful sign-in and after a successful password change
+ * (Story 4 AC1): regaining the password days later is independent evidence of ownership, so a
+ * pending public request is dropped.
+ *
+ * Never throws, and never touches Redis or a queue. With background jobs disabled an unregistered
+ * queue throws (`QueueManager.ts:55-59`); a clear that needed one would 500 every sign-in.
+ */
+export async function clearDeletionRequestBestEffort(collegeId: string, accountId: string): Promise<void> {
+  try {
+    await clearDeletionRequest(collegeId, accountId);
+  } catch (err) {
+    console.warn('[juvi-app] best-effort deletion-request clear failed', accountId, err);
+  }
 }
 

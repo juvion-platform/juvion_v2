@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vitest';
 import type { Express } from 'express';
 import { getTestApp, cleanupTestApp } from '../setup/test-app';
 import { seedBase, BaseFixtures } from '../setup/seed-base';
@@ -86,5 +86,104 @@ describe('DELETE /me/account (011 T5)', () => {
     expect(res.status).toBe(401);
     expect(await JuviAccount.countDocuments({ collegeId: fx.collegeId })).toBe(1);
     expect(String((await JuviAccount.findOne({ collegeId: fx.collegeId }).lean())!._id)).toBe(String(s.account._id));
+  });
+});
+
+/** Puts a public-path deletion request on the account. */
+function requestDeletion(accountId: unknown, claimedAt?: Date) {
+  return JuviAccount.updateOne(
+    { _id: accountId, collegeId: fx.collegeId },
+    { $set: { deletionRequestedAt: new Date(), deletionRequestedVia: 'public_web', ...(claimedAt ? { deletionClaimedAt: claimedAt } : {}) } },
+  );
+}
+
+describe('DELETE /me/account/deletion-request (011 T6)', () => {
+  it('clears a pending, unclaimed request and leaves the account in place', async () => {
+    const s = await signedInStudent();
+    await requestDeletion(s.account._id);
+
+    await mobileClient(app, s.token).delete(`${V1}/me/account/deletion-request`).expect(204);
+
+    // $unset, not $set: null — the sparse `{ deletionRequestedAt: 1 }` sweep index only indexes
+    // present fields, so an explicit null would drag every cleared account back into the scan.
+    const raw = await JuviAccount.findOne({ collegeId: fx.collegeId }).lean();
+    expect(raw).not.toBeNull();
+    expect('deletionRequestedAt' in raw!).toBe(false);
+    expect('deletionRequestedVia' in raw!).toBe(false);
+    expect('deletionClaimedAt' in raw!).toBe(false);
+    expect(await MobileSession.countDocuments({ collegeId: fx.collegeId })).toBe(1);
+  });
+
+  it('is a 204 no-op when nothing was pending', async () => {
+    const s = await signedInStudent();
+    await mobileClient(app, s.token).delete(`${V1}/me/account/deletion-request`).expect(204);
+    expect(await JuviAccount.countDocuments({ collegeId: fx.collegeId })).toBe(1);
+  });
+
+  it('refuses with 409 once the executor has claimed the row', async () => {
+    const s = await signedInStudent();
+    await requestDeletion(s.account._id, new Date());
+
+    const res = await mobileClient(app, s.token).delete(`${V1}/me/account/deletion-request`);
+
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('DELETION_NOT_CANCELLABLE');
+    // Still set: the deletion is committing and the UI must be able to say "too late".
+    const raw = await JuviAccount.findOne({ collegeId: fx.collegeId }).lean();
+    expect(raw!.deletionRequestedAt).toBeInstanceOf(Date);
+  });
+
+  it('requires an authenticated session', async () => {
+    const s = await signedInStudent();
+    await requestDeletion(s.account._id);
+    expect((await mobileClient(app).delete(`${V1}/me/account/deletion-request`)).status).toBe(401);
+    const raw = await JuviAccount.findOne({ collegeId: fx.collegeId }).lean();
+    expect(raw!.deletionRequestedAt).toBeInstanceOf(Date);
+  });
+});
+
+describe('best-effort clears on the auth paths (011 T6)', () => {
+  it('drops a pending request on a successful sign-in', async () => {
+    const s = await provisionTestStudent(fx);
+    await requestDeletion(s.account._id);
+
+    await signIn(s.student.rollNumber, s.tempPassword).expect(200);
+
+    const raw = await JuviAccount.findOne({ collegeId: fx.collegeId }).lean();
+    expect('deletionRequestedAt' in raw!).toBe(false);
+  });
+
+  it('drops a pending request on a successful password change', async () => {
+    const s = await signedInStudent();
+    await requestDeletion(s.account._id);
+
+    await mobileClient(app, s.token)
+      .post(`${V1}/auth/change-password`)
+      .send({ currentPassword: s.tempPassword, newPassword: 'a-much-longer-passphrase-1' })
+      .expect(204);
+
+    const raw = await JuviAccount.findOne({ collegeId: fx.collegeId }).lean();
+    expect('deletionRequestedAt' in raw!).toBe(false);
+  });
+
+  it('still returns 200 when the clear itself throws', async () => {
+    const s = await provisionTestStudent(fx);
+    await requestDeletion(s.account._id);
+
+    // The realistic failure: a write that cannot land (primary unavailable, timeout). Sign-in
+    // proved the credentials; a bookkeeping clear that fails must not turn that into a 500.
+    const spy = vi.spyOn(JuviAccount, 'updateOne').mockRejectedValueOnce(new Error('primary unavailable'));
+    let attempted = 0;
+    try {
+      await signIn(s.student.rollNumber, s.tempPassword).expect(200);
+    } finally {
+      // Read the call count before restoring: `mockRestore` resets the call history with it.
+      attempted = spy.mock.calls.length;
+      spy.mockRestore();
+    }
+    expect(attempted).toBeGreaterThan(0);
+    // …and the request is still there for the next attempt to clear.
+    const raw = await JuviAccount.findOne({ collegeId: fx.collegeId }).lean();
+    expect(raw!.deletionRequestedAt).toBeInstanceOf(Date);
   });
 });

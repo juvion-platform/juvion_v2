@@ -8,6 +8,7 @@ import { getJuviConfig } from '../config/institution-config';
 import { resolveIdentifierToUser } from './identifier-resolver';
 import { getCooldown, recordFailure, clearFailures } from './cooldown';
 import { createSession, findRotatableSession, rotateSession, revokeSession, revokeOtherSessions, signAccessToken, SessionTokens } from './session-service';
+import { clearDeletionRequestBestEffort } from './deletion-service';
 import { SignInInput, AccountSummary, signInResponseSchema } from './schemas';
 import { ONBOARDING_STEPS } from './onboarding';
 
@@ -66,6 +67,9 @@ export async function signIn(input: SignInInput): Promise<z.infer<typeof signInR
     collegeId: input.collegeId, accountId: String(account._id), userId: String(user._id),
     role: user.role, kind: account.kind, device: input.device,
   });
+  // Story 4 AC1's safety net: holding the password again is independent evidence of ownership, so
+  // any pending public deletion request is dropped. Best-effort — it can never fail the sign-in.
+  await clearDeletionRequestBestEffort(input.collegeId, String(account._id));
   return { ...tokens, account: accountSummary(account, user) };
 }
 
@@ -110,4 +114,7 @@ export async function changePassword(ctx: MobileContext, currentPassword: string
   user.passwordChangedAt = new Date();
   await user.save();
   await revokeOtherSessions(ctx.accountId, ctx.sessionId, 'password_changed');
+  // Story 4 AC1's second safety net, same shape and same reasoning as the sign-in clear: knowing
+  // the current password and choosing a new one is an even stronger statement of ownership.
+  await clearDeletionRequestBestEffort(ctx.collegeId, ctx.accountId);
 }

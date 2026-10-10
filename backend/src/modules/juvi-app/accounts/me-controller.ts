@@ -3,7 +3,7 @@ import { MobileRequest, requireMobile } from '../middleware/authenticate-mobile'
 import { MobileApiError } from '../errors';
 import { JuviAccount } from '../../../models/juvi/JuviAccount';
 import { settingsPatchSchema, onboardingAdvanceSchema, objectId } from './schemas';
-import { runAccountDeletion } from './deletion-service';
+import { runAccountDeletion, cancelDeletionRequest } from './deletion-service';
 import * as me from './me-service';
 
 export async function getMe(req: MobileRequest, res: Response, next: NextFunction) {
@@ -48,6 +48,14 @@ export async function deleteAccount(req: MobileRequest, res: Response, next: Nex
     const account = await JuviAccount.findOne({ _id: ctx.accountId, collegeId: ctx.collegeId });
     if (!account) throw new MobileApiError(404, 'NOT_FOUND', 'Account not found');
     await runAccountDeletion(account);
+    res.status(204).end();
+  } catch (e) { next(e); }
+}
+/** `DELETE /v1/me/account/deletion-request` (011 T6) — the explicit *Cancel deletion* action. */
+export async function cancelDeletion(req: MobileRequest, res: Response, next: NextFunction) {
+  try {
+    const ctx = requireMobile(req);
+    await cancelDeletionRequest(ctx.collegeId, ctx.accountId);
     res.status(204).end();
   } catch (e) { next(e); }
 }
