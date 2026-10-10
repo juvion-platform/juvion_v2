@@ -80,6 +80,13 @@ class _PendingDeletionBannerState extends ConsumerState<PendingDeletionBanner> {
     // re-made while this device was away is never observed as absent here, only as a different
     // timestamp, so keying on presence would leave Cancel dead for the genuinely-new request. And
     // never on the present → absent edge, where there is no request to re-arm for.
+    //
+    // Known wrinkle: a repeat public POST re-asserts the *same* request's clock
+    // (`requestPublicDeletion` writes a fresh `deletionRequestedAt`), and `/me` carries no request
+    // identity, so a re-assert is indistinguishable here from a new request — this can therefore
+    // re-arm Cancel for a request that is still claimed. That is the benign direction: a tap
+    // simply 409s again and the too-late line comes back. A request id on `/me` is what would
+    // close it, not anything this widget can see.
     ref.listen(meProvider, (prev, next) {
       final was = prev?.value?.data.deletionRequestedAt;
       final now = next.value?.data.deletionRequestedAt;
