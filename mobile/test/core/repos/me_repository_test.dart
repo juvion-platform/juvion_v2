@@ -1,12 +1,18 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http_mock_adapter/http_mock_adapter.dart';
 import 'package:juvi/core/analytics/analytics.dart';
 import 'package:juvi/core/http/api_failure.dart';
 import 'package:juvi/core/http/api_providers.dart';
 import 'package:juvi/core/models/models.dart';
 import 'package:juvi/core/repos/me_repository.dart';
 import 'package:juvi/core/storage/app_database.dart';
+import 'package:juvi/core/storage/secure_store.dart';
 import 'package:mocktail/mocktail.dart';
+
+class _Storage extends Mock implements FlutterSecureStorage {}
 
 class _MeRepo extends Mock implements MeRepository {}
 
@@ -162,5 +168,93 @@ void main() {
       {'key': 'tiers'},
       {'key': 'quietHours'},
     ]);
+  });
+
+  // 011 T21. The banner's trigger is the cached `me` document, and what makes it go away is this
+  // write — not a lucky second `GET /me`: the 204 is the server's confirmation that it cleared
+  // `deletionRequestedAt`, so the device stops showing the request in the same breath. A 409 (or
+  // anything else) never reaches the write, which is why a too-late cancel leaves the banner up.
+  group('cancelAccountDeletion', () {
+    const requested = '2026-11-03T04:00:00.000Z';
+    const serverTooLate = 'This deletion is already being processed and can no longer be cancelled.';
+
+    late AppDatabase db;
+    late ProviderContainer c;
+
+    Future<void> open() async {
+      db = AppDatabase.memory();
+      addTearDown(db.close);
+      final storage = _Storage();
+      when(() => storage.read(key: any(named: 'key'))).thenAnswer((_) async => null);
+      // The authenticated Dio's interceptor stamps `X-Juvi-Device-Id` on every request, and
+      // `SecureStore.deviceId()` mints one on first use — an unstubbed `write` here does not
+      // surface as a storage error, it surfaces as a response-less `DioException` that
+      // `ApiFailure.fromDio` reports as `offline`, i.e. a test failure that names the wrong cause.
+      when(() => storage.write(key: any(named: 'key'), value: any(named: 'value'))).thenAnswer((_) async {});
+      when(() => storage.delete(key: any(named: 'key'))).thenAnswer((_) async {});
+      await db.writeDoc('me', {...meJson, 'deletionRequestedAt': requested, 'deletionRequestedVia': 'public_web'}, DateTime.utc(2026, 10, 9));
+      c = ProviderContainer(retry: (_, _) => null, overrides: [
+        secureStoreProvider.overrideWithValue(SecureStore(storage)),
+        appDatabaseProvider.overrideWith((_) async => db),
+        analyticsProvider.overrideWithValue(_NoopAnalytics()),
+      ]);
+      addTearDown(c.dispose);
+    }
+
+    Future<MeRepository> repoWith(void Function(DioAdapter) route) async {
+      route(DioAdapter(dio: c.read(dioProvider)));
+      return c.read(meRepositoryProvider.future);
+    }
+
+    Future<Map<String, dynamic>> cachedJson() async => (await db.readDoc('me'))!.json;
+
+    test('a 204 clears the request fields and leaves the rest of the document alone', () async {
+      await open();
+      final repo = await repoWith((a) => a.onDelete('/me/account/deletion-request', (s) => s.reply(204, null)));
+
+      await repo.cancelAccountDeletion();
+
+      final json = await cachedJson();
+      expect(json['deletionRequestedAt'], isNull);
+      expect(json['deletionRequestedVia'], isNull);
+      // Only the request goes: everything else in the document survives the write.
+      expect((json['account'] as Map)['id'], 'a');
+      expect(((json['settings'] as Map)['tiers'] as Map)['routine'], isTrue);
+    });
+
+    test('a 409 DELETION_NOT_CANCELLABLE throws and leaves the cached request untouched', () async {
+      await open();
+      final repo = await repoWith((a) => a.onDelete(
+            '/me/account/deletion-request',
+            (s) => s.reply(409, {
+              'error': {'code': 'DELETION_NOT_CANCELLABLE', 'message': serverTooLate},
+            }),
+          ));
+
+      await expectLater(
+        repo.cancelAccountDeletion(),
+        throwsA(isA<ApiFailure>().having((f) => f.code, 'code', ApiErrorCode.deletionNotCancellable)),
+      );
+
+      final json = await cachedJson();
+      expect(json['deletionRequestedAt'], requested);
+      expect(json['deletionRequestedVia'], 'public_web');
+    });
+
+    test('an offline cancel throws and leaves the cached request untouched', () async {
+      await open();
+      final repo = await repoWith((a) => a.onDelete(
+            '/me/account/deletion-request',
+            (s) => s.throws(0, DioException.connectionError(requestOptions: RequestOptions(), reason: 'offline')),
+          ));
+
+      await expectLater(
+        repo.cancelAccountDeletion(),
+        throwsA(isA<ApiFailure>().having((f) => f.code, 'code', ApiErrorCode.offline)),
+      );
+
+      final json = await cachedJson();
+      expect(json['deletionRequestedAt'], requested);
+    });
   });
 }

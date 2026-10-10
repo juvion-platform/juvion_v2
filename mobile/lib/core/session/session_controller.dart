@@ -159,6 +159,9 @@ class SessionController extends _$SessionController {
       case ApiErrorCode.reminderLimit:
       case ApiErrorCode.ackRequired:
       case ApiErrorCode.ackNotRequired:
+      // 011 T21: the banner renders this one itself, as the *too late* copy — nothing for the
+      // session to do about a deletion that is already committing.
+      case ApiErrorCode.deletionNotCancellable:
       case ApiErrorCode.offline:
       case ApiErrorCode.unknown:
         break;

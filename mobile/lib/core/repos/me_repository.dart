@@ -20,6 +20,11 @@ abstract class MeRepository {
   Future<void> revokeDevice(String sessionId);
   Future<int> revokeOtherDevices();
   Future<String?> uploadPhoto(List<int> bytes, String filename);
+
+  /// Withdraws a pending public-web deletion request (011 Story 1 AC7 / Story 4 AC1). Throws an
+  /// [ApiFailure] — `ApiErrorCode.deletionNotCancellable` on the 409 — rather than reporting
+  /// success it did not have, so the caller can tell *cancelled* from *too late*.
+  Future<void> cancelAccountDeletion();
 }
 
 class ApiMeRepository implements MeRepository {
@@ -105,6 +110,22 @@ class ApiMeRepository implements MeRepository {
           await _db.writeDoc('me', {...doc.json, 'person': {...(doc.json['person'] as Map), 'photoUrl': url}}, doc.asOf);
         }
         return url;
+      });
+
+  /// 011 T21 / Story 4 AC1: the *Cancel deletion* action behind the pending-request banner.
+  ///
+  /// A 204 is the server saying it has cleared `deletionRequestedAt`, so the cached `me` document
+  /// is cleared here in the same breath — the banner reads that document, and making it wait for a
+  /// second `GET /me` would be a chance to keep showing a request that is already gone. The write
+  /// comes *after* the call, so the 409 (`deletionNotCancellable`, the deletion already committing)
+  /// and any other failure leave the document — and the banner — exactly as they were.
+  @override
+  Future<void> cancelAccountDeletion() => _guard(() async {
+        await _api.cancelAccountDeletion();
+        final doc = await _db.readDoc('me');
+        if (doc != null) {
+          await _db.writeDoc('me', {...doc.json, 'deletionRequestedAt': null, 'deletionRequestedVia': null}, doc.asOf);
+        }
       });
 }
 

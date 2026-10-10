@@ -688,6 +688,36 @@ abstract class AppLocalizations {
   /// **'Delete my account'**
   String get deleteAccountConfirm;
 
+  /// 011 Story 1 AC7: the banner shown in the app shell (and so on Settings) while GET /me carries a non-null deletionRequestedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Your account is scheduled for deletion'**
+  String get pendingDeletionTitle;
+
+  /// 011 Story 1 AC7 / Story 4 AC1: the cancellation window, stated rather than implied — it closes the moment the deletion is claimed (spec §3.5.1), so the copy must not promise an unlimited one.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel it any time before it is processed.'**
+  String get pendingDeletionBody;
+
+  /// No description provided for @pendingDeletionCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel deletion'**
+  String get pendingDeletionCancel;
+
+  /// 011 Story 1 AC7 / Story 4 AC1: shown on the 409 DELETION_NOT_CANCELLABLE, which is what makes it not a lying 204. The server's own message is never rendered; the copy is localized here.
+  ///
+  /// In en, this message translates to:
+  /// **'Too late — this deletion is already being processed and can no longer be cancelled.'**
+  String get pendingDeletionTooLate;
+
+  /// 011 Story 1 AC7: confirmation after the cancel is accepted (204).
+  ///
+  /// In en, this message translates to:
+  /// **'Your account is no longer scheduled for deletion.'**
+  String get pendingDeletionCancelled;
+
   /// No description provided for @deviceCurrentLabel.
   ///
   /// In en, this message translates to:

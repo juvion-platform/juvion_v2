@@ -333,6 +333,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get deleteAccountConfirm => 'Delete my account';
 
   @override
+  String get pendingDeletionTitle => 'Your account is scheduled for deletion';
+
+  @override
+  String get pendingDeletionBody =>
+      'Cancel it any time before it is processed.';
+
+  @override
+  String get pendingDeletionCancel => 'Cancel deletion';
+
+  @override
+  String get pendingDeletionTooLate =>
+      'Too late — this deletion is already being processed and can no longer be cancelled.';
+
+  @override
+  String get pendingDeletionCancelled =>
+      'Your account is no longer scheduled for deletion.';
+
+  @override
   String deviceCurrentLabel(String name) {
     return '$name (this device)';
   }
