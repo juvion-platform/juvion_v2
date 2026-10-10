@@ -17,6 +17,16 @@ void main() {
       // TODO
     });
 
+    // String deletionRequestedAt
+    test('to test the property `deletionRequestedAt`', () async {
+      // TODO
+    });
+
+    // String deletionRequestedVia
+    test('to test the property `deletionRequestedVia`', () async {
+      // TODO
+    });
+
     // MeFaculty faculty
     test('to test the property `faculty`', () async {
       // TODO

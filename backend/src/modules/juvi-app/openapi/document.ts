@@ -30,6 +30,8 @@ const errorEnvelopeSchema = z.object({
       'NOTICE_NOT_FOUND', 'ALREADY_ACKNOWLEDGED', 'NOTICE_ARCHIVED', 'NOT_PUBLISHER', 'REMINDER_LIMIT', 'ACK_REQUIRED', 'ACK_NOT_REQUIRED',
       // Juvi notifications
       'RECEIPT_INVALID',
+      // Juvi account deletion (011 §3.6): cancellation arrived after the deletion was claimed
+      'DELETION_NOT_CANCELLABLE',
     ]),
     message: z.string(),
     // Optional, never null (the Dart generator cannot parse an object-or-null field).
@@ -174,6 +176,14 @@ export function buildOpenApiDocument(): OpenApiDocument {
     { operationId: 'remindNotice', method: 'post', path: '/notices/{id}/remind', summary: 'Send a reminder (at most two)', auth: true, params: ['id'], response: C.RemindResult, errors: [401, 403, 404, 409] },
     { operationId: 'registerPushToken', method: 'put', path: '/me/devices/current/push-token', summary: 'Register this device\'s FCM token (cleared from any other session first)', auth: true, body: C.PushTokenRequest, status: 204, errors: [400, 401] },
     { operationId: 'clearPushToken', method: 'delete', path: '/me/devices/current/push-token', summary: 'Remove this device\'s FCM token', auth: true, status: 204, errors: [401] },
+    // 011 §3.6. Both are bodyless 204s like the two above, and both act on the account the JWT
+    // names — there is no id in either path, so neither can address anyone else's account.
+    // `deleteAccount` is deliberately unconditional (no grace check, no look at a pending public
+    // request): a request already in flight collapses the window rather than blocking this call.
+    // `cancelAccountDeletion` answers 204 when there was nothing to cancel — an idempotent undo —
+    // and reserves 409 for the one case that is a real refusal: the deletion is already claimed.
+    { operationId: 'deleteAccount', method: 'delete', path: '/me/account', summary: 'Delete this Juvi account now, and everything the app holds for it', auth: true, status: 204, errors: [401] },
+    { operationId: 'cancelAccountDeletion', method: 'delete', path: '/me/account/deletion-request', summary: 'Cancel a pending account deletion; 409 once it is already being processed', auth: true, status: 204, errors: [401, 409] },
     { operationId: 'postNotificationReceipts', method: 'post', path: '/notifications/receipts', summary: 'Delivered and opened receipts; each item is authorised by its HMAC receipt, not a session', auth: false, body: C.ReceiptsRequest, response: C.ReceiptsResult, errors: [400, 401, 429] },
     { operationId: 'postEvents', method: 'post', path: '/events', summary: 'Product analytics: allow-listed names, id-like props; invalid events are dropped one by one', auth: true, body: C.EventsRequest, response: C.EventsResult, errors: [400, 401] },
     { operationId: 'getFirstNotice', method: 'get', path: '/onboarding/first-notice', summary: 'Onboarding step 4: the welcome notice', auth: true, response: C.NoticeDetail, errors: [401] },

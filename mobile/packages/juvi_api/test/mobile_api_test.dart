@@ -21,6 +21,13 @@ void main() {
       // TODO
     });
 
+    // Cancel a pending account deletion; 409 once it is already being processed
+    //
+    //Future cancelAccountDeletion() async
+    test('test cancelAccountDeletion', () async {
+      // TODO
+    });
+
     // Change password; revokes other sessions
     //
     //Future changePassword({ ChangePasswordRequest changePasswordRequest }) async
@@ -32,6 +39,13 @@ void main() {
     //
     //Future clearPushToken() async
     test('test clearPushToken', () async {
+      // TODO
+    });
+
+    // Delete this Juvi account now, and everything the app holds for it
+    //
+    //Future deleteAccount() async
+    test('test deleteAccount', () async {
       // TODO
     });
 

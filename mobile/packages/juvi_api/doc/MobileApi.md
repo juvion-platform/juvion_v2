@@ -11,8 +11,10 @@ Method | HTTP request | Description
 ------------- | ------------- | -------------
 [**acknowledgeNotice**](MobileApi.md#acknowledgenotice) | **POST** /notices/{id}/ack | Acknowledge a notice; 409 ALREADY_ACKNOWLEDGED carries the existing record
 [**advanceOnboarding**](MobileApi.md#advanceonboarding) | **POST** /me/onboarding/advance | Complete the current onboarding step
+[**cancelAccountDeletion**](MobileApi.md#cancelaccountdeletion) | **DELETE** /me/account/deletion-request | Cancel a pending account deletion; 409 once it is already being processed
 [**changePassword**](MobileApi.md#changepassword) | **POST** /auth/change-password | Change password; revokes other sessions
 [**clearPushToken**](MobileApi.md#clearpushtoken) | **DELETE** /me/devices/current/push-token | Remove this device&#39;s FCM token
+[**deleteAccount**](MobileApi.md#deleteaccount) | **DELETE** /me/account | Delete this Juvi account now, and everything the app holds for it
 [**dismissNotice**](MobileApi.md#dismissnotice) | **POST** /notices/{id}/dismiss | Dismiss a notice that needs no acknowledgement
 [**getAttention**](MobileApi.md#getattention) | **GET** /attention | Due items: the notice stack, or every attention item with kinds&#x3D;all
 [**getChannel**](MobileApi.md#getchannel) | **GET** /channels/{id} | Channel header and About
@@ -132,6 +134,42 @@ Name | Type | Description  | Notes
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
+# **cancelAccountDeletion**
+> cancelAccountDeletion()
+
+Cancel a pending account deletion; 409 once it is already being processed
+
+### Example
+```dart
+import 'package:juvi_api/api.dart';
+
+final api = JuviApi().getMobileApi();
+
+try {
+    api.cancelAccountDeletion();
+} catch on DioException (e) {
+    print('Exception when calling MobileApi->cancelAccountDeletion: $e\n');
+}
+```
+
+### Parameters
+This endpoint does not need any parameter.
+
+### Return type
+
+void (empty response body)
+
+### Authorization
+
+[bearerAuth](../README.md#bearerAuth)
+
+### HTTP request headers
+
+ - **Content-Type**: Not defined
+ - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
 # **changePassword**
 > changePassword(changePasswordRequest)
 
@@ -187,6 +225,42 @@ try {
     api.clearPushToken();
 } catch on DioException (e) {
     print('Exception when calling MobileApi->clearPushToken: $e\n');
+}
+```
+
+### Parameters
+This endpoint does not need any parameter.
+
+### Return type
+
+void (empty response body)
+
+### Authorization
+
+[bearerAuth](../README.md#bearerAuth)
+
+### HTTP request headers
+
+ - **Content-Type**: Not defined
+ - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **deleteAccount**
+> deleteAccount()
+
+Delete this Juvi account now, and everything the app holds for it
+
+### Example
+```dart
+import 'package:juvi_api/api.dart';
+
+final api = JuviApi().getMobileApi();
+
+try {
+    api.deleteAccount();
+} catch on DioException (e) {
+    print('Exception when calling MobileApi->deleteAccount: $e\n');
 }
 ```
 

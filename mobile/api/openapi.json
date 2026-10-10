@@ -762,7 +762,8 @@
                   "REMINDER_LIMIT",
                   "ACK_REQUIRED",
                   "ACK_NOT_REQUIRED",
-                  "RECEIPT_INVALID"
+                  "RECEIPT_INVALID",
+                  "DELETION_NOT_CANCELLABLE"
                 ],
                 "type": "string"
               },
@@ -4063,6 +4064,74 @@
           }
         ],
         "summary": "Attendance and dues (student) or courses taught (faculty)",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/me/account": {
+      "delete": {
+        "operationId": "deleteAccount",
+        "responses": {
+          "204": {
+            "description": "No content"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 401"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Delete this Juvi account now, and everything the app holds for it",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/me/account/deletion-request": {
+      "delete": {
+        "operationId": "cancelAccountDeletion",
+        "responses": {
+          "204": {
+            "description": "No content"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 401"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 409"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Cancel a pending account deletion; 409 once it is already being processed",
         "tags": [
           "mobile"
         ]

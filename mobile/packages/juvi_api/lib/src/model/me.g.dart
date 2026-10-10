@@ -13,6 +13,8 @@ Me _$MeFromJson(Map<String, dynamic> json) =>
         requiredKeys: const [
           'account',
           'asOf',
+          'deletionRequestedAt',
+          'deletionRequestedVia',
           'faculty',
           'institution',
           'person',
@@ -26,6 +28,14 @@ Me _$MeFromJson(Map<String, dynamic> json) =>
           (v) => MeAccount.fromJson(v as Map<String, dynamic>),
         ),
         asOf: $checkedConvert('asOf', (v) => v as String),
+        deletionRequestedAt: $checkedConvert(
+          'deletionRequestedAt',
+          (v) => v as String?,
+        ),
+        deletionRequestedVia: $checkedConvert(
+          'deletionRequestedVia',
+          (v) => v as String?,
+        ),
         faculty: $checkedConvert(
           'faculty',
           (v) => MeFaculty.fromJson(v as Map<String, dynamic>),
@@ -53,6 +63,8 @@ Me _$MeFromJson(Map<String, dynamic> json) =>
 Map<String, dynamic> _$MeToJson(Me instance) => <String, dynamic>{
   'account': instance.account.toJson(),
   'asOf': instance.asOf,
+  'deletionRequestedAt': instance.deletionRequestedAt,
+  'deletionRequestedVia': instance.deletionRequestedVia,
   'faculty': instance.faculty.toJson(),
   'institution': instance.institution.toJson(),
   'person': instance.person.toJson(),
