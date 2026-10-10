@@ -21,6 +21,11 @@ class PendingDeletionBanner extends ConsumerStatefulWidget {
 class _PendingDeletionBannerState extends ConsumerState<PendingDeletionBanner> {
   bool _busy = false;
 
+  /// Terminal. The 409 means the deletion is already committing, so a second tap can only 409
+  /// again — leaving the button live under a line that says the deletion "can no longer be
+  /// cancelled" invites a tap that is guaranteed to fail.
+  bool _tooLate = false;
+
   /// The line under the banner's own copy after a failed cancel. The 409 gets the app's *too late*
   /// wording rather than the server's English (AC5); anything else — offline above all — is the
   /// failure's own message, the way the rest of the app reports one.
@@ -41,15 +46,25 @@ class _PendingDeletionBannerState extends ConsumerState<PendingDeletionBanner> {
       await (await ref.read(meRepositoryProvider.future)).cancelAccountDeletion();
     } on ApiFailure catch (f) {
       if (!mounted) return;
+      final tooLate = f.code == ApiErrorCode.deletionNotCancellable;
       setState(() {
         _busy = false;
-        _error = f.code == ApiErrorCode.deletionNotCancellable ? l.pendingDeletionTooLate : f.message;
+        _tooLate = tooLate;
+        _error = tooLate ? l.pendingDeletionTooLate : f.message;
       });
       return;
     }
+    // The widget can be gone by the time the 204 lands: a concurrent 401, a deactivation or a
+    // paused institution tears the session down, the router redirects, and the shell unmounts
+    // while this DELETE is still in flight. Both calls below need the element alive —
+    // `ref.invalidate` asserts it (`flutter_riverpod/consumer.dart:574` → `_assertNotDisposed`,
+    // a `StateError` out of a `Future` nobody awaits) and `ScaffoldMessenger.showSnackBar` asserts
+    // it has a descendant `Scaffold` to present to. The failure branch above is guarded for the
+    // same reason. Both are covered by the one check because neither may run when it is false.
+    if (!mounted) return;
     messenger.showSnackBar(SnackBar(content: Text(l.pendingDeletionCancelled)));
     ref.invalidate(meProvider);
-    if (mounted) setState(() => _busy = false);
+    setState(() => _busy = false);
   }
 
   @override
@@ -65,11 +80,15 @@ class _PendingDeletionBannerState extends ConsumerState<PendingDeletionBanner> {
     final insetAbove = ref.watch(isOnlineProvider).value != false;
     return Semantics(
       liveRegion: true,
-      child: SafeArea(
-        top: insetAbove,
-        bottom: false,
-        child: Material(
-          color: scheme.errorContainer,
+      // `Material` outside `SafeArea`, matching `OfflineBanner` — the two are adjacent strips, and
+      // with the nesting the other way round the status-bar strip above this one is painted with
+      // the Scaffold background instead of `errorContainer`, so this banner stops short of the
+      // chrome while its sibling runs under it.
+      child: Material(
+        color: scheme.errorContainer,
+        child: SafeArea(
+          top: insetAbove,
+          bottom: false,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 4, 0),
             child: Column(
@@ -86,7 +105,7 @@ class _PendingDeletionBannerState extends ConsumerState<PendingDeletionBanner> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
-                    onPressed: _busy ? null : _cancel,
+                    onPressed: (_busy || _tooLate) ? null : _cancel,
                     child: _busy
                         ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
                         : Text(l.pendingDeletionCancel),

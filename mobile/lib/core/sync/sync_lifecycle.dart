@@ -51,6 +51,14 @@ class _SyncLifecycleState extends ConsumerState<SyncLifecycle> with WidgetsBindi
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       ref.read(analyticsProvider).track('app.opened');
+      // Unconditional, and deliberately *not* folded into `_drain`'s `sent > 0` invalidate below:
+      // `meProvider` is the only source of the pending-deletion banner (`deletionRequestedAt` on
+      // `GET /me`), and a request made on the public web page creates no local action to send — so a
+      // drain that sends nothing would leave a request made while this app sat warm in the
+      // background invisible until some unrelated invalidate. The stream re-runs with
+      // `copyWithPrevious`, so this is not a visible reload; offline, the refresh fails into the
+      // existing `markStale` path and the cached document still drives the banner.
+      ref.invalidate(meProvider);
       unawaited(_drain());
     }
     if (state == AppLifecycleState.paused) {

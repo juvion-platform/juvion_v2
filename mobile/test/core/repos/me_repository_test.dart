@@ -16,6 +16,10 @@ class _Storage extends Mock implements FlutterSecureStorage {}
 
 class _MeRepo extends Mock implements MeRepository {}
 
+/// A database whose reads fail — standing in for a locked or full local store at the moment a 204
+/// arrives, which is the only way to reach the cache-write failure without racing the real one.
+class _BrokenDb extends Mock implements AppDatabase {}
+
 class _NoopAnalytics implements Analytics {
   @override
   void track(String event, [Map<String, Object?> props = const {}]) {}
@@ -181,9 +185,9 @@ void main() {
     late AppDatabase db;
     late ProviderContainer c;
 
-    Future<void> open() async {
-      db = AppDatabase.memory();
-      addTearDown(db.close);
+    Future<void> open({AppDatabase? failing}) async {
+      db = failing ?? AppDatabase.memory();
+      if (failing == null) addTearDown(db.close);
       final storage = _Storage();
       when(() => storage.read(key: any(named: 'key'))).thenAnswer((_) async => null);
       // The authenticated Dio's interceptor stamps `X-Juvi-Device-Id` on every request, and
@@ -255,6 +259,25 @@ void main() {
 
       final json = await cachedJson();
       expect(json['deletionRequestedAt'], requested);
+    });
+
+    // The 204 has already cancelled the request, irreversibly. The cache write that follows only
+    // stops this device showing a request the server has cleared, so a storage fault there is a
+    // *cache* failure and must not be dressed up as a cancel failure: left inside `_guard`, the
+    // thrown `SqliteException` would surface as `ApiFailure(unknown, e.toString())` and be rendered
+    // verbatim under the banner, telling the user their cancel did not happen when it did.
+    test('a 204 whose local cache write fails is still a success', () async {
+      final broken = _BrokenDb();
+      // `open()` seeds the document through the same database, so the write has to work; it is the
+      // *read* that is broken, which is the first thing the cancel's cache step does.
+      when(() => broken.writeDoc(any(), any(), any())).thenAnswer((_) async {});
+      when(() => broken.readDoc(any())).thenThrow(StateError('database is locked'));
+      await open(failing: broken);
+      final repo = await repoWith((a) => a.onDelete('/me/account/deletion-request', (s) => s.reply(204, null)));
+
+      await repo.cancelAccountDeletion(); // completes; does not throw
+
+      verify(() => broken.readDoc('me')).called(1);
     });
   });
 }

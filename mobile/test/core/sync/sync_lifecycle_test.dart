@@ -18,6 +18,7 @@ import 'package:juvi/core/sync/pending_action.dart';
 import 'package:juvi/core/sync/sync_lifecycle.dart';
 import 'package:mocktail/mocktail.dart';
 
+import '../repos/me_repository_test.dart' show meJson;
 import '../repos/notices_fixtures.dart';
 
 class _Me extends Mock implements MeRepository {}
@@ -48,6 +49,7 @@ Widget host({
   required Analytics analytics,
   required Stream<bool> online,
   NoticesRepository? notices,
+  bool watchMe = false,
 }) =>
     ProviderScope(
       retry: (_, _) => null,
@@ -59,7 +61,19 @@ Widget host({
         analyticsProvider.overrideWithValue(analytics),
         isOnlineProvider.overrideWith((_) => online),
       ],
-      child: const MaterialApp(home: SyncLifecycle(child: SizedBox.shrink())),
+      child: MaterialApp(
+        home: SyncLifecycle(
+          // `meProvider` is autoDispose, so invalidating it with nothing listening is a no-op —
+          // which is why the tests that do not care about `/me` can leave this off. In the app the
+          // pending-deletion banner is the listener, and that is the case under test here.
+          child: watchMe
+              ? Consumer(builder: (_, ref, _) {
+                  ref.watch(meProvider);
+                  return const SizedBox.shrink();
+                })
+              : const SizedBox.shrink(),
+        ),
+      ),
     );
 
 void main() {
@@ -257,5 +271,31 @@ void main() {
     // action is gone, and the detail provider was invalidated (a second network read).
     expect(await db.pendingActions(), isEmpty);
     verify(() => notices.detail('n1')).called(greaterThanOrEqualTo(2));
+  });
+
+  // 011 S1 AC7 / T21. A deletion requested on the public web page creates no local action, so the
+  // `sent > 0` invalidate in `_runDrain` never fires for it — and `meProvider` is where
+  // `deletionRequestedAt` lives, and therefore where the banner that tells the person *and* carries
+  // the Cancel that makes the grace period mean anything comes from. Without a refresh on resume, a
+  // request made while this app sat warm in the background is invisible until some unrelated
+  // invalidate happens to come along.
+  testWidgets('resuming re-reads /me, so a request made while the app was warm still reaches the banner', (t) async {
+    var reads = 0;
+    when(() => me.cached()).thenAnswer((_) async => null);
+    when(() => me.refresh()).thenAnswer((_) async {
+      reads++;
+      return Cached(Me.fromJson(meJson), DateTime.now());
+    });
+    final controller = StreamController<bool>();
+    addTearDown(controller.close);
+
+    await t.pumpWidget(host(db: db, me: me, spaces: spaces, analytics: analytics, online: controller.stream, watchMe: true));
+    await t.pumpAndSettle();
+    expect(reads, 1);
+
+    t.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await t.pumpAndSettle();
+
+    expect(reads, 2);
   });
 }

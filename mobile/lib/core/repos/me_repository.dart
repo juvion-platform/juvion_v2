@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:juvi/core/analytics/analytics.dart';
 import 'package:juvi/core/http/api_failure.dart';
 import 'package:juvi/core/http/api_providers.dart';
@@ -122,11 +123,27 @@ class ApiMeRepository implements MeRepository {
   @override
   Future<void> cancelAccountDeletion() => _guard(() async {
         await _api.cancelAccountDeletion();
-        final doc = await _db.readDoc('me');
-        if (doc != null) {
-          await _db.writeDoc('me', {...doc.json, 'deletionRequestedAt': null, 'deletionRequestedVia': null}, doc.asOf);
-        }
+        await _clearCachedDeletionRequest();
       });
+
+  /// Best-effort, and deliberately outside the failure it would otherwise be mistaken for.
+  ///
+  /// The 204 that got us here has already cancelled the request, irreversibly; this write only stops
+  /// the device from showing a request the server has cleared. Left inside `_guard`'s `try`, a
+  /// storage fault here — `readDoc`/`writeDoc` throwing on a locked or full database — would be
+  /// converted by `ApiFailure.of` into `ApiFailure(unknown, e.toString())` and rendered verbatim
+  /// under the banner, telling the user their cancel failed when it in fact succeeded. So the write
+  /// fails alone: the caller's `ref.invalidate(meProvider)` refetches `/me` and rewrites this
+  /// document, which is what makes a write lost here self-correcting rather than permanently stale.
+  Future<void> _clearCachedDeletionRequest() async {
+    try {
+      final doc = await _db.readDoc('me');
+      if (doc == null) return;
+      await _db.writeDoc('me', {...doc.json, 'deletionRequestedAt': null, 'deletionRequestedVia': null}, doc.asOf);
+    } on Object catch (e) {
+      debugPrint('[me] clearing the cached deletion request failed: $e');
+    }
+  }
 }
 
 @Riverpod(keepAlive: true)

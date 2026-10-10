@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -129,6 +131,9 @@ void main() {
         }),
       ));
 
+    // The Settings surface really is what this is standing on (§"the test never asserts anything
+    // Settings-specific" — without this the banner assertions would hold over any screen at all).
+    expect(find.text('Notifications and quiet hours'), findsOneWidget);
     expect(find.text(_title), findsOneWidget);
     expect(find.text(_cancel), findsOneWidget);
 
@@ -138,6 +143,13 @@ void main() {
     expect(find.text(_title), findsNothing);
     expect(find.text(_cancel), findsNothing);
     expect(sent, contains('DELETE /me/account/deletion-request'));
+    // …and it is gone because the 204 *cleared the cached request*, not because the refetch that
+    // follows happened to answer differently. The mock above flips to `pending: false` on the
+    // refetch, which would hide the banner on its own — so without this line the assertion above
+    // would pass even if the repository never touched the cache, which is the whole mechanism.
+    final doc = await db.readDoc('me');
+    expect(doc!.json['deletionRequestedAt'], isNull);
+    expect(doc.json['deletionRequestedVia'], isNull);
   });
 
   // S1 AC7 / Story 4 AC1: the 409 is the whole reason this is not a lying 204 — the deletion has
@@ -159,6 +171,12 @@ void main() {
     expect(find.text(_serverTooLate), findsNothing);
     expect(find.text(_title), findsOneWidget);
     expect(find.text(_cancel), findsOneWidget);
+    // The cached request survives the failed cancel too — the *other* half of why the banner is
+    // still up, and the half no mock of `/me` can stand in for.
+    expect((await db.readDoc('me'))!.json['deletionRequestedAt'], isNotNull);
+    // …and the action is spent: the 409 says the deletion is already committing, so a second tap
+    // can only 409 again. A live button under that sentence invites exactly that.
+    expect(t.widget<TextButton>(find.ancestor(of: find.text(_cancel), matching: find.byType(TextButton))).onPressed, isNull);
   });
 
   // Only a 204 counts. Anything else — offline here — leaves the request exactly where it was.
@@ -183,7 +201,45 @@ void main() {
   testWidgets('no pending request means no banner', (t) async {
     await pumpShell(t, (a) => a.onGet('/me', (s) => s.reply(200, _pending(pending: false))));
 
+    // The shell is up and Settings rendered; what is absent is the banner. Without this the test
+    // would also pass against a banner that simply never renders anywhere at all.
+    expect(find.text('Notifications and quiet hours'), findsOneWidget);
     expect(find.text(_title), findsNothing);
     expect(find.text(_cancel), findsNothing);
+  });
+
+  // The 204 can land after the widget is gone: a concurrent 401, a deactivation or a paused
+  // institution tears the session down, the router redirects, and the shell unmounts while this
+  // DELETE is still in flight. `ref.invalidate` asserts the element is still mounted
+  // (`flutter_riverpod/consumer.dart:574` → `_assertNotDisposed`) and throws a `StateError` out of a
+  // `Future` nobody awaits — an unhandled async error on a path that has, from the user's side,
+  // already succeeded.
+  testWidgets('a 204 arriving after the banner is gone does not throw', (t) async {
+    final inFlight = Completer<void>();
+    await pumpShell(t, (a) => a
+      ..onGet('/me', (s) => s.replyCallback(200, (_) => _pending()))
+      ..onDelete(
+        '/me/account/deletion-request',
+        (s) => s.replyCallbackAsync(204, (_) async {
+          await inFlight.future;
+          return null;
+        }),
+      ));
+
+    await t.tap(find.text(_cancel));
+    // Frames, not `pumpAndSettle`: the reply is deliberately held open. The tap's future chain has
+    // to get all the way to the adapter first — the interceptor mints a device id on the way — so
+    // pump until the request is actually out and then assert it is.
+    for (var i = 0; i < 10 && !sent.contains('DELETE /me/account/deletion-request'); i++) {
+      await t.pump(const Duration(milliseconds: 1));
+    }
+    expect(sent, contains('DELETE /me/account/deletion-request'));
+
+    // Tear the app down with the request still out — the shell is disposed, the container is not.
+    await t.pumpWidget(const SizedBox.shrink());
+    inFlight.complete();
+    await t.pumpAndSettle();
+
+    expect(t.takeException(), isNull);
   });
 }
