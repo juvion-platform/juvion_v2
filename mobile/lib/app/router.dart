@@ -10,6 +10,7 @@ import 'package:juvi/features/auth/sign_in_screen.dart';
 import 'package:juvi/features/home/teaching_shell_screen.dart';
 import 'package:juvi/features/home/today_shell_screen.dart';
 import 'package:juvi/features/me/change_password_screen.dart';
+import 'package:juvi/features/me/delete_account_screen.dart';
 import 'package:juvi/features/me/devices_screen.dart';
 import 'package:juvi/features/me/me_screen.dart';
 import 'package:juvi/features/me/settings_screen.dart';
@@ -73,7 +74,9 @@ GoRouter buildRouter(Ref ref) {
           ]),
           StatefulShellBranch(routes: [
             GoRoute(path: '/me', builder: (_, _) => const MeScreen(), routes: [
-              GoRoute(path: 'settings', builder: (_, _) => const SettingsScreen()),
+              GoRoute(path: 'settings', builder: (_, _) => const SettingsScreen(), routes: [
+                GoRoute(path: 'delete-account', builder: (_, _) => const DeleteAccountScreen()),
+              ]),
               GoRoute(path: 'devices', builder: (_, _) => const DevicesScreen()),
               GoRoute(path: 'change-password', builder: (_, _) => const ChangePasswordScreen()),
             ]),

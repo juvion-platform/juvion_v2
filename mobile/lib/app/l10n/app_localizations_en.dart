@@ -279,6 +279,60 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsLanguageMore => 'More languages are planned.';
 
   @override
+  String get deleteAccountRow => 'Delete my Juvi account';
+
+  @override
+  String get deleteAccountTitle => 'Delete your Juvi account';
+
+  @override
+  String get deleteAccountDeletedSection => 'Deleted from Juvi';
+
+  @override
+  String get deleteAccountDeletedAccount => 'Your Juvi account';
+
+  @override
+  String get deleteAccountDeletedDevices => 'Every device signed in to it';
+
+  @override
+  String get deleteAccountDeletedChannels => 'Your channel memberships';
+
+  @override
+  String get deleteAccountDeletedDeliveries => 'Notification delivery records';
+
+  @override
+  String get deleteAccountDeletedAnalytics => 'App analytics events';
+
+  @override
+  String get deleteAccountDeletedNoticeState =>
+      'Your own seen and acknowledged state on notices';
+
+  @override
+  String get deleteAccountRetainedSection => 'Kept by your institution';
+
+  @override
+  String get deleteAccountRetainedRecords =>
+      'Academic, attendance, fee and exam records';
+
+  @override
+  String get deleteAccountRetainedAudience =>
+      'The audience record of notices already published';
+
+  @override
+  String get deleteAccountRetainedPhoto =>
+      'Your profile photo, which is your photo in the ERP';
+
+  @override
+  String deleteAccountPhraseHint(String phrase) {
+    return 'Type $phrase to confirm';
+  }
+
+  @override
+  String get deleteAccountPhraseLabel => 'Confirmation phrase';
+
+  @override
+  String get deleteAccountConfirm => 'Delete my account';
+
+  @override
   String deviceCurrentLabel(String name) {
     return '$name (this device)';
   }

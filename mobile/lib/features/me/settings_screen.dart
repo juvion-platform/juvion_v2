@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:juvi/app/l10n/l10n.dart';
 import 'package:juvi/core/http/api_failure.dart';
 import 'package:juvi/core/push/notification_permission.dart';
@@ -81,6 +82,14 @@ class SettingsScreen extends ConsumerWidget {
           ),
           SectionHeader(l.settingsLanguageSection),
           ListTile(title: Text(l.settingsLanguageEnglish), subtitle: Text(l.settingsLanguageMore)),
+          // 011 Story 1 AC1. Last, and away from the switches above, so it is not reached by
+          // muscle memory while changing a setting.
+          ListTile(
+            leading: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error),
+            title: Text(l.deleteAccountRow, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.go('/me/settings/delete-account'),
+          ),
         ],
       ),
     );
