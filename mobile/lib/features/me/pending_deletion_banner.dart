@@ -57,10 +57,11 @@ class _PendingDeletionBannerState extends ConsumerState<PendingDeletionBanner> {
     // The widget can be gone by the time the 204 lands: a concurrent 401, a deactivation or a
     // paused institution tears the session down, the router redirects, and the shell unmounts
     // while this DELETE is still in flight. Both calls below need the element alive —
-    // `ref.invalidate` asserts it (`flutter_riverpod/consumer.dart:574` → `_assertNotDisposed`,
-    // a `StateError` out of a `Future` nobody awaits) and `ScaffoldMessenger.showSnackBar` asserts
-    // it has a descendant `Scaffold` to present to. The failure branch above is guarded for the
-    // same reason. Both are covered by the one check because neither may run when it is false.
+    // `ref.invalidate` asserts it (`ConsumerStatefulElement.invalidate` → `_assertNotDisposed`,
+    // package-private in `flutter_riverpod`, throwing a `StateError` out of a `Future` nobody
+    // awaits) and `ScaffoldMessenger.showSnackBar` asserts it has a descendant `Scaffold` to
+    // present to. The failure branch above is guarded for the same reason. Both are covered by
+    // the one check because neither may run when it is false.
     if (!mounted) return;
     messenger.showSnackBar(SnackBar(content: Text(l.pendingDeletionCancelled)));
     ref.invalidate(meProvider);
@@ -69,6 +70,16 @@ class _PendingDeletionBannerState extends ConsumerState<PendingDeletionBanner> {
 
   @override
   Widget build(BuildContext context) {
+    // `_tooLate` is terminal for one *request*, not for this element: the banner returns
+    // `SizedBox.shrink` rather than unmounting, so this State outlives a request that is cancelled
+    // on another device and then made again — and without the reset that second request would
+    // render with Cancel already dead, the 409 that set the flag nowhere in sight. Only the
+    // absent → present edge resets it, so a 409 on the request standing now still sticks.
+    ref.listen(meProvider, (prev, next) {
+      final was = prev?.value?.data.deletionRequestedAt != null;
+      final now = next.value?.data.deletionRequestedAt != null;
+      if (!was && now && _tooLate) setState(() => _tooLate = false);
+    });
     final l = context.l10n;
     final me = ref.watch(meProvider).value?.data;
     if (me?.deletionRequestedAt == null) return const SizedBox.shrink();

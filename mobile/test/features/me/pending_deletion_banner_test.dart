@@ -12,9 +12,11 @@ import 'package:juvi/core/analytics/analytics.dart';
 import 'package:juvi/core/http/api_providers.dart';
 import 'package:juvi/core/models/models.dart';
 import 'package:juvi/core/models/notices.dart';
+import 'package:juvi/core/repos/me_repository.dart';
 import 'package:juvi/core/repos/notices_repository.dart';
 import 'package:juvi/core/storage/app_database.dart';
 import 'package:juvi/core/storage/secure_store.dart';
+import 'package:juvi/features/me/pending_deletion_banner.dart';
 import 'package:juvi/features/me/settings_screen.dart';
 import 'package:juvi/shared/widgets/app_shell.dart';
 import 'package:mocktail/mocktail.dart';
@@ -37,6 +39,11 @@ const _serverTooLate = 'This deletion is already being processed and can no long
 const _title = 'Your account is scheduled for deletion';
 const _cancel = 'Cancel deletion';
 const _tooLate = 'Too late — this deletion is already being processed and can no longer be cancelled.';
+
+/// The banner's own Cancel button. Its `onPressed` is where "the action is spent" (the 409) and
+/// "the action is live again" (a request re-made later) tell each other apart.
+TextButton _cancelButton(WidgetTester t) =>
+    t.widget<TextButton>(find.ancestor(of: find.text(_cancel), matching: find.byType(TextButton)));
 
 /// A `/me` payload with the public-web request recorded on the account (spec §3.5.3).
 Map<String, dynamic> _pending({bool pending = true}) => {
@@ -116,20 +123,25 @@ void main() {
   // S1 AC7: the banner is driven by `deletionRequestedAt` on GET /me, and a 204 — the server's
   // confirmation that the field is cleared — takes it away.
   testWidgets('a pending request banners Settings, and Cancel clears it', (t) async {
-    var deleted = false;
-    // `MockServerCallback` runs once, when the mock is *registered* — it configures the reply.
-    // Only the data callbacks (`replyCallback*`) run per request, so `/me` answering differently
-    // after the cancel has to go through one: a closure over `deleted` in `reply` would be read at
-    // registration, and the banner would then be re-lit by the refresh that follows the cancel.
+    var gets = 0;
+    // The invalidate that follows the 204 sends a *second* `GET /me`, and that refetch writes the
+    // whole document back — with `deletionRequestedAt: null` of its own. Holding it open is what
+    // lets the assertions below read the cache at a moment the refetch cannot yet have written
+    // over: the repo's own clear is the only thing that could have left a null there.
+    final refetch = Completer<void>();
+    addTearDown(() {
+      if (!refetch.isCompleted) refetch.complete();
+    });
     await pumpShell(t, (a) => a
-      ..onGet('/me', (s) => s.replyCallback(200, (_) => _pending(pending: !deleted)))
-      ..onDelete(
-        '/me/account/deletion-request',
-        (s) => s.replyCallback(204, (_) {
-          deleted = true;
-          return null;
+      ..onGet(
+        '/me',
+        (s) => s.replyCallbackAsync(200, (_) async {
+          final n = gets++;
+          if (n > 0) await refetch.future;
+          return _pending(pending: n == 0);
         }),
-      ));
+      )
+      ..onDelete('/me/account/deletion-request', (s) => s.reply(204, null)));
 
     // The Settings surface really is what this is standing on (§"the test never asserts anything
     // Settings-specific" — without this the banner assertions would hold over any screen at all).
@@ -138,18 +150,28 @@ void main() {
     expect(find.text(_cancel), findsOneWidget);
 
     await t.tap(find.text(_cancel));
-    await t.pumpAndSettle();
-
-    expect(find.text(_title), findsNothing);
-    expect(find.text(_cancel), findsNothing);
+    // Frames, not `pumpAndSettle`: the refetch is deliberately held open. `gets == 2` is the proof
+    // that the cancel's own `ref.invalidate` has dispatched it, i.e. that the repo's clear — which
+    // runs before the invalidate — has already landed.
+    for (var i = 0; i < 10 && gets < 2; i++) {
+      await t.pump(const Duration(milliseconds: 1));
+    }
     expect(sent, contains('DELETE /me/account/deletion-request'));
-    // …and it is gone because the 204 *cleared the cached request*, not because the refetch that
-    // follows happened to answer differently. The mock above flips to `pending: false` on the
-    // refetch, which would hide the banner on its own — so without this line the assertion above
-    // would pass even if the repository never touched the cache, which is the whole mechanism.
+    expect(gets, 2);
+
+    // …and the request is gone because the 204 *cleared the cached request*. Read here, with the
+    // refetch still in flight, because a refetch that landed would rewrite this document and hide
+    // whether the clear happened at all: without this timing the assertion below passes even
+    // against a repository that never touched the cache. Remove `_clearCachedDeletionRequest` and
+    // this is the line that reddens.
     final doc = await db.readDoc('me');
     expect(doc!.json['deletionRequestedAt'], isNull);
     expect(doc.json['deletionRequestedVia'], isNull);
+
+    refetch.complete();
+    await t.pumpAndSettle();
+    expect(find.text(_title), findsNothing);
+    expect(find.text(_cancel), findsNothing);
   });
 
   // S1 AC7 / Story 4 AC1: the 409 is the whole reason this is not a lying 204 — the deletion has
@@ -174,9 +196,45 @@ void main() {
     // The cached request survives the failed cancel too — the *other* half of why the banner is
     // still up, and the half no mock of `/me` can stand in for.
     expect((await db.readDoc('me'))!.json['deletionRequestedAt'], isNotNull);
+    // …and the failure path must not have re-fetched `/me` either. `sent` covers the whole life of
+    // the shell, and the mock above answers `pending` forever, so a `ref.invalidate(meProvider)`
+    // wrongly added to the error branch would be invisible to the document assertion — the cached
+    // row would simply be re-fetched as pending again — but shows up here as a second `GET /me`.
+    expect(sent.where((s) => s == 'GET /me'), hasLength(1));
     // …and the action is spent: the 409 says the deletion is already committing, so a second tap
     // can only 409 again. A live button under that sentence invites exactly that.
-    expect(t.widget<TextButton>(find.ancestor(of: find.text(_cancel), matching: find.byType(TextButton))).onPressed, isNull);
+    expect(_cancelButton(t).onPressed, isNull);
+  });
+
+  // A 409 is terminal for the request, not for the banner: the element stays mounted (it returns
+  // `SizedBox.shrink` when there is nothing to show), so a request cancelled on another device and
+  // then re-made would otherwise come back with Cancel already dead.
+  testWidgets('a request re-made after a 409 leaves Cancel usable again', (t) async {
+    var pending = true;
+    final c = await pumpShell(t, (a) => a
+      ..onGet('/me', (s) => s.replyCallback(200, (_) => _pending(pending: pending)))
+      ..onDelete(
+        '/me/account/deletion-request',
+        (s) => s.reply(409, {
+          'error': {'code': 'DELETION_NOT_CANCELLABLE', 'message': _serverTooLate},
+        }),
+      ));
+
+    await t.tap(find.text(_cancel));
+    await t.pumpAndSettle();
+    expect(_cancelButton(t).onPressed, isNull);
+
+    // Cleared (cancelled on another device), then re-requested from the public page.
+    pending = false;
+    c.invalidate(meProvider);
+    await t.pumpAndSettle();
+    expect(find.text(_title), findsNothing);
+
+    pending = true;
+    c.invalidate(meProvider);
+    await t.pumpAndSettle();
+    expect(find.text(_title), findsOneWidget);
+    expect(_cancelButton(t).onPressed, isNotNull);
   });
 
   // Only a 204 counts. Anything else — offline here — leaves the request exactly where it was.
@@ -204,6 +262,10 @@ void main() {
     // The shell is up and Settings rendered; what is absent is the banner. Without this the test
     // would also pass against a banner that simply never renders anywhere at all.
     expect(find.text('Notifications and quiet hours'), findsOneWidget);
+    // …and it is mounted — the banner widget is in the tree and choosing to render nothing, which
+    // is the state this asserts, rather than the shell having failed to mount it at all. (That it
+    // renders the banner copy when a request *is* pending is the sibling test's half.)
+    expect(find.byType(PendingDeletionBanner), findsOneWidget);
     expect(find.text(_title), findsNothing);
     expect(find.text(_cancel), findsNothing);
   });
@@ -211,9 +273,9 @@ void main() {
   // The 204 can land after the widget is gone: a concurrent 401, a deactivation or a paused
   // institution tears the session down, the router redirects, and the shell unmounts while this
   // DELETE is still in flight. `ref.invalidate` asserts the element is still mounted
-  // (`flutter_riverpod/consumer.dart:574` → `_assertNotDisposed`) and throws a `StateError` out of a
-  // `Future` nobody awaits — an unhandled async error on a path that has, from the user's side,
-  // already succeeded.
+  // (`ConsumerStatefulElement.invalidate` → `_assertNotDisposed`, package-private in
+  // `flutter_riverpod`) and throws a `StateError` out of a `Future` nobody awaits — an unhandled
+  // async error on a path that has, from the user's side, already succeeded.
   testWidgets('a 204 arriving after the banner is gone does not throw', (t) async {
     final inFlight = Completer<void>();
     await pumpShell(t, (a) => a
