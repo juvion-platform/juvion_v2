@@ -8,6 +8,7 @@ import { registerLeadScoringQueue } from './modules/admissions/lead-scoring/work
 import { initBridgeListeners } from './modules/platform/erpnext-bridge';
 import { registerJuviProvisioningQueue } from './modules/juvi-app/accounts/provisioning-worker';
 import { registerJuviReconcileQueue } from './modules/juvi-app/spaces/reconcile-worker';
+import { registerJuviAccountDeletionQueue } from './modules/juvi-app/accounts/deletion-sweep-worker';
 import { registerOutboxQueue } from './shared/outbox/dispatcher';
 
 const PORT = process.env.PORT || 3003;
@@ -37,6 +38,11 @@ async function start() {
       await registerJuviReconcileQueue();
     } catch (err) {
       console.warn('[server] Failed to register juvi reconcile queue (Redis unavailable?):', err);
+    }
+    try {
+      await registerJuviAccountDeletionQueue();
+    } catch (err) {
+      console.warn('[server] Failed to register juvi account-deletion queue (Redis unavailable?):', err);
     }
     try {
       await registerOutboxQueue();
