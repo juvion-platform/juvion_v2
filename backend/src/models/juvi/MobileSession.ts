@@ -3,10 +3,12 @@ import { Schema, model, Document, Types } from 'mongoose';
 export type MobilePlatform = 'android' | 'ios';
 export type RevokeReason =
   | 'sign_out' | 'signed_out_elsewhere' | 'password_changed'
-  | 'admin' | 'deactivated' | 'token_reuse' | 'expired';
+  | 'admin' | 'deactivated' | 'token_reuse' | 'expired'
+  | 'account_deleted';
 
 export const REVOKE_REASONS: readonly RevokeReason[] = [
   'sign_out', 'signed_out_elsewhere', 'password_changed', 'admin', 'deactivated', 'token_reuse', 'expired',
+  'account_deleted',
 ];
 
 export interface IMobileSession extends Document {

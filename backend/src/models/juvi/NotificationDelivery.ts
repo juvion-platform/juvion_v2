@@ -5,15 +5,22 @@ export type DeliveryStatus = 'suppressed' | 'scheduled' | 'sent' | 'delivered' |
 /** `superseded` and `already_started` are class-change send-time cancellations (Today&Teaching §8). */
 export type DeliveryReason = 'muted' | 'tier_off' | 'no_device' | 'acknowledged' | 'dismissed' | 'archived' | 'superseded' | 'already_started';
 /** `created` and `revoked` are class-change notification kinds (Today&Teaching §8). */
-export type NotificationSourceKind = 'published' | 'reminder-1' | 'reminder-2' | 'created' | 'revoked';
+export type NotificationSourceKind = 'published' | 'reminder-1' | 'reminder-2' | 'created' | 'revoked' | 'requested';
 
 export const NOTIFICATION_TIERS: readonly NotificationTier[] = ['urgent', 'important', 'routine'];
 export const DELIVERY_STATUSES: readonly DeliveryStatus[] = ['suppressed', 'scheduled', 'sent', 'delivered', 'opened', 'cancelled', 'failed'];
 export const DELIVERY_REASONS: readonly DeliveryReason[] = ['muted', 'tier_off', 'no_device', 'acknowledged', 'dismissed', 'archived', 'superseded', 'already_started'];
-export const NOTIFICATION_SOURCE_KINDS: readonly NotificationSourceKind[] = ['published', 'reminder-1', 'reminder-2', 'created', 'revoked'];
+export const NOTIFICATION_SOURCE_KINDS: readonly NotificationSourceKind[] = ['published', 'reminder-1', 'reminder-2', 'created', 'revoked', 'requested'];
 
-/** `class_change` (Today&Teaching §8): id is the exception id, kind is created|revoked. Sub-project 5 adds `post` and `mention` to `type`. */
-export interface INotificationSource { type: 'notice' | 'class_change'; id: Types.ObjectId; kind: NotificationSourceKind }
+/**
+ * `class_change` (Today&Teaching §8): id is the exception id, kind is created|revoked.
+ * `account_deletion` (011 §3.5.2): id is the **account id** — a deletion request has no document
+ * of its own, and the account is what the notification is about. The unique index below then means
+ * "at most one deletion push per account", which is a stronger no-harassment guarantee than the
+ * request-side transition guard alone: a stuffed password cannot produce a second push even after
+ * the owner cancels and is attacked again. Sub-project 5 adds `post` and `mention` to `type`.
+ */
+export interface INotificationSource { type: 'notice' | 'class_change' | 'account_deletion'; id: Types.ObjectId; kind: NotificationSourceKind }
 
 /**
  * One row per person per notification (notifications spec §4.1). The unique
@@ -46,7 +53,7 @@ const schema = new Schema<INotificationDelivery>(
     collegeId: { type: Schema.Types.ObjectId, required: true, index: true },
     accountId: { type: Schema.Types.ObjectId, ref: 'JuviAccount', required: true },
     source: {
-      type: { type: String, enum: ['notice', 'class_change'], required: true },
+      type: { type: String, enum: ['notice', 'class_change', 'account_deletion'], required: true },
       id: { type: Schema.Types.ObjectId, required: true },
       kind: { type: String, enum: NOTIFICATION_SOURCE_KINDS, required: true },
     },

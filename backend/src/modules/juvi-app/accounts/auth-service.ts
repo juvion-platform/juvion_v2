@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
-import { User } from '../../../models/User';
+import { User, IUser } from '../../../models/User';
 import { JuviAccount, IJuviAccount } from '../../../models/juvi/JuviAccount';
 import { MobileApiError } from '../errors';
 import { MobileContext } from '../middleware/authenticate-mobile';
@@ -8,6 +8,7 @@ import { getJuviConfig } from '../config/institution-config';
 import { resolveIdentifierToUser } from './identifier-resolver';
 import { getCooldown, recordFailure, clearFailures } from './cooldown';
 import { createSession, findRotatableSession, rotateSession, revokeSession, revokeOtherSessions, signAccessToken, SessionTokens } from './session-service';
+import { clearDeletionRequestBestEffort } from './deletion-service';
 import { SignInInput, AccountSummary, signInResponseSchema } from './schemas';
 import { ONBOARDING_STEPS } from './onboarding';
 
@@ -26,6 +27,37 @@ export function accountSummary(account: IJuviAccount, user: { mustChangePassword
     onboardingComplete: Boolean(account.onboardingCompletedAt),
     mustChangePassword: Boolean(user.mustChangePassword),
   };
+}
+
+/**
+ * The credential chain, read-only (011 T7, Story 3 AC2).
+ *
+ * `signIn` and the public deletion page share exactly this much and no more: the web form cannot
+ * call `signIn`, which creates a `MobileSession` and needs a `device` payload it cannot supply.
+ *
+ * **Read-only is the contract, and it cuts three ways:** no `MobileSession`, no tokens, and no
+ * `getCooldown`/`recordFailure` — a failing caller must not be able to spend the owner's sign-in
+ * lockout budget, which is the difference between a rate limit and a way to lock someone out of
+ * their own app (Story 3 AC6). The caller owns the institution check, the lockout and the session.
+ *
+ * One generic 401 for every failure mode — unknown identifier, wrong password, no Juvi account —
+ * and `bcrypt.compare` runs against `DUMMY_HASH` when nothing matched, so the work is the same
+ * either way and the response cannot be used to enumerate identifiers.
+ */
+export async function verifyCredentials(
+  collegeId: string,
+  identifier: string,
+  password: string,
+): Promise<{ user: IUser; account: IJuviAccount }> {
+  const user = await resolveIdentifierToUser(collegeId, identifier);
+  const account = user ? await JuviAccount.findOne({ collegeId, userId: user._id }) : null;
+  const ok = await bcrypt.compare(password, user?.password ?? DUMMY_HASH);
+
+  if (!user || !account || !ok) {
+    if (user && !account) console.warn('[juvi-app] credentials verified for a user without a JuviAccount', { userId: String(user._id) });
+    throw invalidCredentials();
+  }
+  return { user, account };
 }
 
 export async function signIn(input: SignInInput): Promise<z.infer<typeof signInResponseSchema>> {
@@ -48,15 +80,16 @@ export async function signIn(input: SignInInput): Promise<z.infer<typeof signInR
     throw new MobileApiError(503, 'INSTITUTION_PAUSED', cfg.pausedMessage ?? 'Juvi is paused.', { message: cfg.pausedMessage ?? 'Juvi is paused.' });
   }
 
-  const user = await resolveIdentifierToUser(input.collegeId, input.identifier);
-  const account = user ? await JuviAccount.findOne({ collegeId: input.collegeId, userId: user._id }) : null;
-  const ok = await bcrypt.compare(input.password, user?.password ?? DUMMY_HASH);
-
-  if (!user || !account || !ok) {
+  // The verification itself is side-effect free; the lockout budget is sign-in's own concern, so a
+  // failed attempt is charged here rather than inside the shared chain.
+  let verified: { user: IUser; account: IJuviAccount };
+  try {
+    verified = await verifyCredentials(input.collegeId, input.identifier, input.password);
+  } catch (e) {
     await recordFailure(input.collegeId, input.identifier);
-    if (user && !account) console.warn('[juvi-app] sign-in for a user without a JuviAccount', { userId: String(user._id) });
-    throw invalidCredentials();
+    throw e;
   }
+  const { user, account } = verified;
   if (account.status === 'deactivated' || !user.isActive) {
     throw new MobileApiError(403, 'ACCOUNT_DEACTIVATED', DEACTIVATED_MESSAGE, { supportContact: cfg.supportContact ?? null });
   }
@@ -66,6 +99,9 @@ export async function signIn(input: SignInInput): Promise<z.infer<typeof signInR
     collegeId: input.collegeId, accountId: String(account._id), userId: String(user._id),
     role: user.role, kind: account.kind, device: input.device,
   });
+  // Story 4 AC1's safety net: holding the password again is independent evidence of ownership, so
+  // any pending public deletion request is dropped. Best-effort — it can never fail the sign-in.
+  await clearDeletionRequestBestEffort(input.collegeId, String(account._id));
   return { ...tokens, account: accountSummary(account, user) };
 }
 
@@ -110,4 +146,7 @@ export async function changePassword(ctx: MobileContext, currentPassword: string
   user.passwordChangedAt = new Date();
   await user.save();
   await revokeOtherSessions(ctx.accountId, ctx.sessionId, 'password_changed');
+  // Story 4 AC1's second safety net, same shape and same reasoning as the sign-in clear: knowing
+  // the current password and choosing a new one is an even stronger statement of ownership.
+  await clearDeletionRequestBestEffort(ctx.collegeId, ctx.accountId);
 }

@@ -5,6 +5,10 @@ enum ApiErrorCode {
   forbidden, notFound, gone, updateRequired, cooldown, institutionPaused, internal,
   // Juvi notices (notices spec §7.1).
   noticeNotFound, alreadyAcknowledged, noticeArchived, notPublisher, reminderLimit, ackRequired, ackNotRequired,
+  // Juvi account deletion (011). A 409 on the cancel: the request has been claimed and the
+  // deletion is already committing, so nothing can stop it — a defined failure rather than a
+  // silent 204 that would lie about having cancelled (Story 4 AC1).
+  deletionNotCancellable,
   offline, unknown;
 
   static ApiErrorCode fromWire(String? code) => switch (code) {
@@ -27,6 +31,7 @@ enum ApiErrorCode {
         'REMINDER_LIMIT' => reminderLimit,
         'ACK_REQUIRED' => ackRequired,
         'ACK_NOT_REQUIRED' => ackNotRequired,
+        'DELETION_NOT_CANCELLABLE' => deletionNotCancellable,
         _ => unknown,
       };
 }

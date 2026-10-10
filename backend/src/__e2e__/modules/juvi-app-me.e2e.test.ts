@@ -5,6 +5,7 @@ import { seedBase, BaseFixtures } from '../setup/seed-base';
 import { enableJuvi, provisionTestStudent, provisionTestFaculty, mobileClient, TEST_DEVICE } from '../factories/juvi.factory';
 import { Student } from '../../models';
 import { JuviAccount } from '../../models/juvi/JuviAccount';
+import { requestPublicDeletion } from '../../modules/juvi-app/accounts/deletion-service';
 
 let app: Express; let fx: BaseFixtures;
 const V1 = '/api/juvi-app/v1';
@@ -28,7 +29,18 @@ describe('GET /me', () => {
     expect(res.body.faculty).toBeNull();
     expect(res.body.settings).toEqual({ quietHours: { start: '22:00', end: '07:00' }, tiers: { important: true, routine: true }, language: 'en' });
     expect(res.body.institution).toMatchObject({ name: 'JIT Test College', code: 'JIT-TEST', accentColor: '#0055aa' });
+    // 011 T14 — the Story 4 banner's only trigger. Nullable, and null until someone actually asks;
+    // absent would be a different bug (the mobile model would still parse, and the banner would
+    // simply never fire), so the assertion is on the value, not on the key's presence.
+    expect(res.body.deletionRequestedAt).toBeNull();
+    expect(res.body.deletionRequestedVia).toBeNull();
     expect(res.body.asOf).toBeTypeOf('string');
+
+    // ...and it carries the request once one exists, as a real ISO instant — the client parses this.
+    expect(await requestPublicDeletion(fx.collegeId, String(s.account._id))).toBe(true);
+    const after = await mobileClient(app, t).get(`${V1}/me`).expect(200);
+    expect(after.body.deletionRequestedVia).toBe('public_web');
+    expect(new Date(after.body.deletionRequestedAt).toISOString()).toBe(after.body.deletionRequestedAt);
   });
 
   it('marks lateral entry and returns the faculty card for faculty', async () => {

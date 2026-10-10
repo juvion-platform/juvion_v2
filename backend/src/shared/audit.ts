@@ -30,6 +30,7 @@ const AUDIT_ACTIONS: AuditAction[] = [
   'waitlist_promote', 'vacate_request', 'vacate_approve', 'vacate_reject',
   'approve', 'reject', 'submit', 'publish', 'archive',
   'acknowledge', 'access_denied',
+  'request_deletion',
   'ai_score_computed',
   'ai_config_suggested',
   'ai_config_applied',

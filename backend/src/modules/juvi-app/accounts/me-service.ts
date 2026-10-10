@@ -102,6 +102,11 @@ export async function getMe(ctx: MobileContext): Promise<MeResponse> {
       name: cfg.name, code: cfg.code, logoUrl: await logoUrlFor(cfg.logo), accentColor: cfg.accentColor ?? null,
       supportContact: cfg.supportContact ?? null, timezone: cfg.timezone,
     },
+    // 011 §3.5.3 — a pending request, and the only signal the Story 4 banner has. Read off the same
+    // document the rest of this payload comes from, so a cancellation (which `$unset`s both fields)
+    // clears it here with no second query.
+    deletionRequestedAt: account.deletionRequestedAt ? account.deletionRequestedAt.toISOString() : null,
+    deletionRequestedVia: account.deletionRequestedVia ?? null,
     asOf: new Date().toISOString(),
   };
 }

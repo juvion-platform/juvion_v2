@@ -28,6 +28,10 @@ class Me {
 
     required  this.asOf,
 
+    required  this.deletionRequestedAt,
+
+    required  this.deletionRequestedVia,
+
     required  this.faculty,
 
     required  this.institution,
@@ -60,6 +64,30 @@ class Me {
 
 
   final String asOf;
+
+
+
+  @JsonKey(
+    
+    name: r'deletionRequestedAt',
+    required: true,
+    includeIfNull: true,
+  )
+
+
+  final String? deletionRequestedAt;
+
+
+
+  @JsonKey(
+    
+    name: r'deletionRequestedVia',
+    required: true,
+    includeIfNull: true,
+  )
+
+
+  final String? deletionRequestedVia;
 
 
 
@@ -129,6 +157,8 @@ class Me {
     bool operator ==(Object other) => identical(this, other) || other is Me &&
       other.account == account &&
       other.asOf == asOf &&
+      other.deletionRequestedAt == deletionRequestedAt &&
+      other.deletionRequestedVia == deletionRequestedVia &&
       other.faculty == faculty &&
       other.institution == institution &&
       other.person == person &&
@@ -139,6 +169,8 @@ class Me {
     int get hashCode =>
         account.hashCode +
         asOf.hashCode +
+        (deletionRequestedAt == null ? 0 : deletionRequestedAt.hashCode) +
+        (deletionRequestedVia == null ? 0 : deletionRequestedVia.hashCode) +
         faculty.hashCode +
         institution.hashCode +
         person.hashCode +

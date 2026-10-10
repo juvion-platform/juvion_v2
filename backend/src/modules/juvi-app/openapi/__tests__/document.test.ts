@@ -13,6 +13,8 @@ const EXPECTED_PATHS = [
   '/onboarding/first-notice',
   '/me/devices/current/push-token', '/notifications/receipts', '/events',
   '/today', '/teaching', '/me/academics',
+  // 011 §3.6 — the in-app delete and the explicit cancellation
+  '/me/account', '/me/account/deletion-request',
 ];
 
 describe('mobile OpenAPI document', () => {
@@ -101,6 +103,31 @@ describe('mobile OpenAPI document', () => {
     expect(doc.components.schemas.EventsRequest.properties.events.items.properties.name.enum).toEqual(
       expect.arrayContaining(['timeline.class_opened', 'glance.opened', 'post_class_prompt.shown', 'post_class_prompt.opened']),
     );
+  });
+
+  it('declares the two account-deletion deletes and the Me deletion fields (011 §3.6)', () => {
+    const del = doc.paths['/me/account'].delete;
+    expect(del.operationId).toBe('deleteAccount');
+    expect(del.security).toEqual([{ bearerAuth: [] }]);
+    expect(del.responses['204']).toBeDefined();
+    expect(del.responses['401']).toBeDefined();
+    // Bodyless on purpose: a schema here would give the generated Dart method a return type
+    // for a body that never arrives (`signOut` and `clearPushToken` are the same shape).
+    expect(del.responses['204'].content).toBeUndefined();
+
+    const cancel = doc.paths['/me/account/deletion-request'].delete;
+    expect(cancel.operationId).toBe('cancelAccountDeletion');
+    expect(cancel.responses['204']).toBeDefined();
+    expect(cancel.responses['409']).toBeDefined();
+    expect(doc.components.schemas.ErrorEnvelope.properties.error.properties.code.enum).toContain('DELETION_NOT_CANCELLABLE');
+
+    // The R61 fields: nullable **and** required — an absent key and a null value are different
+    // states, and the app renders "a deletion is pending" only for the latter.
+    const me = doc.components.schemas.Me;
+    expect(me.required).toEqual(expect.arrayContaining(['deletionRequestedAt', 'deletionRequestedVia']));
+    for (const f of ['deletionRequestedAt', 'deletionRequestedVia'] as const) {
+      expect(me.properties[f].type, f).toEqual(expect.arrayContaining(['null']));
+    }
   });
 
   it('stableStringify orders keys so the file is deterministic', () => {

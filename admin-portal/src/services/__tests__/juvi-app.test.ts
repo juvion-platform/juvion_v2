@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('../api', () => ({ default: { get: vi.fn(), put: vi.fn(), post: vi.fn() } }));
 import api from '../api';
-import { listAccounts, downloadCredentialsCsv, createRun } from '../juvi-app';
+import { listAccounts, downloadCredentialsCsv, createRun, listPendingDeletions } from '../juvi-app';
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -10,6 +10,16 @@ describe('juvi-app service', () => {
     (api.get as any).mockResolvedValue({ data: { items: [], total: 0, page: 1, pages: 1 } });
     await listAccounts({ kind: 'student', q: '', page: 2, limit: 20 });
     expect(api.get).toHaveBeenCalledWith('/juvi-app/admin/accounts', { params: { kind: 'student', page: 2, limit: 20 } });
+  });
+
+  // 011 T15 — no query input, so no params: the only scope is the caller's college, which the
+  // request already carries. Sending an empty params object would be a place for a filter to
+  // creep in later and look like it widened the list.
+  it('listPendingDeletions calls the pending-deletion route with no filters', async () => {
+    (api.get as any).mockResolvedValue({ data: { graceDays: 7, items: [] } });
+    const out = await listPendingDeletions();
+    expect(api.get).toHaveBeenCalledWith('/juvi-app/admin/accounts/pending-deletion');
+    expect(out.graceDays).toBe(7);
   });
 
   it('createRun posts the body and returns the run', async () => {

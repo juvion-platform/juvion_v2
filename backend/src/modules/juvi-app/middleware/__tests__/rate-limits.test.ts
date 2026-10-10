@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
-import { signInLimiter } from '../rate-limits';
+import { signInLimiter, deletionVerifyLimiter } from '../rate-limits';
 
 // The limiters skip themselves under NODE_ENV=test / E2E_TESTING; lift that for these cases.
 const ORIG = { NODE_ENV: process.env.NODE_ENV, E2E_TESTING: process.env.E2E_TESTING };
@@ -44,5 +44,52 @@ describe('signInLimiter', () => {
     expect(blocked.status).toBe(429);
     const other = await request(app).post('/sign-in').set('X-Forwarded-For', '203.0.113.20');
     expect(other.status).toBe(200);
+  });
+});
+
+/**
+ * 011 T8(a) — Story 3 AC3.
+ *
+ * The public deletion-verification route takes an unauthenticated password guess, so it carries
+ * its own IP limiter rather than borrowing the sign-in one: the two paths have different traffic
+ * shapes and a shared bucket would let one starve the other.
+ *
+ * This suite is the only place the 429 can be asserted — the Playwright job runs with
+ * `E2E_TESTING=1`, which switches every limiter off (`rate-limits.ts:4-5`).
+ */
+describe('deletionVerifyLimiter', () => {
+  function appWith(trustProxy: number | false) {
+    const app = express();
+    app.set('trust proxy', trustProxy);
+    app.post('/account-deletion', deletionVerifyLimiter, (_req, res) => { res.json({ ok: true }); });
+    return app;
+  }
+
+  it('blocks the sixth request from one IP within a minute, in the mobile error envelope', async () => {
+    const app = appWith(false);
+    for (let i = 0; i < 5; i++) {
+      const ok = await request(app).post('/account-deletion');
+      expect(ok.status).toBe(200);
+    }
+    const blocked = await request(app).post('/account-deletion');
+    expect(blocked.status).toBe(429);
+    expect(blocked.body).toEqual({ error: { code: 'COOLDOWN', message: 'Too many requests. Try again in a minute.', retryAfterSeconds: 60 } });
+  });
+
+  it('keys on the forwarded client address once trust proxy is set', async () => {
+    const app = appWith(1);
+    for (let i = 0; i < 5; i++) {
+      await request(app).post('/account-deletion').set('X-Forwarded-For', '203.0.113.10');
+    }
+    const blocked = await request(app).post('/account-deletion').set('X-Forwarded-For', '203.0.113.10');
+    expect(blocked.status).toBe(429);
+    // A different phone behind the same nginx is a different bucket — otherwise one shared bucket
+    // would throttle the whole campus on a Play-mandated path.
+    const other = await request(app).post('/account-deletion').set('X-Forwarded-For', '203.0.113.20');
+    expect(other.status).toBe(200);
+  });
+
+  it('is its own limiter, not the sign-in one shared by reference', () => {
+    expect(deletionVerifyLimiter).not.toBe(signInLimiter);
   });
 });

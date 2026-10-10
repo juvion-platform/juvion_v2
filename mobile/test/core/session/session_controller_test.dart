@@ -10,13 +10,16 @@ import 'package:juvi/core/http/api_failure.dart';
 import 'package:juvi/core/http/api_providers.dart';
 import 'package:juvi/core/models/models.dart';
 import 'package:juvi/core/push/push_registration.dart';
+import 'package:juvi/core/push/receipts.dart';
 import 'package:juvi/core/repos/auth_repository.dart';
 import 'package:juvi/core/session/session_controller.dart';
 import 'package:juvi/core/session/session_state.dart';
 import 'package:juvi/core/storage/app_database.dart';
 import 'package:juvi/core/storage/secure_store.dart';
+import 'package:juvi/core/sync/pending_action.dart';
 import 'package:juvi_api/juvi_api.dart' show JuviApi;
 import 'package:mocktail/mocktail.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../push/push_fixtures.dart';
 
@@ -119,6 +122,222 @@ void main() {
     await s.handleFailure(const ApiFailure(ApiErrorCode.sessionInvalidated, 'x', detail: {'reason': 'password_changed'}));
     expect(c.read(sessionControllerProvider), const SessionState.signedOut(reason: 'password_changed'));
     expect(mem['juvi.access'], isNull);
+  });
+
+  // 011 Story 1 AC3/AC6 (T18). A *deletion* wipe, so it also clears what a sign-out is required
+  // to keep: `juvi.pending_link` outlives the sign-out it is waiting behind, and
+  // `juvi.last_account` is what makes a held destination specific to its account. Neither is in
+  // `wipeAll()`'s 3-key allowlist, and the receipt queue lives in shared preferences rather than
+  // in the database, so all three need naming here. The device id and the database key are not
+  // the account's: clearing them would orphan the encrypted database and make the app look like
+  // a fresh install to the server.
+  test('the deletion wipe empties every surface 011 AC3 names, keeping the device identity', () async {
+    SharedPreferences.setMockInitialValues({});
+    final store = c.read(secureStoreProvider);
+    final queue = ReceiptQueue();
+    final deviceId = await store.deviceId();
+    final databaseKey = await store.databaseKey();
+
+    mem['juvi.access'] = 'a';
+    mem['juvi.refresh'] = 'r';
+    mem['juvi.college_id'] = 'c1';
+    await db.writeDoc('me', {'id': 'a1'}, DateTime.now().toUtc());
+    final action = PendingAction.create('settings.patch', {'k': 'v'});
+    await db.enqueueAction(action);
+    await db.enqueueEvent('glance.opened', DateTime.now().toUtc(), {'n': 1});
+    await queue.add(ReceiptItem(deliveryId: 'd1', receipt: 'sig.1', event: 'delivered', at: DateTime.now().toUtc()));
+    await store.writePendingLink('{"route":"/notices/n1"}');
+    await store.writeLastAccount('c1:a1');
+
+    // Every surface is genuinely loaded first, so the assertions after the wipe cannot pass
+    // by having had nothing to clear.
+    expect(await store.readTokens(), isNotNull);
+    expect(await db.readDoc('me'), isNotNull);
+    expect(await db.hasAction(action.id), isTrue);
+    expect(await db.eventCount(), 1);
+    expect(await queue.read(), hasLength(1));
+    expect(await store.readPendingLink(), isNotNull);
+    expect(await store.readLastAccount(), isNotNull);
+
+    await c.read(sessionControllerProvider.notifier).handleFailure(
+          const ApiFailure(ApiErrorCode.sessionInvalidated, 'x', detail: {'reason': 'account_deleted'}),
+        );
+
+    expect(c.read(sessionControllerProvider), const SessionState.signedOut(reason: 'account_deleted'));
+    expect(await store.readTokens(), isNull);
+    expect(mem['juvi.college_id'], isNull);
+    expect(await db.readDoc('me'), isNull);
+    expect(await db.hasAction(action.id), isFalse);
+    expect(await db.eventCount(), 0);
+    expect(await queue.read(), isEmpty);
+    // Removed rather than left as an empty list: nothing about the queue should remain.
+    expect((await SharedPreferences.getInstance()).getString(ReceiptQueue.key), isNull);
+    expect(await store.readPendingLink(), isNull);
+    expect(await store.readLastAccount(), isNull);
+
+    expect(await store.deviceId(), deviceId);
+    expect(await store.databaseKey(), databaseKey);
+  });
+
+  // The deletion wipe is *not* the sign-out wipe. 011 AC3 adds three surfaces **on top of** the
+  // wipe for a deletion, and two of them — `juvi.pending_link` and `juvi.last_account` — are
+  // exactly what a sign-out is required to keep: a notification tapped while signed out parks its
+  // destination in the first, under the account named by the second, and the next sign-in is what
+  // opens it (notifications §12). A sign-out that cleared them drops that destination on the floor.
+  test('an ordinary sign-out keeps the destination and last-account markers', () async {
+    SharedPreferences.setMockInitialValues({});
+    mem.clear();
+    final dio = Dio(BaseOptions(baseUrl: 'https://api.test/v1'));
+    DioAdapter(dio: dio).onDelete('/me/devices/current/push-token', (s) => s.reply(204, null));
+    final container = ProviderContainer(retry: (_, _) => null, overrides: [
+      authRepositoryProvider.overrideWithValue(auth),
+      secureStoreProvider.overrideWithValue(SecureStore(_storageOver(mem))),
+      appDatabaseProvider.overrideWith((_) async => db),
+      pushRegistrationProvider.overrideWithValue(PushRegistration(
+        messaging: FakePushMessaging(),
+        local: FakeLocalNotifications(),
+        api: () => JuviApi(dio: dio, basePathOverride: 'https://api.test/v1').getMobileApi(),
+        signedIn: () => true,
+        allowed: () async => true,
+      )),
+    ]);
+    addTearDown(container.dispose);
+
+    final store = container.read(secureStoreProvider);
+    mem['juvi.access'] = 'a';
+    mem['juvi.refresh'] = 'r';
+    mem['juvi.college_id'] = 'c1';
+    await db.writeDoc('me', {'id': 'a1'}, DateTime.now().toUtc());
+    await ReceiptQueue().add(ReceiptItem(deliveryId: 'd1', receipt: 'sig.1', event: 'delivered', at: DateTime.now().toUtc()));
+    await store.writePendingLink('{"route":"/notices/n1"}');
+    await store.writeLastAccount('c1:a1');
+    when(() => auth.signOut()).thenAnswer((_) async {});
+
+    await container.read(sessionControllerProvider.notifier).signOut();
+
+    // The wipe really ran: the session's own surfaces are gone, so nothing below can pass by the
+    // sign-out having wiped nothing at all.
+    expect(container.read(sessionControllerProvider), const SessionState.signedOut());
+    expect(await store.readTokens(), isNull);
+    expect(mem['juvi.college_id'], isNull);
+    expect(await db.readDoc('me'), isNull);
+
+    // …and the surfaces a sign-out must leave for the account that signs back in are still here.
+    expect(await store.readPendingLink(), isNotNull);
+    expect(await store.readLastAccount(), 'c1:a1');
+    expect(await ReceiptQueue().read(), hasLength(1));
+  });
+
+  // 011 Story 1 AC3/AC4 (T20). The server call is what authorises the wipe, and it is the only
+  // thing that does: a deletion must not go through `signOut()`, because the push-token revoke
+  // and the logout call both 401 against an account that no longer exists.
+  group('deleteAccount', () {
+    late FakePushMessaging messaging;
+    late FakeLocalNotifications local;
+    late ProviderContainer scoped;
+    late String actionId;
+
+    ProviderContainer withPush() {
+      final dio = Dio(BaseOptions(baseUrl: 'https://api.test/v1'));
+      DioAdapter(dio: dio).onDelete('/me/devices/current/push-token', (s) => s.reply(204, null));
+      final registration = PushRegistration(
+        messaging: messaging,
+        local: local,
+        api: () => JuviApi(dio: dio, basePathOverride: 'https://api.test/v1').getMobileApi(),
+        signedIn: () => true,
+        allowed: () async => true,
+      );
+      final container = ProviderContainer(retry: (_, _) => null, overrides: [
+        authRepositoryProvider.overrideWithValue(auth),
+        secureStoreProvider.overrideWithValue(SecureStore(_storageOver(mem))),
+        appDatabaseProvider.overrideWith((_) async => db),
+        pushRegistrationProvider.overrideWithValue(registration),
+      ]);
+      addTearDown(container.dispose);
+      return container;
+    }
+
+    /// Everything the wipe has to reach, loaded and asserted: the assertions after it can only
+    /// pass because the deletion emptied them, not because they were never populated.
+    Future<void> seed() async {
+      final store = scoped.read(secureStoreProvider);
+      final action = PendingAction.create('settings.patch', {'k': 'v'});
+      mem['juvi.access'] = 'a';
+      mem['juvi.refresh'] = 'r';
+      mem['juvi.college_id'] = 'c1';
+      await (await scoped.read(appDatabaseProvider.future)).writeDoc('me', {'id': 'a1'}, DateTime.now().toUtc());
+      await db.enqueueAction(action);
+      actionId = action.id;
+      await db.enqueueEvent('glance.opened', DateTime.now().toUtc(), {'n': 1});
+      await ReceiptQueue().add(ReceiptItem(deliveryId: 'd1', receipt: 'sig.1', event: 'delivered', at: DateTime.now().toUtc()));
+      await store.writePendingLink('{"route":"/notices/n1"}');
+      await store.writeLastAccount('c1:a1');
+      expect(await store.readTokens(), isNotNull);
+      expect(await db.readDoc('me'), isNotNull);
+      expect(await db.hasAction(actionId), isTrue);
+      expect(await db.eventCount(), 1);
+      expect(await ReceiptQueue().read(), hasLength(1));
+      expect(await store.readPendingLink(), isNotNull);
+      expect(await store.readLastAccount(), isNotNull);
+    }
+
+    Future<void> expectEverythingGone() async {
+      final store = scoped.read(secureStoreProvider);
+      expect(mem['juvi.access'], isNull);
+      expect(mem['juvi.college_id'], isNull);
+      expect(await db.readDoc('me'), isNull);
+      expect(await db.hasAction(actionId), isFalse);
+      expect(await db.eventCount(), 0);
+      expect(await ReceiptQueue().read(), isEmpty);
+      expect(await store.readPendingLink(), isNull);
+      expect(await store.readLastAccount(), isNull);
+    }
+
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+      mem.clear();
+      messaging = FakePushMessaging();
+      local = FakeLocalNotifications();
+      scoped = withPush();
+    });
+
+    test('asks the server, then wipes, and never signs out or unregisters push', () async {
+      when(() => auth.deleteAccount()).thenAnswer((_) async {});
+      await seed();
+      await scoped.read(sessionControllerProvider.notifier).deleteAccount();
+
+      verify(() => auth.deleteAccount()).called(1);
+      verifyNever(() => auth.signOut());
+      expect(messaging.deletes, 0);
+      expect(local.cancelled, 0);
+      await expectEverythingGone();
+      expect(scoped.read(sessionControllerProvider), const SessionState.signedOut(reason: 'account_deleted'));
+    });
+
+    // AC4: nothing is deleted locally and the app stays signed in — a failed or offline delete
+    // must leave no half-deleted client behind.
+    for (final failure in [
+      const ApiFailure(ApiErrorCode.internal, 'Server exploded', status: 500),
+      const ApiFailure(ApiErrorCode.offline, "You're offline."),
+    ]) {
+      test('a failed delete (${failure.code.name}) touches nothing and keeps the session', () async {
+        when(() => auth.deleteAccount()).thenThrow(failure);
+        await scoped.read(sessionControllerProvider.notifier).updateAccount(account);
+        await seed();
+
+        await expectLater(scoped.read(sessionControllerProvider.notifier).deleteAccount(), throwsA(same(failure)));
+
+        expect(scoped.read(sessionControllerProvider), const SessionState.signedIn(account));
+        expect(mem['juvi.access'], 'a');
+        expect(mem['juvi.college_id'], 'c1');
+        expect((await db.readDoc('me'))!.json['id'], 'a1');
+        expect(await db.hasAction(actionId), isTrue);
+        expect(await db.eventCount(), 1);
+        expect(await ReceiptQueue().read(), hasLength(1));
+        expect(await scoped.read(secureStoreProvider).readPendingLink(), isNotNull);
+        expect(await scoped.read(secureStoreProvider).readLastAccount(), isNotNull);
+      });
+    }
   });
 
   test('accountDeactivated then sessionInvalidated keeps the deactivated state', () async {

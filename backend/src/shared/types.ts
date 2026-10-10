@@ -46,6 +46,8 @@ export type AuditAction =
   | 'archive'
   // Juvi notices: an acknowledgement recorded from the app
   | 'acknowledge'
+  // Juvi account deletion (011): a deletion was requested from the public web form
+  | 'request_deletion'
   // A refused attempt to read or act on something the caller may not (RCH-02)
   | 'access_denied'
   // AI / scoring events

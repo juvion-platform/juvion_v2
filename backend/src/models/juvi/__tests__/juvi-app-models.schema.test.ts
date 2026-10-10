@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { Types } from 'mongoose';
 import { JuviAccount } from '../JuviAccount';
-import { MobileSession } from '../MobileSession';
+import { MobileSession, REVOKE_REASONS } from '../MobileSession';
 import { ChannelTemplate } from '../ChannelTemplate';
 import { Channel } from '../Channel';
 import { ChannelMembership } from '../ChannelMembership';
@@ -82,5 +82,31 @@ describe('juvi-app models', () => {
     expect(c.juvi.enabled).toBe(false);
     expect(c.juvi.quietHoursDefault).toEqual({ start: '22:00', end: '07:00' });
     expect(c.juvi.timezone).toBe('Asia/Kolkata');
+  });
+
+  it('MobileSession accepts the account_deleted revoke reason and rejects a bogus one (011 T2)', () => {
+    expect(REVOKE_REASONS).toContain('account_deleted');
+    const base = { collegeId: oid(), accountId: oid(), userId: oid(), deviceId: 'd1', deviceName: 'Pixel', platform: 'android' as const, appVersion: '1.0.0', osVersion: '14', refreshTokenHash: 'h', refreshExpiresAt: new Date() };
+    expect(new MobileSession({ ...base, revokedReason: 'account_deleted' }).validateSync()).toBeUndefined();
+    expect(new MobileSession({ ...base, revokedReason: 'cleanup' }).validateSync()?.errors.revokedReason).toBeDefined();
+  });
+
+  it('JuviAccount deletion fields are absent (never null) and the sweep index is sparse', () => {
+    const base = { collegeId: oid(), personId: oid(), userId: oid(), kind: 'student' as const, provisionedBy: 'test' };
+    const doc = new JuviAccount(base);
+    expect(doc.validateSync()).toBeUndefined();
+    // Absent, not null: a sparse index DOES index an explicit null, so `default: null` would put every
+    // account in the sweep's index and defeat the scan (§5). This is the assertion that catches that.
+    expect(doc.deletionRequestedAt).toBeUndefined();
+    expect(doc.deletionRequestedVia).toBeUndefined();
+    expect(doc.deletionClaimedAt).toBeUndefined();
+    expect((JuviAccount.schema.path('deletionRequestedAt') as any).options.default).toBeUndefined();
+    expect((JuviAccount.schema.path('deletionClaimedAt') as any).options.default).toBeUndefined();
+    // `deletionRequestedVia` is a schema-local closed set, deliberately not exported (plan T1).
+    expect(new JuviAccount({ ...base, deletionRequestedVia: 'web' }).validateSync()?.errors.deletionRequestedVia).toBeDefined();
+    // The sweep's index is sparse so it covers only accounts that actually have a pending request.
+    const sweep = JuviAccount.schema.indexes().find(([fields]) => (fields as any).deletionRequestedAt === 1);
+    expect(sweep).toBeDefined();
+    expect((sweep![1] as any).sparse).toBe(true);
   });
 });

@@ -44,6 +44,14 @@ export interface IJuviAccount extends Document {
   transitions: IAccountTransition[];
   provisionedAt: Date;
   provisionedBy: string;
+  /**
+   * Account-deletion lifecycle (011 §5). Deliberately optional and with **no** default: the fields
+   * stay absent until a request exists, which is what lets the sparse index below stay small.
+   * `deletionClaimedAt` is an internal claim marker, never a scan predicate.
+   */
+  deletionRequestedAt?: Date;
+  deletionRequestedVia?: 'public_web';
+  deletionClaimedAt?: Date;
 }
 
 /** Shape of a JuviAccount read with `.lean()`: fields only, no Document methods. */
@@ -88,6 +96,11 @@ const schema = new Schema<IJuviAccount>(
     transitions: { type: [transitionSchema], default: [] },
     provisionedAt: { type: Date, default: Date.now },
     provisionedBy: { type: String, required: true },
+    // Account-deletion lifecycle (011 §5). No `default: null`, no `required`: `default: null` would be
+    // indexed by the sparse index below and pull every account into the sweep's scan.
+    deletionRequestedAt: { type: Date },
+    deletionRequestedVia: { type: String, enum: ['public_web'] },
+    deletionClaimedAt: { type: Date },
   },
   { timestamps: true },
 );
@@ -97,5 +110,7 @@ schema.index({ collegeId: 1, userId: 1 });
 schema.index({ collegeId: 1, status: 1, kind: 1 });
 schema.index({ collegeId: 1, studentId: 1 }, { sparse: true });
 schema.index({ collegeId: 1, facultyId: 1 }, { sparse: true });
+// The sweep's scan (011 §3.5.1). Sparse, so it holds only accounts with a pending deletion request.
+schema.index({ deletionRequestedAt: 1 }, { sparse: true });
 
 export const JuviAccount = model<IJuviAccount>('JuviAccount', schema);

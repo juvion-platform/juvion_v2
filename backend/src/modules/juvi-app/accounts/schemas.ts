@@ -21,6 +21,18 @@ export type SignInInput = z.infer<typeof signInSchema>;
 
 export const refreshSchema = z.object({ refreshToken: z.string().min(20).max(200), deviceId: z.string().min(8).max(128) });
 
+/**
+ * The public web form (011 Story 3 AC1). A native `<form>` submission, so every field arrives as a
+ * string; the institution **code** is the input, not a `collegeId` — resolving one to the other is
+ * `lookupInstitutionByCode`'s job and is what keeps this page usable by someone who no longer has
+ * the app. Same bounds as `signInSchema`, so a body accepted here is one sign-in would accept.
+ */
+export const accountDeletionRequestSchema = z.object({
+  institutionCode: z.string().trim().min(1).max(32),
+  identifier: z.string().trim().min(1).max(120),
+  password: z.string().min(1).max(200),
+});
+
 export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1).max(200),
   // ≥ 8 chars, no forced character classes (PRD S01).
@@ -81,6 +93,13 @@ export const meResponseSchema = z.object({
     supportContact: z.object({ name: z.string(), phone: z.string().optional(), email: z.string().optional() }).nullable(),
     timezone: z.string(),
   }),
+  /**
+   * 011 §3.5.3 — the trigger for the "deletion scheduled" banner. Top-level rather than inside
+   * `account`, because `accountSummarySchema` is the *sign-in* identity card too and carries no
+   * deletion state. Both are null until someone asks, and stay null after a cancellation.
+   */
+  deletionRequestedAt: z.string().nullable(),
+  deletionRequestedVia: z.string().nullable(),
   asOf: z.string(),
 });
 export type MeResponse = z.infer<typeof meResponseSchema>;

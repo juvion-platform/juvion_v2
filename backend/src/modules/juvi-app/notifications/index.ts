@@ -11,6 +11,7 @@ import { pushTransportWarning } from './transport';
 
 export { requestNoticeNotification, notificationKey, NOTIFICATION_REQUESTED } from './expand-consumer';
 export { requestClassChangeNotification } from './class-change';
+export { notifyDeletionRequestedBestEffort, accountDeletionKey, ACCOUNT_DELETION_KIND } from './account-deletion';
 
 export function registerNotificationConsumers(): void {
   registerConsumer(NOTIFICATION_REQUESTED, async (payload) => { await expandNotification(payload); });

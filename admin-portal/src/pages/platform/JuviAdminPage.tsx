@@ -2,6 +2,7 @@ import { NavLink, Route, Routes } from 'react-router-dom';
 import SettingsTab from '../../components/platform/juvi/SettingsTab';
 import ProvisioningTab from '../../components/platform/juvi/ProvisioningTab';   // Task 7
 import ChannelsTab from '../../components/platform/juvi/ChannelsTab';           // Task 8
+import DeletionsTab from '../../components/platform/juvi/DeletionsTab';         // 011 T15
 
 // Absolute paths: this page is mounted at `path="juvi/*"` (Platform.tsx), so a relative
 // NavLink target resolves against whatever the wildcard captured (the current URL), not
@@ -11,6 +12,7 @@ const TABS = [
   { to: '/platform/juvi', label: 'Provisioning', end: true },
   { to: '/platform/juvi/settings', label: 'Settings', end: false },
   { to: '/platform/juvi/channels', label: 'Channels', end: false },
+  { to: '/platform/juvi/deletions', label: 'Deletions', end: false },
 ];
 
 export default function JuviAdminPage() {
@@ -34,6 +36,7 @@ export default function JuviAdminPage() {
         <Route index element={<ProvisioningTab />} />
         <Route path="settings" element={<SettingsTab />} />
         <Route path="channels" element={<ChannelsTab />} />
+        <Route path="deletions" element={<DeletionsTab />} />
       </Routes>
     </div>
   );

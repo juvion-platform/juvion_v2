@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { mobileErrorHandler, MobileApiError } from './errors';
 import { configRouter } from './config/routes';
 import { accountsRouter } from './accounts/routes';
+import { publicDeletionRouter } from './accounts/public-deletion-routes';
 import { spacesRouter } from './spaces/routes';
 import { adminRouter } from './admin/routes';
 import { registerNoticeConsumers } from './notices/consumers';
@@ -22,6 +23,9 @@ v1Router.use(accountsRouter);
 v1Router.use(noticesRouter);
 v1Router.use(notificationsRouter);
 v1Router.use(homeRouter);   // §7: /today, /teaching, /me/academics — after notificationsRouter, before spacesRouter
+// Before spacesRouter, same reason as the receipts path above: the public account-deletion form has
+// no session at all (011 Story 3 AC7), so a router-wide authenticateMobile must not see it first.
+v1Router.use(publicDeletionRouter);
 v1Router.use(spacesRouter);
 
 const router = Router();

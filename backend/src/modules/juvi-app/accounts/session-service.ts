@@ -145,6 +145,15 @@ export async function rotateSession(
   throw new MobileApiError(401, 'SESSION_INVALIDATED', 'Please sign in again.', { reason: 'expired' });
 }
 
+/**
+ * Revokes one session by id, writing the reason through to the cache so the very next request on
+ * that device sees it (spec §8).
+ *
+ * Deliberately unscoped — this is the one session write that does not filter by `collegeId`, so
+ * every caller must have established that the session belongs to them first. `me-service.revokeDevice`
+ * does it with a scoped `findOne` before calling; the deletion path's ids come from a `collegeId`-scoped
+ * read. A caller passing an id straight off a request would cross colleges silently.
+ */
 export async function revokeSession(sessionId: string, reason: RevokeReason): Promise<void> {
   // The session's push token goes with it (notifications spec §7.1): a revoked device gets no more notifications.
   await MobileSession.updateOne({ _id: sessionId, revokedAt: null }, { $set: { revokedAt: new Date(), revokedReason: reason }, $unset: { pushToken: 1 } });

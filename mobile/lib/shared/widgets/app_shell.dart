@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:juvi/app/l10n/l10n.dart';
+import 'package:juvi/features/me/pending_deletion_banner.dart';
 import 'package:juvi/features/notices/widgets/due_badge.dart';
 import 'package:juvi/features/system/offline_banner.dart';
 
@@ -16,7 +17,9 @@ class AppShell extends StatelessWidget {
     final l = context.l10n;
     final isStudent = kind == 'student';
     return Scaffold(
-      body: Column(children: [const OfflineBanner(), Expanded(child: navigationShell)]),
+      // Both strips are silent (`SizedBox.shrink`) when they have nothing to say. The pending
+      // deletion is last so it sits under the offline strip, which owns the status-bar inset.
+      body: Column(children: [const OfflineBanner(), const PendingDeletionBanner(), Expanded(child: navigationShell)]),
       bottomNavigationBar: NavigationBar(
         selectedIndex: navigationShell.currentIndex,
         onDestinationSelected: (i) => navigationShell.goBranch(i, initialLocation: i == navigationShell.currentIndex),

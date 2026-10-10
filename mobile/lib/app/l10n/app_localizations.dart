@@ -592,6 +592,132 @@ abstract class AppLocalizations {
   /// **'More languages are planned.'**
   String get settingsLanguageMore;
 
+  /// 011 Story 1 AC1: the Settings row that opens the confirmation screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete my Juvi account'**
+  String get deleteAccountRow;
+
+  /// No description provided for @deleteAccountTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete your Juvi account'**
+  String get deleteAccountTitle;
+
+  /// 011 Story 1 AC1: heading of the list of what the deletion removes. The items below are its entries.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted from Juvi'**
+  String get deleteAccountDeletedSection;
+
+  /// No description provided for @deleteAccountDeletedAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Juvi account'**
+  String get deleteAccountDeletedAccount;
+
+  /// No description provided for @deleteAccountDeletedDevices.
+  ///
+  /// In en, this message translates to:
+  /// **'Every device signed in to it'**
+  String get deleteAccountDeletedDevices;
+
+  /// No description provided for @deleteAccountDeletedChannels.
+  ///
+  /// In en, this message translates to:
+  /// **'Your channel memberships'**
+  String get deleteAccountDeletedChannels;
+
+  /// No description provided for @deleteAccountDeletedDeliveries.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification delivery records'**
+  String get deleteAccountDeletedDeliveries;
+
+  /// No description provided for @deleteAccountDeletedAnalytics.
+  ///
+  /// In en, this message translates to:
+  /// **'App analytics events'**
+  String get deleteAccountDeletedAnalytics;
+
+  /// 011 Story 1 AC1: only the user's own acknowledgement rows go; the notice's audience record stays (see deleteAccountRetainedAudience).
+  ///
+  /// In en, this message translates to:
+  /// **'Your own seen and acknowledged state on notices'**
+  String get deleteAccountDeletedNoticeState;
+
+  /// 011 Story 1 AC1: heading of the list of what the college keeps. The items below are its entries.
+  ///
+  /// In en, this message translates to:
+  /// **'Kept by your institution'**
+  String get deleteAccountRetainedSection;
+
+  /// No description provided for @deleteAccountRetainedRecords.
+  ///
+  /// In en, this message translates to:
+  /// **'Academic, attendance, fee and exam records'**
+  String get deleteAccountRetainedRecords;
+
+  /// No description provided for @deleteAccountRetainedAudience.
+  ///
+  /// In en, this message translates to:
+  /// **'The audience record of notices already published'**
+  String get deleteAccountRetainedAudience;
+
+  /// No description provided for @deleteAccountRetainedPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Your profile photo, which is your photo in the ERP'**
+  String get deleteAccountRetainedPhoto;
+
+  /// 011 Story 1 AC2: the field's helper text. The phrase itself is passed in so it has one definition in code.
+  ///
+  /// In en, this message translates to:
+  /// **'Type {phrase} to confirm'**
+  String deleteAccountPhraseHint(String phrase);
+
+  /// No description provided for @deleteAccountPhraseLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirmation phrase'**
+  String get deleteAccountPhraseLabel;
+
+  /// 011 Story 1 AC2: the destructive button. It stays disabled until the phrase is typed exactly.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete my account'**
+  String get deleteAccountConfirm;
+
+  /// 011 Story 1 AC7: the banner shown in the app shell (and so on Settings) while GET /me carries a non-null deletionRequestedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Your account is scheduled for deletion'**
+  String get pendingDeletionTitle;
+
+  /// 011 Story 1 AC7 / Story 4 AC1: the cancellation window, stated rather than implied — it closes the moment the deletion is claimed (spec §3.5.1), so the copy must not promise an unlimited one.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel it any time before it is processed.'**
+  String get pendingDeletionBody;
+
+  /// No description provided for @pendingDeletionCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel deletion'**
+  String get pendingDeletionCancel;
+
+  /// 011 Story 1 AC7 / Story 4 AC1: shown on the 409 DELETION_NOT_CANCELLABLE, which is what makes it not a lying 204. The server's own message is never rendered; the copy is localized here.
+  ///
+  /// In en, this message translates to:
+  /// **'Too late — this deletion is already being processed and can no longer be cancelled.'**
+  String get pendingDeletionTooLate;
+
+  /// 011 Story 1 AC7: confirmation after the cancel is accepted (204).
+  ///
+  /// In en, this message translates to:
+  /// **'Your account is no longer scheduled for deletion.'**
+  String get pendingDeletionCancelled;
+
   /// No description provided for @deviceCurrentLabel.
   ///
   /// In en, this message translates to:

@@ -7,6 +7,7 @@ import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import { errorHandler } from './middleware/errorHandler';
 import { globalRateLimit } from './middleware/globalRateLimit';
+import { allowedOrigins } from './shared/http/allowed-origins';
 import apiRouter from './routes';
 import authRouter from './modules/auth/routes';
 import juviAppRouter from './modules/juvi-app/routes';
@@ -24,17 +25,14 @@ app.set('trust proxy', process.env.TRUST_PROXY_HOPS ? Number(process.env.TRUST_P
 
 app.use(helmet());
 
-// CORS: support multiple allowed origins via comma-separated ALLOWED_ORIGINS env var
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || process.env.CLIENT_URL || 'http://localhost:5173')
-  .split(',')
-  .map(o => o.trim())
-  .filter(Boolean);
-
+// CORS: support multiple allowed origins via comma-separated ALLOWED_ORIGINS env var.
+// Shared with the public account-deletion route, which applies the same list as its own CSRF
+// check (011 Story 3 AC8) — see `shared/http/allowed-origins.ts`.
 app.use(cors({
   origin(origin, callback) {
     // Allow requests with no origin (curl, server-to-server, mobile apps)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
+    if (allowedOrigins().includes(origin)) return callback(null, true);
     callback(new Error(`Origin ${origin} not allowed by CORS`));
   },
   credentials: true,

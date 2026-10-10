@@ -22,6 +22,7 @@ abstract class AuthRepository {
   Future<({Tokens tokens, AccountSummary account})> signIn({required String collegeId, required String identifier, required String password, required DeviceInfo device});
   Future<Tokens?> refresh(String refreshToken, String deviceId);
   Future<void> signOut();
+  Future<void> deleteAccount();
   Future<void> changePassword(String currentPassword, String newPassword);
   Future<AccountSummary> fetchAccount();
 }
@@ -89,6 +90,18 @@ class ApiAuthRepository implements AuthRepository {
       await _api.signOut();
     } on Object catch (_) {
       /* best effort; local wipe follows */
+    }
+  }
+
+  /// 011 Story 1 AC3: the one call that is *not* best effort. Unlike [signOut] this must not
+  /// swallow its failure — the caller only wipes the device once the server has confirmed, so an
+  /// offline or failed delete has to reach it as an [ApiFailure].
+  @override
+  Future<void> deleteAccount() async {
+    try {
+      await _api.deleteAccount();
+    } catch (e) {
+      throw ApiFailure.of(e);
     }
   }
 

@@ -10,6 +10,8 @@ Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **account** | [**MeAccount**](MeAccount.md) |  | 
 **asOf** | **String** |  | 
+**deletionRequestedAt** | **String** |  | 
+**deletionRequestedVia** | **String** |  | 
 **faculty** | [**MeFaculty**](MeFaculty.md) |  | 
 **institution** | [**MeInstitution**](MeInstitution.md) |  | 
 **person** | [**MePerson**](MePerson.md) |  | 

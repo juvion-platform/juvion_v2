@@ -3,6 +3,7 @@ import 'package:juvi/core/http/api_failure.dart';
 import 'package:juvi/core/http/api_providers.dart';
 import 'package:juvi/core/models/models.dart';
 import 'package:juvi/core/push/push_registration.dart';
+import 'package:juvi/core/push/receipts.dart';
 import 'package:juvi/core/repos/auth_repository.dart';
 import 'package:juvi/core/session/session_state.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -93,6 +94,23 @@ class SessionController extends _$SessionController {
     state = const SessionState.signedOut();
   }
 
+  /// 011 Story 1 AC3/AC4: delete the account on the server, and only then wipe this device.
+  ///
+  /// Deliberately not [signOut]: that revokes this phone's push token and calls the logout
+  /// endpoint, and both 401 against an account that no longer exists. Nothing here is best
+  /// effort either — if the call fails or the device is offline it throws, and because the wipe
+  /// happens after it, a failure leaves every local surface exactly as it was and the session
+  /// live (AC4). A half-deleted client is never a possible state.
+  ///
+  /// A 401 on this request is not handled here: the Dio interceptor already treats
+  /// `SESSION_INVALIDATED` as fatal and routes it through [handleFailure], which wipes the same
+  /// surfaces (AC6) — including on the other device whose copy of the account this is.
+  Future<void> deleteAccount() async {
+    await ref.read(authRepositoryProvider).deleteAccount();
+    await _wipeForDeletion();
+    state = const SessionState.signedOut(reason: 'account_deleted');
+  }
+
   /// Used by the Dio interceptor. Returns null when the session is gone (and wipes).
   Future<Tokens?> refreshTokens() async {
     final store = ref.read(secureStoreProvider);
@@ -115,7 +133,9 @@ class SessionController extends _$SessionController {
         // later sign-out (e.g. a second in-flight request that also 401s).
         if (state is Deactivated) return;
         state = SessionState.signedOut(reason: f.reason);
-        await _wipe();
+        // 011 AC6: an invalidation is how a deletion on *another* device reaches this one, and it
+        // triggers the same wipe a local deletion does — so the deletion one, not the sign-out one.
+        await _wipeForDeletion();
       case ApiErrorCode.accountDeactivated:
         final sc = f.detail['supportContact'];
         state = SessionState.deactivated(
@@ -141,6 +161,9 @@ class SessionController extends _$SessionController {
       case ApiErrorCode.reminderLimit:
       case ApiErrorCode.ackRequired:
       case ApiErrorCode.ackNotRequired:
+      // 011 T21: the banner renders this one itself, as the *too late* copy — nothing for the
+      // session to do about a deletion that is already committing.
+      case ApiErrorCode.deletionNotCancellable:
       case ApiErrorCode.offline:
       case ApiErrorCode.unknown:
         break;
@@ -156,6 +179,14 @@ class SessionController extends _$SessionController {
 
   /// Best effort, each part on its own: a storage error must not stop the rest of the
   /// wipe, nor escape as an uncaught error from the interceptor's `onFatal`.
+  ///
+  /// This is the *sign-out* wipe, and it is deliberately not the whole of what a deletion clears
+  /// ([_wipeForDeletion] is). It leaves `juvi.pending_link` and `juvi.last_account` — a
+  /// notification tapped while signed out parks its destination in the first, under the account
+  /// named by the second, and the next sign-in is what opens it (notifications §12) — and it
+  /// leaves the receipt queue, which lives in shared preferences rather than the drift database.
+  /// `wipeAll()` is a 3-key allowlist for the same reason; the device identity is not the
+  /// account's, and clearing it would orphan the encrypted database.
   Future<void> _wipe() async {
     try {
       await ref.read(secureStoreProvider).wipeAll();
@@ -167,6 +198,30 @@ class SessionController extends _$SessionController {
       await db.wipe();
     } on Object {
       // The cache is disposable; an unopenable one holds nothing to leak.
+    }
+  }
+
+  /// 011 Story 1 AC3/AC6: [the account is being deleted], either by this device or by another —
+  /// so this is [_wipe] **plus** the three surfaces a sign-out has to keep. Once the account is
+  /// gone there is no next sign-in for a held destination to open under, and an undrained
+  /// receipt is unusable without the account it belongs to.
+  ///
+  /// Kept separate from [_wipe] rather than folded into it: [signOut] and [refreshTokens]'s
+  /// expiry branch call that one, and clearing the held destination on an ordinary sign-out would
+  /// drop the destination a notification tapped while signed out was parked for.
+  Future<void> _wipeForDeletion() async {
+    await _wipe();
+    final store = ref.read(secureStoreProvider);
+    try {
+      await store.clearPendingLink();
+      await store.clearLastAccount();
+    } on Object {
+      // Defensive: both deletes are already best effort, so this only covers the read above.
+    }
+    try {
+      await ReceiptQueue().clear();
+    } on Object {
+      // An undrained receipt is unusable without the account it belongs to.
     }
   }
 }

@@ -69,8 +69,10 @@ Class | Method | HTTP request | Description
 ------------ | ------------- | ------------- | -------------
 [*MobileApi*](doc/MobileApi.md) | [**acknowledgeNotice**](doc/MobileApi.md#acknowledgenotice) | **POST** /notices/{id}/ack | Acknowledge a notice; 409 ALREADY_ACKNOWLEDGED carries the existing record
 [*MobileApi*](doc/MobileApi.md) | [**advanceOnboarding**](doc/MobileApi.md#advanceonboarding) | **POST** /me/onboarding/advance | Complete the current onboarding step
+[*MobileApi*](doc/MobileApi.md) | [**cancelAccountDeletion**](doc/MobileApi.md#cancelaccountdeletion) | **DELETE** /me/account/deletion-request | Cancel a pending account deletion; 409 once it is already being processed
 [*MobileApi*](doc/MobileApi.md) | [**changePassword**](doc/MobileApi.md#changepassword) | **POST** /auth/change-password | Change password; revokes other sessions
 [*MobileApi*](doc/MobileApi.md) | [**clearPushToken**](doc/MobileApi.md#clearpushtoken) | **DELETE** /me/devices/current/push-token | Remove this device&#39;s FCM token
+[*MobileApi*](doc/MobileApi.md) | [**deleteAccount**](doc/MobileApi.md#deleteaccount) | **DELETE** /me/account | Delete this Juvi account now, and everything the app holds for it
 [*MobileApi*](doc/MobileApi.md) | [**dismissNotice**](doc/MobileApi.md#dismissnotice) | **POST** /notices/{id}/dismiss | Dismiss a notice that needs no acknowledgement
 [*MobileApi*](doc/MobileApi.md) | [**getAttention**](doc/MobileApi.md#getattention) | **GET** /attention | Due items: the notice stack, or every attention item with kinds&#x3D;all
 [*MobileApi*](doc/MobileApi.md) | [**getChannel**](doc/MobileApi.md#getchannel) | **GET** /channels/{id} | Channel header and About
