@@ -180,9 +180,12 @@ export function buildOpenApiDocument(): OpenApiDocument {
     // names — there is no id in either path, so neither can address anyone else's account.
     // `deleteAccount` is deliberately unconditional (no grace check, no look at a pending public
     // request): a request already in flight collapses the window rather than blocking this call.
+    // The 404 is the idempotent second call's other half (Story 2 AC6) — the account row is gone
+    // by then, so `me-controller` throws NOT_FOUND rather than 204ing at an account that is not
+    // there (`juvi-account-deletion.e2e.test.ts:60` accepts either).
     // `cancelAccountDeletion` answers 204 when there was nothing to cancel — an idempotent undo —
     // and reserves 409 for the one case that is a real refusal: the deletion is already claimed.
-    { operationId: 'deleteAccount', method: 'delete', path: '/me/account', summary: 'Delete this Juvi account now, and everything the app holds for it', auth: true, status: 204, errors: [401] },
+    { operationId: 'deleteAccount', method: 'delete', path: '/me/account', summary: 'Delete this Juvi account now, and everything the app holds for it', auth: true, status: 204, errors: [401, 404] },
     { operationId: 'cancelAccountDeletion', method: 'delete', path: '/me/account/deletion-request', summary: 'Cancel a pending account deletion; 409 once it is already being processed', auth: true, status: 204, errors: [401, 409] },
     { operationId: 'postNotificationReceipts', method: 'post', path: '/notifications/receipts', summary: 'Delivered and opened receipts; each item is authorised by its HMAC receipt, not a session', auth: false, body: C.ReceiptsRequest, response: C.ReceiptsResult, errors: [400, 401, 429] },
     { operationId: 'postEvents', method: 'post', path: '/events', summary: 'Product analytics: allow-listed names, id-like props; invalid events are dropped one by one', auth: true, body: C.EventsRequest, response: C.EventsResult, errors: [400, 401] },

@@ -4085,6 +4085,16 @@
               }
             },
             "description": "Error 401"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error 404"
           }
         },
         "security": [
