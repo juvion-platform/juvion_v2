@@ -1,19 +1,35 @@
 # Tasks — 011-account-deletion
 
 ## STATUS
-**Not started.** GATE 2 met (round 4: 0 CRITICAL / 0 HIGH on all three validators; revision-5 edits
-confirmed against live code, 22/22). `plan.md` written. **GATE 3 met** — `gate3-audit.md` reads PASS,
-0 CRITICAL / 0 HIGH; all four MEDIUMs and all six LOWs folded into `spec.md` / `plan.md` / this file
-(see that file's "Disposition" section). Implementation may begin; the only thing outstanding is the
-branch (below).
+**Complete.** T1–T22 are implemented, tested and committed on `feat/juvi-account-deletion` (branched
+from `origin/main`; 25 commits, `ba197a5` … `e7a3b5f`). GATE 2 and GATE 3 were met before T1
+(round 4: 0 CRITICAL / 0 HIGH on all three validators; `gate3-audit.md` reads PASS) — see
+`gate2-resolution.md` and `gate3-audit.md`.
+
+**Both feature gates discharged**, each by mutation rather than by reading, each with the mutated
+file restored byte-identically (`diff -q`):
+
+- **T4 (`isActive: true` on both paths).** The in-app half already existed
+  (`deletion-service.test.ts:81`). The sweep half was missing — `deletion-sweep.test.ts` mocks the
+  deleter at module scope, so nothing there could ask whether the deleter was *safe* to reach — and
+  is now `deletion-sweep.test.ts:177`, running the real `runAccountDeletion` through
+  `sweepAccountDeletions`. `$set: { isActive: false }` in the deleter reddens both by name;
+  `User.deleteOne` reddens the e2e assertion (`juvi-account-deletion.e2e.test.ts:45`). Commit
+  `4cead21`.
+- **T12 (query shapes by mutation).** `status: { $in: ELIGIBLE_STATUSES }` on the scan reddens
+  `deletion-sweep.test.ts:52`; removing `if (!claimed) continue;` reddens `:117`.
+
+Test runners: `npx vitest run <path>` (backend units), `npx vitest run --config vitest.e2e.config.ts
+<path>` (backend e2e — in-memory Mongo, no live services), `flutter test` (mobile), Playwright for
+the browser suite.
 
 TDD-ordered, each commit-shaped. Derived from `plan.md` (§5–§13), incorporating the GATE-2 rulings in
 `gate2-resolution.md` (rulings 11–15). Each task: **RED** (failing test) → **GREEN** (minimal impl) →
 **REFACTOR** → typecheck → commit.
 
-Branch: **not yet created** — the `.sdd/` artifacts are currently untracked on
-`chore/deploy-atomic-portal-publish` (PR #113) and need a branch off `origin/main` before T1 commits.
-Test runner: `npx vitest run` (backend, scoped by path); `flutter test` (mobile); Playwright for e2e.
+Not code, and not finished by this branch: the deploy prerequisites in the "Before publishing"
+section of `docs/juvi/account-deletion-retention.md` (a hosted URL for the disclosure, which is what
+the Play listing links to) and the one-time server setup recorded on PR #113.
 
 Every commit message ends with:
 `Co-Authored-By: Claude Code <noreply@anthropic.com>`
