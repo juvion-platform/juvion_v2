@@ -2,9 +2,20 @@
 
 ## STATUS
 **Complete.** T1–T22 are implemented, tested and committed on `feat/juvi-account-deletion` (branched
-from `origin/main`; 25 commits, `ba197a5` … `e7a3b5f`). GATE 2 and GATE 3 were met before T1
+from `origin/main`; 29 commits, `ba197a5` … `ea6f902`). GATE 2 and GATE 3 were met before T1
 (round 4: 0 CRITICAL / 0 HIGH on all three validators; `gate3-audit.md` reads PASS) — see
 `gate2-resolution.md` and `gate3-audit.md`.
+
+**T21's tests took three fix rounds**, each one closing a *falsifiability* gap rather than a
+behaviour change, and each verified by mutation with the mutated file restored byte-identically:
+the first round fixed five review findings (`e7a3b5f`); the second re-review found the round's own
+"Cancel clears it" assertion **vacuous** — it read the cached `me` document after `pumpAndSettle`,
+by which point the post-invalidate refetch had already rewritten it, so deleting the repository's
+cache clear left the test green (reproduced, then `e4a8ee3`: the refetch is now held open and the
+cache read while it is in flight, so the clear is the only writer of a null at that moment); the
+third (`ea6f902`) finished the re-arm — clearing `_error` with `_tooLate`, and keying the reset on
+a *changed* `deletionRequestedAt` rather than its presence. Full mobile suite 351/351,
+`flutter analyze lib test` clean.
 
 **Both feature gates discharged**, each by mutation rather than by reading, each with the mutated
 file restored byte-identically (`diff -q`):
