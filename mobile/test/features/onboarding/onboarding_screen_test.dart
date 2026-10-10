@@ -236,4 +236,38 @@ void main() {
     expect(router.state.uri.toString(), '/onboarding/0');
     expect(find.text('Your college has set you up'), findsOneWidget);
   });
+
+  // R54 deliberately lets the back button land on an already-completed step, but that step's
+  // Continue replayed advanceOnboarding(widget.step) — and the server refuses any step below
+  // account.onboardingStep ("That step is out of order.", me-service.ts advanceOnboarding),
+  // so the user was left holding a button that could never succeed. Re-entry is not progress:
+  // Continue there must move forward to the step the account is actually on, without a call.
+  testWidgets('Continue on a completed step reached via back moves forward instead of re-advancing', (t) async {
+    final repo = _Repo();
+    when(() => repo.advanceOnboarding(0)).thenAnswer((_) async {
+      throw const ApiFailure(ApiErrorCode.validationFailed, 'That step is out of order.');
+    });
+    final router = GoRouter(
+      initialLocation: '/onboarding/0',
+      routes: [GoRoute(path: '/onboarding/:step', builder: (_, s) => OnboardingScreen(step: int.parse(s.pathParameters['step']!)))],
+    );
+    addTearDown(router.dispose);
+    await t.pumpWidget(ProviderScope(
+      overrides: [
+        meProvider.overrideWith((_) async* { yield Cached(Me.fromJson(meJson), DateTime.now()); }),
+        spacesProvider.overrideWith((_) async* { yield Cached(SpacesData.fromJson(spacesJson), DateTime.now()); }),
+        meRepositoryProvider.overrideWith((_) async => repo),
+        // onboardingStep is already 1 — this is the state back-navigation produces.
+        sessionControllerProvider.overrideWith(() => _Session(['identity', 'spaces'])),
+      ],
+      child: MaterialApp.router(localizationsDelegates: AppLocalizations.localizationsDelegates, supportedLocales: AppLocalizations.supportedLocales, routerConfig: router),
+    ));
+    await t.pumpAndSettle();
+    expect(find.text('Your college has set you up'), findsOneWidget);
+    await t.tap(find.text('Continue'));
+    await t.pumpAndSettle();
+    expect(find.text('That step is out of order.'), findsNothing);
+    verifyNever(() => repo.advanceOnboarding(0));
+    expect(router.state.uri.toString(), '/onboarding/1');
+  });
 }
