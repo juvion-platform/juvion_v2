@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:juvi/app/l10n/l10n.dart';
+import 'package:juvi/core/http/api_failure.dart';
 import 'package:juvi/shared/widgets/section_header.dart';
 
 /// The phrase the user has to type (011 Story 1 AC2). Exact — not case-folded and not trimmed,
@@ -23,6 +24,7 @@ class DeleteAccountScreen extends StatefulWidget {
 
 class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
   final _typed = TextEditingController();
+  bool _busy = false;
 
   @override
   void dispose() {
@@ -30,10 +32,25 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
     super.dispose();
   }
 
+  /// AC4: a failed or offline delete leaves everything as it was, so the failure is shown and the
+  /// screen stays usable — the phrase is still typed, so a retry does not mean typing it again.
+  /// On success the controller flips to signed-out and the router takes this screen away, which
+  /// is why nothing resets `_busy` in that case.
+  Future<void> _confirm() async {
+    setState(() => _busy = true);
+    try {
+      await widget.onConfirm?.call();
+    } on ApiFailure catch (f) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(f.message)));
+    }
+    if (mounted) setState(() => _busy = false);
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
     final error = Theme.of(context).colorScheme.error;
+    const spinner = SizedBox.square(dimension: 24, child: CircularProgressIndicator(strokeWidth: 2.5));
     return Scaffold(
       appBar: AppBar(title: Text(l.deleteAccountTitle)),
       body: ListView(
@@ -68,8 +85,8 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: FilledButton(
-              onPressed: _typed.text == deleteAccountPhrase ? () => widget.onConfirm?.call() : null,
-              child: Text(l.deleteAccountConfirm),
+              onPressed: !_busy && _typed.text == deleteAccountPhrase ? _confirm : null,
+              child: _busy ? spinner : Text(l.deleteAccountConfirm),
             ),
           ),
         ],

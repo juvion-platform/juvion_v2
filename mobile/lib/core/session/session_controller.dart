@@ -94,6 +94,23 @@ class SessionController extends _$SessionController {
     state = const SessionState.signedOut();
   }
 
+  /// 011 Story 1 AC3/AC4: delete the account on the server, and only then wipe this device.
+  ///
+  /// Deliberately not [signOut]: that revokes this phone's push token and calls the logout
+  /// endpoint, and both 401 against an account that no longer exists. Nothing here is best
+  /// effort either — if the call fails or the device is offline it throws, and because the wipe
+  /// happens after it, a failure leaves every local surface exactly as it was and the session
+  /// live (AC4). A half-deleted client is never a possible state.
+  ///
+  /// A 401 on this request is not handled here: the Dio interceptor already treats
+  /// `SESSION_INVALIDATED` as fatal and routes it through [handleFailure], which wipes the same
+  /// surfaces (AC6) — including on the other device whose copy of the account this is.
+  Future<void> deleteAccount() async {
+    await ref.read(authRepositoryProvider).deleteAccount();
+    await _wipe();
+    state = const SessionState.signedOut(reason: 'account_deleted');
+  }
+
   /// Used by the Dio interceptor. Returns null when the session is gone (and wipes).
   Future<Tokens?> refreshTokens() async {
     final store = ref.read(secureStoreProvider);

@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:juvi/app/l10n/l10n.dart';
 import 'package:juvi/core/analytics/analytics.dart';
+import 'package:juvi/core/http/api_failure.dart';
 import 'package:juvi/core/models/models.dart';
 import 'package:juvi/core/repos/me_repository.dart';
 import 'package:juvi/features/me/delete_account_screen.dart';
@@ -137,5 +138,17 @@ void main() {
     await t.tap(find.byType(FilledButton));
     await t.pumpAndSettle();
     expect(deletes, 1);
+  });
+
+  // S1 AC4: the failure is shown rather than swallowed, and the screen stays usable — the phrase
+  // is still typed, so retrying does not mean typing it again.
+  testWidgets('S1 AC4: a failed confirmation says why and leaves the screen usable', (t) async {
+    await _pump(t, onConfirm: () async => throw const ApiFailure(ApiErrorCode.internal, 'Server exploded'));
+    await t.enterText(find.byType(TextField), 'DELETE');
+    await t.pumpAndSettle();
+    await t.tap(find.byType(FilledButton));
+    await t.pumpAndSettle();
+    expect(find.text('Server exploded'), findsOneWidget);
+    expect(t.widget<FilledButton>(find.byType(FilledButton)).onPressed, isNotNull);
   });
 }

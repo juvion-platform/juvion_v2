@@ -75,7 +75,14 @@ GoRouter buildRouter(Ref ref) {
           StatefulShellBranch(routes: [
             GoRoute(path: '/me', builder: (_, _) => const MeScreen(), routes: [
               GoRoute(path: 'settings', builder: (_, _) => const SettingsScreen(), routes: [
-                GoRoute(path: 'delete-account', builder: (_, _) => const DeleteAccountScreen()),
+                // The screen only gates the action; the delete-then-wipe itself is the session
+                // controller's (011 Story 1 AC3).
+                GoRoute(
+                  path: 'delete-account',
+                  builder: (_, _) => DeleteAccountScreen(
+                    onConfirm: () => ref.read(sessionControllerProvider.notifier).deleteAccount(),
+                  ),
+                ),
               ]),
               GoRoute(path: 'devices', builder: (_, _) => const DevicesScreen()),
               GoRoute(path: 'change-password', builder: (_, _) => const ChangePasswordScreen()),

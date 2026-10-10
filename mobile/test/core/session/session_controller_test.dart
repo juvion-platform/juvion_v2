@@ -179,6 +179,118 @@ void main() {
     expect(await store.databaseKey(), databaseKey);
   });
 
+  // 011 Story 1 AC3/AC4 (T20). The server call is what authorises the wipe, and it is the only
+  // thing that does: a deletion must not go through `signOut()`, because the push-token revoke
+  // and the logout call both 401 against an account that no longer exists.
+  group('deleteAccount', () {
+    late FakePushMessaging messaging;
+    late FakeLocalNotifications local;
+    late ProviderContainer scoped;
+    late String actionId;
+
+    ProviderContainer withPush() {
+      final dio = Dio(BaseOptions(baseUrl: 'https://api.test/v1'));
+      DioAdapter(dio: dio).onDelete('/me/devices/current/push-token', (s) => s.reply(204, null));
+      final registration = PushRegistration(
+        messaging: messaging,
+        local: local,
+        api: () => JuviApi(dio: dio, basePathOverride: 'https://api.test/v1').getMobileApi(),
+        signedIn: () => true,
+        allowed: () async => true,
+      );
+      final container = ProviderContainer(retry: (_, _) => null, overrides: [
+        authRepositoryProvider.overrideWithValue(auth),
+        secureStoreProvider.overrideWithValue(SecureStore(_storageOver(mem))),
+        appDatabaseProvider.overrideWith((_) async => db),
+        pushRegistrationProvider.overrideWithValue(registration),
+      ]);
+      addTearDown(container.dispose);
+      return container;
+    }
+
+    /// Everything the wipe has to reach, loaded and asserted: the assertions after it can only
+    /// pass because the deletion emptied them, not because they were never populated.
+    Future<void> seed() async {
+      final store = scoped.read(secureStoreProvider);
+      final action = PendingAction.create('settings.patch', {'k': 'v'});
+      mem['juvi.access'] = 'a';
+      mem['juvi.refresh'] = 'r';
+      mem['juvi.college_id'] = 'c1';
+      await (await scoped.read(appDatabaseProvider.future)).writeDoc('me', {'id': 'a1'}, DateTime.now().toUtc());
+      await db.enqueueAction(action);
+      actionId = action.id;
+      await db.enqueueEvent('glance.opened', DateTime.now().toUtc(), {'n': 1});
+      await ReceiptQueue().add(ReceiptItem(deliveryId: 'd1', receipt: 'sig.1', event: 'delivered', at: DateTime.now().toUtc()));
+      await store.writePendingLink('{"route":"/notices/n1"}');
+      await store.writeLastAccount('c1:a1');
+      expect(await store.readTokens(), isNotNull);
+      expect(await db.readDoc('me'), isNotNull);
+      expect(await db.hasAction(actionId), isTrue);
+      expect(await db.eventCount(), 1);
+      expect(await ReceiptQueue().read(), hasLength(1));
+      expect(await store.readPendingLink(), isNotNull);
+      expect(await store.readLastAccount(), isNotNull);
+    }
+
+    Future<void> expectEverythingGone() async {
+      final store = scoped.read(secureStoreProvider);
+      expect(mem['juvi.access'], isNull);
+      expect(mem['juvi.college_id'], isNull);
+      expect(await db.readDoc('me'), isNull);
+      expect(await db.hasAction(actionId), isFalse);
+      expect(await db.eventCount(), 0);
+      expect(await ReceiptQueue().read(), isEmpty);
+      expect(await store.readPendingLink(), isNull);
+      expect(await store.readLastAccount(), isNull);
+    }
+
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+      mem.clear();
+      messaging = FakePushMessaging();
+      local = FakeLocalNotifications();
+      scoped = withPush();
+    });
+
+    test('asks the server, then wipes, and never signs out or unregisters push', () async {
+      when(() => auth.deleteAccount()).thenAnswer((_) async {});
+      await seed();
+      await scoped.read(sessionControllerProvider.notifier).deleteAccount();
+
+      verify(() => auth.deleteAccount()).called(1);
+      verifyNever(() => auth.signOut());
+      expect(messaging.deletes, 0);
+      expect(local.cancelled, 0);
+      await expectEverythingGone();
+      expect(scoped.read(sessionControllerProvider), const SessionState.signedOut(reason: 'account_deleted'));
+    });
+
+    // AC4: nothing is deleted locally and the app stays signed in — a failed or offline delete
+    // must leave no half-deleted client behind.
+    for (final failure in [
+      const ApiFailure(ApiErrorCode.internal, 'Server exploded', status: 500),
+      const ApiFailure(ApiErrorCode.offline, "You're offline."),
+    ]) {
+      test('a failed delete (${failure.code.name}) touches nothing and keeps the session', () async {
+        when(() => auth.deleteAccount()).thenThrow(failure);
+        await scoped.read(sessionControllerProvider.notifier).updateAccount(account);
+        await seed();
+
+        await expectLater(scoped.read(sessionControllerProvider.notifier).deleteAccount(), throwsA(same(failure)));
+
+        expect(scoped.read(sessionControllerProvider), const SessionState.signedIn(account));
+        expect(mem['juvi.access'], 'a');
+        expect(mem['juvi.college_id'], 'c1');
+        expect((await db.readDoc('me'))!.json['id'], 'a1');
+        expect(await db.hasAction(actionId), isTrue);
+        expect(await db.eventCount(), 1);
+        expect(await ReceiptQueue().read(), hasLength(1));
+        expect(await scoped.read(secureStoreProvider).readPendingLink(), isNotNull);
+        expect(await scoped.read(secureStoreProvider).readLastAccount(), isNotNull);
+      });
+    }
+  });
+
   test('accountDeactivated then sessionInvalidated keeps the deactivated state', () async {
     mem['juvi.access'] = 'a';
     final s = c.read(sessionControllerProvider.notifier);
