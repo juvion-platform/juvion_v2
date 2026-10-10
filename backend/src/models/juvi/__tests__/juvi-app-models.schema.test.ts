@@ -83,4 +83,23 @@ describe('juvi-app models', () => {
     expect(c.juvi.quietHoursDefault).toEqual({ start: '22:00', end: '07:00' });
     expect(c.juvi.timezone).toBe('Asia/Kolkata');
   });
+
+  it('JuviAccount deletion fields are absent (never null) and the sweep index is sparse', () => {
+    const base = { collegeId: oid(), personId: oid(), userId: oid(), kind: 'student' as const, provisionedBy: 'test' };
+    const doc = new JuviAccount(base);
+    expect(doc.validateSync()).toBeUndefined();
+    // Absent, not null: a sparse index DOES index an explicit null, so `default: null` would put every
+    // account in the sweep's index and defeat the scan (§5). This is the assertion that catches that.
+    expect(doc.deletionRequestedAt).toBeUndefined();
+    expect(doc.deletionRequestedVia).toBeUndefined();
+    expect(doc.deletionClaimedAt).toBeUndefined();
+    expect((JuviAccount.schema.path('deletionRequestedAt') as any).options.default).toBeUndefined();
+    expect((JuviAccount.schema.path('deletionClaimedAt') as any).options.default).toBeUndefined();
+    // `deletionRequestedVia` is a schema-local closed set, deliberately not exported (plan T1).
+    expect(new JuviAccount({ ...base, deletionRequestedVia: 'web' }).validateSync()?.errors.deletionRequestedVia).toBeDefined();
+    // The sweep's index is sparse so it covers only accounts that actually have a pending request.
+    const sweep = JuviAccount.schema.indexes().find(([fields]) => (fields as any).deletionRequestedAt === 1);
+    expect(sweep).toBeDefined();
+    expect((sweep![1] as any).sparse).toBe(true);
+  });
 });
