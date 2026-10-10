@@ -3,6 +3,9 @@ import type { Express } from 'express';
 import { getTestApp, cleanupTestApp } from '../setup/test-app';
 import { seedBase, BaseFixtures } from '../setup/seed-base';
 import { enableJuvi, provisionTestStudent, mobileClient, TEST_DEVICE } from '../factories/juvi.factory';
+import request from 'supertest';
+import { allowedOrigins } from '../../shared/http/allowed-origins';
+import { DELETION_GRACE_DAYS } from '../../modules/juvi-app/accounts/deletion-service';
 import { JuviAccount } from '../../models/juvi/JuviAccount';
 import { MobileSession } from '../../models/juvi/MobileSession';
 import { User } from '../../models/User';
@@ -185,5 +188,59 @@ describe('best-effort clears on the auth paths (011 T6)', () => {
     // …and the request is still there for the next attempt to clear.
     const raw = await JuviAccount.findOne({ collegeId: fx.collegeId }).lean();
     expect(raw!.deletionRequestedAt).toBeInstanceOf(Date);
+  });
+});
+
+/**
+ * 011 T9 — the public web path, through the **real** app.
+ *
+ * The route's own CSRF matrix is pinned by `accounts/__tests__/public-deletion.test.ts`, which mounts
+ * the router bare: `app.ts`'s `cors()` rejects a disallowed `Origin` before the route runs, so a
+ * full-app test could only ever observe the middleware. What this file adds is the two things the
+ * bare-router test structurally cannot show — that the route is reachable with **no**
+ * `Authorization` header (AC7), and that it reads the *same* allowlist `cors()` does.
+ */
+describe('POST /account-deletion (011 T9)', () => {
+  /** A same-origin submission from the allowlisted portal origin, with both AC8 signals agreeing. */
+  function publicForm(fields: Record<string, string>) {
+    return request(app)
+      .post(`${V1}/account-deletion`)
+      .set('Origin', allowedOrigins()[0]!)
+      .set('Sec-Fetch-Site', 'same-origin')
+      .type('form')
+      .send(fields);
+  }
+
+  it('answers with no Authorization header at all, and schedules rather than deletes', async () => {
+    const s = await provisionTestStudent(fx);
+
+    const res = await publicForm({
+      institutionCode: 'JIT-TEST', identifier: s.student.rollNumber, password: s.tempPassword,
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.graceDays).toBe(DELETION_GRACE_DAYS);
+    // Scheduled, not executed: the account is still there and the ERP login is untouched. If the
+    // mount had landed *after* spacesRouter this would be a 401 and nothing would be set — which is
+    // exactly what moving that one line in `routes.ts` produces.
+    const raw = await JuviAccount.findById(s.account._id).lean();
+    expect(raw).not.toBeNull();
+    expect(raw!.deletionRequestedAt).toBeInstanceOf(Date);
+    expect(raw!.deletionRequestedVia).toBe('public_web');
+    expect(await MobileSession.countDocuments({ collegeId: fx.collegeId })).toBe(0);
+    expect(String((await User.findById(s.account.userId).lean())!.password)).toBeTruthy();
+  });
+
+  it('carries no session and no token back to the caller', async () => {
+    const s = await provisionTestStudent(fx);
+
+    const res = await publicForm({
+      institutionCode: 'JIT-TEST', identifier: s.student.rollNumber, password: s.tempPassword,
+    });
+
+    // A web form has nowhere to put a token, and issuing one here would be an unauthenticated
+    // session-minting endpoint. The body is exactly the scheduling receipt.
+    expect(Object.keys(res.body).sort()).toEqual(['completesAt', 'graceDays', 'requested']);
+    expect(JSON.stringify(res.body)).not.toMatch(/token/i);
   });
 });

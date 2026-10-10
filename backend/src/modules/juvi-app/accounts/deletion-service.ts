@@ -156,3 +156,55 @@ export async function clearDeletionRequestBestEffort(collegeId: string, accountI
   }
 }
 
+/**
+ * The deferred public path's grace period, in days (011 §3.5).
+ *
+ * It lives here rather than in the sweep worker because **two** modules need the same number and
+ * neither may own the other: the public endpoint tells the requester when their deletion completes,
+ * and the sweep decides when to run it. Defining it in the worker would make the response text
+ * depend on the executor, so a drift between the two would be a promise the college never keeps.
+ *
+ * Seven days is the industry norm for exactly this shape: long enough that a stuffed shared
+ * password is not an irreversible silence, short enough that the requester — who may no longer have
+ * the app — is not left waiting.
+ */
+export const DELETION_GRACE_DAYS = 7;
+
+/**
+ * Schedule a deletion from the public web form (011 Story 3 AC4, §3.5).
+ *
+ * **Not the deletion, and deliberately not idempotent-with-a-guard.** The in-app path deletes now,
+ * because a live authenticated session plus a typed phrase proves possession. The web form has only
+ * a password, and that password is the *shared ERP credential* — so a single stuffed password would
+ * otherwise become an unauthenticated, irreversible account destruction. The request therefore sets
+ * a deadline and the sweep executes it.
+ *
+ * Returns whether **this call** was the unset → set transition. Two things hang off it and must not
+ * be duplicated by a repeat POST: the `request_deletion` audit row and, in T10, the push. A repeat
+ * still re-asserts `deletionRequestedAt` to now, which **extends** the window rather than
+ * completing it — deliberate: the second request is a second independent proof of the password, and
+ * someone who just asked again has asked to be deleted, not to be deleted sooner.
+ *
+ * Two statements rather than one `findOneAndUpdate`, because the two branches write different
+ * things: only the transition may be reported to the audit trail. `$unset`ing the claim is not
+ * needed here — a claimed row means the executor is already past the point of no return, and
+ * `clearDeletionRequest` (the only place that unsets) is what refuses in that case, not this.
+ */
+export async function requestPublicDeletion(collegeId: string, accountId: string): Promise<boolean> {
+  const requestedAt = new Date();
+  const set = { deletionRequestedAt: requestedAt, deletionRequestedVia: 'public_web' as const };
+
+  const transition = await JuviAccount.updateOne(
+    { _id: accountId, collegeId, deletionRequestedAt: null },
+    { $set: set },
+  );
+  if ((transition.matchedCount ?? 0) > 0) return true;
+
+  // Already set: re-assert the clock, and write nothing a reader could mistake for a first request.
+  await JuviAccount.updateOne(
+    { _id: accountId, collegeId, deletionRequestedAt: { $ne: null } },
+    { $set: { deletionRequestedAt: requestedAt } },
+  );
+  return false;
+}
+
