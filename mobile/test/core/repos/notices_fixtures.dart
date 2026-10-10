@@ -84,7 +84,25 @@ Map<String, dynamic> detailJson(
 
 const Map<String, dynamic> pdfAttachment = {'key': 'colleges/c1/notices/7f3a', 'name': 'timetable.pdf', 'mime': 'application/pdf', 'size': 245760};
 
-Map<String, dynamic> attentionJson(List<Map<String, dynamic>> items, {int? dueCount}) => {'dueCount': dueCount ?? items.length, 'items': items};
+/// Builds an `Attention` response body.
+///
+/// The contract requires every `AttentionItem` to carry a `kind` discriminator
+/// (`mobile/api/openapi.json`, `required: ['kind','id']`, enum
+/// `notice|class_change|fee_due|assessment`) — the regenerated client enforces it
+/// with `$checkKeys(..., requiredKeys: ['id','kind'])`. The server stamps
+/// `kind: 'notice'` on every notice card it emits (`notices/mobile-service.ts`,
+/// both `attention()` and `attentionAll()`), so a bare [cardJson] is NOT a valid
+/// attention item: its absence throws inside the generated `Attention.fromJson`,
+/// which the repository's `_guard` flattens into `ApiFailure(unknown)`.
+///
+/// Stamped here rather than in [cardJson], which also models the `/notices`
+/// `NoticeCard` — that schema has no `kind` and must not gain one. An item that
+/// already carries a `kind` (an ERP `fee_due` / `class_change` / `assessment`
+/// item) keeps it.
+Map<String, dynamic> attentionJson(List<Map<String, dynamic>> items, {int? dueCount}) => {
+      'dueCount': dueCount ?? items.length,
+      'items': items.map((i) => <String, dynamic>{'kind': 'notice', ...i}).toList(),
+    };
 
 Map<String, dynamic> ackJson({bool late = false, String method = 'hold', bool offline = false, String? clientAt}) => {
       'ackAt': '2026-10-01T05:00:00.000Z',
