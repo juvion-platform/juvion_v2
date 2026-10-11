@@ -29,7 +29,13 @@ test.describe('Public privacy policy page', () => {
 
     const html = await page.content();
     expect(html).not.toContain('<script');
-    expect(html).not.toMatch(/\son(click|submit|load|input|change|focus|blur)\s*=/i);
+    // Every inline handler, not a named handful (an `onerror` on an injected `<img>` is a script in
+    // all but name), plus `javascript:` URLs in a link. Explicit names rather than `on[a-z]+` so a
+    // stray " on ... =" in the policy's prose cannot redden this by accident.
+    expect(html).not.toMatch(
+      /\son(click|submit|load|input|change|focus|blur|error|mouseover|mouseout|pointerdown|keydown|keyup)\s*=/i,
+    );
+    expect(html).not.toMatch(/href\s*=\s*["']?\s*javascript:/i);
 
     // One heading names the document; a second would mean a stray fragment was pasted in.
     await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);

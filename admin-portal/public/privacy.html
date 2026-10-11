@@ -100,8 +100,10 @@
         <p>
           What was sent to you, when it was delivered, whether you opened it, and your own state on
           each notice — received, seen, dismissed, reminded, or acknowledged. If you type a comment
-          when you acknowledge a notice, that comment is stored too. The push notification itself
-          carries only identifiers, never the notice's text, attachments or names.
+          when you acknowledge a notice, that comment is stored too. A push notification carries the
+          notice's identifier and the office that sent it, plus the title of a single notice that is
+          not confidential. It never carries the notice's body or attachments, or anyone's name, roll
+          number or deadline.
         </p>
 
         <h3>Which parts of the app you use</h3>
@@ -126,9 +128,11 @@
 
       <h3>What the app does not collect</h3>
       <p>
-        The Juvi app does not read or send your phone number, email address, date of birth, home
-        address, government identifiers, or bank or payment details. It takes no payment, and it
-        contains no advertising and no third-party analytics or tracking software.
+        The Juvi app does not collect your phone number, date of birth, home address, government
+        identifiers, or bank or payment details. It takes no payment, and it contains no advertising
+        and no third-party analytics or tracking software. The only identifying detail you give it is
+        your sign-in credential — your roll number, your employee code, or your email address, if your
+        college issues email sign-ins.
       </p>
 
       <h2>Why we use it</h2>
@@ -184,8 +188,8 @@
         <tbody>
           <tr><td>Your account, devices and notice state</td><td>Until your account is deleted.</td></tr>
           <tr><td>Records of which app features you used</td><td>Up to 400 days, then removed automatically.</td></tr>
-          <tr><td>Temporary sign-in credentials</td><td>7 days, or until you use them.</td></tr>
-          <tr><td>Notification delivery receipts</td><td>7 days.</td></tr>
+          <tr><td>Temporary sign-in credentials</td><td>7 days.</td></tr>
+          <tr><td>The receipt token in a push notification</td><td>7 days.</td></tr>
           <tr><td>Files stored on your college's behalf</td><td>As long as the college record they belong to is kept.</td></tr>
         </tbody>
       </table>
@@ -200,15 +204,16 @@
       </p>
       <p>
         Deletion removes your Juvi account and everything the app holds for it: your signed-in
-        devices, your memberships in Juvi spaces, your notification history, your acknowledgements,
-        your app-activity records, and anything the app stored on your device. <strong>Deletion is
-        final and cannot be undone.</strong>
+        devices, your memberships in Juvi spaces, your notification history, any note you added when
+        acknowledging a notice, your app-activity records, and anything the app stored on your device.
+        <strong>Deletion is final and cannot be undone.</strong>
       </p>
       <div class="note">
         <p>
           <strong>Deleting your Juvi account does not delete you from your college.</strong> Your
           admission, academic, attendance, fee and employment records belong to the college and are
-          kept under its own record-keeping obligations, as is your profile photo. The full list of
+          kept under its own record-keeping obligations, as is your profile photo. Your college also
+          keeps an audit record that a notice was sent to you and was acknowledged. The full list of
           what is deleted and what is kept is on the
           <a href="account-deletion.html">deletion page</a>.
         </p>

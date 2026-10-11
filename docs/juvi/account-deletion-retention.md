@@ -1,8 +1,9 @@
-# Juvi account deletion — retention disclosure (draft)
+# Juvi account deletion — retention disclosure
 
 **Status: source text. The published form now exists** — `admin-portal/public/privacy.html`, served
-by nginx at `/privacy.html`, whose *Deleting your account* section is this document's disclosures in
-their published wording. Drafting this text was part of feature 011
+by nginx at `/privacy.html`, whose *Deleting your account* section renders the core disclosures below
+in their published wording. This document stays the fuller statement, because it also records the
+residues the published page compresses away. Drafting this text was part of feature 011
 (`.sdd/specs/011-account-deletion/`, §3.4); hosting it is still a deployment step, not a code change,
 so the Play Console's "Privacy policy" field is pointed at the deployed URL by hand.
 
@@ -59,7 +60,12 @@ obligations:
 - your **profile photo**. A photo you upload through the app is written to your college record as
   that person's photo, not kept as app-local imagery — so it stays with the person record, and it is
   what the portal and the app will show if your account is provisioned again;
-- the **notice audience rows** described above, with your Juvi state cleared.
+- the **notice audience rows** described above, with your Juvi state cleared;
+- the **audit entry recording your acknowledgement** (`notices/consumers.ts:recordAcknowledgement`) —
+  an immutable record that the notice was acknowledged, carrying the person's name, the notice, the
+  method, the time and the session it came from, and `hasComment` but never the comment text. The
+  acknowledgement *state* on the audience row is cleared; this entry is not, and no TTL reaches it.
+  It is an ERP audit record, so it is retained on the same footing as the rows above.
 
 Two smaller residues are worth naming rather than leaving to be discovered:
 
@@ -122,3 +128,8 @@ of the spec.
 3. Confirm `DELETION_GRACE_DAYS` in `backend/src/modules/juvi-app/accounts/deletion-service.ts` is
    still 7. It is a constant because the sweep's timing and the public page's copy both quote it,
    and a drift between the two would be a promise the college never keeps.
+4. Confirm the deployment serves the API over **https**. The policy states that traffic is
+   encrypted in transit, and that is true of a correctly configured deployment but is *not* enforced
+   anywhere in the app — `AppEnv.apiBaseUrl` (`mobile/lib/core/env.dart`) defaults to a plaintext dev
+   address and nothing in the client requires TLS, so this is a deployment property the operator
+   owns.
