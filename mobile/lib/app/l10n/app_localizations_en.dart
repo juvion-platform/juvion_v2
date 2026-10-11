@@ -219,7 +219,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get meDataPrivacyNote =>
-      'Your data stays with your institution. Juvi never shares it with third parties.';
+      'Your data stays with your institution. Juvi never sells it or shares it for advertising.';
 
   @override
   String get meSignOut => 'Sign out';
