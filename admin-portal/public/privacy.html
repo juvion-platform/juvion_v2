@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Juvi privacy policy</title>
+    <meta name="description" content="What the Juvi app collects, why, who else processes it, and how to have your account deleted." />
+    <link rel="icon" href="/favicon.svg" />
+    <!--
+      The public privacy-policy page (the Play listing's "Privacy policy" URL).
+
+      Same mechanism as the account-deletion page (011 T16): a static asset, copied verbatim by vite
+      from `admin-portal/public/` into `dist/`, published by scripts/deploy.sh, and served by nginx
+      at /privacy.html — outside React Router, with no auth and no backend HTML. Nothing here needs
+      backend middleware, so its headers are an nginx concern, exactly as they are for the deletion
+      page.
+
+      It carries NO SCRIPT for the same reason the deletion page does not: a policy that a
+      locked-down browser refuses to render is not a published policy, and an app-store reviewer or
+      a data-protection regulator may well open it in one. Links between this page and
+      /account-deletion.html are RELATIVE so the pair keeps working from any origin they are served
+      under.
+
+      Every claim below was taken from the code rather than written from the shape of a typical
+      policy, and two consequences of that are deliberate:
+        - It does NOT claim to handle payments, email, SMS or AI. No payment gateway, mail or SMS
+          provider, and no OCR vendor exists in this codebase, and the app's own request path never
+          reaches the LLM stack (that is ERP-side, and masks personal data before the prompt).
+        - It says the profile photo is RETAINED after account deletion. The photo is written to the
+          college's own person record, and the deletion path does not touch S3 — so promising that
+          deletion erases every image would be a promise the code does not keep.
+
+      Operator: fill in the developer contact address before publishing (marked "CONTACT" below).
+      Juvi is the app; "Juvion" is the developer name used in the deletion page's footer and here.
+    -->
+    <style>
+      :root { color-scheme: light; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; padding: 2rem 1rem 4rem;
+        font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        color: #1f2937; background: #f8fafc;
+      }
+      main { max-width: 42rem; margin: 0 auto; }
+      header { margin-bottom: 1.5rem; }
+      h1 { font-size: 1.75rem; line-height: 1.25; margin: 0 0 0.5rem; color: #0f172a; }
+      h2 { font-size: 1.125rem; margin: 2rem 0 0.5rem; color: #0f172a; }
+      h3 { font-size: 1rem; margin: 1.25rem 0 0.25rem; color: #0f172a; }
+      p, li { margin: 0 0 0.75rem; }
+      ul { padding-left: 1.25rem; }
+      .lede { font-size: 1.0625rem; color: #374151; }
+      .updated { color: #6b7280; font-size: 0.875rem; margin-top: 0; }
+      .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 0.75rem; padding: 1.25rem; }
+      .note { background: #fffbeb; border: 1px solid #fde68a; border-radius: 0.75rem; padding: 1rem 1.25rem; margin: 1.5rem 0; }
+      .note p:last-child, .card p:last-child, li:last-child { margin-bottom: 0; }
+      table { width: 100%; border-collapse: collapse; margin: 0 0 0.75rem; font-size: 0.9375rem; }
+      th, td { text-align: left; vertical-align: top; padding: 0.5rem 0.625rem; border-bottom: 1px solid #e2e8f0; }
+      th { font-weight: 600; color: #0f172a; }
+      a { color: #1d4ed8; }
+      a:focus-visible { outline: 2px solid #2563eb; outline-offset: 1px; }
+      footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; color: #6b7280; font-size: 0.875rem; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Juvi privacy policy</h1>
+        <p class="lede">
+          Juvi is the student and faculty app for your college. This policy explains what the app
+          collects, why it collects it, who else handles it, and how to have your account deleted.
+        </p>
+        <p class="updated">Last updated: 11 October 2026</p>
+      </header>
+
+      <h2>Who is responsible</h2>
+      <p>
+        Your <strong>college</strong> provides Juvi to you and is responsible for the student, faculty
+        and staff records it holds about you. <strong>Juvion</strong> builds and operates the Juvi app
+        on your college's behalf. If you have a question about your own records, your college office
+        is the right place to ask.
+      </p>
+
+      <h2>What the Juvi app collects</h2>
+      <div class="card">
+        <h3>Your account and your college</h3>
+        <p>
+          Which college you belong to, whether you are a student, faculty or staff member, the
+          identifier you sign in with (your roll number, employee code or email address), and the
+          preferences you set in the app, such as quiet hours and language.
+        </p>
+
+        <h3>Your devices</h3>
+        <p>
+          Each device you sign in on is recorded: a device identifier, the name you or your phone
+          gives it, the operating system and its version, the app version, when the device last used
+          Juvi, and a push-notification address so Juvi can reach that device.
+        </p>
+
+        <h3>Your notifications and notices</h3>
+        <p>
+          What was sent to you, when it was delivered, whether you opened it, and your own state on
+          each notice — received, seen, dismissed, reminded, or acknowledged. If you type a comment
+          when you acknowledge a notice, that comment is stored too. The push notification itself
+          carries only identifiers, never the notice's text, attachments or names.
+        </p>
+
+        <h3>Which parts of the app you use</h3>
+        <p>
+          The app records which features you open and when, so we can see whether Juvi works. These
+          records hold identifiers and labels only — never the contents of anything you read or
+          write.
+        </p>
+
+        <h3>Your photo, if you add one</h3>
+        <p>
+          A photo you upload through Juvi is stored with your college record as that person's photo.
+          Location and camera information is stripped from the image before it is stored.
+        </p>
+
+        <h3>Crash reports</h3>
+        <p>
+          If the released app crashes, a crash report is sent so the fault can be found and fixed.
+          It contains no user identifier and no custom data about you.
+        </p>
+      </div>
+
+      <h3>What the app does not collect</h3>
+      <p>
+        The Juvi app does not read or send your phone number, email address, date of birth, home
+        address, government identifiers, or bank or payment details. It takes no payment, and it
+        contains no advertising and no third-party analytics or tracking software.
+      </p>
+
+      <h2>Why we use it</h2>
+      <ul>
+        <li>To sign you in, keep your session secure, and let you see and manage your devices.</li>
+        <li>To deliver the notices and alerts your college sends you, and to record that you saw them.</li>
+        <li>To remember your preferences.</li>
+        <li>To find and fix crashes and faults.</li>
+        <li>To understand which parts of the app are used, so we can improve them.</li>
+      </ul>
+
+      <h2>What we never do</h2>
+      <ul>
+        <li>We do not sell your data.</li>
+        <li>We do not use it for advertising, and we do not share it with advertisers or data brokers.</li>
+        <li>We do not show your data to other students, or to any other college.</li>
+      </ul>
+      <p>
+        Your data is shared only with the service providers named below, who process it on your
+        college's instructions and for no purpose of their own.
+      </p>
+
+      <h2>Who else processes it</h2>
+      <table>
+        <thead>
+          <tr><th>Provider</th><th>What it handles</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Google (Firebase Cloud Messaging)</td>
+            <td>Delivering push notifications to your device, which requires your device's push address.</td>
+          </tr>
+          <tr>
+            <td>Google (Firebase Crashlytics)</td>
+            <td>Collecting crash reports from released builds of the app. No user identifier is attached.</td>
+          </tr>
+          <tr>
+            <td>Amazon Web Services (S3)</td>
+            <td>Storing files such as a photo you upload. Stored files are encrypted at rest.</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        That is the complete list. No email, SMS, payment, document-scanning or artificial
+        intelligence provider receives data from the Juvi app.
+      </p>
+
+      <h2>How long we keep it</h2>
+      <table>
+        <thead>
+          <tr><th>What</th><th>How long</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Your account, devices and notice state</td><td>Until your account is deleted.</td></tr>
+          <tr><td>Records of which app features you used</td><td>Up to 400 days, then removed automatically.</td></tr>
+          <tr><td>Temporary sign-in credentials</td><td>7 days, or until you use them.</td></tr>
+          <tr><td>Notification delivery receipts</td><td>7 days.</td></tr>
+          <tr><td>Files stored on your college's behalf</td><td>As long as the college record they belong to is kept.</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Deleting your account</h2>
+      <p>
+        You can delete your Juvi account from inside the app, under Settings. It takes effect
+        immediately. You can also request deletion without the app installed, using the
+        <a href="account-deletion.html">public deletion page</a>; a request made there takes effect
+        <strong>7 days</strong> later, which gives you time to notice and cancel a request you did
+        not make.
+      </p>
+      <p>
+        Deletion removes your Juvi account and everything the app holds for it: your signed-in
+        devices, your memberships in Juvi spaces, your notification history, your acknowledgements,
+        your app-activity records, and anything the app stored on your device. <strong>Deletion is
+        final and cannot be undone.</strong>
+      </p>
+      <div class="note">
+        <p>
+          <strong>Deleting your Juvi account does not delete you from your college.</strong> Your
+          admission, academic, attendance, fee and employment records belong to the college and are
+          kept under its own record-keeping obligations, as is your profile photo. The full list of
+          what is deleted and what is kept is on the
+          <a href="account-deletion.html">deletion page</a>.
+        </p>
+      </div>
+
+      <h2>Your choices</h2>
+      <ul>
+        <li>Delete your account, from the app or from the <a href="account-deletion.html">deletion page</a>.</li>
+        <li>Turn notifications off in the app's settings, or in your phone's settings.</li>
+        <li>Sign out a device you no longer use, from the app's device list.</li>
+        <li>Ask your college office to correct your personal details, or to explain what it holds.</li>
+      </ul>
+
+      <h2>Students</h2>
+      <p>
+        Juvi is provided to you through your college, and it is intended for college students and
+        staff. If you are a student and your college requires a parent's or guardian's consent for
+        your use of college systems, that is your college's process and your college office can tell
+        you about it.
+      </p>
+
+      <h2>How we protect it</h2>
+      <p>
+        Traffic between the app and the server is encrypted in transit. Passwords are stored only as
+        a one-way hash, never as text. Files kept on your college's behalf are encrypted at rest, and
+        location information is removed from photos before they are stored. Access to your data inside
+        your college follows the roles your college has set.
+      </p>
+
+      <h2>Changes to this policy</h2>
+      <p>
+        If this policy changes in a way that affects you, the date at the top changes, and your
+        college will tell you through Juvi or its usual channels.
+      </p>
+
+      <h2>Contact</h2>
+      <p>
+        For anything about your own records, start with your college office. For anything about the
+        Juvi app itself, write to the developer, Juvion.
+        <!-- CONTACT: operator to fill in the developer's published contact address before the Play submission. -->
+      </p>
+
+      <footer>
+        <p>
+          Juvi is developed by Juvion.
+          See also <a href="account-deletion.html">deleting your Juvi account</a>.
+        </p>
+      </footer>
+    </main>
+  </body>
+</html>

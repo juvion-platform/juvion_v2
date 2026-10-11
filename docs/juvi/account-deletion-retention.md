@@ -1,14 +1,19 @@
 # Juvi account deletion — retention disclosure (draft)
 
-**Status: draft. Not published.** Drafting this text is part of feature 011
-(`.sdd/specs/011-account-deletion/`, §3.4); publishing it is not, because a published policy needs a
-hosted URL for the Play listing to link to, and that URL is a deployment step, not a code change.
+**Status: source text. The published form now exists** — `admin-portal/public/privacy.html`, served
+by nginx at `/privacy.html`, whose *Deleting your account* section is this document's disclosures in
+their published wording. Drafting this text was part of feature 011
+(`.sdd/specs/011-account-deletion/`, §3.4); hosting it is still a deployment step, not a code change,
+so the Play Console's "Privacy policy" field is pointed at the deployed URL by hand.
 
-This is the **deletion section of the privacy policy**. It is also the text the Play Console
-Data-safety answer is written from, so the operator notes at the end map each disclosure to the form.
+This remains the **authoritative statement of the deletion disclosures**, and the text the Play
+Console Data-safety answer is written from, so the operator notes at the end map each disclosure to
+the form. If the two ever disagree, this document is the source and the page is the rendering —
+change both in the same commit.
 
-What already exists and is *not* this document: the public deletion **request** form, served as a
-static page at `/account-deletion.html`.
+The other public page: the deletion **request** form, served as a static page at
+`/account-deletion.html`. The two pages link to each other, relatively, so they must be published
+together.
 
 ---
 
@@ -106,7 +111,11 @@ of the spec.
 
 **Before publishing:**
 
-1. A hosted URL the Play listing can link to (this document has no host yet).
+1. The pages are written (`privacy.html` and `account-deletion.html`, both under
+   `admin-portal/public/`) but published by hand: deploy them, then put the policy's URL in the Play
+   Console's "Privacy policy" field and the deletion page's URL in the Data-safety form. Before
+   submitting, fill in the developer contact address left open in `privacy.html` (search for
+   `CONTACT`).
 2. Confirm the published text and the app's own copy still agree. The app states the cancellation
    boundary at the point of action; this document states it in prose. They are two renderings of one
    rule, and 011 Story 4 AC1 is where that rule is defined.
