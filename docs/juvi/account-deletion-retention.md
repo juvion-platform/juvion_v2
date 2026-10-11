@@ -119,9 +119,7 @@ of the spec.
 
 1. The pages are written (`privacy.html` and `account-deletion.html`, both under
    `admin-portal/public/`) but published by hand: deploy them, then put the policy's URL in the Play
-   Console's "Privacy policy" field and the deletion page's URL in the Data-safety form. Before
-   submitting, fill in the developer contact address left open in `privacy.html` (search for
-   `CONTACT`).
+   Console's "Privacy policy" field and the deletion page's URL in the Data-safety form.
 2. Confirm the published text and the app's own copy still agree. The app states the cancellation
    boundary at the point of action; this document states it in prose. They are two renderings of one
    rule, and 011 Story 4 AC1 is where that rule is defined.
@@ -132,4 +130,6 @@ of the spec.
    encrypted in transit, and that is true of a correctly configured deployment but is *not* enforced
    anywhere in the app — `AppEnv.apiBaseUrl` (`mobile/lib/core/env.dart`) defaults to a plaintext dev
    address and nothing in the client requires TLS, so this is a deployment property the operator
-   owns.
+   owns. **Confirmed 2026-10-11: the production deployment serves the API over https.** The
+   plaintext default in `env.dart` is still a dev-only path and is still not a guarantee — re-check
+   this if the deployment is ever reconfigured.
