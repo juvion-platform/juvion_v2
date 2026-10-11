@@ -151,13 +151,13 @@ npm run "$PORTAL_BUILD_SCRIPT" -w admin-portal
 # half-copied bundle, and index.html never references an asset that has not
 # landed yet. Rolling back is re-pointing the symlink — no rebuild:
 #
-#   ln -sfn /var/www/packkme/juvion/releases/<older> /var/www/packkme/juvion/current.tmp
-#   mv -T /var/www/packkme/juvion/current.tmp /var/www/packkme/juvion/current
+#   ln -sfn /var/www/juvion/releases/<older> /var/www/juvion/current.tmp
+#   mv -T /var/www/juvion/current.tmp /var/www/juvion/current
 #
 # Set WEB_ROOT= (empty) to skip publishing — e.g. on a QA checkout whose portal
 # nobody serves, where the in-place build is enough.
 # ---------------------------------------------------------------------------
-WEB_ROOT="${WEB_ROOT-/var/www/packkme/juvion}"
+WEB_ROOT="${WEB_ROOT-/var/www/juvion}"
 KEEP_RELEASES="${KEEP_RELEASES:-5}"
 
 if [ -z "$WEB_ROOT" ]; then
