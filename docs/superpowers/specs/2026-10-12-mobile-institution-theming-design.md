@@ -170,8 +170,9 @@ Ported verbatim: `L_LADDER`, `S_SCALE`, `L500_MIN`/`L500_MAX` `0.44`/`0.58`, `S5
 `LUM_CEILING` `[0.170, 0.130, 0.080, 0.045, 0.024]`, `ACHROMATIC_S` `0.04`, the 32-iteration binary
 search in `capLuminance`, and `clamp(s500 * S_SCALE[i], achromatic ? 0 : 0.02, 0.95)`.
 
-`parseHexColor` moves here from `theme.dart` and is **not** kept in two places: its only callers are
-`app.dart:16` and `theme.dart` itself, and the port needs the same parse. One predicate, one parser.
+`parseHexColor` is **deleted**, not moved: after the rewire its only caller (`app.dart:16`) passes
+the raw string through instead, so keeping it would ship a second, unused hex parser next to the
+port's own. Its regex lives on as the port's `isValidAccentHex` — one predicate, one parse.
 
 **Porting hazards, each checked rather than assumed:**
 
@@ -281,8 +282,8 @@ chrome, it ports those three lines and the fixture grows — the algorithm is al
 
 | File | Change |
 |---|---|
-| `mobile/lib/app/brand_ramp.dart` | **new** — the port, `kLegacyRamp`, `resolveRamp`, `isValidAccentHex`, `parseHexColor` |
-| `mobile/lib/app/theme.dart` | `buildTheme` takes `String? accentHex`; builds the scheme via `fromSeed(...).copyWith(brand roles)`; `kDefaultAccent` and `parseHexColor` removed |
+| `mobile/lib/app/brand_ramp.dart` | **new** — the port: `kLegacyRamp`, `resolveRamp`, `isValidAccentHex` |
+| `mobile/lib/app/theme.dart` | `buildTheme` takes `String? accentHex`; builds the scheme via `fromSeed(...).copyWith(brand roles)`; `kDefaultAccent` and `parseHexColor` both removed |
 | `mobile/lib/app/app.dart` | `:16` passes the raw accent string instead of parsing it |
 | `mobile/test/app/brand_ramp_test.dart` | **new** — port behaviour + golden-fixture parity |
 | `mobile/test/app/theme_test.dart` | **new** — the role mapping, both brightnesses, both with and without an accent |
@@ -359,7 +360,7 @@ Each settled with a default; each overrulable at review.
 | D5 | **No accent adopts the portal's legacy ramp** | Keeping `#0B5FA5` as a mobile-only default — would leave criterion 2 unmet |
 | D6 | **`error` and all neutrals stay put** | Re-hueing them from the ramp — the portal froze its semantic ramps for the same reason |
 | D7 | **`navy`/`chrome` are not ported** | Porting the whole `BrandRamp` shape — ships two unconsumed fields |
-| D8 | **`parseHexColor` moves into the port** rather than staying in `theme.dart` | Two parsers with the same regex, which is how C3's guarantee gets lost |
+| D8 | **`parseHexColor` is deleted**, its validation living on as the port's `isValidAccentHex` | Moving it into the port — with `app.dart` no longer calling it, that ships a dead second parser |
 | D9 | **Pre-auth screens keep the default palette** | Reading the accent from the config cache before it resolves — theming a screen from data the app has not fetched yet |
 
 ---
