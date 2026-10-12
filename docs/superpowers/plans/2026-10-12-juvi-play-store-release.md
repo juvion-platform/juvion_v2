@@ -343,8 +343,8 @@ Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 ./scripts/deploy.sh
 ```
 
-Then confirm `https://admin.juvion.in/privacy-policy.html` returns 200 and links to
-`https://admin.juvion.in/account-deletion.html`. (This step is the user's, on the deploy host.)
+Then confirm `https://juvion.in/privacy-policy` returns 200 and links to
+`https://juvion.in/account-deletion`. (This step is the user's, on the deploy host.)
 
 ---
 
@@ -362,8 +362,8 @@ For the Android app `in.juvion.juvi`. Design: `docs/superpowers/specs/2026-10-12
 
 ## URLs the listing needs
 
-- Privacy policy: `https://admin.juvion.in/privacy-policy.html`
-- Account deletion: `https://admin.juvion.in/account-deletion.html`
+- Privacy policy: `https://juvion.in/privacy-policy`
+- Account deletion: `https://juvion.in/account-deletion`
 
 ## Store listing copy
 
@@ -432,7 +432,7 @@ notifications and account deletion.
 |---|---|
 | Data deleted on request? | Yes — in-app immediately; web request after a 7-day grace period. |
 | Not deleted on request? | College ERP records and the profile photo (part of the person record); regulatory record-keeping. |
-| Account deletion URL | `https://admin.juvion.in/account-deletion.html` |
+| Account deletion URL | `https://juvion.in/account-deletion` |
 | Data collected / retention | The two lists in the policy page are authoritative. |
 
 ## Releasing a new version

@@ -4,8 +4,8 @@ For the Android app `in.juvion.juvi`. Design: `docs/superpowers/specs/2026-10-12
 
 ## URLs the listing needs
 
-- Privacy policy: `https://admin.juvion.in/privacy-policy`
-- Account deletion: `https://admin.juvion.in/account-deletion.html`
+- Privacy policy: `https://juvion.in/privacy-policy`
+- Account deletion: `https://juvion.in/account-deletion`
 
 ## Store listing copy
 
@@ -78,7 +78,7 @@ above remain.
 |---|---|
 | Data deleted on request? | Yes — in-app immediately; web request after a 7-day grace period. |
 | Not deleted on request? | College ERP records and the profile photo (part of the person record); regulatory record-keeping. |
-| Account deletion URL | `https://admin.juvion.in/account-deletion.html` |
+| Account deletion URL | `https://juvion.in/account-deletion` |
 | Data collected / retention | The two lists in the policy page are authoritative. |
 
 ## Releasing a new version

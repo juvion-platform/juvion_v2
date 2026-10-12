@@ -6,7 +6,7 @@
  * The assertion is therefore on the *rendered* page — its title and content — rather than on
  * a served artifact's bytes. Nothing here hits the API.
  *
- * (The deletion page it links to stays a static file — it posts a native, script-free form.)
+ * (The deletion page it links to is a sibling public route — it posts a native, same-origin form.)
  */
 import { test, expect } from '@playwright/test';
 
@@ -26,6 +26,6 @@ test.describe('Privacy policy page', () => {
       await expect(page.getByRole('heading', { name: heading, level: 2 })).toBeVisible();
     }
 
-    await expect(page.locator('a[href="/account-deletion.html"]')).toHaveCount(1);
+    await expect(page.locator('a[href="/account-deletion"]')).toHaveCount(1);
   });
 });

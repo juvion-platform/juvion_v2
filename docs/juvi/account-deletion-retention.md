@@ -7,8 +7,8 @@ hosted URL for the Play listing to link to, and that URL is a deployment step, n
 This is the **deletion section of the privacy policy**. It is also the text the Play Console
 Data-safety answer is written from, so the operator notes at the end map each disclosure to the form.
 
-What already exists and is *not* this document: the public deletion **request** form, served as a
-static page at `/account-deletion.html`.
+What already exists and is *not* this document: the public deletion **request** form, a public React
+route at `/account-deletion` that posts a native, same-origin form to the API.
 
 ---
 

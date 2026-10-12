@@ -45,7 +45,7 @@ Out of scope (later work):
 | Firebase used for FCM + Crashlytics only — **no** Firebase Auth / Google Sign-In | `pubspec.yaml:13-15` (no `firebase_auth`, no `google_sign_in`) |
 | Public deletion page exists and ships with the portal | `admin-portal/public/account-deletion.html`, `scripts/deploy.sh:134-185` |
 | No privacy policy page exists | only `docs/juvi/account-deletion-retention.md`, marked "draft, not published" |
-| Portal origin `https://admin.juvion.in`; API `https://api.juvion.in/api` | `backend/.env.example:26`, `admin-portal/.env.production` |
+| Portal origin `https://juvion.in`; API `https://api.juvion.in/api` | `backend/.env.example:26`, `admin-portal/.env.production` |
 
 ## 4. Key decisions
 
@@ -67,7 +67,7 @@ Out of scope (later work):
    rotation later is free.
 
 5. **Privacy policy is a static page in the portal's `public/` dir**, served at
-   `https://admin.juvion.in/privacy-policy.html` — the same hosting path as the deletion page, so no
+   `https://juvion.in/privacy-policy` — the same hosting path as the deletion page, so no
    new host or nginx rule is needed.
 
 ## 5. Design
@@ -102,8 +102,8 @@ Out of scope (later work):
   deletion (linking `/account-deletion.html`), and a contact address.
 - The deletion section is taken verbatim in substance from `docs/juvi/account-deletion-retention.md`.
 - After the portal's next deploy (`scripts/deploy.sh`), the two Play URLs are live:
-  - Privacy policy: `https://admin.juvion.in/privacy-policy.html`
-  - Account deletion: `https://admin.juvion.in/account-deletion.html`
+  - Privacy policy: `https://juvion.in/privacy-policy`
+  - Account deletion: `https://juvion.in/account-deletion`
 
 ### 5.3 Store listing content (deliverable)
 

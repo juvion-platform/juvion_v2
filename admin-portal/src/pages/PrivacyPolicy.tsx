@@ -7,9 +7,8 @@ import { useEffect } from 'react';
  * anonymous visitor (a Play reviewer, someone who has not installed the app) reaches it
  * without a session. Nothing here calls the API.
  *
- * The deletion page it links to is a *static* file (`public/account-deletion.html`) and
- * must stay that way — it posts a native, script-free form. This page carries no such
- * constraint, so it lives here in the app instead.
+ * The deletion page it links to is a sibling public route (`/account-deletion`,
+ * `pages/AccountDeletion.tsx`), which posts a native, same-origin form to the API.
  */
 const LAST_UPDATED = '12 October 2026';
 
@@ -96,7 +95,7 @@ export default function PrivacyPolicy() {
             You can delete your Juvi account from inside the app (immediately) or by requesting
             deletion on the web:{' '}
             <a
-              href="/account-deletion.html"
+              href="/account-deletion"
               className="font-medium text-primary-600 underline-offset-2 hover:underline"
             >
               Delete your Juvi account
