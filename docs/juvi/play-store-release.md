@@ -4,7 +4,7 @@ For the Android app `in.juvion.juvi`. Design: `docs/superpowers/specs/2026-10-12
 
 ## URLs the listing needs
 
-- Privacy policy: `https://admin.juvion.in/privacy-policy.html`
+- Privacy policy: `https://admin.juvion.in/privacy-policy`
 - Account deletion: `https://admin.juvion.in/account-deletion.html`
 
 ## Store listing copy

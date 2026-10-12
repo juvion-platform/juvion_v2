@@ -7,6 +7,7 @@ import SessionWatcher from './components/SessionWatcher';
 import RequirePermission from './components/RequirePermission';
 
 const Login = lazy(() => import('./pages/Login'));
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 const CollegeSelector = lazy(() => import('./pages/CollegeSelector'));
 const CollegeManagement = lazy(() => import('./pages/CollegeManagement'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -96,6 +97,11 @@ export default function App() {
       <SessionWatcher />
       <Routes>
         <Route path="/login" element={renderLazyPage(<Login />)} />
+
+        {/* Public, unauthenticated — the Juvi app's privacy policy, linked from the Play
+            listing. Reached by play reviewers and users who are not signed in, so it sits
+            outside RequireCollege. */}
+        <Route path="/privacy-policy" element={renderLazyPage(<PrivacyPolicy />)} />
 
         {/* Superadmin-only routes */}
         <Route path="/select-college" element={<ProtectedRoute>{renderLazyPage(<CollegeSelector />)}</ProtectedRoute>} />
