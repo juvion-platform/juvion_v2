@@ -208,9 +208,11 @@ ThemeData buildTheme({required Brightness brightness, String? accentHex}) {
   through, so the parse-and-validate path is the port's, exactly as on the portal.
 - **The seed is `ramp.color(600)`, and it stays load-bearing even though `primary` is overridden.**
   `fromSeed` derives `secondary` and the neutral surface tints from it, so those move with the seed.
-  For an accent-set college the seed is the accent, as today; for no accent it moves from `#0B5FA5`
-  to the legacy ramp's `#2563A0` — the same tone ladder at a hue two degrees away, so the surface
-  tints shift imperceptibly rather than identically. This is why criterion 3 is worded as "still
+  For an accent-set college that is the ramp's own 600 step, not the raw accent — `#0B5FA5` seeds
+  as `#1868AA`, a hue 0.2° away — so the neutral tints follow the colour the buttons actually
+  paint rather than the input that generated it. For no accent it moves from `#0B5FA5` to the
+  legacy ramp's `#2563A0`, the same tone ladder at a hue two degrees away. Either way the surface
+  tints shift imperceptibly rather than identically, which is why criterion 3 is worded as "still
   `fromSeed`-derived" rather than "byte-identical". `error` is not seed-derived at all, and §5 pins
   it in a test rather than asserting it here.
 - 5 of the 6 lines of `theme.dart`'s current `copyWith` block (scaffold colour, text theme, card,
@@ -341,8 +343,12 @@ clamps and the luminance ceiling are all exercised, not just a comfortable mid-b
 running them); `flutter test --exclude-tags golden` green; `npm test -w admin-portal` green;
 `npm run typecheck` 0 errors.
 
-**Golden images:** all **4** golden tests of C6 need regenerating, not just the 2 that pass an
-accent — the other 2 render with no accent, and the no-accent palette is exactly what §4.4 changes.
+**Golden images:** every golden that renders through `buildTheme` needs regenerating — **16** test
+cases across 5 files (`notice_widgets` ×4, `deadline_ring` ×2, `system_screens` ×6,
+`permission_card` ×2, `empty_state` ×2), not just the 2 that pass an accent. The rest reach
+`buildTheme` through `noticeHost` (`test/features/notices/host.dart:21`) or call it with no accent
+directly, and the no-accent palette is exactly what §4.4 changes. Do not read "the 4 call sites C6
+lists" as "4 tests": the tests numbered 16, and the eight that look foreign belong to this change.
 A local, tag-excluded concern (C8), recorded so it is not mistaken for a regression.
 
 ---
