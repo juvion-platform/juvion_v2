@@ -209,7 +209,7 @@ Prerequisite: the portal is served per the e2e suite's `webServer` (see `e2e/pla
 npm run test -w e2e -- tests/privacy-policy.spec.ts
 ```
 
-Expected: FAIL — `page.goto` gets **404** (the file does not exist yet).
+Expected: FAIL — the Vite dev server answers the missing path with **200** (its SPA fallback serves `index.html`), so the run fails on `expect(html).not.toContain('<script')`; a production static host would 404 instead.
 
 - [ ] **Step 3: Create `admin-portal/public/privacy-policy.html`**
 

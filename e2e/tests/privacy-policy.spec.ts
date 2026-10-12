@@ -12,6 +12,7 @@ test.describe('Privacy policy page', () => {
     const response = await page.goto(PAGE);
     expect(response?.status()).toBe(200);
     expect(response?.headers()['content-type']).toContain('text/html');
+    await expect(page).toHaveTitle('Privacy Policy — Juvi');
 
     const html = await page.content();
     expect(html).not.toContain('<script');
