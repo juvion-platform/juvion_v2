@@ -30,9 +30,30 @@ const GOLDEN_PATH = path.resolve(process.cwd(), 'src/lib/brand-ramp.golden.json'
  * of those 23 in the list the fixture silently fails to cover the upper end of
  * the clamp band, and a port with a wrong `L500_MAX` passes. Blue-dominant and
  * bright enough to stay under the step-500 ceiling (0.170) is what makes it one.
+ *
+ * The last two pin the two remaining scalars that a lone mutation can move
+ * without any earlier accent noticing, both measured by dumping a 218-accent
+ * grid and re-dumping it with the constant altered:
+ *
+ *  - `#9E9C93` sits above `ACHROMATIC_S`, so raising that threshold past this
+ *    accent's saturation flips it to the grey identity. `#7F8080` pins the same
+ *    constant only from below. Because this accent also sits below `S500_MIN`,
+ *    it catches the floor moving down as a side effect; every saturated accent
+ *    in the list is above that floor and never clamps, which is why the floor
+ *    went unpinned until this row existed.
+ *  - `#8C6E4A` is that same floor again, from mid-saturation. Redundant while the
+ *    two constants hold their current values; it is here so the floor stays
+ *    pinned if `ACHROMATIC_S` ever rises past `#9E9C93`, which would stop that row
+ *    from reaching the clamp at all.
+ *
+ * Deliberately not tighter than this: an accent a thousandth above a threshold
+ * would catch a few more mutations but would make a faithful port's result hinge
+ * on the last bits of a float, turning a benign precision difference into a red
+ * build. These two sit 0.014 and 0.042 clear of their thresholds.
  */
 export const GOLDEN_ACCENTS: (string | null)[] = [
   null, '#0B5FA5', '#FFEE00', '#FFFFFF', '#7F8080', '#0F172A', '#3333FF', '#C62828', '#2E7D32', '#663399',
+  '#9E9C93', '#8C6E4A',
 ];
 
 describe('golden fixture', () => {
