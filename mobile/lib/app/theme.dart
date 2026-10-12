@@ -1,10 +1,22 @@
 import 'package:flutter/material.dart';
-
-const kDefaultAccent = Color(0xFF0B5FA5);
+import 'package:juvi/app/brand_ramp.dart';
 
 /// Institution accent on primary actions only; everything else stays neutral (spec §11).
-ThemeData buildTheme({required Brightness brightness, Color? accent}) {
-  final scheme = ColorScheme.fromSeed(seedColor: accent ?? kDefaultAccent, brightness: brightness);
+///
+/// The palette comes from [resolveRamp] — the same derivation the web portal uses
+/// (`admin-portal/src/lib/brand-ramp.ts`), so both surfaces render the same hexes.
+/// `fromSeed` still fills every role; only the brand-bearing ones are repointed,
+/// which is why no obscure Material role can be left unpopulated.
+ThemeData buildTheme({required Brightness brightness, String? accentHex}) {
+  final ramp = resolveRamp(accentHex);
+  final dark = brightness == Brightness.dark;
+  final scheme = ColorScheme.fromSeed(seedColor: ramp.color(600), brightness: brightness).copyWith(
+    primary: ramp.color(dark ? 300 : 600),
+    onPrimary: dark ? ramp.color(900) : const Color(0xFFFFFFFF),
+    primaryContainer: ramp.color(dark ? 800 : 100),
+    onPrimaryContainer: ramp.color(dark ? 100 : 900),
+    tertiary: ramp.color(dark ? 300 : 700),
+  );
   final base = ThemeData(colorScheme: scheme, useMaterial3: true, brightness: brightness);
   final text = base.textTheme;
   return base.copyWith(
@@ -22,9 +34,4 @@ ThemeData buildTheme({required Brightness brightness, Color? accent}) {
     textButtonTheme: TextButtonThemeData(style: TextButton.styleFrom(minimumSize: const Size(44, 48))),
     listTileTheme: const ListTileThemeData(minVerticalPadding: 12),
   );
-}
-
-Color? parseHexColor(String? hex) {
-  if (hex == null || !RegExp(r'^#[0-9a-fA-F]{6}$').hasMatch(hex)) return null;
-  return Color(int.parse(hex.substring(1), radix: 16) | 0xFF000000);
 }

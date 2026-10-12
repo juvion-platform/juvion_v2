@@ -478,10 +478,10 @@ abstract class AppLocalizations {
   /// **'Juvi {version}'**
   String meAppVersion(String version);
 
-  /// No description provided for @meDataPrivacyNote.
+  /// The Me screen's privacy line. Deliberately 'never sells it or shares it for advertising' rather than 'never shares it with third parties': the app does send data to processors (Firebase Cloud Messaging for push, Crashlytics for crash reports, AWS S3 for uploaded photos), so the stronger claim would be untrue. Keep this line consistent with the public policy at admin-portal/public/privacy.html.
   ///
   /// In en, this message translates to:
-  /// **'Your data stays with your institution. Juvi never shares it with third parties.'**
+  /// **'Your data stays with your institution. Juvi never sells it or shares it for advertising.'**
   String get meDataPrivacyNote;
 
   /// No description provided for @meSignOut.

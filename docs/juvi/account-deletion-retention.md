@@ -1,14 +1,20 @@
-# Juvi account deletion — retention disclosure (draft)
+# Juvi account deletion — retention disclosure
 
-**Status: draft. Not published.** Drafting this text is part of feature 011
-(`.sdd/specs/011-account-deletion/`, §3.4); publishing it is not, because a published policy needs a
-hosted URL for the Play listing to link to, and that URL is a deployment step, not a code change.
+**Status: source text. The published form now exists** — `admin-portal/public/privacy.html`, served
+by nginx at `/privacy.html`, whose *Deleting your account* section renders the core disclosures below
+in their published wording. This document stays the fuller statement, because it also records the
+residues the published page compresses away. Drafting this text was part of feature 011
+(`.sdd/specs/011-account-deletion/`, §3.4); hosting it is still a deployment step, not a code change,
+so the Play Console's "Privacy policy" field is pointed at the deployed URL by hand.
 
-This is the **deletion section of the privacy policy**. It is also the text the Play Console
-Data-safety answer is written from, so the operator notes at the end map each disclosure to the form.
+This remains the **authoritative statement of the deletion disclosures**, and the text the Play
+Console Data-safety answer is written from, so the operator notes at the end map each disclosure to
+the form. If the two ever disagree, this document is the source and the page is the rendering —
+change both in the same commit.
 
-What already exists and is *not* this document: the public deletion **request** form, a public React
-route at `/account-deletion` that posts a native, same-origin form to the API.
+The other public page: the deletion **request** form, served as a static page at
+`/account-deletion.html`. The two pages link to each other, relatively, so they must be published
+together.
 
 ---
 
@@ -54,7 +60,12 @@ obligations:
 - your **profile photo**. A photo you upload through the app is written to your college record as
   that person's photo, not kept as app-local imagery — so it stays with the person record, and it is
   what the portal and the app will show if your account is provisioned again;
-- the **notice audience rows** described above, with your Juvi state cleared.
+- the **notice audience rows** described above, with your Juvi state cleared;
+- the **audit entry recording your acknowledgement** (`notices/consumers.ts:recordAcknowledgement`) —
+  an immutable record that the notice was acknowledged, carrying the person's name, the notice, the
+  method, the time and the session it came from, and `hasComment` but never the comment text. The
+  acknowledgement *state* on the audience row is cleared; this entry is not, and no TTL reaches it.
+  It is an ERP audit record, so it is retained on the same footing as the rows above.
 
 Two smaller residues are worth naming rather than leaving to be discovered:
 
@@ -106,10 +117,20 @@ of the spec.
 
 **Before publishing:**
 
-1. A hosted URL the Play listing can link to (this document has no host yet).
+1. The pages are written (`privacy.html` and `account-deletion.html`, both under
+   `admin-portal/public/`) but published by hand: deploy them, then put the policy's URL in the Play
+   Console's "Privacy policy" field and the deletion page's URL in the Data-safety form. Both pages
+   name the developer contact — **info@packkme.com** — and the developer as "Juvion".
 2. Confirm the published text and the app's own copy still agree. The app states the cancellation
    boundary at the point of action; this document states it in prose. They are two renderings of one
    rule, and 011 Story 4 AC1 is where that rule is defined.
 3. Confirm `DELETION_GRACE_DAYS` in `backend/src/modules/juvi-app/accounts/deletion-service.ts` is
    still 7. It is a constant because the sweep's timing and the public page's copy both quote it,
    and a drift between the two would be a promise the college never keeps.
+4. Confirm the deployment serves the API over **https**. The policy states that traffic is
+   encrypted in transit, and that is true of a correctly configured deployment but is *not* enforced
+   anywhere in the app — `AppEnv.apiBaseUrl` (`mobile/lib/core/env.dart`) defaults to a plaintext dev
+   address and nothing in the client requires TLS, so this is a deployment property the operator
+   owns. **Confirmed 2026-10-11: the production deployment serves the API over https.** The
+   plaintext default in `env.dart` is still a dev-only path and is still not a guarantee — re-check
+   this if the deployment is ever reconfigured.

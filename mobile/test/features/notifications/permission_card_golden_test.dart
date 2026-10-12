@@ -12,7 +12,7 @@ void main() {
     testWidgets('PermissionDeniedCard golden ${brightness.name}', (tester) async {
       await tester.binding.setSurfaceSize(const Size(400, 320));
       await tester.pumpWidget(MaterialApp(
-        theme: buildTheme(accent: const Color(0xFF0B5FA5), brightness: brightness),
+        theme: buildTheme(accentHex: '#0B5FA5', brightness: brightness),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(body: Center(child: PermissionDeniedCard(onOpenSettings: () {}, onDismiss: () {}))),

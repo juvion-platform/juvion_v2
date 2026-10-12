@@ -13,14 +13,14 @@ class JuviApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // R42: AsyncValue.valueOrNull is gone in Riverpod 3 — use .value.
-    final accent = parseHexColor(ref.watch(appConfigProvider).value?.data.accentColor);
+    final accentHex = ref.watch(appConfigProvider).value?.data.accentColor;
     final mode = ref.watch(themePreferenceProvider);
     return SyncLifecycle(
       child: PushLifecycle(
         child: MaterialApp.router(
           onGenerateTitle: (c) => c.l10n.appName,
-          theme: buildTheme(accent: accent, brightness: Brightness.light),
-          darkTheme: buildTheme(accent: accent, brightness: Brightness.dark),
+          theme: buildTheme(accentHex: accentHex, brightness: Brightness.light),
+          darkTheme: buildTheme(accentHex: accentHex, brightness: Brightness.dark),
           themeMode: mode,
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
