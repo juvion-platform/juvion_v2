@@ -7,8 +7,6 @@ import SessionWatcher from './components/SessionWatcher';
 import RequirePermission from './components/RequirePermission';
 
 const Login = lazy(() => import('./pages/Login'));
-const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
-const AccountDeletion = lazy(() => import('./pages/AccountDeletion'));
 const CollegeSelector = lazy(() => import('./pages/CollegeSelector'));
 const CollegeManagement = lazy(() => import('./pages/CollegeManagement'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -98,14 +96,6 @@ export default function App() {
       <SessionWatcher />
       <Routes>
         <Route path="/login" element={renderLazyPage(<Login />)} />
-
-        {/* Public, unauthenticated — the Juvi app's privacy policy and account-deletion
-            page, linked from the Play listing. Reached by play reviewers and users who are
-            not signed in, so they sit outside RequireCollege. The deletion page posts a
-            native form to /api; serving it from the portal's own origin (which proxies /api)
-            is what keeps that submission same-origin. */}
-        <Route path="/privacy-policy" element={renderLazyPage(<PrivacyPolicy />)} />
-        <Route path="/account-deletion" element={renderLazyPage(<AccountDeletion />)} />
 
         {/* Superadmin-only routes */}
         <Route path="/select-college" element={<ProtectedRoute>{renderLazyPage(<CollegeSelector />)}</ProtectedRoute>} />
