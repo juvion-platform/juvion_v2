@@ -47,12 +47,16 @@ notifications and account deletion.
 
 ## Assets to supply (Play's current specs)
 
-| Asset | Spec |
-|---|---|
-| App icon | 512×512 PNG, 32-bit, ≤1 MB, no transparency |
-| Feature graphic | 1024×500 PNG or JPEG |
-| Phone screenshots | ≥2, each side 320–3840 px, 16:9 or 9:16 |
-| (optional) 7-inch / 10-inch tablet screenshots | same rules |
+| Asset | Spec | Status |
+|---|---|---|
+| App icon | 512×512 PNG, 32-bit, ≤1 MB, no transparency | **provided** — `docs/juvi/playstore-icon.png` (512×512) |
+| Feature graphic | 1024×500 PNG or JPEG | to supply |
+| Phone screenshots | ≥2, each side 320–3840 px, 16:9 or 9:16 | to supply |
+| (optional) 7-inch / 10-inch tablet screenshots | same rules | to supply |
+
+The launcher icons inside the app (Android `mipmap-*` incl. the adaptive/round variants, iOS
+`AppIcon.appiconset`) are already the Juvi brand icon; only the feature graphic and screenshots
+above remain.
 
 ## Play Console walkthrough
 
