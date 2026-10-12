@@ -152,16 +152,10 @@ jobs:
       - name: Install dependencies
         run: npm ci --include=dev
 
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
-        with:
-          # The browser build is pinned by the @playwright/test version, which
-          # the lockfile owns — hence the key. A miss costs a re-download, not
-          # a failure. The `--with-deps` apt step below still runs on a hit;
-          # only the ~15s browser download is skipped.
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-
+      # Deliberately NOT caching ~/.cache/ms-playwright. It would save ~15s,
+      # but this job is not the critical path — `checks` is, by roughly two
+      # minutes — so the saving is invisible in wall-clock and the cache only
+      # adds a second source of browser binaries into a job that gates merges.
       - name: Install Playwright browsers (chromium only)
         run: npm run test:install -w e2e
 
