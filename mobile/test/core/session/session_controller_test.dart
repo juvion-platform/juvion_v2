@@ -74,14 +74,17 @@ void main() {
     expect(c.read(sessionControllerProvider), const SessionState.signedOut());
   });
 
-  test('signIn stores tokens and account, state becomes signedIn', () async {
-    when(() => auth.signIn(collegeId: 'c1', identifier: '21CS1', password: 'pw', device: any(named: 'device')))
-        .thenAnswer((_) async => (tokens: const Tokens(accessToken: 'a', refreshToken: 'r'), account: account));
+  test('signIn stores tokens, the account and the college the server resolved', () async {
+    // The request no longer names a college, so this value can only have come from the
+    // response (D7) — hence the deliberately unmistakable value: nothing in this test
+    // passes it in.
+    when(() => auth.signIn(juviId: 'JUV4K7P2M9X', password: 'pw', device: any(named: 'device')))
+        .thenAnswer((_) async => (tokens: const Tokens(accessToken: 'a', refreshToken: 'r'), account: account, collegeId: 'c-from-server'));
     final s = c.read(sessionControllerProvider.notifier);
-    await s.signIn(collegeId: 'c1', identifier: '21CS1', password: 'pw');
+    await s.signIn(juviId: 'JUV4K7P2M9X', password: 'pw');
     expect(c.read(sessionControllerProvider), const SessionState.signedIn(account));
     expect(mem['juvi.access'], 'a');
-    expect(mem['juvi.college_id'], 'c1');
+    expect(mem['juvi.college_id'], 'c-from-server');
     expect((await db.readDoc('account'))!.json['id'], 'a1');
   });
 

@@ -15,13 +15,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get signInTitle => 'Sign in to your college';
 
   @override
-  String get institutionCodeLabel => 'Institution code';
-
-  @override
-  String get institutionCodeNotFound => 'We couldn\'t find that college code.';
-
-  @override
-  String get identifierLabel => 'Roll number, employee code or email';
+  String get juviIdLabel => 'Juvi ID';
 
   @override
   String get passwordLabel => 'Password';
@@ -30,8 +24,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get signInButton => 'Sign in';
 
   @override
-  String get firstTimeHint =>
-      'First time? Use the temporary password you received.';
+  String get juviIdFirstTimeHint =>
+      'First time? Your Juvi ID and temporary password are on the slip from your college office.';
 
   @override
   String get forgotPassword => 'Forgot password?';
@@ -41,7 +35,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Your college resets Juvi passwords. Contact the office listed below and they will give you a new temporary password.';
 
   @override
-  String get invalidCredentials => 'That identifier or password is not right.';
+  String get invalidCredentials => 'That Juvi ID or password is not right.';
 
   @override
   String cooldownMessage(int minutes) {

@@ -22,6 +22,11 @@ void main() {
       // TODO
     });
 
+    // String collegeId
+    test('to test the property `collegeId`', () async {
+      // TODO
+    });
+
     // String refreshToken
     test('to test the property `refreshToken`', () async {
       // TODO

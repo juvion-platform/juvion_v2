@@ -105,21 +105,12 @@ void main() {
     // advanced a single onboarding step — which would freeze every one of these
     // responses at their step-0/mustChange-true starting values for the rest of the test.
     adapter
-      ..onGet(
-        '/institutions/JIT',
-        (s) => s.reply(200, {
-          'collegeId': 'c1',
-          'name': 'JIT College',
-          'logoUrl': null,
-          'accentColor': '#0B5FA5',
-          'paused': false,
-          'pausedMessage': null,
-          'minAppVersion': null,
-        }),
-      )
+      // No `/institutions/JIT` mock: nothing looks a college up before credentials any more.
+      // Leaving one here would hide a regression that started calling it.
       ..onPost(
         '/auth/sign-in',
-        (s) => s.replyCallback(200, (_) => {'accessToken': 'a', 'accessExpiresIn': 900, 'refreshToken': 'r' * 43, 'account': account()}),
+        // `collegeId` travels back in the response (D7); the request does not name a college.
+        (s) => s.replyCallback(200, (_) => {'collegeId': 'c1', 'accessToken': 'a', 'accessExpiresIn': 900, 'refreshToken': 'r' * 43, 'account': account()}),
         data: Matchers.any,
       )
       ..onPost(
@@ -206,10 +197,9 @@ void main() {
 
     // S01 — a first launch must not be told its (non-existent) session ended.
     expect(find.text('Please sign in again.'), findsNothing);
-    await t.enterText(find.bySemanticsLabel('Institution code'), 'JIT');
-    await t.pump(const Duration(milliseconds: 600));
-    expect(find.text('JIT College'), findsOneWidget);
-    await t.enterText(find.bySemanticsLabel('Roll number, employee code or email'), '24JIT0001');
+    // The college is no longer named before credentials: US-1 AC1 and AC5 are deleted with
+    // the code field (spec §13), so the first thing typed is the ID.
+    await t.enterText(find.bySemanticsLabel('Juvi ID'), 'JUV-4K7P-2M9X');
     await t.enterText(find.bySemanticsLabel('Password'), 'river-lamp-482');
     await t.pump(); // rebuild so the just-typed password is reflected before the tap finds the (now-enabled) button.
     await t.tap(find.widgetWithText(FilledButton, 'Sign in'));
@@ -300,13 +290,9 @@ void main() {
       'mustChangePassword': false,
     };
     DioAdapter(dio: dio)
-      ..onGet(
-        '/institutions/JIT',
-        (s) => s.reply(200, {'collegeId': 'c1', 'name': 'JIT College', 'logoUrl': null, 'accentColor': '#0B5FA5', 'paused': false, 'pausedMessage': null, 'minAppVersion': null}),
-      )
       ..onPost(
         '/auth/sign-in',
-        (s) => s.reply(200, {'accessToken': 'a', 'accessExpiresIn': 900, 'refreshToken': 'r' * 43, 'account': account}),
+        (s) => s.reply(200, {'collegeId': 'c1', 'accessToken': 'a', 'accessExpiresIn': 900, 'refreshToken': 'r' * 43, 'account': account}),
         data: Matchers.any,
       )
       ..onGet('/me', (s) => s.reply(200, {...meJson, 'account': account}))
@@ -369,9 +355,7 @@ void main() {
     expect(find.text('Sign in to your college'), findsOneWidget);
     expect(requests, contains('POST /notifications/receipts'));
 
-    await t.enterText(find.bySemanticsLabel('Institution code'), 'JIT');
-    await t.pump(const Duration(milliseconds: 600));
-    await t.enterText(find.bySemanticsLabel('Roll number, employee code or email'), '24JIT0001');
+    await t.enterText(find.bySemanticsLabel('Juvi ID'), 'JUV-4K7P-2M9X');
     await t.enterText(find.bySemanticsLabel('Password'), 'longenough1');
     await t.pump();
     await t.tap(find.widgetWithText(FilledButton, 'Sign in'));

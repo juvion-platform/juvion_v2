@@ -14,6 +14,7 @@ Name | Type | Description | Notes
 **deletionRequestedVia** | **String** |  | 
 **faculty** | [**MeFaculty**](MeFaculty.md) |  | 
 **institution** | [**MeInstitution**](MeInstitution.md) |  | 
+**juviId** | **String** |  | 
 **person** | [**MePerson**](MePerson.md) |  | 
 **settings** | [**MeSettings**](MeSettings.md) |  | 
 **student** | [**MeStudent**](MeStudent.md) |  | 

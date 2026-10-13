@@ -106,23 +106,11 @@ abstract class AppLocalizations {
   /// **'Sign in to your college'**
   String get signInTitle;
 
-  /// No description provided for @institutionCodeLabel.
+  /// No description provided for @juviIdLabel.
   ///
   /// In en, this message translates to:
-  /// **'Institution code'**
-  String get institutionCodeLabel;
-
-  /// No description provided for @institutionCodeNotFound.
-  ///
-  /// In en, this message translates to:
-  /// **'We couldn\'t find that college code.'**
-  String get institutionCodeNotFound;
-
-  /// No description provided for @identifierLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Roll number, employee code or email'**
-  String get identifierLabel;
+  /// **'Juvi ID'**
+  String get juviIdLabel;
 
   /// No description provided for @passwordLabel.
   ///
@@ -136,11 +124,11 @@ abstract class AppLocalizations {
   /// **'Sign in'**
   String get signInButton;
 
-  /// No description provided for @firstTimeHint.
+  /// No description provided for @juviIdFirstTimeHint.
   ///
   /// In en, this message translates to:
-  /// **'First time? Use the temporary password you received.'**
-  String get firstTimeHint;
+  /// **'First time? Your Juvi ID and temporary password are on the slip from your college office.'**
+  String get juviIdFirstTimeHint;
 
   /// No description provided for @forgotPassword.
   ///
@@ -157,7 +145,7 @@ abstract class AppLocalizations {
   /// No description provided for @invalidCredentials.
   ///
   /// In en, this message translates to:
-  /// **'That identifier or password is not right.'**
+  /// **'That Juvi ID or password is not right.'**
   String get invalidCredentials;
 
   /// No description provided for @cooldownMessage.

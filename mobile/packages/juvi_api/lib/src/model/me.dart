@@ -36,6 +36,8 @@ class Me {
 
     required  this.institution,
 
+    required  this.juviId,
+
     required  this.person,
 
     required  this.settings,
@@ -117,6 +119,18 @@ class Me {
 
   @JsonKey(
     
+    name: r'juviId',
+    required: true,
+    includeIfNull: true,
+  )
+
+
+  final String? juviId;
+
+
+
+  @JsonKey(
+    
     name: r'person',
     required: true,
     includeIfNull: false,
@@ -161,6 +175,7 @@ class Me {
       other.deletionRequestedVia == deletionRequestedVia &&
       other.faculty == faculty &&
       other.institution == institution &&
+      other.juviId == juviId &&
       other.person == person &&
       other.settings == settings &&
       other.student == student;
@@ -173,6 +188,7 @@ class Me {
         (deletionRequestedVia == null ? 0 : deletionRequestedVia.hashCode) +
         faculty.hashCode +
         institution.hashCode +
+        (juviId == null ? 0 : juviId.hashCode) +
         person.hashCode +
         settings.hashCode +
         student.hashCode;

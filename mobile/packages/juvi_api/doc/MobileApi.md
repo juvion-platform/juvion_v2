@@ -43,7 +43,7 @@ Method | HTTP request | Description
 [**remindNotice**](MobileApi.md#remindnotice) | **POST** /notices/{id}/remind | Send a reminder (at most two)
 [**revokeDevice**](MobileApi.md#revokedevice) | **DELETE** /me/devices/{id} | Sign out one device
 [**revokeOtherDevices**](MobileApi.md#revokeotherdevices) | **POST** /me/devices/revoke-others | Sign out every other device
-[**signIn**](MobileApi.md#signin) | **POST** /auth/sign-in | Sign in with institution, identifier and password
+[**signIn**](MobileApi.md#signin) | **POST** /auth/sign-in | Sign in with a Juvi ID and password
 [**signOut**](MobileApi.md#signout) | **POST** /auth/sign-out | Revoke this session
 [**unmuteChannel**](MobileApi.md#unmutechannel) | **DELETE** /channels/{id}/mute | Unmute a channel
 [**updateSettings**](MobileApi.md#updatesettings) | **PATCH** /me/settings | Update settings
@@ -1407,7 +1407,7 @@ This endpoint does not need any parameter.
 # **signIn**
 > SignInResponse signIn(signInRequest)
 
-Sign in with institution, identifier and password
+Sign in with a Juvi ID and password
 
 ### Example
 ```dart

@@ -25,6 +25,8 @@ class SignInResponse {
 
     required  this.account,
 
+    required  this.collegeId,
+
     required  this.refreshToken,
   });
 
@@ -66,6 +68,18 @@ class SignInResponse {
 
   @JsonKey(
     
+    name: r'collegeId',
+    required: true,
+    includeIfNull: false,
+  )
+
+
+  final String collegeId;
+
+
+
+  @JsonKey(
+    
     name: r'refreshToken',
     required: true,
     includeIfNull: false,
@@ -83,6 +97,7 @@ class SignInResponse {
       other.accessExpiresIn == accessExpiresIn &&
       other.accessToken == accessToken &&
       other.account == account &&
+      other.collegeId == collegeId &&
       other.refreshToken == refreshToken;
 
     @override
@@ -90,6 +105,7 @@ class SignInResponse {
         accessExpiresIn.hashCode +
         accessToken.hashCode +
         account.hashCode +
+        collegeId.hashCode +
         refreshToken.hashCode;
 
   factory SignInResponse.fromJson(Map<String, dynamic> json) => _$SignInResponseFromJson(json);

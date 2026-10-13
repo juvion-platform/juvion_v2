@@ -19,26 +19,12 @@ class SignInRequest {
   /// Returns a new [SignInRequest] instance.
   SignInRequest({
 
-    required  this.collegeId,
-
     required  this.device,
 
-    required  this.identifier,
+    required  this.juviId,
 
     required  this.password,
   });
-
-  @JsonKey(
-    
-    name: r'collegeId',
-    required: true,
-    includeIfNull: false,
-  )
-
-
-  final String collegeId;
-
-
 
   @JsonKey(
     
@@ -54,13 +40,13 @@ class SignInRequest {
 
   @JsonKey(
     
-    name: r'identifier',
+    name: r'juviId',
     required: true,
     includeIfNull: false,
   )
 
 
-  final String identifier;
+  final String juviId;
 
 
 
@@ -80,16 +66,14 @@ class SignInRequest {
 
     @override
     bool operator ==(Object other) => identical(this, other) || other is SignInRequest &&
-      other.collegeId == collegeId &&
       other.device == device &&
-      other.identifier == identifier &&
+      other.juviId == juviId &&
       other.password == password;
 
     @override
     int get hashCode =>
-        collegeId.hashCode +
         device.hashCode +
-        identifier.hashCode +
+        juviId.hashCode +
         password.hashCode;
 
   factory SignInRequest.fromJson(Map<String, dynamic> json) => _$SignInRequestFromJson(json);
