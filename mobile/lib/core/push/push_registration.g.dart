@@ -53,4 +53,4 @@ final class PushRegistrationProvider
   }
 }
 
-String _$pushRegistrationHash() => r'c0939a5434c67005e263a599af7828b96459bc10';
+String _$pushRegistrationHash() => r'caffde2f64b1ee77a5c97f7a11023718f6317875';
