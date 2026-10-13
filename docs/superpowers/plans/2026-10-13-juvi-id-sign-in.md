@@ -1819,6 +1819,8 @@ Expected: PASS, 4/4.
 
 This is the task's real deliverable: the script exists *and* has been run in the environment the demo uses. The dev Mongo is on `localhost:27017`, database `juvion_v2`.
 
+**Prerequisite — run `scripts/ensure-juvi-id-index.ts` FIRST.** The backfill's doc comment *asserts* that the partial unique index must exist, but the script does not verify it, and the failure is quiet rather than loud: without the index a duplicate candidate is not rejected, the mint's `E11000` retry never fires, and two Users can end up holding the same ID. §6 resolves a person by `juviId` alone, so one of them is then locked out and the ID no longer identifies exactly one person. This ordering is why ruling R-K exists.
+
 Run: `MONGODB_URI=mongodb://localhost:27017/juvion_v2 npx ts-node --transpile-only backend/src/scripts/backfill-juvi-ids.ts`
 Expected: a line like `[backfill-juvi-ids] scanned N, minted N, skipped 0, failed 0`, exit 0 — the first run mints everything. Run it a second time and expect `minted 0, skipped N` — that is the re-runnability proof on real data, not just in the harness.
 
