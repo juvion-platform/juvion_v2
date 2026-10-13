@@ -89,6 +89,12 @@ export const devicesResponseSchema = z.object({ items: z.array(deviceRowSchema) 
 
 export const meResponseSchema = z.object({
   account: accountSummarySchema,
+  /**
+   * §8 — the durable Juvi ID, so a signed-in person can read it back and save it. Nullable rather
+   * than required (ruling R-J): an account the backfill has not reached reports null, and a
+   * missing key would make the generated client's `$checkKeys` throw.
+   */
+  juviId: z.string().nullable(),
   person: z.object({ name: z.string(), firstName: z.string(), photoUrl: z.string().nullable() }),
   student: z.object({
     rollNumber: z.string().nullable(), programme: z.string().nullable(), branch: z.string().nullable(),

@@ -4,6 +4,7 @@ import { getTestApp, cleanupTestApp } from '../setup/test-app';
 import { seedBase, BaseFixtures } from '../setup/seed-base';
 import { enableJuvi, provisionTestStudent, provisionTestFaculty, mobileClient, TEST_DEVICE } from '../factories/juvi.factory';
 import { Student } from '../../models';
+import { User } from '../../models/User';
 import { JuviAccount } from '../../models/juvi/JuviAccount';
 import { requestPublicDeletion } from '../../modules/juvi-app/accounts/deletion-service';
 
@@ -24,6 +25,8 @@ describe('GET /me', () => {
     const t = await tokenFor(s.juviId, s.tempPassword);
     const res = await mobileClient(app, t).get(`${V1}/me`).expect(200);
     expect(res.body.account).toMatchObject({ kind: 'student', onboardingSteps: ['identity', 'spaces', 'notifications', 'first_notice'], mustChangePassword: true });
+    // §8: the only place a signed-in person can read their own ID back.
+    expect(res.body.juviId).toBe(s.juviId);
     expect(res.body.person.name).toBe(s.person.name);
     expect(res.body.student).toMatchObject({ rollNumber: s.student.rollNumber, programme: 'B.Tech', branch: 'CSE', batch: '2024 Batch', section: 'A', department: 'Computer Science', isLateralEntry: false, hostel: null });
     expect(res.body.faculty).toBeNull();
@@ -54,6 +57,18 @@ describe('GET /me', () => {
     const res = await mobileClient(app, tf).get(`${V1}/me`).expect(200);
     expect(res.body.student).toBeNull();
     expect(res.body.faculty).toMatchObject({ employeeCode: f.faculty.employeeCode, department: 'Computer Science', isHod: false });
+  });
+
+  // Ruling R-J: an account the backfill has not reached yields null, not a missing key — the
+  // generated client throws on a missing required key (`$checkKeys`), and the app's first screen
+  // must not crash on a data state the server is allowed to be in.
+  it('reports a null Juvi ID rather than omitting the key when the User has none', async () => {
+    const s = await provisionTestStudent(fx);
+    const t = await tokenFor(s.juviId, s.tempPassword);
+    await User.updateOne({ collegeId: fx.collegeId, _id: s.account.userId }, { $unset: { juviId: 1 } });
+    const res = await mobileClient(app, t).get(`${V1}/me`).expect(200);
+    expect(res.body).toHaveProperty('juviId');
+    expect(res.body.juviId).toBeNull();
   });
 });
 

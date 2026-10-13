@@ -50,7 +50,7 @@ async function logoUrlFor(logoKey?: string): Promise<string | null> {
 export async function getMe(ctx: MobileContext): Promise<MeResponse> {
   const [account, user, person, cfg] = await Promise.all([
     JuviAccount.findOne({ _id: ctx.accountId, collegeId: ctx.collegeId }),
-    User.findOne({ _id: ctx.userId, collegeId: ctx.collegeId }).select('mustChangePassword role').lean(),
+    User.findOne({ _id: ctx.userId, collegeId: ctx.collegeId }).select('mustChangePassword role juviId').lean(),
     Person.findOne({ _id: ctx.account.personId, collegeId: ctx.collegeId }).select('name').lean(),
     getJuviConfig(ctx.collegeId),
   ]);
@@ -94,6 +94,7 @@ export async function getMe(ctx: MobileContext): Promise<MeResponse> {
 
   return {
     account: accountSummary(account, user),
+    juviId: user.juviId ?? null,
     person: { name: person.name, firstName: person.name.split(/\s+/)[0] ?? person.name, photoUrl: await photoUrlFor(ctx) },
     student,
     faculty,

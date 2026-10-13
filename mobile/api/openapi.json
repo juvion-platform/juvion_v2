@@ -1094,6 +1094,12 @@
             ],
             "type": "object"
           },
+          "juviId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "person": {
             "properties": {
               "firstName": {
@@ -1230,6 +1236,7 @@
         },
         "required": [
           "account",
+          "juviId",
           "person",
           "student",
           "faculty",
