@@ -47,6 +47,17 @@ The Android app is `in.juvion.juvi`. `android/app/google-services.json` is git-i
 ## Release signing
 `android/key.properties` (git-ignored, with `storeFile`, `storePassword`, `keyAlias`, `keyPassword`; a relative `storeFile` is resolved from `android/app/`, an absolute one is used as is) signs release builds; without it a release build uses the debug key. Only on a push to `main` with both `ANDROID_KEYSTORE_BASE64` and `GOOGLE_SERVICES_JSON` set does CI decode the keystore into `$RUNNER_TEMP`, write `key.properties` with that absolute `storeFile` (plus `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`) and build a signed App Bundle (artifact `juvi-release-aab`); pull requests, forks and builds on the placeholder Firebase config get only the debug APK. Firebase and Play both key on the signing certificate: add the release SHA-1/SHA-256 to the Firebase app.
 
+Create the upload keystore once, from the repo root (never commit it):
+
+    keytool -genkeypair -v -keystore mobile/android/app/upload-keystore.jks \
+      -alias upload -keyalg RSA -keysize 2048 -validity 10000 \
+      -storepass <pw> -keypass <pw> -dname "CN=Juvion, O=Juvion, C=IN"
+
+then write `mobile/android/key.properties` (`storeFile=upload-keystore.jks`, `storePassword=…`,
+`keyAlias=upload`, `keyPassword=…`) and base64-encode the keystore into the GitHub secret
+`ANDROID_KEYSTORE_BASE64`. A legacy keystore at `android/juvion` has no known password and is
+unused.
+
 ## Toolchain notes
 - `riverpod_lint` / `custom_lint` are not installed: they require Dart >=3.13, and this toolchain pins Dart 3.12.2. Re-add them once the pinned Flutter/Dart version moves past that floor.
 - `freezed` resolves to a `4.0.0-dev.x` prerelease for the same reason (`freezed` ^4.0.0 stable requires Dart >=3.13).

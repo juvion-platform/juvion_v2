@@ -12,4 +12,8 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+# A legacy keystore at android/juvion (no extension) — never committed.
+/juvion
+# PKCS#12 keystores
+**/*.p12
 /.kotlin/

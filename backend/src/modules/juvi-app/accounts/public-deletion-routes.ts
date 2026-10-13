@@ -152,7 +152,7 @@ export async function requestDeletionFromWeb(req: Request, res: Response, next: 
 
 export const publicDeletionRouter = Router();
 
-// `express.urlencoded` on **this route only**: the public page carries no script at all (AC9), so it
-// submits a native form, and `app.ts:46-51` registers `express.json` and nothing else. Mounting it
+// `express.urlencoded` on **this route only**: the public page submits a native form rather than a
+// script-built request, and `app.ts:46-51` registers `express.json` and nothing else. Mounting it
 // app-wide would put a second body parser on every ERP and mobile route.
 publicDeletionRouter.post('/account-deletion', deletionVerifyLimiter, express.urlencoded({ extended: false }), requestDeletionFromWeb);
