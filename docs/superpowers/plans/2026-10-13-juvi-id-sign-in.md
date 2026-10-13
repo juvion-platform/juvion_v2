@@ -2413,7 +2413,9 @@ Second:
     await t.enterText(find.bySemanticsLabel('Juvi ID'), 'JUV-4K7P-2M9X');
 ```
 
-Both sites keep the `expect(find.text('Sign in to your college'), …)` assertions: that copy is unchanged, because the app is still signing into the person's college — it just no longer asks which one.
+The **second** site keeps its `expect(find.text('Sign in to your college'), …)` assertion: that copy is unchanged, because the app is still signing into the person's college — it just no longer asks which one. The **first** site does not have that assertion, and never did: at the base revision `sign_in_flow_test.dart:211` reads `expect(find.text('JIT College'), findsOneWidget);`, which asserts the very behaviour this task removes and is therefore **deleted**, not kept. The base file has exactly two `Sign in to your college` assertions (`:366`, `:369`), both inside the second test, and the rewritten file has exactly two (`:352`, `:355`). So the first site loses an assertion and gains none — its rewritten body is the sign-in tap alone.
+
+> **Correction (recorded after Task 8 ran, from `rev-t8-2`'s review).** This paragraph previously read "Both sites keep the `expect(find.text('Sign in to your college'), …)` assertions". That was wrong about the first site. It is a trap, not a typo: this is Step 9 of a rewrite whose whole point is that no assertion may still pin the institution-code behaviour, so an executor following the sentence literally would carry `JIT College` forward — and, had the screen been rewritten as directed, be left with a test that cannot pass for a reason the step never mentions. The implementer read the situation correctly and deleted the assertion; only this prose was wrong.
 
 - [ ] **Step 10: Run both rewritten test files to verify they fail**
 
