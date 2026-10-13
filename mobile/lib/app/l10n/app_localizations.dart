@@ -460,6 +460,12 @@ abstract class AppLocalizations {
   /// **'About'**
   String get meAboutSection;
 
+  /// No description provided for @meJuviIdCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Juvi ID copied'**
+  String get meJuviIdCopied;
+
   /// No description provided for @meAppVersion.
   ///
   /// In en, this message translates to:

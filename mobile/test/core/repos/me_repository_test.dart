@@ -41,6 +41,7 @@ const Map<String, dynamic> meJson = {
     'onboardingComplete': false,
     'mustChangePassword': false,
   },
+  'juviId': 'JUV4K7P2M9X',
   'person': {'name': 'Aditya Nair', 'firstName': 'Aditya', 'photoUrl': null},
   'student': {
     'rollNumber': '24JIT0001',
@@ -68,6 +69,7 @@ void main() {
     expect(me.person.firstName, 'Aditya');
     expect(me.student?.section, 'A');
     expect(me.faculty, isNull);
+    expect(me.juviId, 'JUV4K7P2M9X');
     expect(me.settings.tiers.routine, isTrue);
     expect(me.institution.supportContact?.name, 'Office');
     expect(me.toJson()['student'], isA<Map<String, dynamic>>());

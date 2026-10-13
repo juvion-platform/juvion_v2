@@ -73,6 +73,7 @@
   "changePasswordTitle": "Change password",
   "@changePasswordTitle": { "description": "Also used as the Me screen's entry label for the change-password screen." },
   "meAboutSection": "About",
+  "meJuviIdCopied": "Juvi ID copied",
   "meAppVersion": "Juvi {version}",
   "@meAppVersion": { "placeholders": { "version": { "type": "String" } } },
   "meDataPrivacyNote": "Your data stays with your institution. Juvi never sells it or shares it for advertising.",

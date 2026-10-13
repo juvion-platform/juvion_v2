@@ -207,6 +207,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get meAboutSection => 'About';
 
   @override
+  String get meJuviIdCopied => 'Juvi ID copied';
+
+  @override
   String meAppVersion(String version) {
     return 'Juvi $version';
   }

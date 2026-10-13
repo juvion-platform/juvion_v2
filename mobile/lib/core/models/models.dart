@@ -139,6 +139,12 @@ abstract class Me with _$Me {
     FacultyCard? faculty,
     String? deletionRequestedAt,
     String? deletionRequestedVia,
+    /// The durable Juvi ID (spec §8). Nullable rather than required (R-J): the server sends
+    /// null for an account the backfill has not reached, and — like `deletionRequestedAt`
+    /// above — it must be declared **here** and not only on the wire model, because freezed's
+    /// `fromJson` drops unknown keys silently, so a server-only field would leave this `Me`
+    /// without it and the row below would simply never render.
+    String? juviId,
   }) = _Me;
   factory Me.fromJson(Map<String, dynamic> json) => _$MeFromJson(json);
 }

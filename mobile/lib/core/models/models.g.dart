@@ -223,6 +223,7 @@ _Me _$MeFromJson(Map<String, dynamic> json) => _Me(
       : FacultyCard.fromJson(json['faculty'] as Map<String, dynamic>),
   deletionRequestedAt: json['deletionRequestedAt'] as String?,
   deletionRequestedVia: json['deletionRequestedVia'] as String?,
+  juviId: json['juviId'] as String?,
 );
 
 Map<String, dynamic> _$MeToJson(_Me instance) => <String, dynamic>{
@@ -235,6 +236,7 @@ Map<String, dynamic> _$MeToJson(_Me instance) => <String, dynamic>{
   'faculty': instance.faculty?.toJson(),
   'deletionRequestedAt': instance.deletionRequestedAt,
   'deletionRequestedVia': instance.deletionRequestedVia,
+  'juviId': instance.juviId,
 };
 
 _OnboardingStateData _$OnboardingStateDataFromJson(Map<String, dynamic> json) =>
