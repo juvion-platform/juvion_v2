@@ -73,8 +73,10 @@ export async function signIn(input: SignInInput): Promise<z.infer<typeof signInR
   // query in the module that is not scoped by collegeId — an exact hit on a globally unique key.
   const user = await resolveJuviIdToUser(juviId);
   if (!user) {
-    // Same work as a real compare, so a miss costs what a hit costs.
+    // Same work as a real compare, so a miss costs what a hit costs — and the same budget, or the
+    // 429-vs-401 difference on the 6th attempt tells a stranger whether the ID exists (spec §6/§8).
     await bcrypt.compare(input.password, DUMMY_HASH);
+    await recordFailure(juviId);
     throw invalidCredentials();
   }
 

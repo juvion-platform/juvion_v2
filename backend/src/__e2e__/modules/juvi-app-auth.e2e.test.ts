@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import type { Express } from 'express';
+import bcrypt from 'bcryptjs';
 import { getTestApp, cleanupTestApp } from '../setup/test-app';
 import { seedBase, BaseFixtures } from '../setup/seed-base';
 import { enableJuvi, provisionTestStudent, mobileClient, TEST_DEVICE } from '../factories/juvi.factory';
@@ -8,6 +9,7 @@ import { deactivateAccount } from '../../modules/juvi-app/accounts/provisioning-
 import { User } from '../../models/User';
 import { formatJuviId } from '../../modules/juvi-app/accounts/juvi-id';
 import { JuviAccount } from '../../models/juvi/JuviAccount';
+import { clearFailures } from '../../modules/juvi-app/accounts/cooldown';
 
 let app: Express; let fx: BaseFixtures;
 const V1 = '/api/juvi-app/v1';
@@ -16,7 +18,15 @@ const V1 = '/api/juvi-app/v1';
 const UNKNOWN_JUVI_ID = 'JUVZZZZZZZZ';
 
 beforeAll(async () => { app = await getTestApp(); });
-beforeEach(async () => { await cleanupTestApp(); fx = await seedBase(); await enableJuvi(fx.collegeId, { supportContact: { name: 'Exam Office', phone: '040-1' } }); });
+beforeEach(async () => {
+  await cleanupTestApp();
+  fx = await seedBase();
+  await enableJuvi(fx.collegeId, { supportContact: { name: 'Exam Office', phone: '040-1' } });
+  // Redis is never flushed between runs, so the two fixed literals below would accrue one cooldown
+  // charge per run and flip their assertions from 401 to 429 within the 600s window.
+  await clearFailures(UNKNOWN_JUVI_ID);
+  await clearFailures('JUVR00T0000');
+});
 afterAll(async () => { await cleanupTestApp(); });
 
 function signIn(juviId: string, password: string, device = TEST_DEVICE) {
@@ -67,10 +77,31 @@ describe('POST /auth/sign-in', () => {
     expect(a.body.error.code).toBe('INVALID_CREDENTIALS');
   });
 
+  // Review finding 1 — the cooldown must not be a way to tell a real ID from an unknown one.
+  it('spends the same failure budget for an unknown Juvi ID as for a real one', async () => {
+    const s = await provisionTestStudent(fx);
+    const unknown = 'JUVQQQQQQQQ'; // valid shape, no User behind it
+    await clearFailures(s.juviId);
+    await clearFailures(unknown); // this literal recurs across runs; Redis is not flushed between them
+
+    for (let i = 0; i < 5; i += 1) {
+      await signIn(s.juviId, 'bad-bad-000').expect(401);
+      await signIn(unknown, 'bad-bad-000').expect(401);
+    }
+
+    // The 6th attempt must be indistinguishable: same status, same body.
+    const real = await signIn(s.juviId, 'bad-bad-000').expect(429);
+    const ghost = await signIn(unknown, 'bad-bad-000').expect(429);
+    expect(real.body).toEqual(ghost.body);
+    expect(real.body.error.code).toBe('COOLDOWN');
+  });
+
   // Review Focus 5 — a User that holds an ID but carries no college is a clean 401, never a 500.
   it('401s, and does not 500, for a User with a Juvi ID and no collegeId', async () => {
-    await User.create({ email: 'root@x.test', password: '$2a$10$abcdefghijklmnopqrstuv', name: 'Root', role: 'super_admin', juviId: 'JUVR00T0000' });
-    const res = await signIn('JUVR00T0000', 'anything').expect(401);
+    const password = 'root-horse-9';
+    await User.create({ email: 'root@x.test', password: await bcrypt.hash(password, 10), name: 'Root', role: 'super_admin', juviId: 'JUVR00T0000' });
+    // The correct password, so the 401 can only come from the no-college guard — never from `!ok`.
+    const res = await signIn('JUVR00T0000', password).expect(401);
     expect(res.body.error.code).toBe('INVALID_CREDENTIALS');
   });
 

@@ -406,7 +406,7 @@ Then `JuviAccount.findOne({ collegeId, userId })`. Decision table:
 | Condition | Response |
 |---|---|
 | Cooldown counter ≥ 5 | 429 `COOLDOWN { retryAfterSeconds }` (checked first, before any lookup) |
-| No User, or no JuviAccount, or bcrypt mismatch | 401 `INVALID_CREDENTIALS`; bcrypt still runs against a fixed dummy hash when no User is found; counter incremented; server log line with reason |
+| No User, or no JuviAccount, or bcrypt mismatch | 401 `INVALID_CREDENTIALS`; bcrypt still runs against a fixed dummy hash when no User is found; the counter is incremented on every arm, so an unknown ID spends the same budget as a real one and the 6th attempt is 429 either way; no identifier material is logged — the cooldown key is hashed by design (`cooldown.ts:9-13`). *Amended in place 2026-10-13: the "counter incremented" clause was not true of the no-User arm until then, and the "server log line" clause is struck rather than implemented.* |
 | Password ok, account `deactivated` or User `isActive: false` | 403 `ACCOUNT_DEACTIVATED { supportContact }` |
 | Password ok | 200 below; counter cleared |
 
