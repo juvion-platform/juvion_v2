@@ -87,9 +87,15 @@ void main() {
         ? detailJson('w1', title: 'Welcome to Juvi', office: 'Juvi', deadline: null, purpose: 'welcome', state: 'acknowledged', ackAt: '2026-10-01T05:00:00.000Z')
         : detailJson('w1', title: 'Welcome to Juvi', office: 'Juvi', deadline: null, purpose: 'welcome');
 
-    // `/institutions/{code}` and `/config` send `minAppVersion`/`supportContact` as
-    // `null` here because that's what the real server sends whenever there's no
-    // app-version gate or support contact configured — the common (not the edge) case.
+    // `/config` alone is mocked here, and it sends `minAppVersion`/`supportContact` as
+    // `null` because that's what the real server sends whenever there's no app-version
+    // gate or support contact configured — the common (not the edge) case.
+    // `/institutions/{code}` is deliberately *not* mocked in this file any more: nothing
+    // looks a college up before credentials (see the note below the sign-in mock), so an
+    // unmocked call fails these tests — that failure is the guard. Don't reinstate the
+    // mock to "restore coverage": an answered request looks identical to one never made,
+    // so it would silently tolerate the pre-credential lookup the removal exists to
+    // prevent. That endpoint's own raw-Dio read is covered by auth_repository_test.dart.
     // Both endpoints are read on a raw Dio (auth_repository.dart's `lookupInstitution`,
     // config_repository.dart's `refresh`), not through the generated client, precisely
     // because the generated client's `fromJson` cannot handle that `null` (see
