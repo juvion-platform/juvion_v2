@@ -96,6 +96,11 @@ describe('POST /auth/sign-in', () => {
     // excluded from an exact comparison on purpose — it is derived from the caller's own request
     // timing (each arm's cooldown window starts at its own first failure, ~70ms apart), so it can
     // differ by a second without carrying any signal about the ID. Everything else must match.
+    //
+    // The key sets must match too. Whole-body equality used to cover this incidentally; a shape
+    // difference between the arms — one carrying a detail key the other does not — is an existence
+    // oracle in its own right, and it is the failure class this test exists to catch.
+    expect(Object.keys(real.body.error)).toEqual(Object.keys(ghost.body.error));
     expect(real.body.error.code).toBe('COOLDOWN');
     expect(ghost.body.error.code).toBe('COOLDOWN');
     expect(real.body.error.message).toBe(ghost.body.error.message);
