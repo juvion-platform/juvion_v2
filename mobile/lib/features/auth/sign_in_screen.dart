@@ -16,6 +16,17 @@ class SignInScreen extends ConsumerStatefulWidget {
   ConsumerState<SignInScreen> createState() => _SignInScreenState();
 }
 
+/// The server's field-level message for the Juvi ID, when it sent one (R-C). Selected by `path`
+/// rather than by position, so a zod issue ordering change cannot silently swap which message the
+/// person reads; the schema makes the shape message the *only* `juviId` issue, and this must not
+/// depend on that staying true.
+String? _juviIdFieldMessage(ApiFailure f) {
+  for (final field in f.fields) {
+    if (field['path'] == 'juviId') return field['message'] as String?;
+  }
+  return null;
+}
+
 class _SignInScreenState extends ConsumerState<SignInScreen> {
   final _juviId = TextEditingController();
   final _password = TextEditingController();
@@ -54,6 +65,12 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
             ApiErrorCode.offline => l.signInNeedsConnection,
             // R56: ApiFailure.fromDio strips `message` out of `detail` into the top-level field.
             ApiErrorCode.institutionPaused => f.message,
+            // R-C: the actionable copy — what the ID looks like — is in the 400's `fields[]`, not
+            // in its envelope message, which reads only "Some fields are invalid.". This is the
+            // one surface the person sees (nothing else in the app reads `fields`), so R-C arrives
+            // only if it is lifted here. Selected by `path`, not by position: zod's issue order is
+            // an implementation detail this screen must not depend on.
+            ApiErrorCode.validationFailed => _juviIdFieldMessage(f) ?? f.message,
             _ => f.message,
           });
     } finally {

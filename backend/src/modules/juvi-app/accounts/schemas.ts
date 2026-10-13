@@ -14,13 +14,20 @@ export const deviceSchema = z.object({
 
 export const signInSchema = z
   .object({
-    juviId: z.string().trim().min(1).max(32),
+    // No `max` on `juviId`, deliberately. The refine below requires the canonical 11-character
+    // shape, so a length bound can never accept anything the refine rejects — it is redundant for
+    // correctness. It is not neutral, though: zod reports a bound *before* the refine, so a
+    // `max(32)` demoted the shape message to `fields[1]` for any mistyped input longer than 32 —
+    // and an email (one of the three inputs §13 says stop working) is 37. The person was then told
+    // about characters instead of the ID. Input size is bounded by the JSON body limit.
+    juviId: z.string().trim().min(1),
     password: z.string().min(1).max(200),
     device: deviceSchema,
   })
   // Ruling R-C: the likeliest migration mistake is a roll number typed into the new field. A 400
   // naming the shape is actionable where the generic 401 would just read as a wrong password — and
-  // it leaks nothing, because the shape is printed on every slip.
+  // it leaks nothing, because the shape is printed on every slip. This must be the *only* issue
+  // reported for `juviId`, or it is not the message the person reads.
   .refine((v) => CANONICAL_JUVI_ID.test(normaliseJuviId(v.juviId)), {
     message: "That doesn't look like a Juvi ID. It looks like JUV-4K7P-2M9X.",
     path: ['juviId'],

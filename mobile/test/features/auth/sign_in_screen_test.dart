@@ -112,6 +112,26 @@ void main() {
     expect(find.text('Back Monday'), findsOneWidget);
   });
 
+  // Whole-branch review, Finding A. The 400's actionable copy lives in `error.fields[]`; the
+  // envelope's `message` is only "Some fields are invalid.". This screen is the one surface the
+  // person reads and nothing else in the app reads `fields`, so without this case R-C's
+  // "name the shape" promise reaches nobody — however well the API-side e2e pins the body.
+  testWidgets('an input that cannot be a Juvi ID shows the shape the server names', (t) async {
+    session.failWith = const ApiFailure(ApiErrorCode.validationFailed, 'Some fields are invalid.', status: 400, detail: {
+      'fields': [
+        {'path': 'juviId', 'message': "That doesn't look like a Juvi ID. It looks like JUV-4K7P-2M9X."},
+      ],
+    });
+    await t.pumpWidget(app(ov()));
+    await t.enterText(find.bySemanticsLabel('Juvi ID'), '21CS1042');
+    await t.enterText(find.bySemanticsLabel('Password'), 'river-lamp-482');
+    await t.pump();
+    await t.tap(find.widgetWithText(FilledButton, 'Sign in'));
+    await t.pumpAndSettle();
+    expect(find.text("That doesn't look like a Juvi ID. It looks like JUV-4K7P-2M9X."), findsOneWidget);
+    expect(find.text('Some fields are invalid.'), findsNothing);
+  });
+
   testWidgets('forgot password opens the explanation sheet', (t) async {
     await t.pumpWidget(app(ov()));
     await t.tap(find.text('Forgot password?'));
