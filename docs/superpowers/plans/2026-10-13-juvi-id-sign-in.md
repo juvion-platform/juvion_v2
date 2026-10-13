@@ -1819,8 +1819,17 @@ Expected: PASS, 4/4.
 
 This is the task's real deliverable: the script exists *and* has been run in the environment the demo uses. The dev Mongo is on `localhost:27017`, database `juvion_v2`.
 
-Run: `MONGODB_URI=mongodb://localhost:27017/juvion_v2 npx ts-node-dev --transpile-only backend/src/scripts/backfill-juvi-ids.ts`
-Expected: a line like `[backfill-juvi-ids] scanned 6, minted 6, skipped 0, failed 0`, exit 0. Run it a second time and expect `minted 0, skipped 6` — that is the re-runnability proof on real data, not just in the harness.
+Run: `MONGODB_URI=mongodb://localhost:27017/juvion_v2 npx ts-node --transpile-only backend/src/scripts/backfill-juvi-ids.ts`
+Expected: a line like `[backfill-juvi-ids] scanned N, minted N, skipped 0, failed 0`, exit 0 — the first run mints everything. Run it a second time and expect `minted 0, skipped N` — that is the re-runnability proof on real data, not just in the harness.
+
+> **Corrected after execution (2026-10-13).** This step originally specified `ts-node-dev`, which is a
+> **file watcher and never exits**: `main()` completing does not end the command, so it hung for 180s
+> with empty output and wrote nothing to the database. It is a non-starter for a one-shot migration,
+> not merely slow — and the failure mode is a silent hang rather than a visible error, which is the
+> worst shape for a step a deploy runs. `ts-node` honours the `require.main === module` guard under
+> CommonJS and exits. The count was also wrong (`6`); the dev database holds **9** accounts, and all 9
+> migrated on the first run with a clean idempotent second run. **Use `ts-node`, never `ts-node-dev`,
+> as the operator command for this script.**
 
 - [ ] **Step 6: Typecheck and commit**
 
