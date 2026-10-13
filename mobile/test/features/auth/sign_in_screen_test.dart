@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 // riverpod 3.4.3 moved `Override` out of the main flutter_riverpod.dart barrel; see misc.dart.
@@ -13,26 +11,23 @@ import 'package:juvi/core/session/session_controller.dart';
 import 'package:juvi/core/session/session_state.dart';
 import 'package:juvi/features/auth/sign_in_screen.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class _Auth extends Mock implements AuthRepository {}
 
 class _Session extends SessionController {
   ApiFailure? failWith;
-  String? lastCollegeId;
+  String? lastJuviId;
   @override
   SessionState build() => const SessionState.signedOut();
   @override
-  Future<void> signIn({required String collegeId, required String identifier, required String password}) async {
-    lastCollegeId = collegeId;
+  Future<void> signIn({required String juviId, required String password}) async {
+    lastJuviId = juviId;
     if (failWith != null) throw failWith!;
     state = const SessionState.signedIn(
       AccountSummary(id: 'a', kind: 'student', status: 'onboarding', onboardingStep: 0, onboardingSteps: ['identity'], onboardingComplete: false, mustChangePassword: true),
     );
   }
 }
-
-const jit = InstitutionIdentity(collegeId: 'c1', name: 'JIT College', paused: false);
 
 Widget app(List<Override> overrides) => ProviderScope(
       overrides: overrides,
@@ -43,88 +38,52 @@ void main() {
   late _Auth auth;
   late _Session session;
   setUp(() {
-    SharedPreferences.setMockInitialValues({});
     auth = _Auth();
     session = _Session();
-    registerFallbackValue(const DeviceInfo(id: 'd', name: 'n', platform: 'android', appVersion: '1', osVersion: '1'));
-    when(() => auth.lookupInstitution('JIT')).thenAnswer((_) async => jit);
-    when(() => auth.lookupInstitution('NOPE')).thenThrow(const ApiFailure(ApiErrorCode.notFound, "We couldn't find that college code."));
   });
   List<Override> ov() => [authRepositoryProvider.overrideWithValue(auth), sessionControllerProvider.overrideWith(() => session)];
 
-  testWidgets('resolves the institution code and shows the college name; unknown code shows the not-found message', (t) async {
+  testWidgets('no institution-code field is rendered and no lookup is attempted', (t) async {
     await t.pumpWidget(app(ov()));
-    await t.pump(); // shared_preferences 2.5.5's getInstance() needs a second microtask/frame turn to resolve.
-    await t.enterText(find.bySemanticsLabel('Institution code'), 'JIT');
-    await t.pump(const Duration(milliseconds: 600));
-    expect(find.text('JIT College'), findsOneWidget);
-    await t.enterText(find.bySemanticsLabel('Institution code'), 'NOPE');
-    await t.pump(const Duration(milliseconds: 600));
-    expect(find.text("We couldn't find that college code."), findsOneWidget);
-    expect(find.text('JIT College'), findsNothing);
+    expect(find.bySemanticsLabel('Juvi ID'), findsOneWidget);
+    expect(find.bySemanticsLabel('Institution code'), findsNothing);
+    verifyNever(() => auth.lookupInstitution(any()));
   });
 
-  testWidgets('a stale lookup response is ignored once a different code has since been typed', (t) async {
-    const alfa = InstitutionIdentity(collegeId: 'a1', name: 'Alfa College', paused: false);
-    const beta = InstitutionIdentity(collegeId: 'b1', name: 'Beta College', paused: false);
-    final alfaCompleter = Completer<InstitutionIdentity>();
-    when(() => auth.lookupInstitution('ALFA')).thenAnswer((_) => alfaCompleter.future);
-    when(() => auth.lookupInstitution('BETA')).thenAnswer((_) async => beta);
-
+  testWidgets('the typed Juvi ID reaches the controller, trimmed and otherwise untouched', (t) async {
     await t.pumpWidget(app(ov()));
-    await t.pump(); // shared_preferences 2.5.5's getInstance() needs a second microtask/frame turn to resolve.
-    await t.enterText(find.bySemanticsLabel('Institution code'), 'ALFA');
-    await t.pump(const Duration(milliseconds: 600)); // debounce fires; lookupInstitution('ALFA') is now in flight, pending.
-    await t.enterText(find.bySemanticsLabel('Institution code'), 'BETA');
-    await t.pump(const Duration(milliseconds: 600)); // debounce fires; BETA resolves immediately.
-    expect(find.text('Beta College'), findsOneWidget);
-    expect(find.text('Alfa College'), findsNothing);
-
-    // ALFA's late response arrives after BETA has already resolved — it must not overwrite BETA.
-    alfaCompleter.complete(alfa);
-    await t.pump();
-    await t.pump();
-    expect(find.text('Beta College'), findsOneWidget);
-    expect(find.text('Alfa College'), findsNothing);
-
-    // The parent must still be bound to BETA's collegeId, never ALFA's.
-    await t.enterText(find.bySemanticsLabel('Roll number, employee code or email'), '21CS1042');
+    await t.enterText(find.bySemanticsLabel('Juvi ID'), '  juv 4k7p 2m9x  ');
     await t.enterText(find.bySemanticsLabel('Password'), 'river-lamp-482');
     await t.pump();
     await t.tap(find.widgetWithText(FilledButton, 'Sign in'));
     await t.pumpAndSettle();
-    expect(session.lastCollegeId, 'b1');
+    // Normalisation (case, separators) happens on the server, the only side that can be
+    // trusted with it. The app must not mangle what the person transcribed (R-N).
+    expect(session.lastJuviId, 'juv 4k7p 2m9x');
   });
 
-  testWidgets('sign-in button is disabled until code, identifier and password are present; success remembers the code', (t) async {
+  testWidgets('the button stays disabled until a Juvi ID and a password are present', (t) async {
     await t.pumpWidget(app(ov()));
-    await t.pump(); // shared_preferences 2.5.5's getInstance() needs a second microtask/frame turn to resolve.
     final button = find.widgetWithText(FilledButton, 'Sign in');
     expect(t.widget<FilledButton>(button).onPressed, isNull);
-    await t.enterText(find.bySemanticsLabel('Institution code'), 'JIT');
-    await t.pump(const Duration(milliseconds: 600));
-    await t.enterText(find.bySemanticsLabel('Roll number, employee code or email'), '21CS1042');
+    await t.enterText(find.bySemanticsLabel('Juvi ID'), 'JUV-4K7P-2M9X');
+    await t.pump();
+    expect(t.widget<FilledButton>(button).onPressed, isNull);
     await t.enterText(find.bySemanticsLabel('Password'), 'river-lamp-482');
     await t.pump();
     expect(t.widget<FilledButton>(button).onPressed, isNotNull);
-    await t.tap(button);
-    await t.pumpAndSettle();
-    expect((await SharedPreferences.getInstance()).getString('juvi.institution_code'), 'JIT');
   });
 
-  testWidgets('wrong credentials show one generic message and keep the typed identifier; cooldown shows minutes', (t) async {
+  testWidgets('wrong credentials show one generic message and keep the typed Juvi ID; cooldown shows minutes', (t) async {
     session.failWith = const ApiFailure(ApiErrorCode.invalidCredentials, 'x');
     await t.pumpWidget(app(ov()));
-    await t.pump(); // shared_preferences 2.5.5's getInstance() needs a second microtask/frame turn to resolve.
-    await t.enterText(find.bySemanticsLabel('Institution code'), 'JIT');
-    await t.pump(const Duration(milliseconds: 600));
-    await t.enterText(find.bySemanticsLabel('Roll number, employee code or email'), '21CS1042');
+    await t.enterText(find.bySemanticsLabel('Juvi ID'), 'JUV-4K7P-2M9X');
     await t.enterText(find.bySemanticsLabel('Password'), 'bad');
     await t.pump(); // rebuild so the just-typed password is reflected before the tap finds the button.
     await t.tap(find.widgetWithText(FilledButton, 'Sign in'));
     await t.pumpAndSettle();
-    expect(find.text('That identifier or password is not right.'), findsOneWidget);
-    expect(find.text('21CS1042'), findsOneWidget);
+    expect(find.text('That Juvi ID or password is not right.'), findsOneWidget);
+    expect(find.text('JUV-4K7P-2M9X'), findsOneWidget);
     session.failWith = const ApiFailure(ApiErrorCode.cooldown, 'x', detail: {'retryAfterSeconds': 540});
     await t.tap(find.widgetWithText(FilledButton, 'Sign in'));
     await t.pumpAndSettle();
@@ -134,10 +93,7 @@ void main() {
   testWidgets('offline explains that sign-in needs a connection', (t) async {
     session.failWith = const ApiFailure(ApiErrorCode.offline, 'x');
     await t.pumpWidget(app(ov()));
-    await t.pump(); // shared_preferences 2.5.5's getInstance() needs a second microtask/frame turn to resolve.
-    await t.enterText(find.bySemanticsLabel('Institution code'), 'JIT');
-    await t.pump(const Duration(milliseconds: 600));
-    await t.enterText(find.bySemanticsLabel('Roll number, employee code or email'), 'x');
+    await t.enterText(find.bySemanticsLabel('Juvi ID'), 'JUV-4K7P-2M9X');
     await t.enterText(find.bySemanticsLabel('Password'), 'y');
     await t.pump(); // rebuild so the just-typed password is reflected before the tap finds the button.
     await t.tap(find.widgetWithText(FilledButton, 'Sign in'));
@@ -145,9 +101,39 @@ void main() {
     expect(find.textContaining('needs a connection'), findsOneWidget);
   });
 
+  testWidgets('a paused college is reported from the server, not from a lookup', (t) async {
+    session.failWith = const ApiFailure(ApiErrorCode.institutionPaused, 'Back Monday');
+    await t.pumpWidget(app(ov()));
+    await t.enterText(find.bySemanticsLabel('Juvi ID'), 'JUV-4K7P-2M9X');
+    await t.enterText(find.bySemanticsLabel('Password'), 'river-lamp-482');
+    await t.pump();
+    await t.tap(find.widgetWithText(FilledButton, 'Sign in'));
+    await t.pumpAndSettle();
+    expect(find.text('Back Monday'), findsOneWidget);
+  });
+
+  // Whole-branch review, Finding A. The 400's actionable copy lives in `error.fields[]`; the
+  // envelope's `message` is only "Some fields are invalid.". This screen is the one surface the
+  // person reads and nothing else in the app reads `fields`, so without this case R-C's
+  // "name the shape" promise reaches nobody — however well the API-side e2e pins the body.
+  testWidgets('an input that cannot be a Juvi ID shows the shape the server names', (t) async {
+    session.failWith = const ApiFailure(ApiErrorCode.validationFailed, 'Some fields are invalid.', status: 400, detail: {
+      'fields': [
+        {'path': 'juviId', 'message': "That doesn't look like a Juvi ID. It looks like JUV-4K7P-2M9X."},
+      ],
+    });
+    await t.pumpWidget(app(ov()));
+    await t.enterText(find.bySemanticsLabel('Juvi ID'), '21CS1042');
+    await t.enterText(find.bySemanticsLabel('Password'), 'river-lamp-482');
+    await t.pump();
+    await t.tap(find.widgetWithText(FilledButton, 'Sign in'));
+    await t.pumpAndSettle();
+    expect(find.text("That doesn't look like a Juvi ID. It looks like JUV-4K7P-2M9X."), findsOneWidget);
+    expect(find.text('Some fields are invalid.'), findsNothing);
+  });
+
   testWidgets('forgot password opens the explanation sheet', (t) async {
     await t.pumpWidget(app(ov()));
-    await t.pump(); // shared_preferences 2.5.5's getInstance() needs a second microtask/frame turn to resolve.
     await t.tap(find.text('Forgot password?'));
     await t.pumpAndSettle();
     expect(find.textContaining('Your college resets Juvi passwords'), findsOneWidget);

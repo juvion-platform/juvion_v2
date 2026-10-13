@@ -144,7 +144,7 @@ export function buildOpenApiDocument(): OpenApiDocument {
   const routes: RouteDef[] = [
     { operationId: 'lookupInstitution', method: 'get', path: '/institutions/{code}', summary: 'Resolve an institution code for sign-in', auth: false, params: ['code'], response: C.InstitutionLookup, errors: [404, 429] },
     { operationId: 'getConfig', method: 'get', path: '/config', summary: 'Institution configuration for the signed-in user', auth: true, response: C.Config, errors: [401, 503] },
-    { operationId: 'signIn', method: 'post', path: '/auth/sign-in', summary: 'Sign in with institution, identifier and password', auth: false, body: C.SignInRequest, response: C.SignInResponse, errors: [400, 401, 403, 429, 503] },
+    { operationId: 'signIn', method: 'post', path: '/auth/sign-in', summary: 'Sign in with a Juvi ID and password', auth: false, body: C.SignInRequest, response: C.SignInResponse, errors: [400, 401, 403, 429, 503] },
     { operationId: 'refresh', method: 'post', path: '/auth/refresh', summary: 'Rotate the refresh token', auth: false, body: C.RefreshRequest, response: C.Tokens, errors: [400, 401] },
     { operationId: 'signOut', method: 'post', path: '/auth/sign-out', summary: 'Revoke this session', auth: true, status: 204, errors: [401] },
     { operationId: 'changePassword', method: 'post', path: '/auth/change-password', summary: 'Change password; revokes other sessions', auth: true, body: C.ChangePasswordRequest, status: 204, errors: [400, 401] },

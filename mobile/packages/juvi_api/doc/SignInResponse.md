@@ -11,6 +11,7 @@ Name | Type | Description | Notes
 **accessExpiresIn** | **int** |  | 
 **accessToken** | **String** |  | 
 **account** | [**MeAccount**](MeAccount.md) |  | 
+**collegeId** | **String** |  | 
 **refreshToken** | **String** |  | 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)

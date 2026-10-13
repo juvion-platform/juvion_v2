@@ -8,17 +8,13 @@ part of 'sign_in_request.dart';
 
 SignInRequest _$SignInRequestFromJson(Map<String, dynamic> json) =>
     $checkedCreate('SignInRequest', json, ($checkedConvert) {
-      $checkKeys(
-        json,
-        requiredKeys: const ['collegeId', 'device', 'identifier', 'password'],
-      );
+      $checkKeys(json, requiredKeys: const ['device', 'juviId', 'password']);
       final val = SignInRequest(
-        collegeId: $checkedConvert('collegeId', (v) => v as String),
         device: $checkedConvert(
           'device',
           (v) => SignInRequestDevice.fromJson(v as Map<String, dynamic>),
         ),
-        identifier: $checkedConvert('identifier', (v) => v as String),
+        juviId: $checkedConvert('juviId', (v) => v as String),
         password: $checkedConvert('password', (v) => v as String),
       );
       return val;
@@ -26,8 +22,7 @@ SignInRequest _$SignInRequestFromJson(Map<String, dynamic> json) =>
 
 Map<String, dynamic> _$SignInRequestToJson(SignInRequest instance) =>
     <String, dynamic>{
-      'collegeId': instance.collegeId,
       'device': instance.device.toJson(),
-      'identifier': instance.identifier,
+      'juviId': instance.juviId,
       'password': instance.password,
     };

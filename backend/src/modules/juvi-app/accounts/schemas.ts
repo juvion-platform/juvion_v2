@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { HHMM } from '../../../models/juvi/JuviAccount';
+import { CANONICAL_JUVI_ID, normaliseJuviId } from './juvi-id';
 
 export const objectId = z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid id');
 
@@ -11,12 +12,26 @@ export const deviceSchema = z.object({
   osVersion: z.string().min(1).max(32),
 });
 
-export const signInSchema = z.object({
-  collegeId: objectId,
-  identifier: z.string().trim().min(1).max(120),
-  password: z.string().min(1).max(200),
-  device: deviceSchema,
-});
+export const signInSchema = z
+  .object({
+    // No `max` on `juviId`, deliberately. The refine below requires the canonical 11-character
+    // shape, so a length bound can never accept anything the refine rejects — it is redundant for
+    // correctness. It is not neutral, though: zod reports a bound *before* the refine, so a
+    // `max(32)` demoted the shape message to `fields[1]` for any mistyped input longer than 32 —
+    // and an email (one of the three inputs §13 says stop working) is 37. The person was then told
+    // about characters instead of the ID. Input size is bounded by the JSON body limit.
+    juviId: z.string().trim().min(1),
+    password: z.string().min(1).max(200),
+    device: deviceSchema,
+  })
+  // Ruling R-C: the likeliest migration mistake is a roll number typed into the new field. A 400
+  // naming the shape is actionable where the generic 401 would just read as a wrong password — and
+  // it leaks nothing, because the shape is printed on every slip. This must be the *only* issue
+  // reported for `juviId`, or it is not the message the person reads.
+  .refine((v) => CANONICAL_JUVI_ID.test(normaliseJuviId(v.juviId)), {
+    message: "That doesn't look like a Juvi ID. It looks like JUV-4K7P-2M9X.",
+    path: ['juviId'],
+  });
 export type SignInInput = z.infer<typeof signInSchema>;
 
 export const refreshSchema = z.object({ refreshToken: z.string().min(20).max(200), deviceId: z.string().min(8).max(128) });
@@ -53,7 +68,10 @@ export type AccountSummary = z.infer<typeof accountSummarySchema>;
 export const tokensResponseSchema = z.object({
   accessToken: z.string(), accessExpiresIn: z.number().int(), refreshToken: z.string(),
 });
-export const signInResponseSchema = tokensResponseSchema.extend({ account: accountSummarySchema });
+// D7: the client's persisted deep-link owner key is `<collegeId>:<accountId>`, and it used to be
+// fed by the request. It now comes back from the server, so the key keeps its shape and a
+// notification link parked before this update still matches.
+export const signInResponseSchema = tokensResponseSchema.extend({ collegeId: z.string(), account: accountSummarySchema });
 
 export const settingsSchema = z.object({
   quietHours: z.object({ start: z.string().regex(HHMM), end: z.string().regex(HHMM) }),
@@ -78,6 +96,14 @@ export const devicesResponseSchema = z.object({ items: z.array(deviceRowSchema) 
 
 export const meResponseSchema = z.object({
   account: accountSummarySchema,
+  /**
+   * §8 — the durable Juvi ID, so a signed-in person can read it back and save it. A **required key
+   * with a nullable value** (ruling R-J): an account the backfill has not reached reports null, and
+   * because the key is still present the generated client's `$checkKeys` does not throw. Do not make
+   * this `.optional()` — an absent key and a null value are different states, and only the second is
+   * one the server is allowed to be in.
+   */
+  juviId: z.string().nullable(),
   person: z.object({ name: z.string(), firstName: z.string(), photoUrl: z.string().nullable() }),
   student: z.object({
     rollNumber: z.string().nullable(), programme: z.string().nullable(), branch: z.string().nullable(),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:juvi/app/l10n/l10n.dart';
@@ -89,12 +90,45 @@ void main() {
     expect(find.text("You're offline."), findsOneWidget);
   });
 
+  testWidgets('the Me screen groups the Juvi ID for reading and copies the canonical value', (t) async {
+    t.view.physicalSize = const Size(800, 1600);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    // The clipboard is a platform channel; nothing else in this test touches it.
+    final copied = <String>[];
+    t.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.setData') copied.add((call.arguments as Map)['text'] as String);
+      return null;
+    });
+    addTearDown(() => t.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null));
+    await t.pumpWidget(
+      ProviderScope(
+        retry: (_, _) => null,
+        overrides: [
+          meProvider.overrideWith((_) async* {
+            yield Cached(Me.fromJson(meJson), DateTime.now());
+          }),
+        ],
+        child: const MaterialApp(localizationsDelegates: AppLocalizations.localizationsDelegates, supportedLocales: AppLocalizations.supportedLocales, home: MeScreen()),
+      ),
+    );
+    await t.pump();
+    // Grouped on screen (spec §4), because this row exists to be read aloud off the phone.
+    expect(find.text('JUV-4K7P-2M9X'), findsOneWidget);
+    expect(find.text('JUV4K7P2M9X'), findsNothing);
+    await t.tap(find.text('JUV-4K7P-2M9X'));
+    await t.pumpAndSettle();
+    // Canonical on the clipboard: what the office's accounts table shows (R-M, R-O).
+    expect(copied, ['JUV4K7P2M9X']);
+    expect(find.text('Juvi ID copied'), findsOneWidget);
+  });
+
   testWidgets('shows the identity card, settings, devices, about and sign-out entries', (t) async {
     // The full Me list (identity card, settings, devices, change password, about,
     // sign out) is taller than the default 800x600 test surface, and ListView only
     // builds children within the viewport + cache extent — grow the surface so every
     // entry this test checks is actually laid out, instead of scrolling to each one.
-    t.view.physicalSize = const Size(800, 1400);
+    t.view.physicalSize = const Size(800, 1600);
     t.view.devicePixelRatio = 1;
     addTearDown(t.view.reset);
     final me = Me.fromJson(meJson);

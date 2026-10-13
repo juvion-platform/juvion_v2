@@ -19,7 +19,7 @@ class DeviceInfo {
 
 abstract class AuthRepository {
   Future<InstitutionIdentity> lookupInstitution(String code);
-  Future<({Tokens tokens, AccountSummary account})> signIn({required String collegeId, required String identifier, required String password, required DeviceInfo device});
+  Future<({Tokens tokens, AccountSummary account, String collegeId})> signIn({required String juviId, required String password, required DeviceInfo device});
   Future<Tokens?> refresh(String refreshToken, String deviceId);
   Future<void> signOut();
   Future<void> deleteAccount();
@@ -54,17 +54,22 @@ class ApiAuthRepository implements AuthRepository {
     }
   }
 
+  /// The college arrives in the *response* (D7), not the request: the sign-in key is a Juvi
+  /// ID, unique across colleges, so nothing names a college until the server has resolved
+  /// one. `SessionController` persists this value under the key `deep_link_resolver.dart`
+  /// builds its persisted owner key from.
   @override
-  Future<({Tokens tokens, AccountSummary account})> signIn({required String collegeId, required String identifier, required String password, required DeviceInfo device}) async {
+  Future<({Tokens tokens, AccountSummary account, String collegeId})> signIn({required String juviId, required String password, required DeviceInfo device}) async {
     try {
       final r = await _bare.signIn(signInRequest: wire.SignInRequest.fromJson({
-        'collegeId': collegeId, 'identifier': identifier, 'password': password,
+        'juviId': juviId, 'password': password,
         'device': {'id': device.id, 'name': device.name, 'platform': device.platform, 'appVersion': device.appVersion, 'osVersion': device.osVersion},
       }));
       final json = r.data!.toJson();
       return (
         tokens: Tokens(accessToken: json['accessToken'] as String, refreshToken: json['refreshToken'] as String),
         account: AccountSummary.fromJson(Map<String, dynamic>.from(json['account'] as Map)),
+        collegeId: json['collegeId'] as String,
       );
     } catch (e) {
       throw ApiFailure.of(e);

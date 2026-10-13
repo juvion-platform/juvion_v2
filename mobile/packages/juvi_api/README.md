@@ -101,7 +101,7 @@ Class | Method | HTTP request | Description
 [*MobileApi*](doc/MobileApi.md) | [**remindNotice**](doc/MobileApi.md#remindnotice) | **POST** /notices/{id}/remind | Send a reminder (at most two)
 [*MobileApi*](doc/MobileApi.md) | [**revokeDevice**](doc/MobileApi.md#revokedevice) | **DELETE** /me/devices/{id} | Sign out one device
 [*MobileApi*](doc/MobileApi.md) | [**revokeOtherDevices**](doc/MobileApi.md#revokeotherdevices) | **POST** /me/devices/revoke-others | Sign out every other device
-[*MobileApi*](doc/MobileApi.md) | [**signIn**](doc/MobileApi.md#signin) | **POST** /auth/sign-in | Sign in with institution, identifier and password
+[*MobileApi*](doc/MobileApi.md) | [**signIn**](doc/MobileApi.md#signin) | **POST** /auth/sign-in | Sign in with a Juvi ID and password
 [*MobileApi*](doc/MobileApi.md) | [**signOut**](doc/MobileApi.md#signout) | **POST** /auth/sign-out | Revoke this session
 [*MobileApi*](doc/MobileApi.md) | [**unmuteChannel**](doc/MobileApi.md#unmutechannel) | **DELETE** /channels/{id}/mute | Unmute a channel
 [*MobileApi*](doc/MobileApi.md) | [**updateSettings**](doc/MobileApi.md#updatesettings) | **PATCH** /me/settings | Update settings

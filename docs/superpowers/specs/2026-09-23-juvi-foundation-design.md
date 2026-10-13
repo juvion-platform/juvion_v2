@@ -98,9 +98,8 @@ Flutter shell against the live API.
 ## 4. Goals
 
 - A provisioned student or faculty member installs the app, signs in with
-  institution code + roll number or email or employee code + temporary
-  password, sets a real password, and lands on Today or Teaching in under a
-  minute.
+  their Juvi ID + temporary password, sets a real password, and lands on
+  Today or Teaching in under a minute.
 - Onboarding reveals who the app already knows they are and which spaces they
   belong to, with zero typed input beyond the optional photo.
 - Spaces reflects ERP registrations within five minutes of a change, with no
@@ -128,21 +127,21 @@ Each AC is testable. IDs map to PRD requirement IDs where one exists.
 
 ### US-1 Sign in (S01) — ACC-01, ACC-02, ACC-05
 
-As a provisioned user I sign in with my institution code, identifier and
-password, and am forced to set a real password on first use.
+As a provisioned user I sign in with my Juvi ID and password, and am forced
+to set a real password on first use.
 
-1. Entering a valid institution code shows the college name and mark before
-   any credentials are typed; an unknown code shows "We couldn't find that
-   college code" with no distinction between unknown and disabled.
-2. Roll number, employee code and email each resolve to the same User; wrong
-   identifier and wrong password return one identical 401 body.
+1. **Deleted 2026-10-13** — the app no longer asks for an institution code, so
+   nothing knows the college before credentials are typed; superseded by
+   `2026-10-13-juvi-id-sign-in-design.md` §6.
+2. The Juvi ID resolves to the User; a wrong identifier and a wrong password
+   return one identical 401 body.
 3. A user with `mustChangePassword` cannot reach any screen but set-password;
    after setting one (≥ 8 chars, no forced character classes) the temporary
    password no longer works.
-4. Five failures within ten minutes for one college+identifier return 429
-   with `retryAfterSeconds`; the sixth attempt with the correct password also
+4. Five failures within ten minutes for one Juvi ID return 429 with
+   `retryAfterSeconds`; the sixth attempt with the correct password also
    waits; there is no permanent lock.
-5. Institution code is prefilled on second launch.
+5. **Deleted 2026-10-13** — there is nothing left to prefill.
 6. A deactivated account with the correct password receives
    `ACCOUNT_DEACTIVATED`, not the generic error; with a wrong password it
    receives the generic error.
@@ -387,29 +386,33 @@ paused, pausedMessage, minAppVersion }`. Any other case returns 404
 `POST /auth/sign-in`
 
 ```json
-{ "collegeId": "…", "identifier": "21CS1042", "password": "river-lamp-482",
+{ "juviId": "JUV-4K7P-2M9X", "password": "river-lamp-482",
   "device": { "id": "uuid", "name": "Pixel 7a", "platform": "android",
               "appVersion": "1.0.0", "osVersion": "14" } }
 ```
 
-Identifier resolution, in order, all scoped by `collegeId`:
+One exact lookup on a globally unique key, and the only query in the module not scoped by
+`collegeId`:
 
-1. Contains `@` → `User.findOne({ collegeId, email })`.
-2. `Student.findOne({ collegeId, rollNumber })` → `personId` → `User`.
-3. `Faculty.findOne({ collegeId, employeeCode })` → `personId` → `User`.
-4. `Staff.findOne({ collegeId, employeeCode })` → `personId` → `User`.
+1. Normalise the ID (uppercase, drop every character outside `A–Z0–9`) →
+   `User.findOne({ juviId })`.
+
+The `collegeId` used by every later check is the one the resolved `User` carries. The
+email / roll number / employee code resolution that used to be here stays in the code for
+the public account-deletion form's college-scoped check, not for sign-in.
 
 Then `JuviAccount.findOne({ collegeId, userId })`. Decision table:
 
 | Condition | Response |
 |---|---|
 | Cooldown counter ≥ 5 | 429 `COOLDOWN { retryAfterSeconds }` (checked first, before any lookup) |
-| No User, or no JuviAccount, or bcrypt mismatch | 401 `INVALID_CREDENTIALS`; bcrypt still runs against a fixed dummy hash when no User is found; counter incremented; server log line with reason |
+| No User, or no JuviAccount, or bcrypt mismatch | 401 `INVALID_CREDENTIALS`; bcrypt still runs against a fixed dummy hash when no User is found; the counter is incremented on every arm, so an unknown ID spends the same budget as a real one and the 6th attempt is 429 either way; no identifier material is logged — the cooldown key is hashed by design (`cooldown.ts:9-13`). *Amended in place 2026-10-13: the "counter incremented" clause was not true of the no-User arm until then, and the "server log line" clause is struck rather than implemented.* |
 | Password ok, account `deactivated` or User `isActive: false` | 403 `ACCOUNT_DEACTIVATED { supportContact }` |
 | Password ok | 200 below; counter cleared |
 
 ```json
 { "accessToken": "…", "accessExpiresIn": 900, "refreshToken": "…",
+  "collegeId": "…",
   "account": { "id": "…", "kind": "student", "status": "onboarding",
                "onboardingStep": 0, "onboardingComplete": false,
                "mustChangePassword": true } }
@@ -418,8 +421,9 @@ Then `JuviAccount.findOne({ collegeId, userId })`. Decision table:
 Success replaces any existing session for `(accountId, device.id)`, revoking
 the old one with reason `sign_out`.
 
-Cooldown key: `juvi:login-fail:{collegeId}:{sha256(identifier.lower())}`,
-`INCR` + `EXPIRE 600`. Never keyed by IP alone, never persisted on User.
+Cooldown key: `juvi:login-fail:{sha256(normaliseJuviId(id))}`, `INCR` + `EXPIRE 600`. Keyed
+by the ID alone — there is no college to scope by — and never by IP alone, never persisted
+on User.
 
 ### Tokens
 
@@ -551,7 +555,7 @@ paper, satisfies the 8-character minimum.
 
 `GET /admin/provisioning/runs/:id/credentials.csv?sectionId=…|batchId=…|departmentId=…`
 decrypts matching `JuviProvisionedCredential` rows and streams
-`identifier,name,section,temporaryPassword,institutionCode`. After
+`identifier,name,section,juviId,temporaryPassword,institutionCode`. After
 `credentialsExpireAt` the rows are gone (TTL index) and the endpoint returns
 410 `GONE`. A single account's live credential, including workflow-sourced
 ones, is revealed from the console's accounts table through

@@ -5,12 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:juvi/app/l10n/l10n.dart';
 import 'package:juvi/core/http/api_failure.dart';
-import 'package:juvi/core/models/models.dart';
 import 'package:juvi/core/session/session_controller.dart';
 import 'package:juvi/core/session/session_state.dart';
 import 'package:juvi/features/auth/forgot_password_sheet.dart';
-import 'package:juvi/features/auth/institution_code_field.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class SignInScreen extends ConsumerStatefulWidget {
   const SignInScreen({super.key});
@@ -19,35 +16,35 @@ class SignInScreen extends ConsumerStatefulWidget {
   ConsumerState<SignInScreen> createState() => _SignInScreenState();
 }
 
-class _SignInScreenState extends ConsumerState<SignInScreen> {
-  static const _rememberKey = 'juvi.institution_code';
-  final _identifier = TextEditingController();
-  final _password = TextEditingController();
-  InstitutionIdentity? _institution;
+/// The server's field-level message for the Juvi ID, when it sent one (R-C). Selected by `path`
+/// rather than by position, so a zod issue ordering change cannot silently swap which message the
+/// person reads; the schema makes the shape message the *only* `juviId` issue, and this must not
+/// depend on that staying true.
+String? _juviIdFieldMessage(ApiFailure f) {
+  for (final field in f.fields) {
+    if (field['path'] == 'juviId') return field['message'] as String?;
+  }
+  return null;
+}
 
-  /// The institution code that resolved; remembered for the next launch (S01 AC 2).
-  String? _resolvedCode;
-  String? _rememberedCode;
+class _SignInScreenState extends ConsumerState<SignInScreen> {
+  final _juviId = TextEditingController();
+  final _password = TextEditingController();
   String? _error;
   bool _busy = false;
   bool _obscure = true;
 
   @override
-  void initState() {
-    super.initState();
-    unawaited(SharedPreferences.getInstance().then((p) {
-      if (mounted) setState(() => _rememberedCode = p.getString(_rememberKey) ?? '');
-    }));
-  }
-
-  @override
   void dispose() {
-    _identifier.dispose();
+    _juviId.dispose();
     _password.dispose();
     super.dispose();
   }
 
-  bool get _canSubmit => _institution != null && !_institution!.paused && _identifier.text.trim().isNotEmpty && _password.text.isNotEmpty && !_busy;
+  // Nothing gates the button but the two fields: the Juvi ID is the only key, and the college
+  // is resolved by the server after the password is checked (spec §6). A paused college can no
+  // longer be known before credentials, so it reaches this screen only as the 503's message.
+  bool get _canSubmit => _juviId.text.trim().isNotEmpty && _password.text.isNotEmpty && !_busy;
 
   Future<void> _submit() async {
     setState(() {
@@ -55,8 +52,9 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       _error = null;
     });
     try {
-      await ref.read(sessionControllerProvider.notifier).signIn(collegeId: _institution!.collegeId, identifier: _identifier.text.trim(), password: _password.text);
-      await (await SharedPreferences.getInstance()).setString(_rememberKey, _resolvedCode ?? '');
+      // Trimmed, and otherwise sent exactly as typed: normalisation (case, separators) belongs
+      // to the server, the only side that can be trusted with it (R-N).
+      await ref.read(sessionControllerProvider.notifier).signIn(juviId: _juviId.text.trim(), password: _password.text);
     } on ApiFailure catch (f) {
       if (!mounted) return;
       final l = context.l10n;
@@ -67,6 +65,12 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
             ApiErrorCode.offline => l.signInNeedsConnection,
             // R56: ApiFailure.fromDio strips `message` out of `detail` into the top-level field.
             ApiErrorCode.institutionPaused => f.message,
+            // R-C: the actionable copy — what the ID looks like — is in the 400's `fields[]`, not
+            // in its envelope message, which reads only "Some fields are invalid.". This is the
+            // one surface the person sees (nothing else in the app reads `fields`), so R-C arrives
+            // only if it is lifted here. Selected by `path`, not by position: zod's issue order is
+            // an implementation detail this screen must not depend on.
+            ApiErrorCode.validationFailed => _juviIdFieldMessage(f) ?? f.message,
             _ => f.message,
           });
     } finally {
@@ -85,7 +89,6 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       null || 'restore' => null,
       _ => l.signedOutGeneric,
     };
-    if (_rememberedCode == null) return const Scaffold(body: SizedBox.shrink()); // waiting for prefs, one frame
 
     return Scaffold(
       body: SafeArea(
@@ -98,16 +101,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
             Text(l.signInTitle, style: Theme.of(context).textTheme.titleMedium),
             if (reasonText != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(reasonText, style: TextStyle(color: Theme.of(context).colorScheme.tertiary))),
             const SizedBox(height: 28),
-            InstitutionCodeField(
-              initialCode: _rememberedCode!.isEmpty ? null : _rememberedCode,
-              onResolved: (id, code) => setState(() {
-                _institution = id;
-                _resolvedCode = id != null ? code : null;
-              }),
-            ),
-            if (_institution?.paused == true) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_institution!.pausedMessage ?? l.pausedTitle)),
-            const SizedBox(height: 16),
-            TextField(controller: _identifier, autocorrect: false, decoration: InputDecoration(labelText: l.identifierLabel), onChanged: (_) => setState(() {})),
+            TextField(controller: _juviId, autocorrect: false, decoration: InputDecoration(labelText: l.juviIdLabel), onChanged: (_) => setState(() {})),
             const SizedBox(height: 12),
             TextField(
               controller: _password,
@@ -129,7 +123,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
               child: _busy ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : Text(l.signInButton),
             ),
             const SizedBox(height: 16),
-            Text(l.firstTimeHint, style: Theme.of(context).textTheme.bodyMedium, textAlign: TextAlign.center),
+            Text(l.juviIdFirstTimeHint, style: Theme.of(context).textTheme.bodyMedium, textAlign: TextAlign.center),
             TextButton(onPressed: () => unawaited(showForgotPasswordSheet(context)), child: Text(l.forgotPassword)),
           ],
         ),

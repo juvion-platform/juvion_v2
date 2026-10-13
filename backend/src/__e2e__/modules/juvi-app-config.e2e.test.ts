@@ -34,7 +34,7 @@ describe('GET /config', () => {
   it('returns branding, defaults and onboarding steps to a signed-in user', async () => {
     await enableJuvi(fx.collegeId, { supportContact: { name: 'Office', phone: '1' } });
     const s = await provisionTestStudent(fx);
-    const t = (await mobileClient(app).post(`${V1}/auth/sign-in`).send({ collegeId: fx.collegeId, identifier: s.student.rollNumber, password: s.tempPassword, device: TEST_DEVICE })).body.accessToken;
+    const t = (await mobileClient(app).post(`${V1}/auth/sign-in`).send({ juviId: s.juviId, password: s.tempPassword, device: TEST_DEVICE })).body.accessToken;
     const res = await mobileClient(app, t).get(`${V1}/config`).expect(200);
     expect(res.body).toMatchObject({ name: 'JIT Test College', code: 'JIT-TEST', supportContact: { name: 'Office', phone: '1' }, quietHoursDefault: { start: '22:00', end: '07:00' }, timezone: 'Asia/Kolkata', featureFlags: { languageRoadmap: false }, onboardingSteps: ['identity', 'spaces', 'notifications', 'first_notice'] });
   });
@@ -42,7 +42,7 @@ describe('GET /config', () => {
   it('is 503 INSTITUTION_PAUSED once the admin pauses', async () => {
     await enableJuvi(fx.collegeId);
     const s = await provisionTestStudent(fx);
-    const t = (await mobileClient(app).post(`${V1}/auth/sign-in`).send({ collegeId: fx.collegeId, identifier: s.student.rollNumber, password: s.tempPassword, device: TEST_DEVICE })).body.accessToken;
+    const t = (await mobileClient(app).post(`${V1}/auth/sign-in`).send({ juviId: s.juviId, password: s.tempPassword, device: TEST_DEVICE })).body.accessToken;
     await enableJuvi(fx.collegeId, { paused: true, pausedMessage: 'Back Monday' });
     const res = await mobileClient(app, t).get(`${V1}/config`).expect(503);
     expect(res.body.error).toEqual({ code: 'INSTITUTION_PAUSED', message: 'Back Monday' });

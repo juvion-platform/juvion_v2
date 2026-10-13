@@ -18,6 +18,8 @@ import { revokeOtherSessions } from './session-service';
 import { getJuviConfig, normalizeJuviConfig } from '../config/institution-config';
 import { MobileApiError, notFound } from '../errors';
 import { onAccountActivated } from '../notices/recipient-service';
+import { AppError } from '../../../middleware/errorHandler';
+import { CANONICAL_JUVI_ID, mintJuviId, normaliseJuviId } from './juvi-id';
 
 export interface ProvisionPersonInput {
   collegeId: string;
@@ -30,6 +32,8 @@ export interface ProvisionPersonInput {
   runId?: string | null;
   /** Seed/dev only: use this temporary password instead of generating one. */
   temporaryPassword?: string;
+  /** Seed/dev only: mint this Juvi ID instead of drawing one. Mirrors `temporaryPassword`. */
+  juviId?: string;
 }
 
 export interface ProvisionPersonResult {
@@ -90,6 +94,66 @@ async function loadKindRow(collegeId: string, personId: string, kind: AccountKin
   };
 }
 
+/** Bounded: the unique index is the guarantee, and a loop that never ends is not a retry. */
+const MINT_ATTEMPTS = 5;
+
+function isDuplicateKey(e: unknown): boolean {
+  return typeof e === 'object' && e !== null && (e as { code?: number }).code === 11000;
+}
+
+/**
+ * Give this User a Juvi ID if it has none, and return whichever one it ends up holding.
+ *
+ * `updateOne` with `juviId: { $exists: false }` in the filter, rather than assigning the
+ * field and saving: a duplicate-key error on a `save()` leaves the in-memory document
+ * ambiguous about what is actually stored, and the retry then works from a lie.
+ *
+ * The caller-supplied `juviId` (seed/dev) is taken as given — a collision there is a
+ * configuration mistake to be shouted about, not a random draw to retry.
+ */
+export async function ensureJuviId(input: { collegeId: string; userId: string; juviId?: string }): Promise<string> {
+  const scope = { _id: input.userId, collegeId: input.collegeId };
+  const readBack = async (): Promise<string | null> =>
+    (await User.findOne(scope).select('juviId').lean())?.juviId ?? null;
+
+  const current = await readBack();
+  if (current) return current;
+
+  if (input.juviId !== undefined) {
+    const canonical = normaliseJuviId(input.juviId);
+    if (!CANONICAL_JUVI_ID.test(canonical)) {
+      throw new AppError(400, `juviId override must look like JUV-4K7P-2M9X, got "${input.juviId}"`);
+    }
+    const res = await User.updateOne({ ...scope, juviId: { $exists: false } }, { $set: { juviId: canonical } });
+    if (res.modifiedCount === 1) return canonical;
+    const settled = await readBack();
+    if (settled === canonical) return canonical;
+    if (settled) throw new Error(`User ${input.userId} already holds juviId ${settled}`);
+    throw notFound('User');
+  }
+
+  for (let attempt = 0; attempt < MINT_ATTEMPTS; attempt += 1) {
+    const candidate = mintJuviId();
+    try {
+      const res = await User.updateOne({ ...scope, juviId: { $exists: false } }, { $set: { juviId: candidate } });
+      if (res.modifiedCount === 1) return candidate;
+      // Nothing modified: a concurrent call stored one first, or the User is gone.
+      const settled = await readBack();
+      if (settled) return settled;
+      throw notFound('User');
+    } catch (e) {
+      if (isDuplicateKey(e)) continue;
+      throw e;
+    }
+  }
+  throw new AppError(500, `Could not mint a Juvi ID after ${MINT_ATTEMPTS} attempts`);
+}
+
+/** `JUV4K7P2M9X` for a User that has one; `null` when it does not. */
+export async function readJuviId(collegeId: string, userId: string): Promise<string | null> {
+  return (await User.findOne({ _id: userId, collegeId }).select('juviId').lean())?.juviId ?? null;
+}
+
 export async function provisionPerson(input: ProvisionPersonInput): Promise<ProvisionPersonResult> {
   const resetPassword = input.resetPassword ?? true;
   const person = await Person.findOne({ _id: input.personId, collegeId: input.collegeId }).select('name email').lean();
@@ -98,11 +162,16 @@ export async function provisionPerson(input: ProvisionPersonInput): Promise<Prov
   if (!college) throw notFound('College');
   const row = await loadKindRow(input.collegeId, input.personId, input.kind);
 
-  // Existing account: nothing to do (idempotent).
-  const existing = await JuviAccount.findOne({ collegeId: input.collegeId, personId: input.personId });
-  if (existing) return { account: existing, created: false, userCreated: false };
-
+  // The User is loaded before the early return: an account that predates the Juvi ID still
+  // needs one, so re-provisioning is a repair path, not just an idempotent no-op (ruling R-F).
   let user: IUser | null = await User.findOne({ collegeId: input.collegeId, personId: input.personId });
+
+  // Existing account: nothing else to do (idempotent).
+  const existing = await JuviAccount.findOne({ collegeId: input.collegeId, personId: input.personId });
+  if (existing) {
+    if (user) await ensureJuviId({ collegeId: input.collegeId, userId: String(user._id), juviId: input.juviId });
+    return { account: existing, created: false, userCreated: false };
+  }
   let userCreated = false;
   let temporaryPassword: string | undefined;
 
@@ -130,6 +199,8 @@ export async function provisionPerson(input: ProvisionPersonInput): Promise<Prov
     user.mustChangePassword = true;
     await user.save();
   }
+
+  await ensureJuviId({ collegeId: input.collegeId, userId: String(user._id), juviId: input.juviId });
 
   const quiet = normalizeJuviConfig(college.juvi).quietHoursDefault;
   const account = await JuviAccount.create({

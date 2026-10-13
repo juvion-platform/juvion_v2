@@ -17,6 +17,7 @@ Me _$MeFromJson(Map<String, dynamic> json) =>
           'deletionRequestedVia',
           'faculty',
           'institution',
+          'juviId',
           'person',
           'settings',
           'student',
@@ -44,6 +45,7 @@ Me _$MeFromJson(Map<String, dynamic> json) =>
           'institution',
           (v) => MeInstitution.fromJson(v as Map<String, dynamic>),
         ),
+        juviId: $checkedConvert('juviId', (v) => v as String?),
         person: $checkedConvert(
           'person',
           (v) => MePerson.fromJson(v as Map<String, dynamic>),
@@ -67,6 +69,7 @@ Map<String, dynamic> _$MeToJson(Me instance) => <String, dynamic>{
   'deletionRequestedVia': instance.deletionRequestedVia,
   'faculty': instance.faculty.toJson(),
   'institution': instance.institution.toJson(),
+  'juviId': instance.juviId,
   'person': instance.person.toJson(),
   'settings': instance.settings.toJson(),
   'student': instance.student.toJson(),

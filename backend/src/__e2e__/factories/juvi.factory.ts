@@ -2,6 +2,8 @@ import supertest from 'supertest';
 import type { Express } from 'express';
 import { College, IJuviConfig } from '../../models/College';
 import { Person, Student, Section } from '../../models';
+import { User } from '../../models/User';
+import { readJuviId } from '../../modules/juvi-app/accounts/provisioning-service';
 import { createTestStudent } from './student.factory';
 import { createTestFaculty } from './academic.factory';
 import type { BaseFixtures } from '../setup/seed-base';
@@ -58,14 +60,16 @@ export async function provisionTestStudent(
   if (opts.sectionId) await Section.updateOne({ _id: opts.sectionId }, { $addToSet: { studentIds: student._id } });
   const { account } = await provisionPerson({ collegeId: fx.collegeId, personId: String(person._id), kind: 'student', source: 'admin', performedBy: 'test' });
   const cred = await revealLatestForAccount(fx.collegeId, String(account._id));
-  return { person, student, account, tempPassword: cred!.password };
+  const juviId = (await User.findOne({ _id: account.userId, collegeId: fx.collegeId }).select('juviId').lean())!.juviId!;
+  return { person, student, account, tempPassword: cred!.password, juviId };
 }
 
 export async function provisionTestFaculty(fx: BaseFixtures, opts: { departmentId?: string } = {}) {
   const f = await createTestFaculty(fx.collegeId, { departmentId: opts.departmentId ?? String(fx.cse._id) });
   const { account } = await provisionPerson({ collegeId: fx.collegeId, personId: String(f.person._id), kind: 'faculty', source: 'admin', performedBy: 'test' });
   const cred = await revealLatestForAccount(fx.collegeId, String(account._id));
-  return { ...f, account, tempPassword: cred!.password };
+  const juviId = (await readJuviId(fx.collegeId, String(account.userId)))!;
+  return { ...f, account, tempPassword: cred!.password, juviId };
 }
 
 /** supertest wrapper that sends the mobile headers. */

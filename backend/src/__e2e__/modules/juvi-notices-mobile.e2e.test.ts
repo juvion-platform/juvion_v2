@@ -40,7 +40,7 @@ afterAll(async () => { await drainOutbox(); await cleanupTestApp(); });
 async function studentOnJuvi(deviceId: string) {
   const s = await provisionTestStudent(fx, { sectionId: String(fx.cseSection._id) });
   await activateAccount(String(s.account._id));
-  return { ...s, token: await signInAs(app, fx, s.student.rollNumber, s.tempPassword, deviceId) };
+  return { ...s, token: await signInAs(app, s.juviId, s.tempPassword, deviceId) };
 }
 
 describe('GET /attention and the due segment (US-3.1, US-3.2)', () => {
@@ -80,7 +80,7 @@ describe('GET /attention and the due segment (US-3.1, US-3.2)', () => {
     expect((await mobileClient(app, a.token).get(`${V1}/attention`).expect(200)).body).toEqual({ dueCount: 0, items: [] });
 
     const c = await provisionTestStudent(fx);                      // onboarding: Not on Juvi
-    const tc = await signInAs(app, fx, c.student.rollNumber, c.tempPassword, 'device-c');
+    const tc = await signInAs(app, c.juviId, c.tempPassword, 'device-c');
     await publishTestNotice(fx, { title: 'Later', ackRequired: true });
     expect((await mobileClient(app, tc).get(`${V1}/attention`).expect(200)).body.dueCount).toBe(0);
   });
@@ -129,7 +129,7 @@ describe('GET /notices segments and paging (US-3.5)', () => {
     const mine = await publishTestNotice(fx, { title: 'Lab moved', audience: { rules: [{ kind: 'course_offering', ids: [String(off._id)] }] } }, erpRef(fac.user));
     await publishTestNotice(fx, { title: 'Office notice' });
 
-    const tf = await signInAs(app, fx, fac.faculty.employeeCode, fac.tempPassword, 'device-f');
+    const tf = await signInAs(app, fac.juviId, fac.tempPassword, 'device-f');
     const res = await mobileClient(app, tf).get(`${V1}/notices?segment=published`).expect(200);
     expect(res.body.items).toHaveLength(1);
     expect(res.body.items[0]).toMatchObject({ id: String(mine._id), title: 'Lab moved', office: 'Course Faculty', isPublisher: true, state: 'received' });

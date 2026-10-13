@@ -7,18 +7,13 @@ void main() {
   // TODO add properties to the entity
 
   group(SignInRequest, () {
-    // String collegeId
-    test('to test the property `collegeId`', () async {
-      // TODO
-    });
-
     // SignInRequestDevice device
     test('to test the property `device`', () async {
       // TODO
     });
 
-    // String identifier
-    test('to test the property `identifier`', () async {
+    // String juviId
+    test('to test the property `juviId`', () async {
       // TODO
     });
 

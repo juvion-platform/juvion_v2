@@ -53,4 +53,4 @@ final class DeepLinkResolverProvider
   }
 }
 
-String _$deepLinkResolverHash() => r'771832e9807f25906f28e5624865b40f82b8a379';
+String _$deepLinkResolverHash() => r'dba1de245a033021aff892597bd0eee2dec62460';

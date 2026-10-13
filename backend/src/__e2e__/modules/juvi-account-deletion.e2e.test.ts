@@ -17,14 +17,14 @@ beforeAll(async () => { app = await getTestApp(); });
 beforeEach(async () => { await cleanupTestApp(); fx = await seedBase(); await enableJuvi(fx.collegeId); });
 afterAll(async () => { await cleanupTestApp(); });
 
-function signIn(identifier: string, password: string) {
-  return mobileClient(app).post(`${V1}/auth/sign-in`).send({ collegeId: fx.collegeId, identifier, password, device: TEST_DEVICE });
+function signIn(juviId: string, password: string) {
+  return mobileClient(app).post(`${V1}/auth/sign-in`).send({ juviId, password, device: TEST_DEVICE });
 }
 
 /** Provisions a student and returns a live access token for it. */
 async function signedInStudent() {
   const s = await provisionTestStudent(fx);
-  const res = await signIn(s.student.rollNumber, s.tempPassword).expect(200);
+  const res = await signIn(s.juviId, s.tempPassword).expect(200);
   return { ...s, token: res.body.accessToken as string };
 }
 
@@ -154,7 +154,7 @@ describe('best-effort clears on the auth paths (011 T6)', () => {
     const s = await provisionTestStudent(fx);
     await requestDeletion(s.account._id);
 
-    await signIn(s.student.rollNumber, s.tempPassword).expect(200);
+    await signIn(s.juviId, s.tempPassword).expect(200);
 
     const raw = await JuviAccount.findOne({ collegeId: fx.collegeId }).lean();
     expect('deletionRequestedAt' in raw!).toBe(false);
@@ -182,7 +182,7 @@ describe('best-effort clears on the auth paths (011 T6)', () => {
     const spy = vi.spyOn(JuviAccount, 'updateOne').mockRejectedValueOnce(new Error('primary unavailable'));
     let attempted = 0;
     try {
-      await signIn(s.student.rollNumber, s.tempPassword).expect(200);
+      await signIn(s.juviId, s.tempPassword).expect(200);
     } finally {
       // Read the call count before restoring: `mockRestore` resets the call history with it.
       attempted = spy.mock.calls.length;

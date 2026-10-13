@@ -29,8 +29,8 @@ beforeAll(async () => { app = await getTestApp(); });
 beforeEach(async () => { await cleanupTestApp(); fx = await seedBase(); await enableJuvi(fx.collegeId); });
 afterAll(async () => { await cleanupTestApp(); });
 
-async function tokenFor(identifier: string, password: string, deviceId = TEST_DEVICE.id) {
-  const res = await mobileClient(app).post(`${V1}/auth/sign-in`).send({ collegeId: fx.collegeId, identifier, password, device: { ...TEST_DEVICE, id: deviceId } }).expect(200);
+async function tokenFor(juviId: string, password: string, deviceId = TEST_DEVICE.id) {
+  const res = await mobileClient(app).post(`${V1}/auth/sign-in`).send({ juviId, password, device: { ...TEST_DEVICE, id: deviceId } }).expect(200);
   return res.body.accessToken as string;
 }
 
@@ -58,7 +58,7 @@ async function scenario() {
 describe('GET /spaces', () => {
   it('groups in student order, orders courses by next class, and includes an emptyHint only for courses', async () => {
     const { stu, os, dbms } = await scenario();
-    const t = await tokenFor(stu.student.rollNumber, stu.tempPassword);
+    const t = await tokenFor(stu.juviId, stu.tempPassword);
     const res = await mobileClient(app, t).get(`${V1}/spaces`).expect(200);
     expect(res.body.groups.map((g: any) => g.key)).toEqual(['college', 'department', 'batch', 'courses']);
     const courses = res.body.groups[3];
@@ -87,7 +87,7 @@ describe('GET /spaces', () => {
 
   it('faculty order starts with My Courses and roles are publisher', async () => {
     const { fac } = await scenario();
-    const t = await tokenFor(fac.faculty.employeeCode, fac.tempPassword, 'device-f');
+    const t = await tokenFor(fac.juviId, fac.tempPassword, 'device-f');
     const res = await mobileClient(app, t).get(`${V1}/spaces`).expect(200);
     expect(res.body.groups.map((g: any) => g.key)).toEqual(['courses', 'department', 'college']);
     expect(res.body.groups[0].channels.every((c: any) => c.role === 'publisher')).toBe(true);
@@ -96,7 +96,7 @@ describe('GET /spaces', () => {
   it('a student with no registrations sees the courses group with a hint', async () => {
     await scenario();
     const other = await provisionTestStudent(fx);
-    const t = await tokenFor(other.student.rollNumber, other.tempPassword, 'device-o');
+    const t = await tokenFor(other.juviId, other.tempPassword, 'device-o');
     const res = await mobileClient(app, t).get(`${V1}/spaces`).expect(200);
     const courses = res.body.groups.find((g: any) => g.key === 'courses');
     expect(courses.channels).toEqual([]);
@@ -105,7 +105,7 @@ describe('GET /spaces', () => {
 
   it('reflects an ERP drop on the next refresh without a college pass', async () => {
     const { stu, dbms } = await scenario();
-    const t = await tokenFor(stu.student.rollNumber, stu.tempPassword);
+    const t = await tokenFor(stu.juviId, stu.tempPassword);
     // A second student stays enrolled in DBMS so the offering's live enrollment
     // count doesn't drop to zero when `stu` is dropped below — otherwise the
     // "empty roster" fallback in strategies.ts re-admits `stu` by section roster,
@@ -124,7 +124,7 @@ describe('GET /spaces', () => {
     const { stu } = await scenario();
     await fx.sem1.updateOne({ $set: { status: 'completed' } });
     await reconcileCollege(fx.collegeId);
-    const t = await tokenFor(stu.student.rollNumber, stu.tempPassword);
+    const t = await tokenFor(stu.juviId, stu.tempPassword);
     const res = await mobileClient(app, t).get(`${V1}/spaces`).expect(200);
     const archived = res.body.groups.at(-1);
     expect(archived.key).toBe('archived');
@@ -137,14 +137,14 @@ describe('channel detail, mute, read', () => {
   it('returns About for a member and 404 for a non-member or another college', async () => {
     const { stu, fac, dbms } = await scenario();
     const ch = (await Channel.findOne({ collegeId: fx.collegeId, scopeId: dbms._id }).lean())!;
-    const ts = await tokenFor(stu.student.rollNumber, stu.tempPassword);
+    const ts = await tokenFor(stu.juviId, stu.tempPassword);
     const detail = await mobileClient(app, ts).get(`${V1}/channels/${ch._id}`).expect(200);
     expect(detail.body).toMatchObject({ id: String(ch._id), name: 'CS201 DBMS · A', memberCount: 2, canPost: false, canReply: true, replyRule: 'allowed', whoCanPost: 'Course faculty', linkedObject: { type: 'course_offering', id: String(dbms._id) } });
-    const tf = await tokenFor(fac.faculty.employeeCode, fac.tempPassword, 'device-f');
+    const tf = await tokenFor(fac.juviId, fac.tempPassword, 'device-f');
     expect((await mobileClient(app, tf).get(`${V1}/channels/${ch._id}`).expect(200)).body.canPost).toBe(true);
 
     const outsider = await provisionTestStudent(fx);
-    const to = await tokenFor(outsider.student.rollNumber, outsider.tempPassword, 'device-o');
+    const to = await tokenFor(outsider.juviId, outsider.tempPassword, 'device-o');
     const nf = await mobileClient(app, to).get(`${V1}/channels/${ch._id}`).expect(404);
     expect(nf.body.error.code).toBe('NOT_FOUND');
     await mobileClient(app, ts).get(`${V1}/channels/000000000000000000000001`).expect(404);
@@ -154,7 +154,7 @@ describe('channel detail, mute, read', () => {
   it('mute and unmute persist; mark-read stamps lastReadAt', async () => {
     const { stu, dbms } = await scenario();
     const ch = (await Channel.findOne({ collegeId: fx.collegeId, scopeId: dbms._id }).lean())!;
-    const t = await tokenFor(stu.student.rollNumber, stu.tempPassword);
+    const t = await tokenFor(stu.juviId, stu.tempPassword);
     expect((await mobileClient(app, t).put(`${V1}/channels/${ch._id}/mute`).expect(200)).body).toEqual({ muted: true });
     expect((await mobileClient(app, t).get(`${V1}/spaces`)).body.groups.find((g: any) => g.key === 'courses').channels.find((c: any) => c.id === String(ch._id)).muted).toBe(true);
     expect((await mobileClient(app, t).delete(`${V1}/channels/${ch._id}/mute`).expect(200)).body).toEqual({ muted: false });
@@ -165,7 +165,7 @@ describe('channel detail, mute, read', () => {
 
   it('no create, join, leave or discover routes exist', async () => {
     const { stu } = await scenario();
-    const t = await tokenFor(stu.student.rollNumber, stu.tempPassword);
+    const t = await tokenFor(stu.juviId, stu.tempPassword);
     for (const path of ['/channels', '/channels/discover']) await mobileClient(app, t).post(`${V1}${path}`).send({}).expect(404);
     await mobileClient(app, t).post(`${V1}/channels/000000000000000000000001/join`).expect(404);
     await mobileClient(app, t).delete(`${V1}/channels/000000000000000000000001`).expect(404);

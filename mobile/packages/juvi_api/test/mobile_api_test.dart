@@ -245,7 +245,7 @@ void main() {
       // TODO
     });
 
-    // Sign in with institution, identifier and password
+    // Sign in with a Juvi ID and password
     //
     //Future<SignInResponse> signIn({ SignInRequest signInRequest }) async
     test('test signIn', () async {

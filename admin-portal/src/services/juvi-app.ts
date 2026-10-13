@@ -46,6 +46,8 @@ export interface CredentialGroupsView { expiresAt: string | null; live: boolean;
 
 export interface AccountRow {
   id: string; kind: AccountKind; status: AccountStatus; name: string; identifier: string; email: string;
+  /** §8 — the durable sign-in ID. Null for an account the backfill has not reached. */
+  juviId: string | null;
   onboardingComplete: boolean; lastSeenAt: string | null; provisionedAt: string;
   hasLiveCredential: boolean; credentialExpiresAt: string | null;
 }

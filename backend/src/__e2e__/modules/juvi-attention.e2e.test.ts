@@ -30,7 +30,7 @@ describe('GET /v1/attention', () => {
       invoiceNumber: 'EAI-1', type: 'fee', totalAmount: 5000,
       dueDate: new Date(Date.now() + 3 * 86_400_000), status: 'sent',
     });
-    const token = await signInAs(app, fx, s.student.rollNumber, s.tempPassword);
+    const token = await signInAs(app, s.juviId, s.tempPassword);
     const res = await mobileClient(app, token).get(`${V1}/attention?kinds=all`).expect(200);
     expect(res.body.dueCount).toBeGreaterThanOrEqual(1);
     expect(res.body.items.some((i: { kind: string }) => i.kind === 'fee_due')).toBe(true);
@@ -49,7 +49,7 @@ describe('GET /v1/attention', () => {
       collegeId: new Types.ObjectId(fx.collegeId), noticeId: notice._id, personId: new Types.ObjectId(String(s.person._id)),
       accountId: new Types.ObjectId(String(s.account._id)), kind: 'student', ackRequired: true, receivedAt: new Date(),
     });
-    const token = await signInAs(app, fx, s.student.rollNumber, s.tempPassword);
+    const token = await signInAs(app, s.juviId, s.tempPassword);
     const res = await mobileClient(app, token).get(`${V1}/attention`).expect(200);
     expect(res.body.items.every((i: { kind: string }) => i.kind === 'notice')).toBe(true);
     expect(res.body.items[0]).toHaveProperty('preview');
@@ -58,7 +58,7 @@ describe('GET /v1/attention', () => {
   it('kinds other than all is 400 VALIDATION_FAILED (R31) and unauthenticated is 401', async () => {
     const s = await provisionTestStudent(fx, { sectionId: String(fx.cseSection._id) });
     await activateAccount(String(s.account._id));
-    const token = await signInAs(app, fx, s.student.rollNumber, s.tempPassword);
+    const token = await signInAs(app, s.juviId, s.tempPassword);
     const res = await mobileClient(app, token).get(`${V1}/attention?kinds=fees`).expect(400);
     expect(res.body.error.message).toBe('kinds must be "all"');
     await mobileClient(app).get(`${V1}/attention?kinds=all`).expect(401);

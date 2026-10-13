@@ -129,7 +129,7 @@ describe('query shapes use their indexes (final review I2, I3)', () => {
     const s = await provisionTestStudent(fx, { sectionId: String(fx.cseSection._id) });
     await activateAccount(String(s.account._id));
     const n = await publishTestNotice(fx, { ackRequired: true });
-    const t = await signInAs(app, fx, s.student.rollNumber, s.tempPassword, 'device-dedupe');
+    const t = await signInAs(app, s.juviId, s.tempPassword, 'device-dedupe');
     await mobileClient(app, t).post(`${V1}/notices/${n._id}/ack`).send({ method: 'hold' }).expect(200);
     await drainOutbox();
     const row = (await NoticeRecipient.findOne({ noticeId: n._id, personId: s.person._id }).lean())!;
@@ -190,14 +190,14 @@ describe('the 409 details in the contract (final review I5)', () => {
     const fac = await provisionTestFaculty(fx);
     await activateAccount(String(fac.account._id));
     const n = await publishTestNotice(fx, { ackRequired: true, audience: { rules: [{ kind: 'custom', ids: [String(s.person._id)] }] } });
-    const t = await signInAs(app, fx, s.student.rollNumber, s.tempPassword, 'device-409');
+    const t = await signInAs(app, s.juviId, s.tempPassword, 'device-409');
     await mobileClient(app, t).post(`${V1}/notices/${n._id}/ack`).send({ method: 'hold' }).expect(200);
     const again = await mobileClient(app, t).post(`${V1}/notices/${n._id}/ack`).send({ method: 'hold' }).expect(409);
     expect(again.body.error.code).toBe('ALREADY_ACKNOWLEDGED');
     expect(ackResponseSchema.strict().parse(again.body.error.ack)).toMatchObject({ method: 'hold', late: false });
 
     await Notice.updateOne({ _id: n._id }, { $set: { 'publisher.userId': fac.user._id } });
-    const facToken = await signInAs(app, fx, fac.faculty.employeeCode, fac.tempPassword, 'device-fac-409');
+    const facToken = await signInAs(app, fac.juviId, fac.tempPassword, 'device-fac-409');
     for (let i = 0; i < 2; i++) await mobileClient(app, facToken).post(`${V1}/notices/${n._id}/remind`).expect(200);
     const limit = await mobileClient(app, facToken).post(`${V1}/notices/${n._id}/remind`).expect(409);
     expect(limit.body.error.code).toBe('REMINDER_LIMIT');
@@ -233,7 +233,7 @@ describe('students and parents are refused reach and audited, even for a missing
   it('mobile: reach, pending and remind check the role first', async () => {
     const s = await provisionTestStudent(fx, { sectionId: String(fx.cseSection._id) });
     await activateAccount(String(s.account._id));
-    const t = await signInAs(app, fx, s.student.rollNumber, s.tempPassword, 'device-refuse');
+    const t = await signInAs(app, s.juviId, s.tempPassword, 'device-refuse');
     const missing = String(new Types.ObjectId());
     for (const [method, path] of [['get', 'reach'], ['get', 'reach/pending'], ['post', 'remind']] as const) {
       const res = await mobileClient(app, t)[method](`${V1}/notices/${missing}/${path}`).expect(403);

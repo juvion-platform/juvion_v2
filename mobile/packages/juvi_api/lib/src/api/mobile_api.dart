@@ -2650,7 +2650,7 @@ _responseData = rawData == null ? null : deserialize<RevokedCount, RevokedCount>
     );
   }
 
-  /// Sign in with institution, identifier and password
+  /// Sign in with a Juvi ID and password
   /// 
   ///
   /// Parameters:

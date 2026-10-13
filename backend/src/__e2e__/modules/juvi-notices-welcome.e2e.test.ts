@@ -25,7 +25,7 @@ afterAll(async () => { await drainOutbox(); await cleanupTestApp(); });
 
 async function onboardingStudent(deviceId: string) {
   const s = await provisionTestStudent(fx, { sectionId: String(fx.cseSection._id) });
-  return { ...s, token: await signInAs(app, fx, s.student.rollNumber, s.tempPassword, deviceId) };
+  return { ...s, token: await signInAs(app, s.juviId, s.tempPassword, deviceId) };
 }
 
 describe('GET /onboarding/first-notice (US-5, spec §6.5)', () => {
@@ -49,7 +49,7 @@ describe('GET /onboarding/first-notice (US-5, spec §6.5)', () => {
     expect((await Notice.findById(first.body.id).lean())!.counts).toEqual({ audience: 2, onJuvi: 2 });
 
     const f = await provisionTestFaculty(fx);
-    const tf = await signInAs(app, fx, f.faculty.employeeCode, f.tempPassword, 'device-f');
+    const tf = await signInAs(app, f.juviId, f.tempPassword, 'device-f');
     const facultyWelcome = await mobileClient(app, tf).get(`${V1}/onboarding/first-notice`).expect(200);
     expect(facultyWelcome.body.id).not.toBe(first.body.id);
     expect((await College.findById(fx.collegeId).lean())!.juvi.welcomeNotice?.facultyNoticeId).toBe(facultyWelcome.body.id);
@@ -142,7 +142,7 @@ describe('GET /channels/:id notices[] (US-6, NTC-07)', () => {
     const batchChannel = (await Channel.findOne({ collegeId: fx.collegeId, scopeType: 'batch', scopeId: fx.batch._id }).lean())!;
     const forBatch = await publishTestNotice(fx, { title: 'For the batch' });
     await publishTestNotice(fx, { title: 'Just one person', audience: { rules: [{ kind: 'custom', ids: [String(other.person._id)] }] } });
-    const t = await signInAs(app, fx, s.student.rollNumber, s.tempPassword, 'device-s');
+    const t = await signInAs(app, s.juviId, s.tempPassword, 'device-s');
     const res = await mobileClient(app, t).get(`${V1}/channels/${batchChannel._id}`).expect(200);
     expect(res.body.notices).toHaveLength(1);
     expect(res.body.notices[0]).toMatchObject({ id: String(forBatch._id), title: 'For the batch', audienceLine: 'Sent to 2024 Batch', state: 'received' });

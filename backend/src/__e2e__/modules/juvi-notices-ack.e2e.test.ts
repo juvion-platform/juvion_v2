@@ -23,7 +23,7 @@ afterAll(async () => { await drainOutbox(); await cleanupTestApp(); });
 async function studentOnJuvi(deviceId: string) {
   const s = await provisionTestStudent(fx, { sectionId: String(fx.cseSection._id) });
   await activateAccount(String(s.account._id));
-  return { ...s, token: await signInAs(app, fx, s.student.rollNumber, s.tempPassword, deviceId) };
+  return { ...s, token: await signInAs(app, s.juviId, s.tempPassword, deviceId) };
 }
 const rowOf = (noticeId: unknown, accountId: unknown) => NoticeRecipient.findOne({ noticeId, accountId }).lean();
 

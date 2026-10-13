@@ -14,6 +14,7 @@ SignInResponse _$SignInResponseFromJson(Map<String, dynamic> json) =>
           'accessExpiresIn',
           'accessToken',
           'account',
+          'collegeId',
           'refreshToken',
         ],
       );
@@ -27,6 +28,7 @@ SignInResponse _$SignInResponseFromJson(Map<String, dynamic> json) =>
           'account',
           (v) => MeAccount.fromJson(v as Map<String, dynamic>),
         ),
+        collegeId: $checkedConvert('collegeId', (v) => v as String),
         refreshToken: $checkedConvert('refreshToken', (v) => v as String),
       );
       return val;
@@ -37,5 +39,6 @@ Map<String, dynamic> _$SignInResponseToJson(SignInResponse instance) =>
       'accessExpiresIn': instance.accessExpiresIn,
       'accessToken': instance.accessToken,
       'account': instance.account.toJson(),
+      'collegeId': instance.collegeId,
       'refreshToken': instance.refreshToken,
     };

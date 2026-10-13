@@ -52,7 +52,7 @@ async function scenario() {
   const { data } = fake.sent.find((m) => m.tokens.includes('tok-delivered'))!.message;
   await supertest(app).post(`${V1}/notifications/receipts`)
     .send({ items: [{ deliveryId: data.deliveryId, receipt: data.receipt, event: 'delivered', at: new Date().toISOString() }] }).expect(200);
-  const facToken = await signInAs(app, fx, fac.faculty.employeeCode, fac.tempPassword, 'device-fac');
+  const facToken = await signInAs(app, fac.juviId, fac.tempPassword, 'device-fac');
   const expected = new Map([
     [sent.person.name, 'not_delivered'], [delivered.person.name, 'delivered'], [noDevice.person.name, 'no_device'],
     [tierOff.person.name, 'tier_off'], [held.person.name, 'scheduled'], [offJuvi.person.name, 'none'],

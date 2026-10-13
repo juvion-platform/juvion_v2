@@ -37,6 +37,11 @@ void main() {
       // TODO
     });
 
+    // String juviId
+    test('to test the property `juviId`', () async {
+      // TODO
+    });
+
     // MePerson person
     test('to test the property `person`', () async {
       // TODO

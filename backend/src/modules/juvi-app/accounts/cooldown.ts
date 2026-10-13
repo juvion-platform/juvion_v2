@@ -1,18 +1,25 @@
 import { createHash } from 'node:crypto';
 import redis from '../../../config/redis';
+import { normaliseJuviId } from './juvi-id';
 
 export const COOLDOWN_MAX_FAILURES = 5;
 export const COOLDOWN_WINDOW_SECONDS = 600;
 
-/** Hash so the identifier itself never lands in Redis or logs. */
-export function cooldownKey(collegeId: string, identifier: string): string {
-  const h = createHash('sha256').update(identifier.trim().toLowerCase()).digest('hex');
-  return `juvi:login-fail:${collegeId}:${h}`;
+/**
+ * Keyed by the Juvi ID alone, hashed so the value itself never lands in Redis or logs.
+ *
+ * There is no college to scope by — the college comes *from* the ID — and nothing to vary to
+ * escape the budget, which keying by college used to allow (spec §7). The consequence is stated
+ * there deliberately: someone who knows an ID can spend its owner's budget for the window.
+ */
+export function cooldownKey(juviId: string): string {
+  const h = createHash('sha256').update(normaliseJuviId(juviId)).digest('hex');
+  return `juvi:login-fail:${h}`;
 }
 
-export async function getCooldown(collegeId: string, identifier: string): Promise<{ blocked: boolean; retryAfterSeconds: number }> {
+export async function getCooldown(juviId: string): Promise<{ blocked: boolean; retryAfterSeconds: number }> {
   try {
-    const k = cooldownKey(collegeId, identifier);
+    const k = cooldownKey(juviId);
     const n = Number.parseInt((await redis.get(k)) ?? '0', 10);
     if (n < COOLDOWN_MAX_FAILURES) return { blocked: false, retryAfterSeconds: 0 };
     const ttl = await redis.ttl(k);
@@ -23,14 +30,14 @@ export async function getCooldown(collegeId: string, identifier: string): Promis
   }
 }
 
-export async function recordFailure(collegeId: string, identifier: string): Promise<void> {
+export async function recordFailure(juviId: string): Promise<void> {
   try {
-    const k = cooldownKey(collegeId, identifier);
+    const k = cooldownKey(juviId);
     const n = await redis.incr(k);
     if (n === 1) await redis.expire(k, COOLDOWN_WINDOW_SECONDS);
   } catch { /* non-fatal */ }
 }
 
-export async function clearFailures(collegeId: string, identifier: string): Promise<void> {
-  try { await redis.del(cooldownKey(collegeId, identifier)); } catch { /* non-fatal */ }
+export async function clearFailures(juviId: string): Promise<void> {
+  try { await redis.del(cooldownKey(juviId)); } catch { /* non-fatal */ }
 }

@@ -69,13 +69,17 @@ class SessionController extends _$SessionController {
     }
   }
 
-  Future<void> signIn({required String collegeId, required String identifier, required String password}) async {
+  Future<void> signIn({required String juviId, required String password}) async {
     final auth = ref.read(authRepositoryProvider);
     final device = await ref.read(deviceInfoProvider.future);
-    final result = await auth.signIn(collegeId: collegeId, identifier: identifier, password: password, device: device);
+    final result = await auth.signIn(juviId: juviId, password: password, device: device);
     final store = ref.read(secureStoreProvider);
     await store.writeTokens(result.tokens);
-    await store.writeCollegeId(collegeId);
+    // D7: the college now arrives with the response, because the request no longer names one.
+    // The persisted value must keep reaching `writeCollegeId`: `deep_link_resolver.dart`
+    // builds its owner key as '<collegeId>:<accountId>', so a notification link parked before
+    // this change still has to match after it.
+    await store.writeCollegeId(result.collegeId);
     final db = await ref.read(appDatabaseProvider.future);
     await db.writeDoc('account', result.account.toJson(), DateTime.now().toUtc());
     state = SessionState.signedIn(result.account);

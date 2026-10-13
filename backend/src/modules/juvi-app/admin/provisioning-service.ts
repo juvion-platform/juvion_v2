@@ -1,6 +1,8 @@
 import { Types } from 'mongoose';
 import { JuviProvisioningRun, IJuviProvisioningRun } from '../../../models/juvi/JuviProvisioningRun';
 import { JuviProvisionedCredential } from '../../../models/juvi/JuviProvisionedCredential';
+import { JuviAccount } from '../../../models/juvi/JuviAccount';
+import { User } from '../../../models/User';
 import { Section } from '../../../models/academic-structure/Section';
 import { Batch } from '../../../models/academic-structure/Batch';
 import { Department } from '../../../models/academic-structure/Department';
@@ -65,14 +67,20 @@ export async function credentialsCsv(
   const rows = await JuviProvisionedCredential.find(q).sort({ identifier: 1 }).lean();
   if (rows.length === 0) throw new AppError(410, 'The credentials for this run have expired or none match. Reset passwords from the accounts table instead.');
 
-  const [college, sections] = await Promise.all([
+  const [college, sections, accounts] = await Promise.all([
     College.findById(collegeId).select('code').lean(),
     Section.find({ collegeId, _id: { $in: rows.map((r) => r.sectionId).filter(Boolean) } }).select('name').lean(),
+    JuviAccount.find({ collegeId, _id: { $in: rows.map((r) => r.accountId) } }).select('userId').lean(),
   ]);
   const sectionName = new Map(sections.map((s) => [String(s._id), s.name]));
-  const lines = ['identifier,name,section,temporaryPassword,institutionCode'];
+  // §8: read from the account, not from the credential row — the credential row is the 7-day
+  // secret, and its identifier is the roll/employee code the office matches people on.
+  const users = await User.find({ collegeId, _id: { $in: accounts.map((a) => a.userId) } }).select('juviId').lean();
+  const juviByUser = new Map(users.map((u) => [String(u._id), u.juviId ?? '']));
+  const juviByAccount = new Map(accounts.map((a) => [String(a._id), juviByUser.get(String(a.userId)) ?? '']));
+  const lines = ['identifier,name,section,juviId,temporaryPassword,institutionCode'];
   for (const r of rows) {
-    lines.push([r.identifier, r.displayName, r.sectionId ? sectionName.get(String(r.sectionId)) ?? '' : '', decryptSecret(r), college?.code ?? ''].map(csvCell).join(','));
+    lines.push([r.identifier, r.displayName, r.sectionId ? sectionName.get(String(r.sectionId)) ?? '' : '', juviByAccount.get(String(r.accountId)) ?? '', decryptSecret(r), college?.code ?? ''].map(csvCell).join(','));
   }
   await createAuditLog({
     collegeId, entityType: 'JuviProvisioningRun', entityId: String(run._id), entityName: `Provisioning run ${String(run._id).slice(-6)}`,

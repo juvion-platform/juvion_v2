@@ -128,6 +128,11 @@ describe('mobile OpenAPI document', () => {
     for (const f of ['deletionRequestedAt', 'deletionRequestedVia'] as const) {
       expect(me.properties[f].type, f).toEqual(expect.arrayContaining(['null']));
     }
+
+    // R-J: the Juvi ID is the same shape — a required key with a nullable value. Task 8's generated
+    // Dart depends on the key being required, so pin both halves rather than only inspecting them.
+    expect(me.required).toContain('juviId');
+    expect(me.properties.juviId.type).toEqual(expect.arrayContaining(['null']));
   });
 
   it('stableStringify orders keys so the file is deterministic', () => {

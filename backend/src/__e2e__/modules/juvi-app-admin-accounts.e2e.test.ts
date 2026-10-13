@@ -25,7 +25,7 @@ describe('admin accounts', () => {
     expect(all.body.items[0]).toMatchObject({ kind: expect.any(String), status: 'onboarding', hasLiveCredential: true, onboardingComplete: false });
     const students = await api.as(fx.admin.token).get(`${A}/accounts?kind=student`).expect(200);
     expect(students.body.items).toHaveLength(1);
-    expect(students.body.items[0]).toMatchObject({ name: s.person.name, identifier: s.student.rollNumber, email: s.person.email });
+    expect(students.body.items[0]).toMatchObject({ name: s.person.name, identifier: s.student.rollNumber, email: s.person.email, juviId: s.juviId });
     const byRoll = await api.as(fx.admin.token).get(`${A}/accounts?q=${s.student.rollNumber.slice(0, 5)}`).expect(200);
     expect(byRoll.body.items.map((r: any) => r.id)).toEqual([String(s.account._id)]);
     const byCode = await api.as(fx.admin.token).get(`${A}/accounts?q=${f.faculty.employeeCode}`).expect(200);
@@ -61,5 +61,16 @@ describe('admin accounts', () => {
 
     await JuviProvisionedCredential.deleteMany({ accountId: s.account._id });
     await api.as(fx.admin.token).post(`${A}/accounts/${s.account._id}/reveal-credential`).expect(410);
+  });
+
+  // D2's recovery flow: the caller reads their ID out over the phone. Without this the office
+  // has a table of thousands and the one value the caller knows is the one it cannot search.
+  it('finds an account by Juvi ID, however the caller spells it', async () => {
+    const s = await provisionTestStudent(fx);
+    await provisionTestFaculty(fx);
+    for (const q of [s.juviId, s.juviId.toLowerCase(), `JUV-${s.juviId.slice(3, 7)}-${s.juviId.slice(7)}`]) {
+      const res = await api.as(fx.admin.token).get(`${A}/accounts?q=${encodeURIComponent(q)}`).expect(200);
+      expect(res.body.items.map((r: any) => r.id)).toEqual([String(s.account._id)]);
+    }
   });
 });

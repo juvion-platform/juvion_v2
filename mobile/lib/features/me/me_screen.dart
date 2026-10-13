@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:juvi/app/l10n/l10n.dart';
@@ -56,6 +57,16 @@ class MeScreen extends ConsumerWidget {
                 onTap: () => context.go('/me/change-password'),
               ),
               SectionHeader(l.meAboutSection),
+              // The ID a person signs in with, on the one surface they are already signed in
+              // to — so they can read it back, or send it to themselves before they need it.
+              if (m.juviId != null)
+                ListTile(
+                  leading: const Icon(Icons.badge_outlined),
+                  title: Text(l.juviIdLabel),
+                  subtitle: Text(_groupedJuviId(m.juviId!)),
+                  trailing: const Icon(Icons.copy_outlined),
+                  onTap: () => unawaited(_copyJuviId(context, l, m.juviId!)),
+                ),
               ListTile(leading: const Icon(Icons.info_outline), title: Text(l.meAppVersion(version)), subtitle: Text(l.meDataPrivacyNote)),
               if (m.institution.supportContact != null)
                 ListTile(
@@ -101,4 +112,16 @@ class MeScreen extends ConsumerWidget {
       ),
     ));
   }
+}
+
+/// `JUV4K7P2M9X` → `JUV-4K7P-2M9X` (spec §4's display form, R-O). Presentation only: storage
+/// and the request body stay canonical, and anything the server compares is normalised there.
+String _groupedJuviId(String id) => id.length == 11 ? '${id.substring(0, 3)}-${id.substring(3, 7)}-${id.substring(7)}' : id;
+
+/// Copies the canonical value, not the grouped one: the person is most likely to paste this
+/// into a message, and what the office's accounts table shows is the canonical form (R-M).
+Future<void> _copyJuviId(BuildContext context, AppLocalizations l, String id) async {
+  await Clipboard.setData(ClipboardData(text: id));
+  if (!context.mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l.meJuviIdCopied)));
 }
