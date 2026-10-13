@@ -61,7 +61,7 @@ export default function AccountsTable() {
   return (
     <div className="space-y-3">
       <form role="search" className="grid gap-2 sm:grid-cols-4" onSubmit={(e) => { e.preventDefault(); setPage(1); setQ(draft.trim()); }}>
-        <input aria-label="Search accounts" maxLength={80} className={`${inp} sm:col-span-2`} placeholder="Name, roll number or employee code" value={draft} onChange={(e) => setDraft(e.target.value)} />
+        <input aria-label="Search accounts" maxLength={80} className={`${inp} sm:col-span-2`} placeholder="Name, roll number, employee code or Juvi ID" value={draft} onChange={(e) => setDraft(e.target.value)} />
         <select aria-label="Kind" className={inp} value={kind} onChange={(e) => { setKind(e.target.value as AccountKind | ''); setPage(1); }}>
           <option value="">All kinds</option><option value="student">Students</option><option value="faculty">Faculty</option><option value="staff">Staff</option>
         </select>
@@ -73,13 +73,14 @@ export default function AccountsTable() {
       <div className="bg-white border rounded-xl overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 text-left text-xs text-gray-500 uppercase">
-            <tr><th className="px-4 py-2">Name</th><th className="px-4 py-2">Identifier</th><th className="px-4 py-2">Kind</th><th className="px-4 py-2">Status</th><th className="px-4 py-2">Last seen</th><th className="px-4 py-2">Credential</th><th className="px-4 py-2" /></tr>
+            <tr><th className="px-4 py-2">Name</th><th className="px-4 py-2">Identifier</th><th className="px-4 py-2">Juvi ID</th><th className="px-4 py-2">Kind</th><th className="px-4 py-2">Status</th><th className="px-4 py-2">Last seen</th><th className="px-4 py-2">Credential</th><th className="px-4 py-2" /></tr>
           </thead>
           <tbody>
             {accounts.data?.items.map((a) => (
               <tr key={a.id} className="border-t align-top">
                 <td className="px-4 py-2">{a.name}<div className="text-xs text-gray-500">{a.email}</div></td>
                 <td className="px-4 py-2 font-mono text-xs">{a.identifier}</td>
+                <td className="px-4 py-2 font-mono text-xs">{a.juviId ?? <span className="text-gray-400">—</span>}</td>
                 <td className="px-4 py-2 capitalize">{a.kind}</td>
                 <td className="px-4 py-2 capitalize">{a.status}{a.onboardingComplete ? '' : <span className="text-xs text-gray-500"> · not onboarded</span>}</td>
                 <td className="px-4 py-2 whitespace-nowrap">{a.lastSeenAt ? new Date(a.lastSeenAt).toLocaleString('en-IN') : 'Never opened'}</td>
@@ -104,7 +105,7 @@ export default function AccountsTable() {
               </tr>
             ))}
             {accounts.data && accounts.data.items.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">No accounts match. Run provisioning to create some.</td></tr>
+              <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-500">No accounts match. Run provisioning to create some.</td></tr>
             )}
           </tbody>
         </table>

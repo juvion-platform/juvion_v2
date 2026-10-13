@@ -10,6 +10,7 @@ import { Staff } from '../../../models/people/Staff';
 import { AppError } from '../../../middleware/errorHandler';
 import { createAuditLog } from '../../../shared/audit';
 import { PaginatedResult } from '../../../shared/types';
+import { normaliseJuviId } from '../accounts/juvi-id';
 import { generateTemporaryPassword } from '../accounts/temp-password';
 import { storeCredential, revealLatestForAccount } from '../accounts/credential-store';
 import { revokeOtherSessions } from '../accounts/session-service';
@@ -17,6 +18,8 @@ import { DELETION_GRACE_DAYS } from '../accounts/deletion-service';
 
 export interface AccountRow {
   id: string; kind: AccountKind; status: AccountStatus; name: string; identifier: string; email: string;
+  /** §8 — the durable sign-in ID. Null for an account the backfill has not reached. */
+  juviId: string | null;
   onboardingComplete: boolean; lastSeenAt: string | null; provisionedAt: string;
   hasLiveCredential: boolean; credentialExpiresAt: string | null;
 }
@@ -37,9 +40,12 @@ export async function listAccounts(
       Faculty.find({ collegeId, employeeCode: rx }).select('_id').lean(),
       Staff.find({ collegeId, employeeCode: rx }).select('_id').lean(),
     ]);
+    const normalized = normaliseJuviId(q.q);
+    const juviUsers = normalized ? await User.find({ collegeId, juviId: new RegExp(escapeRegex(normalized)) }).select('_id').lean() : [];
     filter.$or = [
       { personId: { $in: persons.map((p) => p._id) } }, { studentId: { $in: students.map((s) => s._id) } },
       { facultyId: { $in: faculty.map((f) => f._id) } }, { staffId: { $in: staff.map((s) => s._id) } },
+      { userId: { $in: juviUsers.map((u) => u._id) } },
     ];
   }
 
@@ -48,7 +54,7 @@ export async function listAccounts(
   const ids = accounts.map((a) => a._id);
   const [persons, users, students, faculty, staff, creds] = await Promise.all([
     Person.find({ collegeId, _id: { $in: accounts.map((a) => a.personId) } }).select('name').lean(),
-    User.find({ collegeId, _id: { $in: accounts.map((a) => a.userId) } }).select('email').lean(),
+    User.find({ collegeId, _id: { $in: accounts.map((a) => a.userId) } }).select('email juviId').lean(),
     Student.find({ collegeId, _id: { $in: accounts.map((a) => a.studentId).filter(Boolean) } }).select('rollNumber').lean(),
     Faculty.find({ collegeId, _id: { $in: accounts.map((a) => a.facultyId).filter(Boolean) } }).select('employeeCode').lean(),
     Staff.find({ collegeId, _id: { $in: accounts.map((a) => a.staffId).filter(Boolean) } }).select('employeeCode').lean(),
@@ -64,6 +70,7 @@ export async function listAccounts(
     name: P.get(String(a.personId))?.name ?? '',
     identifier: a.studentId ? S.get(String(a.studentId))?.rollNumber ?? '' : a.facultyId ? F.get(String(a.facultyId))?.employeeCode ?? '' : a.staffId ? ST.get(String(a.staffId))?.employeeCode ?? '' : '',
     email: U.get(String(a.userId))?.email ?? '',
+    juviId: U.get(String(a.userId))?.juviId ?? null,
     onboardingComplete: Boolean(a.onboardingCompletedAt),
     lastSeenAt: a.lastSeenAt ? a.lastSeenAt.toISOString() : null,
     provisionedAt: a.provisionedAt.toISOString(),

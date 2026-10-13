@@ -11,7 +11,7 @@ vi.mock('../../../../stores/confirmStore', () => ({ confirmAction: vi.fn(() => P
 vi.mock('../../../../services/juvi-app', () => ({ listAccounts: vi.fn(), deactivateAccount: vi.fn(), resetAccountPassword: vi.fn(), revealAccountCredential: vi.fn() }));
 import { listAccounts, deactivateAccount, resetAccountPassword, revealAccountCredential } from '../../../../services/juvi-app';
 
-const ROW = { id: 'a1', kind: 'student', status: 'onboarding', name: 'Aditya Nair', identifier: '24JIT0001', email: 'a@x.in', onboardingComplete: false, lastSeenAt: null, provisionedAt: '2026-09-23T03:00:00Z', hasLiveCredential: true, credentialExpiresAt: '2026-09-30T03:00:00Z' };
+const ROW = { id: 'a1', kind: 'student', status: 'onboarding', name: 'Aditya Nair', identifier: '24JIT0001', email: 'a@x.in', juviId: 'JUV4K7P2M9X', onboardingComplete: false, lastSeenAt: null, provisionedAt: '2026-09-23T03:00:00Z', hasLiveCredential: true, credentialExpiresAt: '2026-09-30T03:00:00Z' };
 
 beforeEach(() => {
   vi.clearAllMocks(); perm.can = true; confirmMock.confirmed = true;
@@ -51,5 +51,12 @@ describe('AccountsTable', () => {
     confirmMock.confirmed = false;
     fireEvent.click(screen.getByRole('button', { name: /deactivate aditya nair/i }));
     await waitFor(() => expect(deactivateAccount).not.toHaveBeenCalled());
+  });
+
+  // D2: the office reads this out to the person who lost their ID.
+  it('shows the Juvi ID so the office can read it back', async () => {
+    renderWithProviders(<AccountsTable />);
+    expect(await screen.findByText('JUV4K7P2M9X')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /juvi id/i })).toBeInTheDocument();
   });
 });

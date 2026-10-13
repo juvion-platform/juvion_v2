@@ -69,9 +69,9 @@ describe('provisioning runs', () => {
     expect(csv.headers['content-type']).toMatch(/text\/csv/);
     expect(csv.headers['content-disposition']).toMatch(/attachment; filename="juvi-credentials-/);
     const lines = csv.text.trim().split('\n');
-    expect(lines[0]).toBe('identifier,name,section,temporaryPassword,institutionCode');
+    expect(lines[0]).toBe('identifier,name,section,juviId,temporaryPassword,institutionCode');
     expect(lines).toHaveLength(3);
-    expect(lines[1]).toMatch(/^24D00[12],S 24D00[12],A,[a-z]+-[a-z]+-\d{3},JIT-TEST$/);
+    expect(lines[1]).toMatch(/^24D00[12],S 24D00[12],A,JUV[0-9A-HJKMNP-TV-Z]{8},[a-z]+-[a-z]+-\d{3},JIT-TEST$/);
     expect(await AuditLog.countDocuments({ entityType: 'JuviProvisioningRun', entityId: String(run._id), action: 'update' })).toBe(1);
 
     const none = await api.as(fx.admin.token).get(`${A}/provisioning/runs/${run._id}/credentials.csv?unsectioned=true`).expect(200);
@@ -79,6 +79,7 @@ describe('provisioning runs', () => {
     const noneLines = none.text.trim().split('\n');
     expect(noneLines).toHaveLength(2);
     expect(noneLines[1]?.split(',')[0]).toBe('24D003');
+    expect(noneLines[1]?.split(',')[3]).toMatch(/^JUV[0-9A-HJKMNP-TV-Z]{8}$/);
     await api.as(fx.admin.token).get(`${A}/provisioning/runs/${run._id}/credentials.csv?unsectioned=true&sectionId=${fx.cseSection._id}`).expect(400);
 
     await JuviProvisionedCredential.deleteMany({ runId: run._id });   // simulate TTL expiry
