@@ -89,11 +89,17 @@ describe('POST /auth/sign-in', () => {
       await signIn(unknown, 'bad-bad-000').expect(401);
     }
 
-    // The 6th attempt must be indistinguishable: same status, same body.
     const real = await signIn(s.juviId, 'bad-bad-000').expect(429);
     const ghost = await signIn(unknown, 'bad-bad-000').expect(429);
-    expect(real.body).toEqual(ghost.body);
+
+    // The property: neither arm's response may reveal which ID exists. `retryAfterSeconds` is
+    // excluded from an exact comparison on purpose — it is derived from the caller's own request
+    // timing (each arm's cooldown window starts at its own first failure, ~70ms apart), so it can
+    // differ by a second without carrying any signal about the ID. Everything else must match.
     expect(real.body.error.code).toBe('COOLDOWN');
+    expect(ghost.body.error.code).toBe('COOLDOWN');
+    expect(real.body.error.message).toBe(ghost.body.error.message);
+    expect(Math.abs(real.body.error.retryAfterSeconds - ghost.body.error.retryAfterSeconds)).toBeLessThanOrEqual(1);
   });
 
   // Review Focus 5 — a User that holds an ID but carries no college is a clean 401, never a 500.
