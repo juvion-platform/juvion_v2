@@ -2666,7 +2666,6 @@
             "type": "object"
           },
           "juviId": {
-            "maxLength": 32,
             "minLength": 1,
             "type": "string"
           },
