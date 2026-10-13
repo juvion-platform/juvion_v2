@@ -32,8 +32,8 @@ describe('publish → fan-out → acknowledge → reach, end to end (spec §12)'
     }).expect(201);
     await drainOutbox();
 
-    const ta = await signInAs(app, fx, a.student.rollNumber, a.tempPassword, 'device-a');
-    const tb = await signInAs(app, fx, b.student.rollNumber, b.tempPassword, 'device-b');
+    const ta = await signInAs(app, a.juviId, a.tempPassword, 'device-a');
+    const tb = await signInAs(app, b.juviId, b.tempPassword, 'device-b');
     expect((await mobileClient(app, ta).get(`${V1}/attention`)).body.items.map((c: { id: string }) => c.id)).toEqual([created.body.id]);
     await mobileClient(app, ta).post(`${V1}/notices/${created.body.id}/ack`).send({ method: 'hold' }).expect(200);
     await mobileClient(app, tb).post(`${V1}/notices/${created.body.id}/seen`).expect(200);
@@ -52,7 +52,7 @@ describe('Not on Juvi, then activation (spec §6.6)', () => {
     const s = await provisionTestStudent(fx, { sectionId: String(fx.cseSection._id) });
     const n = await publishTestNotice(fx, { ackRequired: true });
     expect(n.counts).toEqual({ audience: 1, onJuvi: 0 });
-    const t = await signInAs(app, fx, s.student.rollNumber, s.tempPassword, 'device-s');
+    const t = await signInAs(app, s.juviId, s.tempPassword, 'device-s');
     expect((await mobileClient(app, t).get(`${V1}/attention`)).body.dueCount).toBe(0);
 
     for (const step of [0, 1, 2, 3]) await mobileClient(app, t).post(`${V1}/me/onboarding/advance`).send({ step }).expect(200);
@@ -73,7 +73,7 @@ describe('added later (spec §6.5, §6.6)', () => {
     const n = await publishTestNotice(fx, { ackRequired: true });
     const late = await provisionTestStudent(fx, { sectionId: String(fx.cseSection._id) });
     await activateAccount(String(late.account._id));
-    const t = await signInAs(app, fx, late.student.rollNumber, late.tempPassword, 'dev-late');
+    const t = await signInAs(app, late.juviId, late.tempPassword, 'dev-late');
     await mobileClient(app, t).get(`${V1}/spaces`).expect(200);                 // reconcileAccount → backfillAddedLater
 
     const row = (await NoticeRecipient.findOne({ noticeId: n._id, personId: late.person._id }).lean())!;

@@ -13,15 +13,15 @@ beforeAll(async () => { app = await getTestApp(); });
 beforeEach(async () => { await cleanupTestApp(); fx = await seedBase(); await enableJuvi(fx.collegeId, { accentColor: '#0055aa' }); });
 afterAll(async () => { await cleanupTestApp(); });
 
-async function tokenFor(identifier: string, password: string, deviceId = TEST_DEVICE.id) {
-  const res = await mobileClient(app).post(`${V1}/auth/sign-in`).send({ collegeId: fx.collegeId, identifier, password, device: { ...TEST_DEVICE, id: deviceId } }).expect(200);
+async function tokenFor(juviId: string, password: string, deviceId = TEST_DEVICE.id) {
+  const res = await mobileClient(app).post(`${V1}/auth/sign-in`).send({ juviId, password, device: { ...TEST_DEVICE, id: deviceId } }).expect(200);
   return res.body.accessToken as string;
 }
 
 describe('GET /me', () => {
   it('returns the student identity card, settings and institution snapshot', async () => {
     const s = await provisionTestStudent(fx, { sectionId: String(fx.cseSection._id) });
-    const t = await tokenFor(s.student.rollNumber, s.tempPassword);
+    const t = await tokenFor(s.juviId, s.tempPassword);
     const res = await mobileClient(app, t).get(`${V1}/me`).expect(200);
     expect(res.body.account).toMatchObject({ kind: 'student', onboardingSteps: ['identity', 'spaces', 'notifications', 'first_notice'], mustChangePassword: true });
     expect(res.body.person.name).toBe(s.person.name);
@@ -46,11 +46,11 @@ describe('GET /me', () => {
   it('marks lateral entry and returns the faculty card for faculty', async () => {
     const s = await provisionTestStudent(fx);
     await Student.updateOne({ _id: s.student._id }, { $set: { studyYearAtAdmission: 2 } });
-    const ts = await tokenFor(s.student.rollNumber, s.tempPassword);
+    const ts = await tokenFor(s.juviId, s.tempPassword);
     expect((await mobileClient(app, ts).get(`${V1}/me`)).body.student.isLateralEntry).toBe(true);
 
     const f = await provisionTestFaculty(fx);
-    const tf = await tokenFor(f.faculty.employeeCode, f.tempPassword, 'device-f');
+    const tf = await tokenFor(f.juviId, f.tempPassword, 'device-f');
     const res = await mobileClient(app, tf).get(`${V1}/me`).expect(200);
     expect(res.body.student).toBeNull();
     expect(res.body.faculty).toMatchObject({ employeeCode: f.faculty.employeeCode, department: 'Computer Science', isHod: false });
@@ -60,7 +60,7 @@ describe('GET /me', () => {
 describe('settings and onboarding', () => {
   it('PATCH /me/settings persists and rejects an urgent toggle', async () => {
     const s = await provisionTestStudent(fx);
-    const t = await tokenFor(s.student.rollNumber, s.tempPassword);
+    const t = await tokenFor(s.juviId, s.tempPassword);
     const ok = await mobileClient(app, t).patch(`${V1}/me/settings`).send({ quietHours: { start: '23:00', end: '06:30' }, tiers: { routine: false } }).expect(200);
     expect(ok.body).toEqual({ quietHours: { start: '23:00', end: '06:30' }, tiers: { important: true, routine: false }, language: 'en' });
     const bad = await mobileClient(app, t).patch(`${V1}/me/settings`).send({ tiers: { urgent: false } }).expect(400);
@@ -70,7 +70,7 @@ describe('settings and onboarding', () => {
 
   it('advance walks the steps in order and completes after the last', async () => {
     const s = await provisionTestStudent(fx);
-    const t = await tokenFor(s.student.rollNumber, s.tempPassword);
+    const t = await tokenFor(s.juviId, s.tempPassword);
     const wrong = await mobileClient(app, t).post(`${V1}/me/onboarding/advance`).send({ step: 1 }).expect(400);
     expect(wrong.body.error).toMatchObject({ code: 'VALIDATION_FAILED', currentStep: 0 });
     for (const step of [0, 1, 2]) {
@@ -97,9 +97,9 @@ describe('settings and onboarding', () => {
 describe('devices', () => {
   it('lists devices with isCurrent, revokes one, revokes others', async () => {
     const s = await provisionTestStudent(fx);
-    const a = await tokenFor(s.student.rollNumber, s.tempPassword, 'device-a');
-    const b = await tokenFor(s.student.rollNumber, s.tempPassword, 'device-b');
-    const c = await tokenFor(s.student.rollNumber, s.tempPassword, 'device-c');
+    const a = await tokenFor(s.juviId, s.tempPassword, 'device-a');
+    const b = await tokenFor(s.juviId, s.tempPassword, 'device-b');
+    const c = await tokenFor(s.juviId, s.tempPassword, 'device-c');
     const list = await mobileClient(app, a).get(`${V1}/me/devices`).expect(200);
     expect(list.body.items).toHaveLength(3);
     expect(list.body.items.filter((d: any) => d.isCurrent)).toHaveLength(1);
@@ -120,7 +120,7 @@ describe('photo', () => {
   it('returns 503 when S3 is not configured and 400 with no file', async () => {
     delete process.env.AWS_S3_BUCKET;
     const s = await provisionTestStudent(fx);
-    const t = await tokenFor(s.student.rollNumber, s.tempPassword);
+    const t = await tokenFor(s.juviId, s.tempPassword);
     await mobileClient(app, t).post(`${V1}/me/photo`).expect(400);
     const png = Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d4944415478da6364f8cfc0000000030001a1a0d2b70000000049454e44ae426082', 'hex');
     const res = await mobileClient(app, t).post(`${V1}/me/photo`).attach('file', png, { filename: 'p.png', contentType: 'image/png' });

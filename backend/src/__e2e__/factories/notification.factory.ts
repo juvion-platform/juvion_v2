@@ -20,7 +20,7 @@ export async function studentOnJuvi(app: Express, fx: BaseFixtures, opts: { push
   await JuviAccount.updateOne({ _id: s.account._id }, { $set: { 'settings.quietHours': { start: '00:00', end: '00:00' } } });
   deviceCounter += 1;
   const deviceId = `notif-device-${deviceCounter}`;
-  const accessToken = await signInAs(app, fx, s.student.rollNumber, s.tempPassword, deviceId);
+  const accessToken = await signInAs(app, s.juviId, s.tempPassword, deviceId);
   if (opts.pushToken) await MobileSession.updateOne({ accountId: s.account._id, deviceId, revokedAt: null }, { $set: { pushToken: opts.pushToken } });
   return { ...s, accessToken, deviceId };
 }

@@ -2619,10 +2619,6 @@
       },
       "SignInRequest": {
         "properties": {
-          "collegeId": {
-            "pattern": "^[0-9a-fA-F]{24}$",
-            "type": "string"
-          },
           "device": {
             "properties": {
               "appVersion": {
@@ -2662,8 +2658,8 @@
             ],
             "type": "object"
           },
-          "identifier": {
-            "maxLength": 120,
+          "juviId": {
+            "maxLength": 32,
             "minLength": 1,
             "type": "string"
           },
@@ -2674,8 +2670,7 @@
           }
         },
         "required": [
-          "collegeId",
-          "identifier",
+          "juviId",
           "password",
           "device"
         ],
@@ -2739,6 +2734,9 @@
             ],
             "type": "object"
           },
+          "collegeId": {
+            "type": "string"
+          },
           "refreshToken": {
             "type": "string"
           }
@@ -2747,6 +2745,7 @@
           "accessToken",
           "accessExpiresIn",
           "refreshToken",
+          "collegeId",
           "account"
         ],
         "type": "object"
@@ -3508,7 +3507,7 @@
             "description": "Error 503"
           }
         },
-        "summary": "Sign in with institution, identifier and password",
+        "summary": "Sign in with a Juvi ID and password",
         "tags": [
           "mobile"
         ]

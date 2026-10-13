@@ -31,7 +31,7 @@ describe('deletion-verify budget (011 T8)', () => {
     expect(k).toBe(deletionVerifyKey('c1', '21cs1042'));
     expect(k).not.toContain('21CS1042');
     // Key-disjoint from the sign-in budget by construction, not by discipline.
-    expect(k).not.toBe(cooldownKey('c1', '21CS1042'));
+    expect(k).not.toBe(cooldownKey('21CS1042'));
   });
 
   it('waits for no one below the free-attempt threshold', async () => {
@@ -85,6 +85,6 @@ describe('deletion-verify budget (011 T8)', () => {
     expect(keysUsed().length).toBeGreaterThan(0);
     expect(keysUsed().every((k) => k.startsWith('juvi:deletion-verify:'))).toBe(true);
     expect(keysUsed().some((k) => k.startsWith('juvi:login-fail:'))).toBe(false);
-    expect(await getCooldown('c1', 'victim@x.test')).toEqual({ blocked: false, retryAfterSeconds: 0 });
+    expect(await getCooldown('victim@x.test')).toEqual({ blocked: false, retryAfterSeconds: 0 });
   });
 });

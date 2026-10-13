@@ -1,11 +1,12 @@
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { User, IUser } from '../../../models/User';
-import { JuviAccount, IJuviAccount } from '../../../models/juvi/JuviAccount';
+import { JuviAccount, IJuviAccount, ELIGIBLE_STATUSES } from '../../../models/juvi/JuviAccount';
 import { MobileApiError } from '../errors';
 import { MobileContext } from '../middleware/authenticate-mobile';
 import { getJuviConfig } from '../config/institution-config';
-import { resolveIdentifierToUser } from './identifier-resolver';
+import { resolveIdentifierToUser, resolveJuviIdToUser } from './identifier-resolver';
+import { normaliseJuviId } from './juvi-id';
 import { getCooldown, recordFailure, clearFailures } from './cooldown';
 import { createSession, findRotatableSession, rotateSession, revokeSession, revokeOtherSessions, signAccessToken, SessionTokens } from './session-service';
 import { clearDeletionRequestBestEffort } from './deletion-service';
@@ -61,17 +62,57 @@ export async function verifyCredentials(
 }
 
 export async function signIn(input: SignInInput): Promise<z.infer<typeof signInResponseSchema>> {
-  const cooldown = await getCooldown(input.collegeId, input.identifier);
+  const juviId = normaliseJuviId(input.juviId);
+
+  const cooldown = await getCooldown(juviId);
   if (cooldown.blocked) {
     throw new MobileApiError(429, 'COOLDOWN', `Too many attempts. Try again in ${Math.ceil(cooldown.retryAfterSeconds / 60)} minutes.`, { retryAfterSeconds: cooldown.retryAfterSeconds });
   }
 
-  // Ruling R2: an unknown college (no College document) must be indistinguishable from a wrong
-  // password — generic 401, not the 503 that a known-but-disabled institution gets.
-  const cfg = await getJuviConfig(input.collegeId);
-  if (!cfg) {
-    await recordFailure(input.collegeId, input.identifier);
+  // The college is not in the request any more, so it comes from the person. This is the one
+  // query in the module that is not scoped by collegeId — an exact hit on a globally unique key.
+  const user = await resolveJuviIdToUser(juviId);
+  if (!user) {
+    // Same work as a real compare, so a miss costs what a hit costs.
+    await bcrypt.compare(input.password, DUMMY_HASH);
     throw invalidCredentials();
+  }
+
+  const ok = await bcrypt.compare(input.password, user.password);
+  if (!ok) {
+    await recordFailure(juviId);
+    throw invalidCredentials();
+  }
+
+  // Past the password, and only now is the college known. Every check below is scoped by it.
+  if (!user.collegeId) {
+    // A User holding a Juvi ID with no college at all — super_admin. Generic 401, and never a
+    // CastError from scoping a query to the string 'undefined'.
+    await recordFailure(juviId);
+    throw invalidCredentials();
+  }
+  const collegeId = String(user.collegeId);
+
+  const account = await JuviAccount.findOne({ collegeId, userId: user._id });
+  if (!account) {
+    await recordFailure(juviId);
+    throw invalidCredentials();
+  }
+
+  // Read before it is acted on, so the 403 below can cite the college's support contact; its
+  // *state* is checked after eligibility, in the order §6 sets out.
+  //
+  // Ruling R2, unchanged in shape and now reachable only with a correct password: an unknown
+  // college stays indistinguishable from a wrong password rather than getting the 503 that a
+  // known-but-disabled institution gets.
+  const cfg = await getJuviConfig(collegeId);
+  if (!cfg) {
+    await recordFailure(juviId);
+    throw invalidCredentials();
+  }
+
+  if (!ELIGIBLE_STATUSES.includes(account.status) || !user.isActive) {
+    throw new MobileApiError(403, 'ACCOUNT_DEACTIVATED', DEACTIVATED_MESSAGE, { supportContact: cfg.supportContact ?? null });
   }
   if (!cfg.enabled) {
     throw new MobileApiError(503, 'INSTITUTION_PAUSED', 'Juvi is not available for your institution right now.', { message: 'Juvi is not available for your institution right now.' });
@@ -80,29 +121,15 @@ export async function signIn(input: SignInInput): Promise<z.infer<typeof signInR
     throw new MobileApiError(503, 'INSTITUTION_PAUSED', cfg.pausedMessage ?? 'Juvi is paused.', { message: cfg.pausedMessage ?? 'Juvi is paused.' });
   }
 
-  // The verification itself is side-effect free; the lockout budget is sign-in's own concern, so a
-  // failed attempt is charged here rather than inside the shared chain.
-  let verified: { user: IUser; account: IJuviAccount };
-  try {
-    verified = await verifyCredentials(input.collegeId, input.identifier, input.password);
-  } catch (e) {
-    await recordFailure(input.collegeId, input.identifier);
-    throw e;
-  }
-  const { user, account } = verified;
-  if (account.status === 'deactivated' || !user.isActive) {
-    throw new MobileApiError(403, 'ACCOUNT_DEACTIVATED', DEACTIVATED_MESSAGE, { supportContact: cfg.supportContact ?? null });
-  }
-
-  await clearFailures(input.collegeId, input.identifier);
+  await clearFailures(juviId);
   const { tokens } = await createSession({
-    collegeId: input.collegeId, accountId: String(account._id), userId: String(user._id),
+    collegeId, accountId: String(account._id), userId: String(user._id),
     role: user.role, kind: account.kind, device: input.device,
   });
   // Story 4 AC1's safety net: holding the password again is independent evidence of ownership, so
   // any pending public deletion request is dropped. Best-effort — it can never fail the sign-in.
-  await clearDeletionRequestBestEffort(input.collegeId, String(account._id));
-  return { ...tokens, account: accountSummary(account, user) };
+  await clearDeletionRequestBestEffort(collegeId, String(account._id));
+  return { ...tokens, collegeId, account: accountSummary(account, user) };
 }
 
 export async function refresh(input: { refreshToken: string; deviceId: string }): Promise<SessionTokens> {

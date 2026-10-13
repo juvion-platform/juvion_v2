@@ -30,11 +30,12 @@ const DEVICE = { id: 'device-0001', name: 'Test Phone', platform: 'android' as c
  * The sign-in behaviour itself is pinned by the untouched `juvi-app-auth.e2e.test.ts` suite.
  */
 
-async function seed(collegeId: Types.ObjectId, tag: string, password: string) {
+async function seed(collegeId: Types.ObjectId, tag: string, password: string, juviId?: string) {
   const person = await Person.create({ collegeId, name: `Person ${tag}`, phone: '1' });
   const user = await User.create({
     collegeId, personId: person._id, email: `${tag}@x.test`, name: tag, role: 'student', personaType: 'L-STU',
     password: await bcrypt.hash(password, 10),
+    ...(juviId ? { juviId } : {}),
   });
   const account = await JuviAccount.create({ collegeId, personId: person._id, userId: user._id, kind: 'student', provisionedBy: 'test' });
   return { user, account };
@@ -100,11 +101,11 @@ describe('verifyCredentials (011 T7)', () => {
       address: { line1: 'a', city: 'b', state: 'c', pincode: '500001' }, contactEmail: 'a@b.c', contactPhone: '1',
       juvi: { enabled: true },
     });
-    await seed(collegeId, 'dave', 'right-horse-5');
+    await seed(collegeId, 'dave', 'right-horse-5', 'JUVDAVE0000');
 
     // Removing `recordFailure` from `signIn` and leaving it out entirely keeps every other test in
     // this repo green — nothing else asserts the budget is charged at all. This is that assertion.
-    await signIn({ collegeId: String(collegeId), identifier: 'dave@x.test', password: 'wrong-horse-9', device: DEVICE }).catch(() => undefined);
+    await signIn({ juviId: 'JUVDAVE0000', password: 'wrong-horse-9', device: DEVICE }).catch(() => undefined);
 
     expect(redisMock.incr).toHaveBeenCalledTimes(1);
   });

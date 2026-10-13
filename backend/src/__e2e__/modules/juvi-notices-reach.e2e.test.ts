@@ -38,13 +38,13 @@ async function scenario() {
     const s = await provisionTestStudent(fx, { sectionId: String(fx.cseSection._id) });
     await createTestEnrollment(fx.collegeId, { studentId: String(s.student._id), courseOfferingId: String(off._id), semesterId: String(fx.sem1._id) });
     if (i <= 3) await activateAccount(String(s.account._id));
-    students.push({ ...s, token: i <= 3 ? await signInAs(app, fx, s.student.rollNumber, s.tempPassword, `device-s${i}`) : '' });
+    students.push({ ...s, token: i <= 3 ? await signInAs(app, s.juviId, s.tempPassword, `device-s${i}`) : '' });
   }
   const notice = await publishTestNotice(fx, {
     title: 'Lab safety', ackRequired: true, ackCommentAllowed: true, ackDeadline: new Date(Date.now() + 86_400_000).toISOString(),
     audience: { rules: [{ kind: 'course_offering', ids: [String(off._id)] }] },
   }, erpRef(fac.user));
-  const facToken = await signInAs(app, fx, fac.faculty.employeeCode, fac.tempPassword, 'device-fac');
+  const facToken = await signInAs(app, fac.juviId, fac.tempPassword, 'device-fac');
   const [s1, s2, s3, s4] = students as [S, S, S, S];
   return { fac, facToken, off, notice, s1, s2, s3, s4 };
 }

@@ -35,7 +35,7 @@ const dow = (date: string) => DOW[new Date(`${date}T00:00:00Z`).getUTCDay()];
 async function parityWorld() {
   const studentFixture = await provisionTestStudent(fx, { sectionId: String(fx.cseSection._id) });
   await activateAccount(String(studentFixture.account._id));
-  const studentToken = await signInAs(app, fx, studentFixture.student.rollNumber, studentFixture.tempPassword);
+  const studentToken = await signInAs(app, studentFixture.juviId, studentFixture.tempPassword);
   const course = await createTestCourse(fx.collegeId, {
     regulationId: String(fx.regulation._id), departmentId: String(fx.cse._id), code: 'CSX01',
   });

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { HHMM } from '../../../models/juvi/JuviAccount';
+import { CANONICAL_JUVI_ID, normaliseJuviId } from './juvi-id';
 
 export const objectId = z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid id');
 
@@ -11,12 +12,19 @@ export const deviceSchema = z.object({
   osVersion: z.string().min(1).max(32),
 });
 
-export const signInSchema = z.object({
-  collegeId: objectId,
-  identifier: z.string().trim().min(1).max(120),
-  password: z.string().min(1).max(200),
-  device: deviceSchema,
-});
+export const signInSchema = z
+  .object({
+    juviId: z.string().trim().min(1).max(32),
+    password: z.string().min(1).max(200),
+    device: deviceSchema,
+  })
+  // Ruling R-C: the likeliest migration mistake is a roll number typed into the new field. A 400
+  // naming the shape is actionable where the generic 401 would just read as a wrong password — and
+  // it leaks nothing, because the shape is printed on every slip.
+  .refine((v) => CANONICAL_JUVI_ID.test(normaliseJuviId(v.juviId)), {
+    message: "That doesn't look like a Juvi ID. It looks like JUV-4K7P-2M9X.",
+    path: ['juviId'],
+  });
 export type SignInInput = z.infer<typeof signInSchema>;
 
 export const refreshSchema = z.object({ refreshToken: z.string().min(20).max(200), deviceId: z.string().min(8).max(128) });
@@ -53,7 +61,10 @@ export type AccountSummary = z.infer<typeof accountSummarySchema>;
 export const tokensResponseSchema = z.object({
   accessToken: z.string(), accessExpiresIn: z.number().int(), refreshToken: z.string(),
 });
-export const signInResponseSchema = tokensResponseSchema.extend({ account: accountSummarySchema });
+// D7: the client's persisted deep-link owner key is `<collegeId>:<accountId>`, and it used to be
+// fed by the request. It now comes back from the server, so the key keeps its shape and a
+// notification link parked before this update still matches.
+export const signInResponseSchema = tokensResponseSchema.extend({ collegeId: z.string(), account: accountSummarySchema });
 
 export const settingsSchema = z.object({
   quietHours: z.object({ start: z.string().regex(HHMM), end: z.string().regex(HHMM) }),

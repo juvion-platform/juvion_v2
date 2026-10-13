@@ -62,8 +62,13 @@ export async function publishTestNotice(fx: BaseFixtures, overrides: Record<stri
   return (await Notice.findById(notice._id).lean<LeanNotice>())!;
 }
 
-export async function signInAs(app: Express, fx: BaseFixtures, identifier: string, password: string, deviceId = TEST_DEVICE.id): Promise<string> {
+/**
+ * `fx` is gone as of the Juvi ID contract (ruling R-E): the request carries no collegeId, so
+ * there is nothing for the helper to look up. `noUnusedParameters` would not have flagged it —
+ * TypeScript only reports *trailing* unused parameters.
+ */
+export async function signInAs(app: Express, juviId: string, password: string, deviceId = TEST_DEVICE.id): Promise<string> {
   const res = await mobileClient(app).post('/api/juvi-app/v1/auth/sign-in')
-    .send({ collegeId: fx.collegeId, identifier, password, device: { ...TEST_DEVICE, id: deviceId } }).expect(200);
+    .send({ juviId, password, device: { ...TEST_DEVICE, id: deviceId } }).expect(200);
   return res.body.accessToken as string;
 }
