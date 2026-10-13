@@ -3308,7 +3308,13 @@ async function seed() {
 
   const juviSummary = await reconcileCollege(String(CID));
   console.log(`Juvi: ${juviSummary.channels.total} channels, ${juviSummary.memberships.added} memberships${juviSummary.skipped ? ' (skipped: another reconcile holds the lock)' : ''}`);
-  console.log(`Juvi demo sign-in — institution code JIT; student ${demoStudent?.rollNumber ?? '(none)'} / faculty ${demoFaculty?.employeeCode ?? '(none)'}; temporary password ${DEMO_TEMP_PASSWORD}`);
+  const demoStudentJuviId = demoStudent
+    ? (await User.findOne({ collegeId: CID, personId: demoStudent.personId }).select('juviId').lean())?.juviId
+    : undefined;
+  const demoFacultyJuviId = demoFaculty
+    ? (await User.findOne({ collegeId: CID, personId: demoFaculty.personId }).select('juviId').lean())?.juviId
+    : undefined;
+  console.log(`Juvi demo sign-in — student Juvi ID ${demoStudentJuviId ?? '(none)'} / faculty Juvi ID ${demoFacultyJuviId ?? '(none)'}; temporary password ${DEMO_TEMP_PASSWORD}`);
 
   // ========================================================================
   // DONE
