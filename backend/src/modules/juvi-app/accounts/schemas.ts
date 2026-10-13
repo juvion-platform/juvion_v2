@@ -90,9 +90,11 @@ export const devicesResponseSchema = z.object({ items: z.array(deviceRowSchema) 
 export const meResponseSchema = z.object({
   account: accountSummarySchema,
   /**
-   * §8 — the durable Juvi ID, so a signed-in person can read it back and save it. Nullable rather
-   * than required (ruling R-J): an account the backfill has not reached reports null, and a
-   * missing key would make the generated client's `$checkKeys` throw.
+   * §8 — the durable Juvi ID, so a signed-in person can read it back and save it. A **required key
+   * with a nullable value** (ruling R-J): an account the backfill has not reached reports null, and
+   * because the key is still present the generated client's `$checkKeys` does not throw. Do not make
+   * this `.optional()` — an absent key and a null value are different states, and only the second is
+   * one the server is allowed to be in.
    */
   juviId: z.string().nullable(),
   person: z.object({ name: z.string(), firstName: z.string(), photoUrl: z.string().nullable() }),
